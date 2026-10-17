@@ -19,7 +19,7 @@ void static inline ImagingLineBoxBlur32(
     __m128i wws = _mm_set1_epi32(ww);
     __m128i fws = _mm_set1_epi32(fw);
     __m128i b23 = _mm_set1_epi32(1 << 23);
-    __m128i shiftmask = _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 7, 11, 15);
+    __m128i shiftmask = _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 11, 7, 3);
 
     // #define MOVE_ACC(acc, subtract, add)
     //     acc[0] += lineIn[add][0] - lineIn[subtract][0];
@@ -130,7 +130,7 @@ void static inline ImagingLineBoxBlurZero32(
     __m128i wws = _mm_set1_epi32(ww);
     __m128i fws = _mm_set1_epi32(fw);
     __m128i b23 = _mm_set1_epi32(1 << 23);
-    __m128i shiftmask = _mm_set_epi8(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 7, 11, 15);
+    __m128i shiftmask = _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 11, 7, 3);
 
     // #define ADD_FAR(bulk, acc, left, right)
     //     bulk[0] = (acc[0] * ww) + (lineIn[left][0] + lineIn[right][0]) * fw;
