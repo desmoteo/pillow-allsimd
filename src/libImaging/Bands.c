@@ -21,7 +21,6 @@ Imaging
 ImagingGetBand(Imaging imIn, int band) {
     Imaging imOut;
     int x, y;
-    __m128i shuffle_mask;
 
     /* Check arguments */
     if (!imIn || imIn->type != IMAGING_TYPE_UINT8) {
@@ -47,31 +46,75 @@ ImagingGetBand(Imaging imIn, int band) {
         return NULL;
     }
 
-    shuffle_mask = _mm_set_epi8(
+#if defined(IMAGING_SIMD_SSE4)
+    __m128i shuffle_mask = _mm_set_epi8(
         -1,-1,-1,-1, -1,-1,-1,-1, -1,-1,-1,-1, 12+band,8+band,4+band,0+band);
+#endif
 
     /* Extract band from image */
     // restrict safe: imIn is read-only, imOut is a fresh allocation.
     int xsize = imIn->xsize;
     int ysize = imIn->ysize;
+    ImagingSectionCookie cookie;
+    ImagingSectionEnter(&cookie);
     for (y = 0; y < ysize; y++) {
         UINT8 *restrict in = (UINT8 *)imIn->image[y];
         UINT8 *restrict out = imOut->image8[y];
         x = 0;
+#if defined(IMAGING_SIMD_SSE4)
         for (; x < xsize - 3; x += 4) {
             __m128i source = _mm_loadu_si128((__m128i *) in);
-            *((UINT32*) (out + x)) = _mm_cvtsi128_si32(
-                _mm_shuffle_epi8(source, shuffle_mask));
+            UINT32 v = _mm_cvtsi128_si32(_mm_shuffle_epi8(source, shuffle_mask));
+            memcpy(out + x, &v, sizeof(v));
             in += 16;
         }
+#elif defined(IMAGING_SIMD_NEON)
+        for (; x < xsize - 15; x += 16) {
+            uint8x16x4_t source = vld4q_u8(in);
+            vst1q_u8(out + x, source.val[band]);
+            in += 64;
+        }
+#else
+        for (; x < xsize - 3; x += 4) {
+            UINT32 v = MAKE_UINT32(in[band], in[4 + band], in[8 + band], in[12 + band]);
+            memcpy(out + x, &v, sizeof(v));
+            in += 16;
+        }
+#endif
         for (; x < xsize; x++) {
             out[x] = *(in + band);
             in += 4;
         }
     }
+    ImagingSectionLeave(&cookie);
 
     return imOut;
 }
+
+/* Copies four 4-byte pixels of one or more bands into separate planes. */
+#if defined(IMAGING_SIMD_SSE4)
+#define SPLIT_STEP 4
+#define SPLIT_LOAD(in) \
+    __m128i source = _mm_shuffle_epi8(_mm_loadu_si128((__m128i *)(in)), \
+        _mm_set_epi8(15,11,7,3, 14,10,6,2, 13,9,5,1, 12,8,4,0));
+#define SPLIT_STORE(out, band)                                          \
+    {                                                                   \
+        UINT32 v = _mm_cvtsi128_si32(_mm_srli_si128(source, 4 * band)); \
+        memcpy(out, &v, sizeof(v));                                     \
+    }
+#elif defined(IMAGING_SIMD_NEON)
+#define SPLIT_STEP 16
+#define SPLIT_LOAD(in) uint8x16x4_t source = vld4q_u8(in);
+#define SPLIT_STORE(out, band) vst1q_u8(out, source.val[band]);
+#else
+#define SPLIT_STEP 4
+#define SPLIT_LOAD(in)
+#define SPLIT_STORE(out, band)                                                    \
+    {                                                                             \
+        UINT32 v = MAKE_UINT32(in[band], in[4 + band], in[8 + band], in[12 + band]); \
+        memcpy(out, &v, sizeof(v));                                               \
+    }
+#endif
 
 int
 ImagingSplit(Imaging imIn, Imaging bands[4]) {
@@ -104,20 +147,19 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
     // allocation, so none of in/out0..out3 alias each other.
     int xsize = imIn->xsize;
     int ysize = imIn->ysize;
+    ImagingSectionCookie cookie;
+    ImagingSectionEnter(&cookie);
     if (imIn->bands == 2) {
         for (y = 0; y < ysize; y++) {
             UINT8 *restrict in = (UINT8 *)imIn->image[y];
             UINT8 *restrict out0 = bands[0]->image8[y];
             UINT8 *restrict out1 = bands[1]->image8[y];
             x = 0;
-            for (; x < xsize - 3; x += 4) {
-                __m128i source = _mm_loadu_si128((__m128i *) in);
-                source = _mm_shuffle_epi8(source, _mm_set_epi8(
-                    15,11,7,3, 14,10,6,2, 13,9,5,1, 12,8,4,0));
-                *((UINT32*) (out0 + x)) = _mm_cvtsi128_si32(source);
-                *((UINT32*) (out1 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 12));
-                in += 16;
+            for (; x < xsize - (SPLIT_STEP - 1); x += SPLIT_STEP) {
+                SPLIT_LOAD(in);
+                SPLIT_STORE(out0 + x, 0);
+                SPLIT_STORE(out1 + x, 3);
+                in += SPLIT_STEP * 4;
             }
             for (; x < xsize; x++) {
                 out0[x] = in[0];
@@ -132,16 +174,12 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             UINT8 *restrict out1 = bands[1]->image8[y];
             UINT8 *restrict out2 = bands[2]->image8[y];
             x = 0;
-            for (; x < xsize - 3; x += 4) {
-                __m128i source = _mm_loadu_si128((__m128i *) in);
-                source = _mm_shuffle_epi8(source, _mm_set_epi8(
-                    15,11,7,3, 14,10,6,2, 13,9,5,1, 12,8,4,0));
-                *((UINT32*) (out0 + x)) = _mm_cvtsi128_si32(source);
-                *((UINT32*) (out1 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 4));
-                *((UINT32*) (out2 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 8));
-                in += 16;
+            for (; x < xsize - (SPLIT_STEP - 1); x += SPLIT_STEP) {
+                SPLIT_LOAD(in);
+                SPLIT_STORE(out0 + x, 0);
+                SPLIT_STORE(out1 + x, 1);
+                SPLIT_STORE(out2 + x, 2);
+                in += SPLIT_STEP * 4;
             }
             for (; x < xsize; x++) {
                 out0[x] = in[0];
@@ -158,18 +196,13 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             UINT8 *restrict out2 = bands[2]->image8[y];
             UINT8 *restrict out3 = bands[3]->image8[y];
             x = 0;
-            for (; x < xsize - 3; x += 4) {
-                __m128i source = _mm_loadu_si128((__m128i *) in);
-                source = _mm_shuffle_epi8(source, _mm_set_epi8(
-                    15,11,7,3, 14,10,6,2, 13,9,5,1, 12,8,4,0));
-                *((UINT32*) (out0 + x)) = _mm_cvtsi128_si32(source);
-                *((UINT32*) (out1 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 4));
-                *((UINT32*) (out2 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 8));
-                *((UINT32*) (out3 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 12));
-                in += 16;
+            for (; x < xsize - (SPLIT_STEP - 1); x += SPLIT_STEP) {
+                SPLIT_LOAD(in);
+                SPLIT_STORE(out0 + x, 0);
+                SPLIT_STORE(out1 + x, 1);
+                SPLIT_STORE(out2 + x, 2);
+                SPLIT_STORE(out3 + x, 3);
+                in += SPLIT_STEP * 4;
             }
             for (; x < xsize; x++) {
                 out0[x] = in[0];
@@ -180,9 +213,14 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             }
         }
     }
+    ImagingSectionLeave(&cookie);
 
     return imIn->bands;
 }
+
+#undef SPLIT_STEP
+#undef SPLIT_LOAD
+#undef SPLIT_STORE
 
 Imaging
 ImagingPutBand(Imaging imOut, Imaging imIn, int band) {

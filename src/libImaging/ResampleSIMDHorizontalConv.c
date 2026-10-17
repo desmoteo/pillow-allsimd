@@ -1,3 +1,5 @@
+#if defined(IMAGING_SIMD_SSE4)
+
 void
 ImagingResampleHorizontalConvolution8u4x(
     UINT32 *restrict lineOut0, UINT32 *restrict lineOut1,
@@ -15,7 +17,7 @@ ImagingResampleHorizontalConvolution8u4x(
         k = &kk[xx * kmax];
         x = 0;
 
-#if defined(__AVX2__)
+#if defined(IMAGING_SIMD_AVX2)
     {
         __m256i sss0, sss1;
         __m256i zero = _mm256_setzero_si256();
@@ -231,7 +233,7 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
         k = &kk[xx * kmax];
         x = 0;
 
-#if defined(__AVX2__)
+#if defined(IMAGING_SIMD_AVX2)
 
     if (xmax < 8) {
         sss = _mm_set1_epi32(1 << (coefs_precision-1));
@@ -366,3 +368,58 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
         lineOut[xx] = _mm_cvtsi128_si32(_mm_packus_epi16(sss, sss));
     }
 }
+
+#else
+
+/* Portable version of the kernels above, with the same arithmetic:
+   16-bit coefficients, 32-bit accumulators, rounding by adding half. */
+
+void
+ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
+    UINT32 *restrict lineIn,
+    int xsize, int *xbounds, INT16 *kk, int kmax, int coefs_precision)
+{
+    int xmin, xmax, xx, x;
+    INT16 *k;
+
+    for (xx = 0; xx < xsize; xx++) {
+        int ss0, ss1, ss2, ss3;
+        UINT8 *in, *out;
+        xmin = xbounds[xx * 2 + 0];
+        xmax = xbounds[xx * 2 + 1];
+        k = &kk[xx * kmax];
+        in = (UINT8 *)&lineIn[xmin];
+        ss0 = ss1 = ss2 = ss3 = 1 << (coefs_precision - 1);
+        for (x = 0; x < xmax; x++) {
+            ss0 += in[x * 4 + 0] * k[x];
+            ss1 += in[x * 4 + 1] * k[x];
+            ss2 += in[x * 4 + 2] * k[x];
+            ss3 += in[x * 4 + 3] * k[x];
+        }
+        out = (UINT8 *)&lineOut[xx];
+        out[0] = clip8(ss0, coefs_precision);
+        out[1] = clip8(ss1, coefs_precision);
+        out[2] = clip8(ss2, coefs_precision);
+        out[3] = clip8(ss3, coefs_precision);
+    }
+}
+
+void
+ImagingResampleHorizontalConvolution8u4x(
+    UINT32 *restrict lineOut0, UINT32 *restrict lineOut1,
+    UINT32 *restrict lineOut2, UINT32 *restrict lineOut3,
+    UINT32 *restrict lineIn0, UINT32 *restrict lineIn1,
+    UINT32 *restrict lineIn2, UINT32 *restrict lineIn3,
+    int xsize, int *xbounds, INT16 *kk, int kmax, int coefs_precision)
+{
+    ImagingResampleHorizontalConvolution8u(
+        lineOut0, lineIn0, xsize, xbounds, kk, kmax, coefs_precision);
+    ImagingResampleHorizontalConvolution8u(
+        lineOut1, lineIn1, xsize, xbounds, kk, kmax, coefs_precision);
+    ImagingResampleHorizontalConvolution8u(
+        lineOut2, lineIn2, xsize, xbounds, kk, kmax, coefs_precision);
+    ImagingResampleHorizontalConvolution8u(
+        lineOut3, lineIn3, xsize, xbounds, kk, kmax, coefs_precision);
+}
+
+#endif

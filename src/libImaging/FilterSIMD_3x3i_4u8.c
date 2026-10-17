@@ -14,7 +14,7 @@ ImagingFilter3x3i_4u8(Imaging imOut, Imaging im, const INT16* kernel,
         INT32* in1 = im->image32[y+1];
         INT32* out = imOut->image32[y];
 
-#if defined(__AVX2__)
+#if defined(IMAGING_SIMD_AVX2)
 
     #define MM_KERNEL_LOAD(x) \
         source = _mm256_castsi128_si256(_mm_shuffle_epi8(_mm_loadu_si128((__m128i*) &in1[x]), shuffle)); \

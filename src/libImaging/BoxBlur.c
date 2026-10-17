@@ -1,4 +1,5 @@
 #include "Imaging.h"
+#include "ImagingPx4.h"
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))
@@ -14,61 +15,44 @@ void static inline ImagingLineBoxBlur32(
     UINT32 fw
 ) {
     int x;
-    __m128i acc;
-    __m128i bulk;
-    __m128i wws = _mm_set1_epi32(ww);
-    __m128i fws = _mm_set1_epi32(fw);
-    __m128i b23 = _mm_set1_epi32(1 << 23);
-    __m128i shiftmask = _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 11, 7, 3);
+    px4 acc;
+    px4 bulk;
+    px4 wws = px4_set1(ww);
+    px4 fws = px4_set1(fw);
 
     // #define MOVE_ACC(acc, subtract, add)
     //     acc[0] += lineIn[add][0] - lineIn[subtract][0];
 
-#define MOVE_ACC(acc, subtract, add)                         \
-    {                                                        \
-        __m128i tmp1 = mm_cvtepu8_epi32(&lineIn[add]);       \
-        __m128i tmp2 = mm_cvtepu8_epi32(&lineIn[subtract]);  \
-        acc = _mm_sub_epi32(_mm_add_epi32(acc, tmp1), tmp2); \
-    }
+#define MOVE_ACC(acc, subtract, add) \
+    acc = px4_sub(px4_add(acc, px4_load(&lineIn[add])), px4_load(&lineIn[subtract]));
 
     // #define ADD_FAR(bulk, acc, left, right)
     //     bulk[0] = (acc[0] * ww) + (lineIn[left][0] + lineIn[right][0]) * fw;
 
-#define ADD_FAR(bulk, acc, left, right)                                 \
-    {                                                                   \
-        __m128i tmp3 = mm_cvtepu8_epi32(&lineIn[left]);                 \
-        __m128i tmp4 = mm_cvtepu8_epi32(&lineIn[right]);                \
-        __m128i tmp5 = _mm_mullo_epi32(_mm_add_epi32(tmp3, tmp4), fws); \
-        __m128i tmp6 = _mm_mullo_epi32(acc, wws);                       \
-        bulk = _mm_add_epi32(tmp5, tmp6);                               \
-    }
+#define ADD_FAR(bulk, acc, left, right)                                      \
+    bulk = px4_add(                                                          \
+        px4_mul(px4_add(px4_load(&lineIn[left]), px4_load(&lineIn[right])), fws), \
+        px4_mul(acc, wws));
 
     // #define SAVE(x, bulk)
     //    lineOut[x][0] = (UINT8)((bulk[0] + (1 << 23)) >> 24);
 
-#define SAVE(x, bulk) \
-    lineOut[x] =      \
-        _mm_cvtsi128_si32(_mm_shuffle_epi8(_mm_add_epi32(bulk, b23), shiftmask))
+#define SAVE(x, bulk) lineOut[x] = px4_round24(bulk)
 
     /* Compute acc for -1 pixel (outside of image):
        From "-radius-1" to "-1" get first pixel,
        then from "0" to "radius-1". */
     // acc[0] = lineIn[0][0] * (radius + 1);
-    acc = _mm_mullo_epi32(mm_cvtepu8_epi32(&lineIn[0]), _mm_set1_epi32(radius + 1));
+    acc = px4_mul(px4_load(&lineIn[0]), px4_set1(radius + 1));
 
     /* As radius can be bigger than xsize, iterate to edgeA -1. */
     for (x = 0; x < edgeA - 1; x++) {
         // acc[0] += lineIn[x][0];
-        acc = _mm_add_epi32(acc, mm_cvtepu8_epi32(&lineIn[x]));
+        acc = px4_add(acc, px4_load(&lineIn[x]));
     }
     /* Then multiply remainder to last x. */
     // acc[0] += lineIn[lastx][0] * (radius - edgeA + 1);
-    acc = _mm_add_epi32(
-        acc,
-        _mm_mullo_epi32(
-            mm_cvtepu8_epi32(&lineIn[x]), _mm_set1_epi32(radius - edgeA + 1)
-        )
-    );
+    acc = px4_add(acc, px4_mul(px4_load(&lineIn[x]), px4_set1(radius - edgeA + 1)));
 
     if (edgeA <= edgeB) {
         /* Subtract pixel from left ("0").
@@ -125,50 +109,36 @@ void static inline ImagingLineBoxBlurZero32(
     UINT32 fw
 ) {
     int x;
-    __m128i acc;
-    __m128i bulk;
-    __m128i wws = _mm_set1_epi32(ww);
-    __m128i fws = _mm_set1_epi32(fw);
-    __m128i b23 = _mm_set1_epi32(1 << 23);
-    __m128i shiftmask = _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 11, 7, 3);
+    px4 acc;
+    px4 bulk;
+    px4 wws = px4_set1(ww);
+    px4 fws = px4_set1(fw);
 
-    // #define ADD_FAR(bulk, acc, left, right)
-    //     bulk[0] = (acc[0] * ww) + (lineIn[left][0] + lineIn[right][0]) * fw;
+#define ADD_FAR(bulk, acc, left, right)                                      \
+    bulk = px4_add(                                                          \
+        px4_mul(px4_add(px4_load(&lineIn[left]), px4_load(&lineIn[right])), fws), \
+        px4_mul(acc, wws));
 
-#define ADD_FAR(bulk, acc, left, right)                                 \
-    {                                                                   \
-        __m128i tmp3 = mm_cvtepu8_epi32(&lineIn[left]);                 \
-        __m128i tmp4 = mm_cvtepu8_epi32(&lineIn[right]);                \
-        __m128i tmp5 = _mm_mullo_epi32(_mm_add_epi32(tmp3, tmp4), fws); \
-        __m128i tmp6 = _mm_mullo_epi32(acc, wws);                       \
-        bulk = _mm_add_epi32(tmp5, tmp6);                               \
-    }
-
-    // #define SAVE(x, bulk)
-    //    lineOut[x][0] = (UINT8)((bulk[0] + (1 << 23)) >> 24);
-
-#define SAVE(x, bulk) \
-    lineOut[x] =      \
-        _mm_cvtsi128_si32(_mm_shuffle_epi8(_mm_add_epi32(bulk, b23), shiftmask))
+#define SAVE(x, bulk) lineOut[x] = px4_round24(bulk)
 
     /* Subtract pixel from left ("0").
        Add pixels from radius. */
     for (x = 0; x < edgeA; x++) {
-        acc = mm_cvtepu8_epi32(&lineIn[0]);
+        acc = px4_load(&lineIn[0]);
         ADD_FAR(bulk, acc, 0, x + 1);
         SAVE(x, bulk);
     }
     /* Subtract previous pixel from "-radius".
        Add pixels from radius. */
     for (x = edgeA; x < edgeB; x++) {
-        acc = mm_cvtepu8_epi32(&lineIn[x]);
+        acc = px4_load(&lineIn[x]);
         ADD_FAR(bulk, acc, x - 1, x + 1);
         SAVE(x, bulk);
     }
     /* Subtract previous pixel from "-radius".
        Add last pixel. */
     for (x = edgeB; x <= lastx; x++) {
-        acc = mm_cvtepu8_epi32(&lineIn[lastx]);
+        acc = px4_load(&lineIn[lastx]);
         ADD_FAR(bulk, acc, x - 1, lastx);
         SAVE(x, bulk);
     }

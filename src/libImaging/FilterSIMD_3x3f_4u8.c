@@ -22,7 +22,7 @@ ImagingFilter3x3f_4u8(Imaging imOut, Imaging im, const float* kernel,
         INT32* in1 = im->image32[y+1];
         INT32* out = imOut->image32[y];
 
-#if defined(__AVX2__)
+#if defined(IMAGING_SIMD_AVX2)
 
 #define MM256_LOAD(row, x) \
     pix0##row = _mm256_cvtepi32_ps(mm256_cvtepu8_epi32(&in1[x])); \

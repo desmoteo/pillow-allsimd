@@ -1,3 +1,5 @@
+#if defined(IMAGING_SIMD_SSE4)
+
 
 void
 ImagingResampleVerticalConvolution8u(UINT32 *restrict lineOut, Imaging imIn,
@@ -9,7 +11,7 @@ ImagingResampleVerticalConvolution8u(UINT32 *restrict lineOut, Imaging imIn,
 
     __m128i initial = _mm_set1_epi32(1 << (coefs_precision-1));
 
-#if defined(__AVX2__)
+#if defined(IMAGING_SIMD_AVX2)
 
     __m256i initial_256 = _mm256_set1_epi32(1 << (coefs_precision-1));
 
@@ -253,3 +255,36 @@ ImagingResampleVerticalConvolution8u(UINT32 *restrict lineOut, Imaging imIn,
         lineOut[xx] = _mm_cvtsi128_si32(_mm_packus_epi16(sss, sss));
     }
 }
+
+#else
+
+/* Portable version of the kernel above, with the same arithmetic.
+   Works on chunks of bytes so rows are read sequentially. */
+void
+ImagingResampleVerticalConvolution8u(UINT32 *restrict lineOut, Imaging imIn,
+    int xmin, int xmax, INT16 *k, int coefs_precision)
+{
+    int x, xx, i, n;
+    int size = imIn->xsize * 4;
+    UINT8 *out = (UINT8 *)lineOut;
+    int ss[64];
+
+    for (xx = 0; xx < size; xx += n) {
+        n = size - xx < 64 ? size - xx : 64;
+        for (i = 0; i < n; i++) {
+            ss[i] = 1 << (coefs_precision - 1);
+        }
+        for (x = 0; x < xmax; x++) {
+            UINT8 *in = (UINT8 *)imIn->image32[x + xmin] + xx;
+            int kx = k[x];
+            for (i = 0; i < n; i++) {
+                ss[i] += in[i] * kx;
+            }
+        }
+        for (i = 0; i < n; i++) {
+            out[xx + i] = clip8(ss[i], coefs_precision);
+        }
+    }
+}
+
+#endif
