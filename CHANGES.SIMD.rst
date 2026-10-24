@@ -20,6 +20,10 @@ Unreleased
   in the row
 - UnsharpMask: SIMD post-pass, about 1.7x faster
 - Released the GIL in AlphaComposite, Bands, Blend and Chops
+- From Pillow 13.0: I;16 filters keep the high byte and clamp to 0..65535;
+  BoxBlur and GaussianBlur reject NaN, infinite and >= 2**31 radii;
+  ImagingExpand's size check no longer overflows or divides by zero; masked
+  histograms of LA images count the alpha band
 
 9.5.0.post2 & 9.4.0.post2 & 9.3.0.post2 & 9.2.0.post2 & 9.1.1.post2 & 9.0.0.post3
 ---------------------------------------------------------------------------------

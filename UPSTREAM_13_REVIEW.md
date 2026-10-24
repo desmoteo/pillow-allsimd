@@ -127,7 +127,7 @@ Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills
 
 ## 5. Recommended order
 
-1. **Port the 13.0 bug fixes in section 2 now**, on this branch: `I;16` filter, box-blur radius validation, LA histogram, expansion check. Update `test_i16_uses_generic_kernel`. About half a day.
+1. ~~**Port the 13.0 bug fixes in section 2 now**, on this branch: `I;16` filter, box-blur radius validation, LA histogram, expansion check. Update `test_i16_uses_generic_kernel`.~~ Done; see "Status of step 1" below.
 2. **SIMD `ImageChops.multiply`/`screen` (4.1).** About a day including tests.
 3. **Rebase onto Pillow 13.0.0** as the fork usually does: version bump, then the SIMD commits on top.
    - Expect conflicts in Bands.c (`ImagingSplit`), Filter.c (`IMAGING_TYPE_I16`, I;16 loop), Resample.c (pass order, `MUTEX_LOCK`), BoxBlur.c and Convert.c.
@@ -139,6 +139,16 @@ Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills
    - check the 16-bit coefficients with MKS2021.
 5. **NEON ColorLUT (4.2) and NEON reduce 3/4 (4.3)**, then the horizontal box blur (4.4).
 6. **Re-run `checks/simd_bench_remote.sh`** on the Jetson after each step, and on a second arm64 machine (Apple M-series or Graviton) before deciding the final NEON/portable split.
+
+## Status of step 1
+
+All four fixes from section 2 are ported, with 13.0's tests:
+- `Filter.c`: the `I;16` loop is separate from the 8-bit loop, as in 13.0, but still keyed on `IMAGING_TYPE_SPECIAL` until the rebase. `test_i16_uses_generic_kernel` now compares against the same values in an `I` image, not 12.3's output.
+- `BoxBlur.c` and `ImageFilter.BoxBlur`: NaN, infinite and ≥ 2^31 radii raise `ValueError`.
+- `ImagingExpand`: 64-bit size check. Stock 12.3 crashed with SIGFPE both on huge margins and on `MinFilter(1)` applied to a zero-size image.
+- `Histo.c`: the masked path counts byte 3 for LA. The unmasked path was already correct in 12.3.
+
+Also found: the `I;16N → I` conversion clips to 255 in 12.3. That is a separate upstream bug and not touched here.
 
 ## Caveats
 

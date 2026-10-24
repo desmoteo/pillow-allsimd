@@ -103,14 +103,16 @@ ImagingGetHistogram(Imaging im, Imaging imMask, void *minmax) {
             ImagingSectionEnter(&cookie);
             for (y = 0; y < im->ysize; y++) {
                 UINT8 *in = (UINT8 *)im->image32[y];
-                for (x = 0; x < im->xsize; x++) {
+                for (x = 0; x < im->xsize; x++, in += 4) {
                     if (imMask->image8[y][x] != 0) {
-                        h->histogram[(*in++)]++;
-                        h->histogram[(*in++) + 256]++;
-                        h->histogram[(*in++) + 512]++;
-                        h->histogram[(*in++) + 768]++;
-                    } else {
-                        in += 4;
+                        h->histogram[*in]++;
+                        if (im->bands == 2) {
+                            h->histogram[*(in + 3) + 256]++;
+                        } else {
+                            h->histogram[*(in + 1) + 256]++;
+                            h->histogram[*(in + 2) + 512]++;
+                            h->histogram[*(in + 3) + 768]++;
+                        }
                     }
                 }
             }
