@@ -158,6 +158,75 @@ alpha_composite_8px(__m256i mm_dst, __m256i mm_src) {
 
 #endif
 
+#if defined(IMAGING_SIMD_NEON)
+
+/* floor(n / d) for four lanes. Doubles hold both operands exactly and
+   the quotient closely enough that truncation gives the integer result. */
+static inline uint32x4_t
+neon_div_u32(uint32x4_t n, uint32x4_t d) {
+    float64x2_t q_lo = vdivq_f64(
+        vcvtq_f64_u64(vmovl_u32(vget_low_u32(n))),
+        vcvtq_f64_u64(vmovl_u32(vget_low_u32(d))));
+    float64x2_t q_hi = vdivq_f64(
+        vcvtq_f64_u64(vmovl_high_u32(n)), vcvtq_f64_u64(vmovl_high_u32(d)));
+    return vcombine_u32(
+        vmovn_u64(vcvtq_u64_f64(q_lo)), vmovn_u64(vcvtq_u64_f64(q_hi)));
+}
+
+/* SHIFTFORDIV255(src * coef1 + dst * coef2 + (0x80 << 7)) >> 7 */
+static inline uint16x4_t
+neon_blend4(uint16x4_t src, uint16x4_t dst, uint16x4_t coef1, uint16x4_t coef2) {
+    uint32x4_t tmp = vmlal_u16(vmull_u16(src, coef1), dst, coef2);
+    tmp = vaddq_u32(tmp, vdupq_n_u32(0x80 << PRECISION_BITS));
+    tmp = vaddq_u32(tmp, vshrq_n_u32(tmp, 8));
+    return vshrn_n_u32(tmp, 8 + PRECISION_BITS);
+}
+
+/* Composites eight pixels with the same integer arithmetic as the
+   scalar code below, so the results are identical. */
+static inline void
+alpha_composite_8px_neon(rgba8 *out, const rgba8 *dst, const rgba8 *src) {
+    uint8x8x4_t d = vld4_u8((const UINT8 *)dst);
+    uint8x8x4_t s = vld4_u8((const UINT8 *)src);
+    uint8x8x4_t o;
+    uint16x8_t sa = vmovl_u8(s.val[3]);
+    uint16x8_t da = vmovl_u8(d.val[3]);
+
+    // blend = dst->a * (255 - src->a)
+    uint16x8_t blend = vmulq_u16(da, vsubq_u16(vdupq_n_u16(255), sa));
+    // outa255 = src->a * 255 + blend
+    uint16x8_t outa255 = vmlaq_n_u16(blend, sa, 255);
+    // coef1 = src->a * 255 * 255 * (1 << PRECISION_BITS) / outa255
+    uint32x4_t n_lo = vmulq_n_u32(vmovl_u16(vget_low_u16(sa)), 255 * 255 << PRECISION_BITS);
+    uint32x4_t n_hi = vmulq_n_u32(vmovl_high_u16(sa), 255 * 255 << PRECISION_BITS);
+    uint16x8_t coef1 = vcombine_u16(
+        vmovn_u32(neon_div_u32(n_lo, vmovl_u16(vget_low_u16(outa255)))),
+        vmovn_u32(neon_div_u32(n_hi, vmovl_high_u16(outa255))));
+    uint16x8_t coef2 = vsubq_u16(vdupq_n_u16(255 << PRECISION_BITS), coef1);
+
+    for (int c = 0; c < 3; c++) {
+        uint16x8_t sc = vmovl_u8(s.val[c]);
+        uint16x8_t dc = vmovl_u8(d.val[c]);
+        uint16x4_t lo = neon_blend4(
+            vget_low_u16(sc), vget_low_u16(dc), vget_low_u16(coef1), vget_low_u16(coef2));
+        uint16x4_t hi = neon_blend4(
+            vget_high_u16(sc), vget_high_u16(dc), vget_high_u16(coef1), vget_high_u16(coef2));
+        o.val[c] = vmovn_u16(vcombine_u16(lo, hi));
+    }
+    // out->a = SHIFTFORDIV255(outa255 + 0x80)
+    uint16x8_t a = vaddq_u16(outa255, vdupq_n_u16(0x80));
+    o.val[3] = vshrn_n_u16(vaddq_u16(a, vshrq_n_u16(a, 8)), 8);
+
+    // Transparent source pixels copy the destination.
+    uint8x8_t keep = vceqz_u8(s.val[3]);
+    for (int c = 0; c < 4; c++) {
+        o.val[c] = vbsl_u8(keep, d.val[c], o.val[c]);
+    }
+    vst4_u8((UINT8 *)out, o);
+}
+
+#endif
+
 #if defined(IMAGING_SIMD_SSE4)
 #define ALPHA_COMPOSITE_VECTOR
 #define ALPHA_COMPOSITE_4PX(out, dst, src)                                     \
@@ -220,6 +289,12 @@ ImagingAlphaComposite(Imaging imDst, Imaging imSrc) {
             memcpy(&out[x], tmp_out, n * sizeof(rgba8));
         }
 #else
+#if defined(IMAGING_SIMD_NEON)
+        // Exact, so the scalar code can finish the row.
+        for (; x < xsize - 7; x += 8) {
+            alpha_composite_8px_neon(&out[x], &dst[x], &src[x]);
+        }
+#endif
         for (; x < xsize; x += 1) {
             if (src[x].a == 0) {
                 // Copy 4 bytes at once.
