@@ -128,7 +128,7 @@ Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills
 ## 5. Recommended order
 
 1. ~~**Port the 13.0 bug fixes in section 2 now**, on this branch: `I;16` filter, box-blur radius validation, LA histogram, expansion check. Update `test_i16_uses_generic_kernel`.~~ Done; see "Status of step 1" below.
-2. **SIMD `ImageChops.multiply`/`screen` (4.1).** About a day including tests.
+2. ~~**SIMD `ImageChops.multiply`/`screen` (4.1).**~~ Done; see "Status of step 2" below.
 3. **Rebase onto Pillow 13.0.0** as the fork usually does: version bump, then the SIMD commits on top.
    - Expect conflicts in Bands.c (`ImagingSplit`), Filter.c (`IMAGING_TYPE_I16`, I;16 loop), Resample.c (pass order, `MUTEX_LOCK`), BoxBlur.c and Convert.c.
    - Re-run the diff harness and both full test suites afterwards.
@@ -149,6 +149,22 @@ All four fixes from section 2 are ported, with 13.0's tests:
 - `Histo.c`: the masked path counts byte 3 for LA. The unmasked path was already correct in 12.3.
 
 Also found: the `I;16N → I` conversion clips to 255 in 12.3. That is a separate upstream bug and not touched here.
+
+## Status of step 2
+
+`Chops.c` computes multiply and screen with `(x + 1 + (x >> 8)) >> 8` for `x = a * b`. Screen is multiply with every byte inverted on the way in and out (XOR 255). There are AVX2, SSE4 and NEON loops, and the scalar loop for the row tail and `-C simd=disable` uses the same formula, so every build gives the same bytes as the division.
+
+Correctness: `test_multiply_screen_exact` checks all 65,536 byte pairs in L, RGB and RGBA at widths from 1 to 256. It passes on the scalar, SSE4 and AVX2 builds on x86, and the same check passes on the NEON and scalar builds under arm64 emulation. Output matches upstream 12.3 byte for byte.
+
+x86 (this machine, 2560×1600, best of 7, ms):
+
+| Operation | upstream 12.3 | scalar before | scalar | SSE4 before | SSE4 | AVX2 |
+|---|---:|---:|---:|---:|---:|---:|
+| multiply RGB | 18.65 | 18.70 | 2.90 | 11.00 | 2.68 | 2.41 |
+| screen RGB | 23.43 | 23.31 | 2.92 | 12.57 | 2.68 | 2.41 |
+| multiply L | 4.64 | 4.65 | 0.64 | 2.71 | 0.58 | 0.38 |
+
+Most of the gain comes from the formula itself: without the division, GCC vectorises the scalar loop. The intrinsics add 8–70% on top, and matter more for compilers that vectorise less, such as the Jetson's GCC 11. The NEON kernel has not been timed on real arm64 hardware yet. `checks/simd_bench.py` now also times `chops screen` and `chops multiply L`.
 
 ## Caveats
 

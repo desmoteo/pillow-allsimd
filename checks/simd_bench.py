@@ -76,6 +76,8 @@ def operations(Image, ImageChops, ImageFilter, w: int, h: int) -> dict:
         "colorlut RGB 17": lambda: rgb.filter(lut),
         "blend RGB": lambda: Image.blend(rgb, rgb2, 0.3),
         "chops multiply": lambda: ImageChops.multiply(rgb, rgb2),
+        "chops screen": lambda: ImageChops.screen(rgb, rgb2),
+        "chops multiply L": lambda: ImageChops.multiply(L, L),
     }
 
 
