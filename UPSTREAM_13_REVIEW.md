@@ -196,6 +196,8 @@ Same machine and script as section 1. The upstream column matched the earlier ru
 - The outputs differ from upstream in exactly the same 7 operations as before. The new kernels add no differences.
 
 Open on arm64:
-- The L upscale regression above. The NEON 1-byte kernel handled one row at a time and paid for a horizontal `vaddvq` on every output pixel. It now does four rows at a time, as on SSE4: one `vpaddq` reduction per output pixel, and the last 1–3 taps done across the four rows in one vector. The output is unchanged under emulation; not yet timed on the Jetson.
+- The L upscale regression above. The NEON 1-byte kernel handled one row at a time and paid for a horizontal `vaddvq` on every output pixel. Fixed in `4c45bd949`: the kernel now does four rows at a time, as on SSE4, with one `vpaddq` reduction per output pixel and the last 1–3 taps done across the four rows in one vector. Output is unchanged. On the Jetson (upstream column again within 0.3%):
+  - `resize L x1.5 lanczos`: 47.35 → 34.03 ms, 2.48x upstream and 1.43x the scalar build;
+  - `resize L 1/4 bicubic`: 5.39 → 4.37 ms, 3.34x upstream.
 - No NEON code yet for `reduce` 3 and 4 or ColorLUT, which stay at 1.0x upstream.
 - The portable build is slower than the upstream wheel for `convert RGBA->RGBa` (0.32x), `merge RGB` (0.70x) and `convert RGB->L` (0.80x). The NEON build is unaffected, but builds without NEON pay this.
