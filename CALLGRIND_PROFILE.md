@@ -207,6 +207,7 @@ Each change was checked for byte-identical output against the previous build of 
 - ModeFilter: identical to Pillow 12.3.0 on 1,896 cases (sizes 1–21, images 1×1 to 300×200, 2 to 256 levels, L and P), and a new test compares with a Python reference.
 - Transforms: identical to the previous code and to Pillow 12.3.0 on 1,728 rotate, affine, perspective and quad cases in 8 modes, and to the previous code on 1,794 cases with nearest, L, LA, I, F, I;16, P and CMYK. The bilinear and bicubic arithmetic is per channel in `double`, in the same order as the scalar filters; x86 builds don't contract it to FMA. arm64 keeps the scalar filters, since GCC contracts them to FMA there. A new test compares each band of a transformed RGB, RGBX and CMYK image with the same transform of an L image.
 - The tiles alone make the scalar build 4x faster on nearest and 1.2x on bilinear and bicubic rotation.
+- arm64 (Jetson Orin, Cortex-A78AE): rotate 30° nearest 40 → 10.9 ms, bilinear 131 → 114 ms, bicubic 309 → 286 ms; ModeFilter(3) 1249 → 85 ms. A near-identity perspective transform got 4% slower (scalar 211 → 219 ms, NEON 184 → 192 ms): its reads were already sequential, and the tiles cut them into 256-byte pieces. 128×64 tiles keep it at 212 ms but bring nearest rotation back to 25 ms; on x86, tiles of 256×32 or 512×16 make rotation up to 3x slower than 64×64. 64×64 stays.
 
 ### Measured and dropped
 
