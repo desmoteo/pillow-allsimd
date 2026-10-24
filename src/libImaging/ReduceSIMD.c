@@ -559,6 +559,115 @@ ImagingReduce2x1_4u8(Imaging imOut, Imaging imIn, int box[4]) {
     }
 }
 
+/* Adds the sums of xscale neighbouring pixels, for 4 output pixels of
+   one row, to lo (output pixels 0 and 1) and hi (2 and 3). vldN_u32 puts
+   pixel N*i + k in lane i of vector k, so adding the vectors byte by byte
+   sums each group of N pixels channel by channel. */
+static inline void
+neon_reduce_row_4u8(const UINT8 *p, int xscale, uint16x8_t *lo, uint16x8_t *hi) {
+    switch (xscale) {
+        case 1: {
+            uint8x16_t v = vld1q_u8(p);
+            *lo = vaddw_u8(*lo, vget_low_u8(v));
+            *hi = vaddw_high_u8(*hi, v);
+            break;
+        }
+        case 2: {
+            uint32x4x2_t v = vld2q_u32((const uint32_t *)(const void *)p);
+            uint8x16_t v0 = vreinterpretq_u8_u32(v.val[0]);
+            uint8x16_t v1 = vreinterpretq_u8_u32(v.val[1]);
+            *lo = vaddq_u16(*lo, vaddl_u8(vget_low_u8(v0), vget_low_u8(v1)));
+            *hi = vaddq_u16(*hi, vaddl_high_u8(v0, v1));
+            break;
+        }
+        case 3: {
+            uint32x4x3_t v = vld3q_u32((const uint32_t *)(const void *)p);
+            uint8x16_t v0 = vreinterpretq_u8_u32(v.val[0]);
+            uint8x16_t v1 = vreinterpretq_u8_u32(v.val[1]);
+            uint8x16_t v2 = vreinterpretq_u8_u32(v.val[2]);
+            *lo = vaddw_u8(
+                vaddq_u16(*lo, vaddl_u8(vget_low_u8(v0), vget_low_u8(v1))),
+                vget_low_u8(v2)
+            );
+            *hi = vaddw_high_u8(vaddq_u16(*hi, vaddl_high_u8(v0, v1)), v2);
+            break;
+        }
+        default: {
+            uint32x4x4_t v = vld4q_u32((const uint32_t *)(const void *)p);
+            uint8x16_t v0 = vreinterpretq_u8_u32(v.val[0]);
+            uint8x16_t v1 = vreinterpretq_u8_u32(v.val[1]);
+            uint8x16_t v2 = vreinterpretq_u8_u32(v.val[2]);
+            uint8x16_t v3 = vreinterpretq_u8_u32(v.val[3]);
+            *lo = vaddq_u16(
+                vaddq_u16(*lo, vaddl_u8(vget_low_u8(v0), vget_low_u8(v1))),
+                vaddl_u8(vget_low_u8(v2), vget_low_u8(v3))
+            );
+            *hi = vaddq_u16(
+                vaddq_u16(*hi, vaddl_high_u8(v0, v1)), vaddl_high_u8(v2, v3)
+            );
+            break;
+        }
+    }
+}
+
+/* ((sum + amend) * multiplier) >> 24 for the 4 channels of one pixel. */
+static inline uint16x4_t
+neon_reduce_round(uint16x4_t sum, uint32x4_t amend, uint32x4_t multiplier) {
+    uint32x4_t v = vmulq_u32(vaddq_u32(vmovl_u16(sum), amend), multiplier);
+    return vmovn_u32(vshrq_n_u32(v, 24));
+}
+
+/* Any xscale from 1 to 4 and yscale up to 16, so that the sums fit in 16
+   bits: 4 output pixels per step, rounded as in the scalar code. */
+static void
+ImagingReduceNxN_4u8_neon(
+    Imaging imOut, Imaging imIn, int box[4], int xscale, int yscale
+) {
+    int x, y, yy, c;
+    int xsize = box[2] / xscale;
+    UINT32 multiplier = division_UINT32(yscale * xscale, 8);
+    UINT32 amend = yscale * xscale / 2;
+    uint32x4_t mm_multiplier = vdupq_n_u32(multiplier);
+    uint32x4_t mm_amend = vdupq_n_u32(amend);
+
+    for (y = 0; y < box[3] / yscale; y++) {
+        int yy_from = box[1] + y * yscale;
+        UINT8 *out = (UINT8 *)imOut->image[y];
+        for (x = 0; x < xsize - 3; x += 4) {
+            int xx = box[0] + x * xscale;
+            uint16x8_t lo = vdupq_n_u16(0), hi = lo;
+            for (yy = yy_from; yy < yy_from + yscale; yy++) {
+                neon_reduce_row_4u8(
+                    (UINT8 *)imIn->image[yy] + xx * 4, xscale, &lo, &hi
+                );
+            }
+            uint16x8_t o01 = vcombine_u16(
+                neon_reduce_round(vget_low_u16(lo), mm_amend, mm_multiplier),
+                neon_reduce_round(vget_high_u16(lo), mm_amend, mm_multiplier)
+            );
+            uint16x8_t o23 = vcombine_u16(
+                neon_reduce_round(vget_low_u16(hi), mm_amend, mm_multiplier),
+                neon_reduce_round(vget_high_u16(hi), mm_amend, mm_multiplier)
+            );
+            vst1q_u8(&out[x * 4], vcombine_u8(vmovn_u16(o01), vmovn_u16(o23)));
+        }
+        for (; x < xsize; x++) {
+            int xx = box[0] + x * xscale;
+            for (c = 0; c < 4; c++) {
+                UINT32 ss = amend;
+                int i;
+                for (yy = yy_from; yy < yy_from + yscale; yy++) {
+                    UINT8 *line = (UINT8 *)imIn->image[yy];
+                    for (i = 0; i < xscale; i++) {
+                        ss += line[(xx + i) * 4 + c];
+                    }
+                }
+                out[x * 4 + c] = (ss * multiplier) >> 24;
+            }
+        }
+    }
+}
+
 static void
 ImagingReduce1x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
     int x, y;
@@ -618,6 +727,8 @@ ImagingReduce_4u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscal
         ImagingReduce2x1_4u8(imOut, imIn, box);
     } else if (xscale == 2 && yscale == 2) {
         ImagingReduce2x2_4u8(imOut, imIn, box);
+    } else if (xscale <= 4 && yscale <= 16) {
+        ImagingReduceNxN_4u8_neon(imOut, imIn, box, xscale, yscale);
     } else {
         return 0;
     }
