@@ -279,3 +279,21 @@ def test_three_passes() -> None:
         passes=3,
         delta=1,
     )
+
+
+@pytest.mark.parametrize("mode", ("RGB", "RGBA", "CMYK", "LA"))
+@pytest.mark.parametrize("radius", ((2, 0), (0, 2), (2, 2)))
+@pytest.mark.parametrize("n", (1, 2, 3))
+def test_channel_order(mode: str, radius: tuple[int, int], n: int) -> None:
+    # A flat image must come back unchanged, whatever the axes and passes.
+    color = (200, 50, 10, 255)[: len(Image.new(mode, (1, 1)).getbands())]
+    im = Image.new(mode, (16, 9), color)
+    out = im._new(im.im.box_blur(radius, n))
+    assert out.getpixel((8, 4)) == color
+
+
+@pytest.mark.parametrize("radius", ((3, 0), (0, 3)))
+def test_gaussian_one_axis_channel_order(radius: tuple[int, int]) -> None:
+    im = Image.new("RGBA", (16, 9), (200, 50, 10, 255))
+    out = im.filter(ImageFilter.GaussianBlur(radius))
+    assert out.getpixel((8, 4)) == (200, 50, 10, 255)
