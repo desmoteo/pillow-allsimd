@@ -1,0 +1,147 @@
+# Pillow 12.3 and 13.0 as a source of optimizations for pillow-simd
+
+Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/x86-fixes-arm64-neon` (HEAD `2e6edeec2`).
+
+## Sources and method
+
+- Pillow 12.3.0 and 13.0.0 sdists from PyPI, compared file by file.
+  - The 12.3.0 sdist's `src/libImaging` is identical to this fork's base (`bb1d8e8ab`). Everything 12.3 added is already in pillow-simd.
+- The 13.0.0 release notes (`docs/releasenotes/13.0.0.rst`) and the C diffs for every file 13.0 changed that does pixel work: Resample, Filter, Convert, Chops, Bands, BoxBlur, ColorLUT, Geometry, GetBBox, Histo, Offset.
+- Benchmarks of this branch on a Jetson Orin (Cortex-A78AE, Ubuntu 22.04, GCC 11.4, Python 3.10), run with `checks/simd_bench_remote.sh` at commit `b1730a851`. They guided which ideas matter on arm64.
+- Points, Fill, Copy, Pack, Matrix and Negative changed only a little in 13.0 and were not reviewed line by line.
+
+## Summary
+
+1. **Rebase pillow-simd onto 13.0 rather than cherry-pick.** 13.0 rewrote much of the scalar C so compilers vectorise it, added free-threading locks, a new `IMAGING_TYPE_I16` and two resampling filters, and changed several internal return conventions. Cherry-picking would leave the fork diverging on every file we touch.
+2. **Four upstream bug fixes affect code this branch changed** and should be taken in any case:
+   - The `I;16` filter computation.
+   - Box-blur radius validation (our new vertical pass loops over the radius, so a huge radius hangs).
+   - LA histograms.
+   - Filter expansion overflow checks.
+3. **13.0 has a few scalar ideas worth applying inside our SIMD code too:**
+   - vertical-first resampling when the height shrinks much more than the width,
+   - 32-bit palette copies,
+   - an OR-reduce in `getbbox`,
+   - row `memcpy` in `offset`.
+4. **The Jetson run showed that compiler auto-vectorisation can beat hand-written NEON.** On GCC 11 it beat our NEON kernels for blur, unsharp mask and alpha composite. Those three now use the portable code on arm64 (`2e6edeec2`).
+5. **New SIMD targets** that upstream does not cover: `ImageChops.multiply`/`screen` (exact divide by 255 is possible), NEON ColorLUT, NEON `reduce` 3 and 4, and the horizontal box-blur pass.
+
+## 1. What the Jetson run says (commit `b1730a851`, ms, best of 5)
+
+Upstream is the Pillow 12.3.0 wheel from PyPI. "scalar" is this branch built with `-C simd=disable`.
+
+| Operation | upstream | scalar | NEON | Reading |
+|---|---:|---:|---:|---|
+| filter L 3×3 | 48.7 | 46.7 | 8.9 | NEON 5.5x |
+| filter RGB 3×3 | 126.4 | 134.2 | 35.0 | NEON 3.6x |
+| resize RGBA ¼ bicubic | 51.8 | 52.6 | 20.3 | NEON 2.6x |
+| reduce RGB (1, 2) | 7.0 | 7.0 | 1.6 | NEON 4.4x |
+| convert RGBa→RGBA | 38.7 | 38.6 | 14.8 | NEON 2.6x |
+| gaussian RGB r=5 | 160.8 | **111.7** | 144.9 | scalar wins: vertical pass without transposes plus compiler vectorisation |
+| gaussian L r=5 | 54.0 | **29.6** | 36.6 | scalar wins |
+| unsharp RGB | 236.8 | **144.8** | 166.8 | scalar wins: GCC turns `/ 100` into a multiply-high; our NEON used `vdivq_f32` |
+| alpha_composite | 22.0 | 22.2 | 28.6 | NEON loses |
+| convert RGBA→RGBa | 3.4 | 10.6 | 3.6 | scalar 3x slower than upstream (see 3.3) |
+| chops multiply | 14.4 | 21.3 | 21.3 | 0.68x, no NEON (see 4.1) |
+| colorlut RGB 17 | 104.1 | 101.3 | 100.7 | no NEON yet |
+
+Action taken: BoxBlur (both passes), UnsharpMask and AlphaComposite now use the portable code on arm64. All three were exact, so results do not change. x86 keeps its SSE4 paths, which measured faster there.
+
+Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills in UnsharpMask or AlphaComposite, and 6 in the horizontal box-blur pass. Register spills are therefore not the main cause. Treat "compiler beats intrinsics" as something to re-measure per core and compiler, not as a general rule. Measure again on Apple M-series or Graviton before reintroducing these NEON kernels.
+
+## 2. Bugs fixed in 13.0 that affect this branch
+
+| Area | 12.3 behaviour (and this branch) | 13.0 | Action |
+|---|---|---|---|
+| `I;16` 3×3/5×5 filters (`kernel_i16`) | High byte shifted right (`>> 8`) instead of left, and each byte clipped separately: a flat `I;16` image of 1000 filters to 233 | `<< 8`, clamped to 0..65535 with `clip16`; `IMAGING_TYPE_I16` loop separate from the 8-bit loop | Port. `test_i16_uses_generic_kernel` (commit `cf334ba71`) pins 12.3's wrong values and must be updated |
+| BoxBlur radius | NaN and radii ≥ 2^31 accepted; converting them to `int` is undefined | Rejected with `ValueError` | Port. Matters more here: `ImagingVerticalBoxBlur` loops from `-radius-1` to `radius`, so a huge radius hangs |
+| `ImagingExpand` (filter margin) | Size check can overflow | 64-bit check; empty images handled | Port |
+| Histogram of LA images | Second band counted from byte 1 (padding), not byte 3 (alpha) | Byte 3 for two-band images | Port (scalar) |
+
+## 3. 13.0 ideas to reuse, mapped to pillow-simd
+
+### 3.1 Resample: vertical pass first when the height shrinks most
+- 13.0 runs the vertical pass first when `ysize_in - ysize_out > 2 * (xsize_in - xsize_out)`. The horizontal pass, the more expensive one per output pixel, then works on fewer rows.
+- It slots in unchanged with our kernels, since both passes have SSE4/AVX2/NEON versions.
+- Results change slightly versus horizontal-first, because the intermediate image is rounded to 8 bits in a different order. Upstream accepted that, and following it keeps pillow-simd close to upstream.
+- Effort: small (`ImagingResampleInner` only).
+
+### 3.2 Filter: split the 16-bit loop from the 8-bit loop
+- 13.0's "filter up to 3.5x" comes from moving the `I;16` branch out of the 8-bit inner loop, so the 8-bit loop has no per-pixel test and vectorises.
+- Our SIMD path already handles 8-bit images. The change helps the portable fallback (`-C simd=disable`, other architectures) and float kernels with large coefficients.
+- Comes with the rebase.
+
+### 3.3 Convert
+- P, PA → RGB, RGBA: copy the 4-byte palette entry as one `UINT32` and set alpha with a mask (`SET_ALPHA_32`); up to 2.5x. A SIMD gather (AVX2 `vpgatherdd`, 8 pixels per instruction) could go further on x86. NEON has no efficient 1 KB table lookup, so arm64 keeps 13.0's scalar version.
+- RGBA → RGB and RGBX → RGB reuse `rgb2rgba` (copy, alpha = 255); `i2l` clamps without branches. Scalar, comes with the rebase.
+- RGBA → RGBa premultiply: the portable build is 3x slower than the upstream wheel on the Jetson (10.6 vs 3.4 ms) even with `-ftree-vectorize`. 13.0 did not change `rgbA2rgba`, so the gap is compiler version (GCC 11 vs the wheel's newer GCC). NEON already matches the wheel (3.6 ms), so nothing to do for arm64; worth rechecking for other architectures.
+
+### 3.4 Chops
+- 13.0 writes `difference` as a branch-free ternary without the clip (up to 3x). Our SIMD branch only touched Chops for the GIL. Comes with the rebase.
+- `multiply` and `screen` still divide by 255 per byte. See 4.1.
+
+### 3.5 Geometry, GetBBox, Offset, Histo
+- Flip left-right and rotate 180 copy whole typed elements (16-bit for `I;16`, 32-bit for 4-byte modes) so the reversed copy vectorises (up to 10x).
+- `getbbox` first OR-reduces each row and only scans a row element by element when it has data (up to 24x).
+- `ImageChops.offset` copies each row as two `memcpy`s instead of a modulo per pixel (up to 46x).
+- Histogram loops use `restrict` row pointers.
+- All scalar, all from the rebase, and all leave nothing for hand-written SIMD to add, except possibly an explicit NEON/SSE OR-reduce for `getbbox` if the compiler doesn't vectorise it.
+
+### 3.6 Features that interact with the SIMD code
+- **New resampling filters `MKS2013` (support 2.5) and `MKS2021` (support 4.5).** They use the same convolution path, so our resample kernels handle them. The 16-bit coefficient normalisation (`normalize_coeffs_8bpc`) should be tested with their negative lobes. Needs the Python-side enum from 13.0.
+- **Free-threading.** 13.0 locks `imIn->mutex` around pixel loops (`MUTEX_LOCK`). Every function this branch added or restructured needs the same locks after the rebase:
+  - `ImagingFilterSIMD`
+  - `ImagingVerticalBoxBlur`
+  - the `ReduceSIMD.c` and `ResampleSIMD*.c` callers
+  - `ImagingUnsharpMaskRow`
+  - Bands
+- **`IMAGING_TYPE_I16`.** 13.0 gives 16-bit images their own type instead of `IMAGING_TYPE_SPECIAL`. Our `I;16` dispatch fix in Filter.c and the Reduce/Resample type checks use `IMAGING_TYPE_SPECIAL` and must switch.
+- **Changed internal return conventions:**
+  - `ImagingSplit` returns 0 or −1, not the band count.
+  - `ImagingTransformAffine` returns `int`.
+
+  Our Bands.c rewrite touches `ImagingSplit`, so expect a conflict there.
+
+## 4. SIMD opportunities not covered upstream
+
+### 4.1 `ImageChops.multiply` and `screen`
+- They compute `a * b / 255`, which the Jetson shows at 0.68x of the upstream wheel.
+- In 16-bit lanes, `floor(x / 255) == (x + 1 + (x >> 8)) >> 8` for every product `x = a * b` of two bytes. Checked exhaustively; it fails only at x = 65535, which a byte product never reaches.
+- That gives an exact SSE4/NEON kernel with one widening multiply, two adds and two shifts per 8 bytes. `screen` is `255 - multiply(255 - a, 255 - b)`.
+- Expected 2–4x. Effort: small.
+
+### 4.2 NEON ColorLUT
+- 101 ms on the Jetson for a 2560×1600 RGB image, the slowest remaining operation without NEON.
+- The x86 kernel's structure (16-bit fixed point, per-pixel table gathers) maps to NEON, with the gathers done as scalar loads.
+- Effort: medium–high, as estimated in the ARM64 assessment.
+
+### 4.3 NEON reduce 3, 4 and N×N; 1-byte reduce
+- `reduce(3)`, `reduce(4)` and all L reductions run the portable code on arm64 (1.0x).
+- The 2×2 approach (`vld4q_u8` + pairwise widening adds) extends to 4×4 with a second pairwise add, and to 3×3 with three loads.
+- Effort: medium.
+
+### 4.4 Horizontal box-blur pass
+- Gaussian RGB is now dominated by the horizontal pass, which processes one pixel at a time on both x86 and arm64.
+- Option: blur several rows at once so each vector holds the same column of 4 rows, transposing small blocks in registers.
+- Effort: medium–high. Expected up to 2x on Gaussian RGB.
+
+## 5. Recommended order
+
+1. **Port the 13.0 bug fixes in section 2 now**, on this branch: `I;16` filter, box-blur radius validation, LA histogram, expansion check. Update `test_i16_uses_generic_kernel`. About half a day.
+2. **SIMD `ImageChops.multiply`/`screen` (4.1).** About a day including tests.
+3. **Rebase onto Pillow 13.0.0** as the fork usually does: version bump, then the SIMD commits on top.
+   - Expect conflicts in Bands.c (`ImagingSplit`), Filter.c (`IMAGING_TYPE_I16`, I;16 loop), Resample.c (pass order, `MUTEX_LOCK`), BoxBlur.c and Convert.c.
+   - Re-run the diff harness and both full test suites afterwards.
+   - About 2–3 days.
+4. **After the rebase:**
+   - take vertical-first resampling (3.1) through the SIMD kernels;
+   - add mutexes to the SIMD entry points (3.6);
+   - check the 16-bit coefficients with MKS2021.
+5. **NEON ColorLUT (4.2) and NEON reduce 3/4 (4.3)**, then the horizontal box blur (4.4).
+6. **Re-run `checks/simd_bench_remote.sh`** on the Jetson after each step, and on a second arm64 machine (Apple M-series or Graviton) before deciding the final NEON/portable split.
+
+## Caveats
+
+- Upstream speed-up figures are quoted from the 13.0 release notes, not measured here.
+- Only one arm64 machine was measured, with one compiler (GCC 11.4). Newer compilers vectorise more, which can move the NEON/portable balance in either direction.
+- The removal of three NEON kernels was verified for correctness (same output as before, full SIMD test set under emulation) but not yet re-timed on the Jetson.
