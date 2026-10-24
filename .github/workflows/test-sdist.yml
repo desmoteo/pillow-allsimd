@@ -64,7 +64,8 @@ jobs:
     - name: Install from sdist
       run: |
         set -o pipefail
-        python3 -m pip -v install dist/*.tar.gz -C simd="$SIMD" | tee install.log
+        # pip prints the build output to stderr.
+        python3 -m pip -v install dist/*.tar.gz -C simd="$SIMD" 2>&1 | tee install.log
         grep -F -- "--- SIMD kernels: $KERNELS" install.log
       env:
         SIMD: ${{ matrix.simd }}
