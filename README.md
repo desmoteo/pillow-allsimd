@@ -32,7 +32,7 @@ in performing the same operation on multiple data points simultaneously
 by using multiple processing elements.
 Common CPU SIMD instruction sets are MMX, SSE-SSE4, AVX, AVX2, AVX512, NEON.
 
-Currently, Pillow-SIMD can be [compiled](#installation) with SSE4 (default) or AVX2 support.
+Currently, Pillow-SIMD can be [compiled](#installation) with SSE4 (default on x86), AVX2 or NEON (default on arm64) support.
 
 
 ## Status
@@ -46,14 +46,19 @@ In fact, Uploadcare has been running Pillow-SIMD since 2015.
 
 The following image operations are currently SIMD-accelerated:
 
-- Resize (convolution-based resampling): SSE4, AVX2
-- Gaussian and box blur: SSE4
-- Alpha composition: SSE4, AVX2
-- RGBA → RGBa (alpha premultiplication): SSE4, AVX2
-- RGBa → RGBA (division by alpha): SSE4, AVX2
-- RGB → L (grayscale): SSE4
-- 3x3 and 5x5 kernel filters: SSE4, AVX2
-- Split and get_channel: SSE4
+- Resize (convolution-based resampling): SSE4, AVX2, NEON
+- Reduce: SSE4, NEON (2x1, 1x2, 2x2)
+- Gaussian and box blur: SSE4, NEON
+- Unsharp mask: SSE4, NEON
+- Alpha composition: SSE4, AVX2, NEON
+- RGBA → RGBa (alpha premultiplication): SSE4, AVX2, NEON
+- RGBa → RGBA (division by alpha): SSE4, AVX2, NEON
+- RGB → L (grayscale): SSE4, NEON
+- 3x3 and 5x5 kernel filters: SSE4, AVX2, NEON
+- 3D color lookup tables: SSE4, AVX2
+- Split, get_channel and merge: SSE4 (split), NEON
+
+Other architectures build the portable C code.
 
 
 ## Benchmarks

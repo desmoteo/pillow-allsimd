@@ -169,36 +169,42 @@ Every item is done when:
 - arm64 output matches the x86 SSE4 build byte-for-byte, except kernels documented as using approximate reciprocals, which may differ by at most ±1.
 
 ### Phase 1: builds and passes everywhere (scalar)
-- [ ] **1.1 Arch-aware flags.** `setup.py` passes `-msse4` only when the target is x86 (`platform.machine()`, honouring `ARCHFLAGS` on macOS). No flag on arm64.
-- [ ] **1.2 `ImagingSIMD.h`.** `#include <arm_neon.h>` and define `IMAGING_SIMD_NEON` for `__aarch64__` / `_M_ARM64`.
-- [ ] **1.3 Scalar fallbacks.** Restore the upstream scalar code (from `bb1d8e8ab`) under `#else` for:
-  - [ ] AlphaComposite
-  - [ ] Bands
-  - [ ] BoxBlur
-  - [ ] ColorLUT
-  - [ ] Convert (`rgb2l`, `rgb2la`, `rgb2i`, `rgba2la`, `rgbA2rgba`, `rgba2rgbA`)
-  - [ ] Filter (generic 3×3/5×5 for all modes)
-  - [ ] Reduce (whole file)
-  - [ ] Resample (8bpc 4-channel horizontal and vertical)
-- [ ] **1.4 Verified:**
-  - x86 with `-C simd=disable` passes the tests.
-  - arm64 (qemu container) builds and passes the tests.
+- [x] **1.1 Arch-aware flags.** `setup.py` picks the flags from the target architecture (`sysconfig.get_platform()`, or `ARCHFLAGS` on macOS): `-msse4.1` on x86, none on arm64, none for universal2.
+- [x] **1.2 `ImagingSIMD.h`.** `#include <arm_neon.h>` and define `IMAGING_SIMD_NEON` for `__aarch64__` / `_M_ARM64`.
+- [x] **1.3 Scalar fallbacks** (done in `95f8f8035`, differently from plan where noted):
+  - [x] AlphaComposite: upstream code.
+  - [x] Bands: upstream code.
+  - [x] BoxBlur: a small `px4` abstraction (`ImagingPx4.h`) with SSE4, NEON and scalar versions giving identical results, rather than a separate copy.
+  - [x] ColorLUT: upstream code.
+  - [x] Convert (`rgb2l`, `rgb2la`, `rgb2i`, `rgba2la`, `rgbA2rgba`, `rgba2rgbA`): upstream code.
+  - [x] Filter: generic 3×3/5×5 for all modes.
+  - [x] Reduce: the whole file is upstream's again; the SSE4 4-byte kernels moved to `ReduceSIMD.c`.
+  - [x] Resample: portable kernels with the same 16-bit coefficients as the SIMD ones, not upstream's 32-bit ones, so results match the SIMD builds.
+- [x] **1.4 Verified:**
+  - x86 with `-C simd=disable` passes the full test suite.
+  - arm64 (qemu container) builds and passes the full test suite with `-C simd=disable`.
 
 ### Phase 2: NEON kernels, in priority order
-Each kernel has its own commit and a comparison against the x86 SSE4 output on the diff harness (odd sizes, all modes).
+Each kernel has its own commit and a comparison against the x86 output on the diff harness (odd sizes, all modes).
 
-- [ ] **2.1 Resample** horizontal (1-row and 4-row) and vertical. `vmull_s16`/`vmlal_s16` on widened pixels; vertical across 4/8 pixels.
-- [ ] **2.2 Bands.** `split`/`getband` via `vld4q_u8`, `merge` via `vst4q_u8`. `merge` is scalar on x86 too.
-- [ ] **2.3 Convert.**
-  - RGB→L/LA/I: `vld4q_u8` + `vmull_u8`/`vmlal_u8` with the same 15-bit coefficients as x86, so results are bit-identical.
-  - RGBA→RGBa premultiply: exact, same formula as x86.
-  - RGBa→RGBA: `vrecpeq_f32` (approximate, ±1 vs x86 allowed).
-- [ ] **2.4 Reduce:** 1×2, 2×1, 2×2, 1×3, 3×1, 3×3, NxN, 1xN, Nx1, 4-channel.
-- [ ] **2.5 Filter:** 3×3/5×5 integer 4-channel (`vmlal_s16`), float L and float 4-channel.
-- [ ] **2.6 BoxBlur:** 32-bit lane accumulator, same algorithm as SSE4.
-- [ ] **2.7 AlphaComposite:** `vrecpeq_f32`, same structure as SSE4.
-- [ ] **2.8 ColorLUT.** Deferred unless time allows; scalar is the fallback.
+- [x] **2.1 Resample** horizontal (1-row and 4-row) and vertical, `vmlal_n_s16` on widened pixels. **Identical to x86 SSE4.** (`a01049b05`)
+- [x] **2.2 Bands.** `split`/`getband` via `vld4q_u8`, `merge` via `vst4q_u8`.
+- [x] **2.3 Convert.** (`48930a083`)
+  - RGB→L/LA/I and RGBA→LA: `vld4q_u8` with the SSE4 15-bit coefficients, **identical to x86**. Last pixels via padded buffers.
+  - RGBA→RGBa premultiply: exact `MULDIV255` (`vraddhn_u16`).
+  - RGBa→RGBA: **exact** float division (`vdivq_f32`), not `vrecpeq_f32`, so it matches upstream; x86 SSE4 still uses `rcp_ps` (±1).
+- [x] **2.4 Reduce:** NEON for 1×2, 2×1 and 2×2, the common thumbnail factors (`vpaddlq`/`vpadalq` + rounding narrow, `vrhaddq`). Other factors use the scalar code. **Identical to upstream.** (`bf56b0bfd`)
+- [x] **2.5 Filter:** integer 3×3/5×5 for 4-byte and 1-byte images (`FilterSIMD_NxNi.c`, shared with x86 for 1-byte). Large coefficients use the generic code. **Identical to x86 SSE4.** (`30f0a1d50`, `b94b94ee2`)
+- [x] **2.6 BoxBlur:** horizontal pass via `px4`, vertical pass 16 bytes per step. **Identical to upstream.** (`e470d62b6`)
+- [x] **2.7 AlphaComposite:** eight pixels per step with upstream's **exact** integer arithmetic (division in `float64x2_t`), not `vrecpeq_f32`. Verified equal to the scalar code for all 65,536 alpha pairs. (`8e2a6db5c`)
+- [ ] **2.8 ColorLUT.** **Not done**; arm64 uses the upstream scalar code.
+- [x] **Also:** UnsharpMask post-pass (`47dad2b12`), merge (`4d508867b`).
+
+Remaining cross-architecture differences (arm64 vs x86 SSE4), all by design:
+- `rcp_ps`-based unpremultiply and alpha composite on x86 vs exact on arm64 (±1).
+- ColorLUT: SIMD on x86 vs upstream scalar on arm64 (±1).
+- Float filters (only when coefficients don't fit 16 bits): GCC fuses multiply-adds on AArch64 by default (`-ffp-contract=fast`), x86 without `-mfma` doesn't (±1). Upstream Pillow behaves the same.
 
 ### Phase 3: CI and wheels
-- [ ] CI job on `ubuntu-24.04-arm` running the test suite (needs network; prepared, not run locally).
-- [ ] Benchmarks on real arm64 hardware vs upstream Pillow. Drop any NEON kernel that is not faster than scalar.
+- [x] CI jobs on `ubuntu-24.04-arm` (NEON and scalar) in `test.yml`. `macos-latest` (Apple Silicon) now also builds NEON. **Prepared, not run.**
+- [ ] Benchmarks on real arm64 hardware vs upstream Pillow. Drop any NEON kernel that is not faster than scalar. **Not done: no arm64 hardware here. qemu timings are meaningless.**
