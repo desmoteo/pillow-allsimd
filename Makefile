@@ -62,7 +62,7 @@ install:
 
 .PHONY: install-coverage
 install-coverage:
-	CFLAGS="-coverage -Werror=implicit-function-declaration" python3 -m pip -v install .
+	CFLAGS="-coverage -Werror=implicit-function-declaration" python3 -m pip -v install . $(if $(SIMD),-C simd=$(SIMD))
 	python3 selftest.py
 
 .PHONY: debug
