@@ -79,9 +79,12 @@ jobs:
 
     - name: After success
       run: |
-        docker start pillow_container
-        sudo docker cp pillow_container:/Pillow /Pillow
+        # /Pillow in the container is this workspace. Copy it before the
+        # restart: docker start reruns the build and tests, and docker cp
+        # failed with "unexpected EOF" while they wrote to it.
+        sudo cp -a $GITHUB_WORKSPACE /Pillow
         sudo chown -R runner /Pillow
+        docker start pillow_container
         pil_path=`docker exec pillow_container /vpy3/bin/python -c 'import os, PIL;print(os.path.realpath(os.path.dirname(PIL.__file__)))'`
         docker stop pillow_container
         sudo mkdir -p $pil_path
