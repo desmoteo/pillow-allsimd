@@ -173,4 +173,29 @@ Most of the gain comes from the formula itself: without the division, GCC vector
 
 - Upstream speed-up figures are quoted from the 13.0 release notes, not measured here.
 - Only one arm64 machine was measured, with one compiler (GCC 11.4). Newer compilers vectorise more, which can move the NEON/portable balance in either direction.
-- The removal of three NEON kernels was verified for correctness (same output as before, full SIMD test set under emulation) but not yet re-timed on the Jetson.
+- The removal of three NEON kernels has since been re-timed on the Jetson; see "Jetson re-run" below.
+
+## Jetson re-run at `b913b10e8`
+
+Same machine and script as section 1. The upstream column matched the earlier run to within 1%, so differences of a few percent are real here.
+
+| Operation | NEON at `b1730a851` | NEON at `b913b10e8` | Change | Cause |
+|---|---:|---:|---:|---|
+| reduce L 2 | 2.33 | 0.23 | 10.1x | NEON 2×2 for 1-byte images |
+| reduce L 4 | 1.81 | 0.23 | 7.9x | NEON 4×4 for 1-byte images |
+| chops multiply | 21.25 | 4.15 | 5.1x | divide-free multiply (step 2) |
+| resize L 1/4 bicubic | 12.03 | 5.39 | 2.2x | NEON horizontal pass for 1-byte images |
+| gaussian RGB r=5 | 144.86 | 111.21 | 1.30x | portable code instead of NEON (`2e6edeec2`) |
+| box RGB r=2 | 47.75 | 36.62 | 1.30x | same |
+| alpha_composite | 28.62 | 22.22 | 1.29x | same |
+| gaussian L r=5 | 36.57 | 29.54 | 1.24x | same |
+| unsharp RGB | 166.81 | 144.48 | 1.15x | same |
+| **resize L x1.5 lanczos** | 45.11 | 47.35 | **0.95x** | NEON horizontal pass slower than the compiler's code for short kernels (about 7 taps) |
+
+- This confirms the decision in `2e6edeec2`: alpha_composite with the portable code now runs at the upstream wheel's speed (22.2 vs 22.0 ms), against 28.6 ms with the old NEON kernel.
+- The outputs differ from upstream in exactly the same 7 operations as before. The new kernels add no differences.
+
+Open on arm64:
+- The L upscale regression above. The NEON 1-byte kernel handles one row at a time and pays for a horizontal `vaddvq` on every output pixel. Fix: four rows at a time with pairwise adds, as on SSE4, or the scalar loop when a pixel has fewer than 8 taps.
+- No NEON code yet for `reduce` 3 and 4 or ColorLUT, which stay at 1.0x upstream.
+- The portable build is slower than the upstream wheel for `convert RGBA->RGBa` (0.32x), `merge RGB` (0.70x) and `convert RGB->L` (0.80x). The NEON build is unaffected, but builds without NEON pay this.
