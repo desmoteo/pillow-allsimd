@@ -3,8 +3,6 @@
 #include <assert.h>
 #include <math.h>
 
-#include "ResampleSIMDHorizontalConv.c"
-#include "ResampleSIMDVerticalConv.c"
 
 #define ROUND_UP(f) ((int)((f) >= 0.0 ? (f) + 0.5F : (f) - 0.5F))
 
@@ -183,6 +181,9 @@ static inline UINT8
 clip8(int in, int precision) {
     return clip8_lookups[in >> precision];
 }
+
+#include "ResampleSIMDHorizontalConv.c"
+#include "ResampleSIMDVerticalConv.c"
 
 static int
 precompute_coeffs(

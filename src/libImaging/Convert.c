@@ -208,81 +208,148 @@ rgb2bit(UINT8 *out, const UINT8 *in, int xsize) {
     }
 }
 
+#if defined(IMAGING_SIMD_SSE4)
+#define CONVERT_VECTOR
+
+/* ITU-R Recommendation 601-2 luma of four RGBX pixels as 32-bit lanes,
+   with 15-bit coefficients. */
+static inline __m128i
+rgb2l_4px(__m128i source) {
+    __m128i coeff = _mm_set_epi16(0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
+    __m128i pix0 = _mm_unpacklo_epi8(source, _mm_setzero_si128());
+    __m128i pix1 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
+    pix0 = _mm_madd_epi16(pix0, coeff);
+    pix1 = _mm_madd_epi16(pix1, coeff);
+    pix0 = _mm_hadd_epi32(pix0, pix1);
+    pix0 = _mm_add_epi32(pix0, _mm_set1_epi32(0x4000));
+    return _mm_srli_epi32(pix0, 15);
+}
+
+static inline void
+rgb2l_4(UINT8 *out, const UINT8 *in) {
+    __m128i pix = rgb2l_4px(_mm_loadu_si128((__m128i *)in));
+    pix = _mm_packus_epi32(pix, pix);
+    UINT32 v = _mm_cvtsi128_si32(_mm_packus_epi16(pix, pix));
+    memcpy(out, &v, sizeof(v));
+}
+
+static inline void
+rgb2la_4(UINT8 *out, const UINT8 *in) {
+    __m128i pix = rgb2l_4px(_mm_loadu_si128((__m128i *)in));
+    pix = _mm_shuffle_epi8(pix, _mm_set_epi8(
+        -1,12,12,12, -1,8,8,8, -1,4,4,4, -1,0,0,0));
+    pix = _mm_or_si128(pix, _mm_set1_epi32(0xff000000));
+    _mm_storeu_si128((__m128i *)out, pix);
+}
+
+static inline void
+rgb2i_4(UINT8 *out, const UINT8 *in) {
+    _mm_storeu_si128((__m128i *)out, rgb2l_4px(_mm_loadu_si128((__m128i *)in)));
+}
+
+static inline void
+rgba2la_4(UINT8 *out, const UINT8 *in) {
+    __m128i source = _mm_loadu_si128((__m128i *)in);
+    __m128i alpha = _mm_and_si128(source, _mm_set1_epi32(0xff000000));
+    __m128i pix = rgb2l_4px(source);
+    pix = _mm_shuffle_epi8(pix, _mm_set_epi8(
+        -1,12,12,12, -1,8,8,8, -1,4,4,4, -1,0,0,0));
+    _mm_storeu_si128((__m128i *)out, _mm_or_si128(pix, alpha));
+}
+
+/* Removes premultiplication from four pixels with an approximate
+   reciprocal of alpha. Alpha 0 gives colour 0. */
+static inline void
+rgba2rgbA_4(UINT8 *out, const UINT8 *in) {
+    __m128 mmaf;
+    __m128i pix0, pix1, mma;
+    __m128i mma0, mma1;
+    __m128i source = _mm_loadu_si128((__m128i *)in);
+
+    mma = _mm_and_si128(source, _mm_set_epi8(
+        0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
+
+    mmaf = _mm_cvtepi32_ps(_mm_srli_epi32(source, 24));
+    mmaf = _mm_mul_ps(_mm_set1_ps(255.5 * 256), _mm_rcp_ps(mmaf));
+    mma1 = _mm_cvtps_epi32(mmaf);
+
+    mma0 = _mm_shuffle_epi8(mma1, _mm_set_epi8(
+        5,4,5,4, 5,4,5,4, 1,0,1,0, 1,0,1,0));
+    mma1 = _mm_shuffle_epi8(mma1, _mm_set_epi8(
+        13,12,13,12, 13,12,13,12, 9,8,9,8, 9,8,9,8));
+
+    pix0 = _mm_unpacklo_epi8(_mm_setzero_si128(), source);
+    pix1 = _mm_unpackhi_epi8(_mm_setzero_si128(), source);
+
+    pix0 = _mm_mulhi_epu16(pix0, mma0);
+    pix1 = _mm_mulhi_epu16(pix1, mma1);
+
+    source = _mm_packus_epi16(pix0, pix1);
+    source = _mm_blendv_epi8(source, mma, _mm_set_epi8(
+        0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
+    _mm_storeu_si128((__m128i *)out, source);
+}
+#endif
+
+#if defined(CONVERT_VECTOR)
+/* Runs a four-pixel kernel over a row. The last xsize % 4 pixels go
+   through the same kernel via zero-padded buffers, so the result for a
+   pixel doesn't depend on its position. */
+#define CONVERT_ROW_4PX(kernel, out, in, xsize, in_bytes, out_bytes)        \
+    {                                                                       \
+        int x_ = 0;                                                         \
+        for (; x_ < (xsize) - 3; x_ += 4) {                                 \
+            kernel((out) + x_ * (out_bytes), (in) + x_ * (in_bytes));       \
+        }                                                                   \
+        if (x_ < (xsize)) {                                                 \
+            UINT8 tin_[4 * (in_bytes)] = {0};                               \
+            UINT8 tout_[4 * (out_bytes)];                                   \
+            int n_ = (xsize) - x_;                                          \
+            memcpy(tin_, (in) + x_ * (in_bytes), n_ * (in_bytes));          \
+            kernel(tout_, tin_);                                            \
+            memcpy((out) + x_ * (out_bytes), tout_, n_ * (out_bytes));      \
+        }                                                                   \
+    }
+#endif
+
 static void
-rgb2l(UINT8* out, const UINT8* in, int xsize)
-{
-    int x = 0;
-    __m128i coeff = _mm_set_epi16(
-        0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
-    for (; x < xsize - 3; x += 4, in += 16) {
-        __m128i pix0, pix1;
-        __m128i source = _mm_loadu_si128((__m128i*)in);
-        pix0 = _mm_unpacklo_epi8(source, _mm_setzero_si128());
-        pix1 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
-        pix0 = _mm_madd_epi16(pix0, coeff);
-        pix1 = _mm_madd_epi16(pix1, coeff);
-        pix0 = _mm_hadd_epi32(pix0, pix1);
-        pix0 = _mm_add_epi32(pix0, _mm_set1_epi32(0x4000));
-        pix0 = _mm_srli_epi32(pix0, 15);
-        pix0 = _mm_packus_epi32(pix0, pix0);
-        pix0 = _mm_packus_epi16(pix0, pix0);
-        *(UINT32*)&out[x] = _mm_cvtsi128_si32(pix0);
-    }
-    for (; x < xsize; x++, in += 4) {
+rgb2l(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(CONVERT_VECTOR)
+    CONVERT_ROW_4PX(rgb2l_4, out, in, xsize, 4, 1);
+#else
+    int x;
+    for (x = 0; x < xsize; x++, in += 4) {
         /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
-        out[x] = L24(in) >> 16;
+        *out++ = L24(in) >> 16;
     }
+#endif
 }
 
 static void
-rgb2la(UINT8* out, const UINT8* in, int xsize)
-{
-    int x = 0;
-    __m128i coeff = _mm_set_epi16(
-        0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
-    for (; x < xsize - 3; x += 4, in += 16, out += 16) {
-        __m128i pix0, pix1;
-        __m128i source = _mm_loadu_si128((__m128i*)in);
-        pix0 = _mm_unpacklo_epi8(source, _mm_setzero_si128());
-        pix1 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
-        pix0 = _mm_madd_epi16(pix0, coeff);
-        pix1 = _mm_madd_epi16(pix1, coeff);
-        pix0 = _mm_hadd_epi32(pix0, pix1);
-        pix0 = _mm_add_epi32(pix0, _mm_set1_epi32(0x4000));
-        pix0 = _mm_srli_epi32(pix0, 15);
-        pix0 = _mm_shuffle_epi8(pix0, _mm_set_epi8(
-            -1,12,12,12, -1,8,8,8, -1,4,4,4, -1,0,0,0));
-        pix0 = _mm_or_si128(pix0, _mm_set1_epi32(0xff000000));
-        _mm_storeu_si128((__m128i*)out, pix0);
-    }
-    for (; x < xsize; x++, in += 4, out += 4) {
+rgb2la(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(CONVERT_VECTOR)
+    CONVERT_ROW_4PX(rgb2la_4, out, in, xsize, 4, 4);
+#else
+    int x;
+    for (x = 0; x < xsize; x++, in += 4, out += 4) {
         /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
         out[0] = out[1] = out[2] = L24(in) >> 16;
         out[3] = 255;
     }
+#endif
 }
 
 static void
-rgb2i(UINT8* out_, const UINT8* in, int xsize)
-{
-    int x = 0;
-    INT32* out = (INT32*) out_;
-    __m128i coeff = _mm_set_epi16(
-        0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
-    for (; x < xsize - 3; x += 4, in += 16, out += 4) {
-        __m128i pix0, pix1;
-        __m128i source = _mm_loadu_si128((__m128i*)in);
-        pix0 = _mm_unpacklo_epi8(source, _mm_setzero_si128());
-        pix1 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
-        pix0 = _mm_madd_epi16(pix0, coeff);
-        pix1 = _mm_madd_epi16(pix1, coeff);
-        pix0 = _mm_hadd_epi32(pix0, pix1);
-        pix0 = _mm_add_epi32(pix0, _mm_set1_epi32(0x4000));
-        pix0 = _mm_srli_epi32(pix0, 15);
-        _mm_storeu_si128((__m128i*)out, pix0);
+rgb2i(UINT8 *out_, const UINT8 *in, int xsize) {
+#if defined(CONVERT_VECTOR)
+    CONVERT_ROW_4PX(rgb2i_4, out_, in, xsize, 4, 4);
+#else
+    int x;
+    for (x = 0; x < xsize; x++, in += 4, out_ += 4) {
+        INT32 v = L24(in) >> 16;
+        memcpy(out_, &v, sizeof(v));
     }
-    for (; x < xsize; x++, in += 4)
-        *out++ = L24(in) >> 16;
+#endif
 }
 
 static void
@@ -445,32 +512,17 @@ rgb2rgba(UINT8 *out, const UINT8 *in, int xsize) {
 }
 
 static void
-rgba2la(UINT8* out, const UINT8* in, int xsize)
-{
-    int x = 0;
-    __m128i coeff = _mm_set_epi16(
-        0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
-    for (; x < xsize - 3; x += 4, in += 16, out += 16) {
-        __m128i pix0, pix1;
-        __m128i source = _mm_loadu_si128((__m128i*)in);
-        __m128i alpha = _mm_and_si128(source, _mm_set1_epi32(0xff000000));
-        pix0 = _mm_unpacklo_epi8(source, _mm_setzero_si128());
-        pix1 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
-        pix0 = _mm_madd_epi16(pix0, coeff);
-        pix1 = _mm_madd_epi16(pix1, coeff);
-        pix0 = _mm_hadd_epi32(pix0, pix1);
-        pix0 = _mm_add_epi32(pix0, _mm_set1_epi32(0x4000));
-        pix0 = _mm_srli_epi32(pix0, 15);
-        pix0 = _mm_shuffle_epi8(pix0, _mm_set_epi8(
-            -1,12,12,12, -1,8,8,8, -1,4,4,4, -1,0,0,0));
-        pix0 = _mm_or_si128(pix0, alpha);
-        _mm_storeu_si128((__m128i*)out, pix0);
-    }
-    for (; x < xsize; x++, in += 4, out += 4) {
+rgba2la(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(CONVERT_VECTOR)
+    CONVERT_ROW_4PX(rgba2la_4, out, in, xsize, 4, 4);
+#else
+    int x;
+    for (x = 0; x < xsize; x++, in += 4, out += 4) {
         /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
         out[0] = out[1] = out[2] = L24(in) >> 16;
         out[3] = in[3];
     }
+#endif
 }
 
 static void
@@ -492,7 +544,7 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
     unsigned char alpha;
     int x = 0;
 
-#if defined(__AVX2__)
+#if defined(IMAGING_SIMD_AVX2)
     
     __m256i zero = _mm256_setzero_si256();
     __m256i half = _mm256_set1_epi16(128);
@@ -525,7 +577,7 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
         _mm256_storeu_si256((__m256i *) &out[x * 4], source);
     }
 
-#else
+#elif defined(IMAGING_SIMD_SSE4)
 
     __m128i zero = _mm_setzero_si128();
     __m128i half = _mm_set1_epi16(128);
@@ -571,10 +623,10 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
 static void
 rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
 {
+#if defined(CONVERT_VECTOR)
     int x = 0;
-    unsigned int alpha;
 
-#if defined(__AVX2__)
+#if defined(IMAGING_SIMD_AVX2)
 
     for (; x < xsize - 7; x += 8) {
         __m256 mmaf;
@@ -612,40 +664,11 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
 
 #endif
 
-    for (; x < xsize - 3; x += 4) {
-        __m128 mmaf;
-        __m128i pix0, pix1, mma;
-        __m128i mma0, mma1;
-        __m128i source = _mm_loadu_si128((__m128i *) &in[x * 4]);
-
-        mma = _mm_and_si128(source, _mm_set_epi8(
-            0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
-        
-        mmaf = _mm_cvtepi32_ps(_mm_srli_epi32(source, 24));
-        mmaf = _mm_mul_ps(_mm_set1_ps(255.5 * 256), _mm_rcp_ps(mmaf));
-        mma1 = _mm_cvtps_epi32(mmaf);
-
-        mma0 = _mm_shuffle_epi8(mma1, _mm_set_epi8(
-            5,4,5,4, 5,4,5,4, 1,0,1,0, 1,0,1,0));
-        mma1 = _mm_shuffle_epi8(mma1, _mm_set_epi8(
-            13,12,13,12, 13,12,13,12, 9,8,9,8, 9,8,9,8));
-
-        pix0 = _mm_unpacklo_epi8(_mm_setzero_si128(), source);
-        pix1 = _mm_unpackhi_epi8(_mm_setzero_si128(), source);
-
-        pix0 = _mm_mulhi_epu16(pix0, mma0);
-        pix1 = _mm_mulhi_epu16(pix1, mma1);
-
-        source = _mm_packus_epi16(pix0, pix1);
-        source = _mm_blendv_epi8(source, mma, _mm_set_epi8(
-            0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
-        _mm_storeu_si128((__m128i *) &out[x * 4], source);
-    }
-
-    in = &in[x * 4];
-    out = &out[x * 4];
-
-    for (; x < xsize; x++, in += 4) {
+    CONVERT_ROW_4PX(rgba2rgbA_4, out + x * 4, in + x * 4, xsize - x, 4, 4);
+#else
+    int x;
+    unsigned int alpha;
+    for (x = 0; x < xsize; x++, in += 4) {
         alpha = in[3];
         if (alpha == 255 || alpha == 0) {
             *out++ = in[0];
@@ -658,6 +681,7 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
         }
         *out++ = in[3];
     }
+#endif
 }
 
 static void

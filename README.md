@@ -102,13 +102,24 @@ Please install [prerequisites](https://pillow.readthedocs.io/en/stable/installat
 The installation itself is simple just as running `$ pip install pillow-simd`,
 and if you're using SSE4-capable CPU everything should run smoothly.
 If you'd like to install the AVX2-enabled version,
-you need to pass the additional flag to a C compiler.
-The easiest way to do so is to define the `CC` variable during the compilation.
+pass the `simd` build option:
 
 ```bash
 $ pip uninstall pillow
-$ CC="cc -mavx2" pip install -U --force-reinstall pillow-simd
+$ pip install -U --force-reinstall --no-binary pillow-simd -C simd=avx2 pillow-simd
 ```
+
+The `simd` option accepts:
+
+- `auto` (default): SSE4.1 on x86, NEON on arm64, portable C elsewhere.
+- `sse4`: SSE4.1 (x86 only).
+- `avx2`: SSE4.1 and AVX2 (x86 only).
+- `neon`: NEON (arm64 only).
+- `disable`: portable C code only, on any architecture.
+
+Defining the `CC` variable (`CC="cc -mavx2"`) also works.
+Don't use `CFLAGS` for this: setting it replaces Python's default
+compiler flags, including the optimization level.
 
 
 ## Contributing to Pillow-SIMD
