@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 
 import pytest
 
@@ -385,3 +386,39 @@ class TestImageTransformAffine:
 class TestImageTransformPerspective(TestImageTransformAffine):
     # Repeat all tests for AFFINE transformations with PERSPECTIVE
     transform = Image.Transform.PERSPECTIVE
+
+
+@pytest.mark.parametrize("mode", ("RGB", "RGBX", "CMYK"))
+@pytest.mark.parametrize(
+    "resample",
+    (Image.Resampling.NEAREST, Image.Resampling.BILINEAR, Image.Resampling.BICUBIC),
+)
+def test_multiband_matches_single_band(mode: str, resample: Image.Resampling) -> None:
+    # Multi-band images have their own (SIMD) filters, and every image is
+    # transformed in tiles of the output; each band must still equal the same
+    # transform of an L image. 150x90 spans several tiles.
+    im = hopper(mode).resize((150, 90))
+    bands = im.split()
+
+    def check(transform: Callable[[Image.Image], Image.Image]) -> None:
+        expected = Image.merge(mode, [transform(band) for band in bands])
+        assert_image_equal(transform(im), expected)
+
+    check(lambda i: i.rotate(30, resample))
+    check(lambda i: i.rotate(-117.5, resample, expand=True))
+    check(
+        lambda i: i.transform(
+            (170, 80),
+            Image.Transform.AFFINE,
+            (1.2, 0.3, -9.5, -0.2, 0.9, 4.2),
+            resample,
+        )
+    )
+    check(
+        lambda i: i.transform(
+            (150, 90),
+            Image.Transform.PERSPECTIVE,
+            (1.1, 0.1, -3, 0.05, 0.9, 2, 1e-3, 2e-3),
+            resample,
+        )
+    )

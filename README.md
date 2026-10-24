@@ -59,6 +59,8 @@ The following image operations are currently SIMD-accelerated:
   with it), NEON on L images
 - 3x3 and 5x5 kernel filters with float kernels (large coefficients): SSE4,
   AVX2 (3x3 only), NEON on 4-byte images; SSE4 on L images
+- Rotate and transforms with bilinear and bicubic filters, 3- and 4-band
+  images: SSE4, AVX2; every architecture transforms in cache-friendly tiles
 - 3D color lookup tables: SSE4, AVX2, NEON
 - `ImageChops.multiply` and `screen`: SSE4, AVX2, NEON
 - RGB pack and unpack (`frombytes`, `tobytes`, codecs): SSE4, NEON
