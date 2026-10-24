@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from PIL import Image, ImageFilter
@@ -160,6 +162,35 @@ def test_rankfilter_properties() -> None:
         ImageFilter.RankFilter(1, 1)
 
 
+def test_rankfilter_overflow() -> None:
+    # Large margins used to overflow the ImagingExpand overflow guard itself (SIGFPE),
+    # by mutating RankFilter.size after construction, bypassing __init__'s validation.
+    im = Image.new("L", (16, 16))
+    rankfilter = ImageFilter.RankFilter(3, 0)
+
+    for size in (2**31, 2**32 - 1):  # margins of 2**30 and INT_MAX
+        rankfilter.size = size
+        with pytest.raises(ValueError, match="filter size too large"):
+            im.filter(rankfilter)
+
+
+@pytest.mark.parametrize(
+    "filter",
+    (
+        ImageFilter.MinFilter(1),
+        ImageFilter.MedianFilter(1),
+        ImageFilter.MaxFilter(1),
+        ImageFilter.RankFilter(3, 1),
+    ),
+)
+@pytest.mark.parametrize("size", ((0, 1), (1, 0), (0, 0)))
+def test_rankfilter_zero_dimension(
+    filter: ImageFilter.RankFilter, size: tuple[int, int]
+) -> None:
+    im = Image.new("L", size)
+    assert im.filter(filter).size == size
+
+
 def test_builtinfilter_p() -> None:
     builtin_filter = ImageFilter.BuiltinFilter()
 
@@ -210,44 +241,48 @@ def test_consistency_5x5(mode: str) -> None:
             assert_image_equal(source.filter(kernel), reference)
 
 
-@pytest.mark.parametrize(
-    "radius",
-    (
-        -2,
-        (-2, -2),
-        (-2, 2),
-        (2, -2),
-    ),
-)
-def test_invalid_box_blur_filter(radius: int | tuple[int, int]) -> None:
-    with pytest.raises(ValueError):
-        ImageFilter.BoxBlur(radius)
+@pytest.mark.parametrize("size", (-1, math.nan, math.inf, 2**31))
+def test_invalid_box_blur_filter(size: float) -> None:
+    for radius in (size, (size, size), (size, 1), (1, size)):
+        with pytest.raises(ValueError, match="radius"):
+            ImageFilter.BoxBlur(radius)
 
+        im = hopper()
+        box_blur_filter = ImageFilter.BoxBlur(2)
+        box_blur_filter.radius = radius
+        with pytest.raises(ValueError, match="radius"):
+            im.filter(box_blur_filter)
+
+
+@pytest.mark.parametrize("radius", (math.nan, math.inf, 2**31))
+def test_invalid_gaussian_blur_filter(radius: float) -> None:
     im = hopper()
-    box_blur_filter = ImageFilter.BoxBlur(2)
-    box_blur_filter.radius = radius
-    with pytest.raises(ValueError):
-        im.filter(box_blur_filter)
+    with pytest.raises(ValueError, match="radius"):
+        im.filter(ImageFilter.GaussianBlur(radius))
 
 
-@pytest.mark.parametrize("mode", ("I;16", "I;16L", "I;16B"))
+@pytest.mark.parametrize("mode", ("I;16", "I;16L", "I;16B", "I;16N"))
 def test_i16_uses_generic_kernel(mode: str) -> None:
-    # Reference values from the generic (upstream) kernel. 16-bit images
-    # must not be routed to the 8-bit SIMD kernels.
+    # 16-bit images must not be routed to the 8-bit SIMD kernels, and must
+    # filter like the same values in an "I" image, high byte included.
+    data = [(x * 337 + y * 1009) % 4000 for y in range(5) for x in range(6)]
     im = Image.new(mode, (6, 5))
-    im.putdata([(x * 37 + y * 101) % 1000 for y in range(5) for x in range(6)])
-    # fmt: off
-    expected = {
-        "SMOOTH": [
-            0, 37, 74, 111, 148, 185, 101, 119, 136, 153, 171, 286, 202, 161, 99,
-            117, 134, 387, 303, 124, 122, 119, 136, 488, 404, 441, 478, 515, 552, 589,
-        ],
-        "SMOOTH_MORE": [
-            0, 37, 74, 111, 148, 185, 101, 138, 175, 212, 249, 286, 202, 239, 87,
-            106, 350, 387, 303, 340, 377, 414, 451, 488, 404, 441, 478, 515, 552, 589,
-        ],
-    }
-    # fmt: on
-    for name, data in expected.items():
-        out = im.filter(getattr(ImageFilter, name))
-        assert list(out.get_flattened_data()) == data
+    im.putdata(data)
+    # Not im.convert("I"): I;16N -> I clips to 255.
+    im_i = Image.new("I", (6, 5))
+    im_i.putdata(data)
+    for name in ("SMOOTH", "SMOOTH_MORE", "EMBOSS", "SHARPEN"):
+        kernel = getattr(ImageFilter, name)
+        reference = im_i.filter(kernel).get_flattened_data()
+        assert list(im.filter(kernel).get_flattened_data()) == list(reference)
+
+
+@pytest.mark.parametrize("mode", ("I;16", "I;16L", "I;16B", "I;16N"))
+def test_consistency_i16_high_byte(mode: str) -> None:
+    # Exercise filters with a 16bpc image that has content in the high byte, too.
+    im = Image.new(mode, (8, 8), 1000)
+    # Ensure repeated smoothing retains the exact same color value,
+    # rather than drifting due to rounding errors.
+    for _ in range(5):
+        im = im.filter(ImageFilter.SMOOTH)
+        assert im.getpixel((4, 4)) == 1000
