@@ -501,7 +501,7 @@ ImagingFilter(Imaging im, int xsize, int ysize, const FLOAT32 *kernel, FLOAT32 o
     }
 
     ImagingSectionEnter(&cookie);
-    if (im->type == IMAGING_TYPE_INT32) {
+    if (im->type == IMAGING_TYPE_INT32 || im->type == IMAGING_TYPE_SPECIAL) {
         if (xsize == 3) {
             ImagingFilter3x3(imOut, im, kernel, offset);
         } else {

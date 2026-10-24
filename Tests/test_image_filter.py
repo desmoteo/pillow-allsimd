@@ -228,3 +228,26 @@ def test_invalid_box_blur_filter(radius: int | tuple[int, int]) -> None:
     box_blur_filter.radius = radius
     with pytest.raises(ValueError):
         im.filter(box_blur_filter)
+
+
+@pytest.mark.parametrize("mode", ("I;16", "I;16L", "I;16B"))
+def test_i16_uses_generic_kernel(mode: str) -> None:
+    # Reference values from the generic (upstream) kernel. 16-bit images
+    # must not be routed to the 8-bit SIMD kernels.
+    im = Image.new(mode, (6, 5))
+    im.putdata([(x * 37 + y * 101) % 1000 for y in range(5) for x in range(6)])
+    # fmt: off
+    expected = {
+        "SMOOTH": [
+            0, 37, 74, 111, 148, 185, 101, 119, 136, 153, 171, 286, 202, 161, 99,
+            117, 134, 387, 303, 124, 122, 119, 136, 488, 404, 441, 478, 515, 552, 589,
+        ],
+        "SMOOTH_MORE": [
+            0, 37, 74, 111, 148, 185, 101, 138, 175, 212, 249, 286, 202, 239, 87,
+            106, 350, 387, 303, 340, 377, 414, 451, 488, 404, 441, 478, 515, 552, 589,
+        ],
+    }
+    # fmt: on
+    for name, data in expected.items():
+        out = im.filter(getattr(ImageFilter, name))
+        assert list(out.get_flattened_data()) == data
