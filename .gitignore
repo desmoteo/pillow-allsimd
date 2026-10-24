@@ -100,3 +100,6 @@ pillow-test-images.zip
 
 # Generated SBOM
 pillow-*.cdx.json
+
+# checks/simd_bench_remote.sh output
+/bench-results/

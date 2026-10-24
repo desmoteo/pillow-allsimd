@@ -294,30 +294,27 @@ rgba2rgbA_4(UINT8 *out, const UINT8 *in) {
 #if defined(IMAGING_SIMD_NEON)
 #define CONVERT_VECTOR
 
-/* ITU-R Recommendation 601-2 luma of 16 pixels with the same 15-bit
-   coefficients as the SSE4 code, so results are identical. */
+/* ITU-R Recommendation 601-2 luma of 8 pixels with the same 15-bit
+   coefficients as the SSE4 code, so results are identical. Each
+   coefficient is split into bytes (9798 = 38 * 256 + 70, 19235 = 75 * 256
+   + 35, 3735 = 14 * 256 + 151) so all products fit 16-bit lanes:
+   (hi * 256 + lo + 0x4000) >> 15 == (hi + (lo >> 8) + 64) >> 7. */
+static inline uint8x8_t
+rgb2l_8px(uint8x8_t r, uint8x8_t g, uint8x8_t b) {
+    uint16x8_t hi = vmull_u8(r, vdup_n_u8(38));
+    hi = vmlal_u8(hi, g, vdup_n_u8(75));
+    hi = vmlal_u8(hi, b, vdup_n_u8(14));
+    uint16x8_t lo = vmull_u8(r, vdup_n_u8(70));
+    lo = vmlal_u8(lo, g, vdup_n_u8(35));
+    lo = vmlal_u8(lo, b, vdup_n_u8(151));
+    return vrshrn_n_u16(vsraq_n_u16(hi, lo, 8), 7);
+}
+
 static inline uint8x16_t
 rgb2l_16px(uint8x16x4_t px) {
-    uint16x8_t r_lo = vmovl_u8(vget_low_u8(px.val[0]));
-    uint16x8_t r_hi = vmovl_u8(vget_high_u8(px.val[0]));
-    uint16x8_t g_lo = vmovl_u8(vget_low_u8(px.val[1]));
-    uint16x8_t g_hi = vmovl_u8(vget_high_u8(px.val[1]));
-    uint16x8_t b_lo = vmovl_u8(vget_low_u8(px.val[2]));
-    uint16x8_t b_hi = vmovl_u8(vget_high_u8(px.val[2]));
-    uint32x4_t l0, l1, l2, l3;
-
-#define LUMA(r, g, b) \
-    vmlal_n_u16(vmlal_n_u16(vmull_n_u16(r, 9798), g, 19235), b, 3735)
-    l0 = LUMA(vget_low_u16(r_lo), vget_low_u16(g_lo), vget_low_u16(b_lo));
-    l1 = LUMA(vget_high_u16(r_lo), vget_high_u16(g_lo), vget_high_u16(b_lo));
-    l2 = LUMA(vget_low_u16(r_hi), vget_low_u16(g_hi), vget_low_u16(b_hi));
-    l3 = LUMA(vget_high_u16(r_hi), vget_high_u16(g_hi), vget_high_u16(b_hi));
-#undef LUMA
-
-    // (sum + 0x4000) >> 15
-    uint16x8_t lo = vcombine_u16(vrshrn_n_u32(l0, 15), vrshrn_n_u32(l1, 15));
-    uint16x8_t hi = vcombine_u16(vrshrn_n_u32(l2, 15), vrshrn_n_u32(l3, 15));
-    return vcombine_u8(vqmovn_u16(lo), vqmovn_u16(hi));
+    return vcombine_u8(
+        rgb2l_8px(vget_low_u8(px.val[0]), vget_low_u8(px.val[1]), vget_low_u8(px.val[2])),
+        rgb2l_8px(vget_high_u8(px.val[0]), vget_high_u8(px.val[1]), vget_high_u8(px.val[2])));
 }
 
 static inline void

@@ -188,12 +188,16 @@ def main() -> int:
     for n in names:
         print(f"  {n}: Pillow {report['variants'][n]['version']} from {report['variants'][n]['pil']}")
     others = [n for n in names if n != baseline]
+    width = max([11] + [len(n) + 2 for n in names])
+    swidth = max([len(baseline) + 6] + [len(n) + 4 for n in others])
     print()
-    print(f"{'operation':28s}" + "".join(f"{n:>11s}" for n in names)
-          + "".join(f"  {('speedup ' + n):>16s}" for n in others))
+    print(f"{'':28s}" + " " * (width * len(names))
+          + "".join(f"{'vs ' + baseline:>{swidth}s}" for _ in others))
+    print(f"{'operation':28s}" + "".join(f"{n:>{width}s}" for n in names)
+          + "".join(f"{n:>{swidth}s}" for n in others))
     for op in best[baseline]:
-        row = f"{op:28s}" + "".join(f"{best[n][op]:11.2f}" for n in names)
-        row += "".join(f"  {best[baseline][op] / best[n][op]:15.2f}x" for n in others)
+        row = f"{op:28s}" + "".join(f"{best[n][op]:{width}.2f}" for n in names)
+        row += "".join(f"{best[baseline][op] / best[n][op]:{swidth - 1}.2f}x" for n in others)
         print(row)
 
     if args.check:
