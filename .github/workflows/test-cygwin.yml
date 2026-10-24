@@ -145,6 +145,8 @@ jobs:
           flags: GHA_Cygwin
           name: Cygwin Python 3.${{ matrix.python-minor-version }}
           token: ${{ secrets.CODECOV_ORG_TOKEN }}
+          # Cygwin's gpg comes first on PATH and cannot read Codecov's key.
+          skip_validation: true
 
   success:
     permissions:
