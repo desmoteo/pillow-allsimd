@@ -160,17 +160,22 @@ alpha_composite_8px(__m256i mm_dst, __m256i mm_src) {
 
 #if defined(IMAGING_SIMD_NEON)
 
-/* floor(n / d) for four lanes. Doubles hold both operands exactly and
-   the quotient closely enough that truncation gives the integer result. */
+/* floor(n / d) for four lanes, n < 2^31, d > 0. A reciprocal estimate
+   refined twice is within 2^-21 of 1 / d, so the truncated quotient is off
+   by at most one; the remainder corrects it. No divide instruction. */
 static inline uint32x4_t
 neon_div_u32(uint32x4_t n, uint32x4_t d) {
-    float64x2_t q_lo = vdivq_f64(
-        vcvtq_f64_u64(vmovl_u32(vget_low_u32(n))),
-        vcvtq_f64_u64(vmovl_u32(vget_low_u32(d))));
-    float64x2_t q_hi = vdivq_f64(
-        vcvtq_f64_u64(vmovl_high_u32(n)), vcvtq_f64_u64(vmovl_high_u32(d)));
-    return vcombine_u32(
-        vmovn_u64(vcvtq_u64_f64(q_lo)), vmovn_u64(vcvtq_u64_f64(q_hi)));
+    float32x4_t df = vcvtq_f32_u32(d);
+    float32x4_t r = vrecpeq_f32(df);
+    r = vmulq_f32(r, vrecpsq_f32(df, r));
+    r = vmulq_f32(r, vrecpsq_f32(df, r));
+    uint32x4_t q = vcvtq_u32_f32(vmulq_f32(vcvtq_f32_u32(n), r));
+    // Remainder below zero: q is one too big (adds the all-ones mask, -1).
+    int32x4_t rem = vreinterpretq_s32_u32(vmlsq_u32(n, q, d));
+    q = vaddq_u32(q, vreinterpretq_u32_s32(vshrq_n_s32(rem, 31)));
+    // Remainder d or more: q is one too small (subtracts the mask, +1).
+    uint32x4_t rem2 = vmlsq_u32(n, q, d);
+    return vsubq_u32(q, vcgeq_u32(rem2, d));
 }
 
 /* SHIFTFORDIV255(src * coef1 + dst * coef2 + (0x80 << 7)) >> 7 */

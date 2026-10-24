@@ -1065,6 +1065,11 @@ class pil_build_ext(build_ext):
                 raise ValueError(msg)
             simd = "none (scalar)"
 
+        # GCC only vectorizes loops at -O2 since version 12; the scalar code
+        # paths need it to match upstream wheels built with newer compilers.
+        if not msvc:
+            args = args + ["-ftree-vectorize"]
+
         for extension in self.extensions:
             if extension.name == "PIL._imaging":
                 extension.extra_compile_args += args
