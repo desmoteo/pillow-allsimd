@@ -59,5 +59,6 @@ def test_histogram_counts(mode: str, size: tuple[int, int]) -> None:
     for value in im.get_flattened_data():
         values = value if isinstance(value, tuple) else (value,)
         for band, v in enumerate(values):
+            assert isinstance(v, int)
             expected[band * 256 + v] += 1
     assert im.histogram() == expected

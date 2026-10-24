@@ -21,7 +21,9 @@ clip8(int in) {
 
 /* Sharpens one row of bytes in place: out holds the blurred row. */
 static void
-ImagingUnsharpMaskRow(UINT8 *out, const UINT8 *in, int size, int percent, int threshold) {
+ImagingUnsharpMaskRow(
+    UINT8 *out, const UINT8 *in, int size, int percent, int threshold
+) {
     int x = 0, diff;
 
     /* arm64 uses the loop below, which compilers vectorize with a
@@ -37,14 +39,15 @@ ImagingUnsharpMaskRow(UINT8 *out, const UINT8 *in, int size, int percent, int th
             __m128i src = _mm_loadu_si128((__m128i *)&in[x]);
             __m128i blur = _mm_loadu_si128((__m128i *)&out[x]);
             __m128i res[4];
-#define UNSHARP_4(i)                                                              \
-    {                                                                             \
-        __m128i v = _mm_cvtepu8_epi32(_mm_srli_si128(src, i * 4));                \
+#define UNSHARP_4(i)                                                                  \
+    {                                                                                 \
+        __m128i v = _mm_cvtepu8_epi32(_mm_srli_si128(src, i * 4));                    \
         __m128i d = _mm_sub_epi32(v, _mm_cvtepu8_epi32(_mm_srli_si128(blur, i * 4))); \
-        __m128i q = _mm_cvttps_epi32(                                             \
-            _mm_div_ps(_mm_cvtepi32_ps(_mm_mullo_epi32(d, pct)), hundred));       \
-        __m128i mask = _mm_cmpgt_epi32(_mm_abs_epi32(d), thr);                    \
-        res[i] = _mm_blendv_epi8(v, _mm_add_epi32(v, q), mask);                   \
+        __m128i q = _mm_cvttps_epi32(                                                 \
+            _mm_div_ps(_mm_cvtepi32_ps(_mm_mullo_epi32(d, pct)), hundred)             \
+        );                                                                            \
+        __m128i mask = _mm_cmpgt_epi32(_mm_abs_epi32(d), thr);                        \
+        res[i] = _mm_blendv_epi8(v, _mm_add_epi32(v, q), mask);                       \
     }
             UNSHARP_4(0);
             UNSHARP_4(1);
@@ -96,8 +99,11 @@ ImagingUnsharpMask(
 
     for (y = 0; y < imIn->ysize; y++) {
         ImagingUnsharpMaskRow(
-            (UINT8 *)imOut->image[y], (UINT8 *)imIn->image[y], imIn->linesize,
-            percent, threshold
+            (UINT8 *)imOut->image[y],
+            (UINT8 *)imIn->image[y],
+            imIn->linesize,
+            percent,
+            threshold
         );
     }
 

@@ -6,7 +6,7 @@ import pytest
 
 from PIL import FitsImagePlugin, Image
 
-from .helper import assert_image_similar, assert_image_equal_tofile, hopper
+from .helper import assert_image_equal_tofile, assert_image_similar, hopper
 
 TEST_FILE = "Tests/images/hopper.fits"
 

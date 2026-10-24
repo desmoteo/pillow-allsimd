@@ -201,7 +201,7 @@ pretty = true
 
 [tool.pytest]
 addopts = [ "-ra", "--color=auto" ]
+markers = [ "mem: requires a large amount of memory" ]
 testpaths = [
   "Tests",
 ]
-markers = ["mem: requires a large amount of memory"]

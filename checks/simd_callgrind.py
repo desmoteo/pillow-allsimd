@@ -34,6 +34,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from types import ModuleType
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.join(HERE, "simd_bench.py")
@@ -52,8 +53,10 @@ void vg_dump(const char *name) { CALLGRIND_DUMP_STATS_AT(name); }
 """
 
 
-def load_bench():
+def load_bench() -> ModuleType:
     spec = importlib.util.spec_from_file_location("simd_bench", BENCH)
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -75,7 +78,9 @@ def worker(path: str, op: str, control: str, size: tuple[int, int]) -> None:
     vg.vg_dump(op.encode())
 
 
-def run(name: str, path: str, op: str, control: str, args) -> tuple[str, str, int]:
+def run(
+    name: str, path: str, op: str, control: str, args: argparse.Namespace
+) -> tuple[str, str, int]:
     d = os.path.join(args.out, name)
     os.makedirs(d, exist_ok=True)
     cmd = [
@@ -90,7 +95,7 @@ def run(name: str, path: str, op: str, control: str, args) -> tuple[str, str, in
     return name, op, rc
 
 
-def totals(out: str, name: str, op: str) -> dict | None:
+def totals(out: str, name: str, op: str) -> dict[str, int] | None:
     # The dump made by the client request is the one numbered .1.
     for f in glob.glob(os.path.join(out, name, slug(op) + ".*.1")):
         events = values = None
@@ -118,7 +123,8 @@ def main() -> None:
     ap.add_argument("--op", help=argparse.SUPPRESS)
     ap.add_argument("--control", help=argparse.SUPPRESS)
     args = ap.parse_args()
-    size = tuple(int(v) for v in args.size.split("x"))
+    w, h = (int(v) for v in args.size.split("x"))
+    size = (w, h)
 
     if args.worker:
         worker(args.worker, args.op, args.control, size)
@@ -156,9 +162,10 @@ def main() -> None:
     print("\nInstructions (millions)")
     print(f"{'operation':30s}" + "".join(f"{n:>12s}" for n in names))
     for o in ops:
-        row = [
-            results[o][n]["Ir"] / 1e6 if results[o][n] else float("nan") for n in names
-        ]
+        row = []
+        for n in names:
+            t = results[o][n]
+            row.append(t["Ir"] / 1e6 if t else float("nan"))
         print(f"{o:30s}" + "".join(f"{v:12.1f}" for v in row))
 
     print("\nMisses and mispredicts (millions)")

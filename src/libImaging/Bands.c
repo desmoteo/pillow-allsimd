@@ -48,7 +48,23 @@ ImagingGetBand(Imaging imIn, int band) {
 
 #if defined(IMAGING_SIMD_SSE4)
     __m128i shuffle_mask = _mm_set_epi8(
-        -1,-1,-1,-1, -1,-1,-1,-1, -1,-1,-1,-1, 12+band,8+band,4+band,0+band);
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        12 + band,
+        8 + band,
+        4 + band,
+        0 + band
+    );
 #endif
 
     /* Extract band from image */
@@ -63,7 +79,7 @@ ImagingGetBand(Imaging imIn, int band) {
         x = 0;
 #if defined(IMAGING_SIMD_SSE4)
         for (; x < xsize - 3; x += 4) {
-            __m128i source = _mm_loadu_si128((__m128i *) in);
+            __m128i source = _mm_loadu_si128((__m128i *)in);
             UINT32 v = _mm_cvtsi128_si32(_mm_shuffle_epi8(source, shuffle_mask));
             memcpy(out + x, &v, sizeof(v));
             in += 16;
@@ -94,9 +110,11 @@ ImagingGetBand(Imaging imIn, int band) {
 /* Copies four 4-byte pixels of one or more bands into separate planes. */
 #if defined(IMAGING_SIMD_SSE4)
 #define SPLIT_STEP 4
-#define SPLIT_LOAD(in) \
-    __m128i source = _mm_shuffle_epi8(_mm_loadu_si128((__m128i *)(in)), \
-        _mm_set_epi8(15,11,7,3, 14,10,6,2, 13,9,5,1, 12,8,4,0));
+#define SPLIT_LOAD(in)                                                     \
+    __m128i source = _mm_shuffle_epi8(                                     \
+        _mm_loadu_si128((__m128i *)(in)),                                  \
+        _mm_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0) \
+    );
 #define SPLIT_STORE(out, band)                                          \
     {                                                                   \
         UINT32 v = _mm_cvtsi128_si32(_mm_srli_si128(source, 4 * band)); \
@@ -109,10 +127,10 @@ ImagingGetBand(Imaging imIn, int band) {
 #else
 #define SPLIT_STEP 4
 #define SPLIT_LOAD(in)
-#define SPLIT_STORE(out, band)                                                    \
-    {                                                                             \
+#define SPLIT_STORE(out, band)                                                       \
+    {                                                                                \
         UINT32 v = MAKE_UINT32(in[band], in[4 + band], in[8 + band], in[12 + band]); \
-        memcpy(out, &v, sizeof(v));                                               \
+        memcpy(out, &v, sizeof(v));                                                  \
     }
 #endif
 
@@ -362,7 +380,9 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             x = 0;
 #if defined(IMAGING_SIMD_NEON)
             for (; x < xsize - 15; x += 16) {
-                uint8x16x4_t px = {{vld1q_u8(in0 + x), vdupq_n_u8(0), vdupq_n_u8(0), vld1q_u8(in1 + x)}};
+                uint8x16x4_t px = {
+                    {vld1q_u8(in0 + x), vdupq_n_u8(0), vdupq_n_u8(0), vld1q_u8(in1 + x)}
+                };
                 vst4q_u8((UINT8 *)&out[x], px);
             }
 #endif
@@ -379,7 +399,12 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             x = 0;
 #if defined(IMAGING_SIMD_NEON)
             for (; x < xsize - 15; x += 16) {
-                uint8x16x4_t px = {{vld1q_u8(in0 + x), vld1q_u8(in1 + x), vld1q_u8(in2 + x), vdupq_n_u8(0)}};
+                uint8x16x4_t px = {
+                    {vld1q_u8(in0 + x),
+                     vld1q_u8(in1 + x),
+                     vld1q_u8(in2 + x),
+                     vdupq_n_u8(0)}
+                };
                 vst4q_u8((UINT8 *)&out[x], px);
             }
 #endif
@@ -397,7 +422,12 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             x = 0;
 #if defined(IMAGING_SIMD_NEON)
             for (; x < xsize - 15; x += 16) {
-                uint8x16x4_t px = {{vld1q_u8(in0 + x), vld1q_u8(in1 + x), vld1q_u8(in2 + x), vld1q_u8(in3 + x)}};
+                uint8x16x4_t px = {
+                    {vld1q_u8(in0 + x),
+                     vld1q_u8(in1 + x),
+                     vld1q_u8(in2 + x),
+                     vld1q_u8(in3 + x)}
+                };
                 vst4q_u8((UINT8 *)&out[x], px);
             }
 #endif
