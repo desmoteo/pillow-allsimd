@@ -2,6 +2,11 @@
 
 Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/x86-fixes-arm64-neon`; review written at `2e6edeec2`, step 1 of section 5 done in `311d9e4e5`.
 
+## Where things stand (2026-10-26)
+
+- Done: the 13.0 bug fixes (step 1), every SIMD target of section 4 except the RGB horizontal box-blur pass, the callgrind items, x86 work ported to arm64, and the new x86 build options (sections at the end).
+- Open: **the rebase onto Pillow 13.0** (steps 3 and 4 of section 5), a second arm64 machine for the NEON/portable split, and runtime dispatch (not planned on this branch).
+
 ## Sources and method
 
 - Pillow 12.3.0 and 13.0.0 sdists from PyPI, compared file by file.
@@ -22,9 +27,9 @@ Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_AS
    - vertical-first resampling when the height shrinks much more than the width,
    - 32-bit palette copies,
    - an OR-reduce in `getbbox`,
-   - row `memcpy` in `offset`.
+   - row `memcpy` in `offset` (done, `bc77919ef`).
 4. **The Jetson run showed that compiler auto-vectorisation can beat hand-written NEON.** On GCC 11 it beat our NEON kernels for blur, unsharp mask and alpha composite. Those three now use the portable code on arm64 (`2e6edeec2`).
-5. **New SIMD targets** that upstream does not cover: `ImageChops.multiply`/`screen` (exact divide by 255 is possible), NEON ColorLUT, NEON `reduce` 3 and 4, and the horizontal box-blur pass.
+5. **New SIMD targets** that upstream does not cover: `ImageChops.multiply`/`screen` (exact divide by 255 is possible), NEON ColorLUT, NEON `reduce` 3 and 4, and the horizontal box-blur pass. All done except the RGB horizontal box-blur pass; for 1-byte images it is done on x86.
 
 ## 1. What the Jetson run says (commit `b1730a851`, ms, best of 5)
 
@@ -137,11 +142,11 @@ Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills
    - take vertical-first resampling (3.1) through the SIMD kernels;
    - add mutexes to the SIMD entry points (3.6);
    - check the 16-bit coefficients with MKS2021.
-5. **NEON ColorLUT (4.2) and NEON reduce 3/4 (4.3)**, then the horizontal box blur (4.4).
+5. ~~**NEON ColorLUT (4.2) and NEON reduce 3/4 (4.3)**~~ Done (`9fd5b665a`). Horizontal box blur (4.4): done for 1-byte images on x86; two RGB rows per AVX2 vector and the arm64 port were measured and dropped.
 6. ~~**Items from [CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md)**, which are not in this review.~~ Done:
    - Kept: SIMD horizontal resample for L, SIMD reduce for L, and L blur four rows at a time.
    - Measured and dropped: column strips, the SSE4 blend and merge kernels, and two-row AVX2 blur. See the "Outcome" section of that document.
-7. **Re-run `checks/simd_bench_remote.sh`** on the Jetson after each step, and on a second arm64 machine (Apple M-series or Graviton) before deciding the final NEON/portable split.
+7. **Re-run `checks/simd_bench_remote.sh`** on the Jetson after each step (done throughout), and on a second arm64 machine (Apple M-series or Graviton) before deciding the final NEON/portable split (not done).
 
 ## Status of step 1
 
