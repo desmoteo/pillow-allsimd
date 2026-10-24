@@ -1,6 +1,26 @@
 Changelog (Pillow-SIMD)
 =======================
 
+Unreleased
+----------
+
+- arm64: NEON kernels for resize, reduce, box and Gaussian blur, unsharp mask,
+  alpha composition, RGB → L, alpha (un)premultiplication, 3x3 and 5x5
+  filters, split and merge. Other architectures build portable C code
+- Build: ``-C simd=auto|sse4|avx2|neon|disable`` option; flags chosen per
+  target architecture; SSE4.1 baseline on x86 (was SSE4.2)
+- BoxBlur, GaussianBlur: fixed swapped channels for single-axis blurs on
+  4-byte modes; fixed reads past 1-pixel lines; vertical pass without
+  transposes, up to 1.8x faster
+- Filter: fixed I;16 images going to the 8-bit kernel; integer kernel for
+  L images, up to 2x faster
+- Reduce: fixed 1x3 rounding; restored 4x4 and 5x5 for 1-byte images,
+  1.8x faster; 1x2, 2x1, 2x2 about 2x faster
+- AlphaComposite, Convert: results no longer depend on the pixel's position
+  in the row
+- UnsharpMask: SIMD post-pass, about 1.7x faster
+- Released the GIL in AlphaComposite, Bands, Blend and Chops
+
 9.5.0.post2 & 9.4.0.post2 & 9.3.0.post2 & 9.2.0.post2 & 9.1.1.post2 & 9.0.0.post3
 ---------------------------------------------------------------------------------
 

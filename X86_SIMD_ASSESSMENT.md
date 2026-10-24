@@ -250,44 +250,53 @@ Every item is done when:
 - a regression test exists for every bug fix.
 
 ### Phase 1: bugs
-- [ ] **1.1 BoxBlur channel order.** Fix `shiftmask` in `ImagingLineBoxBlur32` and `ImagingLineBoxBlurZero32` ([BoxBlur.c](src/libImaging/BoxBlur.c)).
+- [x] **1.1 BoxBlur channel order.** Fix `shiftmask` in `ImagingLineBoxBlur32` and `ImagingLineBoxBlurZero32` ([BoxBlur.c](src/libImaging/BoxBlur.c)).
   - Test: `BoxBlur((r, 0))`, `BoxBlur((0, r))`, `GaussianBlur((r, 0))` on a flat non-grey RGBA image return the input colour, for n = 1, 2, 3 passes.
-- [ ] **1.2 `I;16` filter dispatch.** Send `IMAGING_TYPE_SPECIAL` to the generic `ImagingFilter3x3/5x5` ([Filter.c](src/libImaging/Filter.c)).
+  - Done in `c4fd9f480`; `test_channel_order` failed 18 times before the fix.
+- [x] **1.2 `I;16` filter dispatch.** Send `IMAGING_TYPE_SPECIAL` to the generic `ImagingFilter3x3/5x5` ([Filter.c](src/libImaging/Filter.c)).
   - Test: `I;16`, `I;16L`, `I;16B` output equals the generic path, i.e. the same result as upstream for a kernel with a known answer.
+  - Done in `cf334ba71`.
+- [x] **Found during implementation: SSE4 Reduce 1×3 added the rounding term twice** (some outputs 1 too high). Fixed in `bf56b0bfd`, with `test_multiband_matches_single_band`, which checks every 4-byte kernel against the 1-byte code.
+- [x] **Found during implementation: the radius-below-1 BoxBlur line functions read `lineIn[-1]` and `lineIn[1]` on 1-pixel lines.** Fixed in `e470d62b6` with `test_one_pixel_line`. All blur results now match upstream.
 
 ### Phase 2: build
-- [ ] **2.1 Feature macros.** `ImagingSIMD.h` defines `IMAGING_SIMD_SSE4`, `IMAGING_SIMD_AVX2` and `IMAGING_SIMD_NEON`; kernels test these instead of compiler macros.
+- [x] **2.1 Feature macros.** `ImagingSIMD.h` defines `IMAGING_SIMD_SSE4`, `IMAGING_SIMD_AVX2` and `IMAGING_SIMD_NEON`; kernels test these instead of compiler macros.
   - MSVC: SSE4 only for `_M_X64`, not for `_M_IX86_FP == 2`.
-- [ ] **2.2 Unaligned loads.** Replace the type-punned load in `mm_cvtepu8_epi32` with `memcpy`.
-- [ ] **2.3 Build options.**
-  - `-C simd=auto|sse4|avx2|disable` in `setup.py` adds the matching flags to `extra_compile_args` of `PIL._imaging` only, so the optimisation flags are kept.
-  - `auto` means SSE4 on x86 and nothing elsewhere.
+- [x] **2.2 Unaligned loads.** Replace the type-punned load in `mm_cvtepu8_epi32` with `memcpy` (plus `mm_load_si32` for the vertical resample kernel).
+- [x] **2.3 Build options.**
+  - `-C simd=auto|sse4|avx2|neon|disable` in `setup.py` adds the matching flags to `extra_compile_args` of `PIL._imaging` only, so the optimisation flags are kept.
+  - `auto` means SSE4.1 (`-msse4.1`, was `-msse4`) on x86, NEON on arm64 and nothing elsewhere. The build summary prints the choice.
   - Documented in `README.md`.
-- [ ] **2.4 macOS/iOS.** `extra_compile_args +=` instead of `=` ([setup.py](setup.py), SDK branches).
-- [ ] **2.5 Scalar fallback.** Every SIMD site has an `#else` scalar path (shared with the arm64 work, see ARM64 checklist phase 1).
-  - `-C simd=disable` on x86 passes the test suite.
+- [x] **2.4 macOS/iOS.** `extra_compile_args +=` instead of `=` ([setup.py](setup.py), SDK branches). Not built on a Mac here.
+- [x] **2.5 Scalar fallback.** Every SIMD site has a scalar path (shared with the arm64 work, see ARM64 checklist phase 1).
+  - `-C simd=disable` on x86 passes the full test suite.
 
 ### Phase 3: column-independent results
-- [ ] **3.1 Shared tail helper.** Leftover pixels (`xsize % N`) are copied into a zero-padded stack buffer, run through the same 4-pixel vector body, and copied back.
-- [ ] **3.2 Convert.** Apply 3.1 to `rgb2l`, `rgb2la`, `rgb2i`, `rgba2la`, `rgbA2rgba` and `rgba2rgbA` ([Convert.c](src/libImaging/Convert.c)).
-- [ ] **3.3 AlphaComposite.** Apply 3.1 ([AlphaComposite.c](src/libImaging/AlphaComposite.c)).
-- [ ] **3.4 Tests.** For the operations above, every pixel of flat images of widths 1, 3, 5, 7, 9 and 17 equals pixel 0.
+- [x] **3.1 Shared tail helper.** Leftover pixels (`xsize % N`) are copied into a zero-padded stack buffer, run through the same vector body, and copied back (`CONVERT_ROW` in Convert.c, inline in AlphaComposite.c).
+- [x] **3.2 Convert.** Applied to `rgb2l`, `rgb2la`, `rgb2i`, `rgba2la` and `rgba2rgbA`. `rgbA2rgba` is exact (`MULDIV255`), so its scalar tail already matched.
+- [x] **3.3 AlphaComposite.** Applied 3.1.
+- [x] **3.4 Tests.** `Tests/test_simd_consistency.py`: flat images of widths 1–17 give flat output for these conversions, alpha composite, and the interior of 3×3/5×5 filters. 12 cases failed on the original branch.
 
 ### Phase 4: performance
-- [ ] **4.1 Reduce.** Restore upstream `ImagingReduce4x4` / `ImagingReduce5x5` for 1-byte modes. L `reduce(4)` must be no slower than `base`.
-- [ ] **4.2 L vertical resample.**
-  - Generalise `ImagingResampleVerticalConvolution8u` to take row pointers and a width in 32-bit words.
-  - Use it for 1-byte images, with a byte tail.
-- [ ] **4.3 GIL.** `ImagingSectionEnter/Leave` around the pixel loops in AlphaComposite, Bands (split, getband, merge, putband, fillband), Blend and Chops.
-- [ ] **4.4 UnsharpMask post-pass in SIMD.**
-  - Compute in 32-bit lanes, with float division by 100 (exact while `|diff·percent| < 2^24`; scalar otherwise).
-  - Output identical to the scalar loop.
-- [ ] 4.5 Reduce 4-channel paths: 4 or 8 outputs per iteration.
-- [ ] 4.6 Filter AVX2 path: real 256-bit loads instead of duplicated lanes.
-- [ ] 4.7 BoxBlur: vertical pass on rows (no transposes), 2–4 rows interleaved in the horizontal pass.
-- [ ] 4.8 L-mode integer 3×3/5×5 filter kernel.
-- [ ] 4.9 New kernels: 3×3 median via a min/max network, then affine/rotate bilinear.
+- [x] **4.1 Reduce.** Reduce.c is upstream's again, which restores `ImagingReduce4x4` / `ImagingReduce5x5`. L `reduce(4)` is 1.8x faster than before (same as `base`). The SSE4 4-byte kernels moved unchanged to `ReduceSIMD.c`.
+- [x] **4.2 L vertical resample.**
+  - `ImagingResampleVerticalConvolution8u` takes the width in 32-bit words and reads rows through `image[]`.
+  - Used for 1-byte images, with a byte tail; output unchanged.
+- [x] **4.3 GIL.** `ImagingSectionEnter/Leave` around the pixel loops in AlphaComposite, Bands (split, getband, merge, putband, fillband), Blend and Chops.
+- [x] **4.4 UnsharpMask post-pass in SIMD.**
+  - SSE4 and NEON, 16 bytes per step, float division by 100 while `|percent| ≤ 65535`; scalar otherwise.
+  - Output identical to the scalar loop for 40 percent/threshold combinations; 82 → 47 ms on a 2560×1600 RGB image.
+- [x] 4.5 Reduce 4-channel paths: four outputs per iteration for 1×2 (`pavgb`), 2×1 and 2×2 (`pshufb` + `pmaddubsw`), about 2x faster. Other factors keep one output per iteration.
+- [ ] 4.6 Filter AVX2 path: real 256-bit loads instead of duplicated lanes. **Not done.**
+- [x] 4.7 BoxBlur: the vertical pass works on rows (no transposes), 16 bytes per step with SSE4/NEON. GaussianBlur on L 1.8x faster, BoxBlur on RGB 1.5x, GaussianBlur on RGB 1.1x: the per-pixel horizontal passes now dominate. **Interleaving rows in the horizontal pass is not done.**
+- [x] 4.8 L-mode integer 3×3/5×5 filter kernel (`FilterSIMD_NxNi.c`, shared with NEON). 1.4x (3×3) and 2x (5×5) faster than the float kernels; x86 and arm64 L filter output is identical.
+- [ ] 4.9 New kernels: 3×3 median via a min/max network, then affine/rotate bilinear. **Not done.**
 
 ### Phase 5: verification
-- [ ] Output diff harness (SSE4 vs AVX2 vs scalar vs upstream) run after each phase. Results recorded in the PR description.
-- [ ] Benchmark table re-run for changed kernels.
+- [x] Output diff harness (SSE4 vs AVX2 vs scalar vs upstream vs arm64) run after each change. Final state:
+  - SSE4 and AVX2: byte-identical on every operation tested.
+  - Scalar build vs upstream Pillow: identical except resize, which keeps pillow-simd's 16-bit coefficients.
+  - SSE4 vs scalar: ±1 from the kept approximations (`rcp_ps` in unpremultiply and alpha composite, 15-bit RGB→L coefficients, float 4-byte filters with large coefficients, ColorLUT).
+- [x] Full test suite passes on amd64 SSE4, AVX2 and scalar builds (Docker image with all codecs).
+- [x] Benchmark table re-run for changed kernels (figures above). The machine had heavy unrelated load in the later runs, so only interleaved before/after ratios are quoted.
+- [x] CI: `simd` matrix dimension with AVX2 and scalar jobs on `ubuntu-latest` (prepared, not run).
