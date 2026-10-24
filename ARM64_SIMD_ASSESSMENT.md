@@ -208,3 +208,4 @@ Remaining cross-architecture differences (arm64 vs x86 SSE4), all by design:
 ### Phase 3: CI and wheels
 - [x] CI jobs on `ubuntu-24.04-arm` (NEON and scalar) in `test.yml`. `macos-latest` (Apple Silicon) now also builds NEON. **Prepared, not run.**
 - [ ] Benchmarks on real arm64 hardware vs upstream Pillow. Drop any NEON kernel that is not faster than scalar. **Not done: no arm64 hardware here. qemu timings are meaningless.**
+  - Run with `checks/simd_bench_remote.sh HOST`: builds the NEON and scalar variants on the host, installs upstream Pillow as a baseline, benchmarks all three and compares outputs. Tested end to end against an emulated arm64 host.
