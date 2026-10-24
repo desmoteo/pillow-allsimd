@@ -253,7 +253,16 @@ ImagingReduce1x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
         int yy = box[1] + y * yscale;
         UINT8 *line0 = (UINT8 *)imIn->image[yy + 0];
         UINT8 *line1 = (UINT8 *)imIn->image[yy + 1];
-        for (x = 0; x < box[2] / xscale; x++) {
+        // (a + b + 1) >> 1 for every byte, four pixels at a time.
+        for (x = 0; x < box[2] / xscale - 3; x += 4) {
+            int xx = box[0] + x * xscale;
+            _mm_storeu_si128(
+                (__m128i *)&((UINT32 *)imOut->image[y])[x],
+                _mm_avg_epu8(
+                    _mm_loadu_si128((__m128i *)&line0[xx * 4]),
+                    _mm_loadu_si128((__m128i *)&line1[xx * 4])));
+        }
+        for (; x < box[2] / xscale; x++) {
             int xx = box[0] + x * xscale;
             __m128i mm_ss0;
 
@@ -281,7 +290,21 @@ ImagingReduce2x1_4u8(Imaging imOut, Imaging imIn, int box[4]) {
     for (y = 0; y < box[3] / yscale; y++) {
         int yy = box[1] + y * yscale;
         UINT8 *line0 = (UINT8 *)imIn->image[yy + 0];
-        for (x = 0; x < box[2] / xscale; x++) {
+        // Channels of neighbouring pixels side by side, then summed in pairs.
+        for (x = 0; x < box[2] / xscale - 3; x += 4) {
+            int xx = box[0] + x * xscale;
+            __m128i shuffle = _mm_set_epi8(15,11,14,10,13,9,12,8, 7,3,6,2,5,1,4,0);
+            __m128i ones = _mm_set1_epi8(1);
+            __m128i ss0 = _mm_maddubs_epi16(_mm_shuffle_epi8(
+                _mm_loadu_si128((__m128i *)&line0[xx * 4]), shuffle), ones);
+            __m128i ss1 = _mm_maddubs_epi16(_mm_shuffle_epi8(
+                _mm_loadu_si128((__m128i *)&line0[xx * 4 + 16]), shuffle), ones);
+            ss0 = _mm_srli_epi16(_mm_add_epi16(ss0, mm_amend), 1);
+            ss1 = _mm_srli_epi16(_mm_add_epi16(ss1, mm_amend), 1);
+            _mm_storeu_si128(
+                (__m128i *)&((UINT32 *)imOut->image[y])[x], _mm_packus_epi16(ss0, ss1));
+        }
+        for (; x < box[2] / xscale; x++) {
             int xx = box[0] + x * xscale;
             __m128i mm_ss0;
 
@@ -310,7 +333,22 @@ ImagingReduce2x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
         int yy = box[1] + y * yscale;
         UINT8 *line0 = (UINT8 *)imIn->image[yy + 0];
         UINT8 *line1 = (UINT8 *)imIn->image[yy + 1];
-        for (x = 0; x < box[2] / xscale; x++) {
+        // Channels of neighbouring pixels side by side, then summed in pairs.
+        for (x = 0; x < box[2] / xscale - 3; x += 4) {
+            int xx = box[0] + x * xscale;
+            __m128i shuffle = _mm_set_epi8(15,11,14,10,13,9,12,8, 7,3,6,2,5,1,4,0);
+            __m128i ones = _mm_set1_epi8(1);
+#define PAIRS(line, off) \
+    _mm_maddubs_epi16(_mm_shuffle_epi8(_mm_loadu_si128((__m128i *)&line[xx * 4 + off]), shuffle), ones)
+            __m128i ss0 = _mm_add_epi16(PAIRS(line0, 0), PAIRS(line1, 0));
+            __m128i ss1 = _mm_add_epi16(PAIRS(line0, 16), PAIRS(line1, 16));
+#undef PAIRS
+            ss0 = _mm_srli_epi16(_mm_add_epi16(ss0, mm_amend), 2);
+            ss1 = _mm_srli_epi16(_mm_add_epi16(ss1, mm_amend), 2);
+            _mm_storeu_si128(
+                (__m128i *)&((UINT32 *)imOut->image[y])[x], _mm_packus_epi16(ss0, ss1));
+        }
+        for (; x < box[2] / xscale; x++) {
             int xx = box[0] + x * xscale;
             __m128i mm_ss0;
 
