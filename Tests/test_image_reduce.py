@@ -4,7 +4,12 @@ import pytest
 
 from PIL import Image, ImageMath, ImageMode
 
-from .helper import assert_image_equal, convert_to_comparable, skip_unless_feature
+from .helper import (
+    assert_image_equal,
+    convert_to_comparable,
+    hopper,
+    skip_unless_feature,
+)
 
 codecs = dir(Image.core)
 
@@ -306,3 +311,16 @@ def test_multiband_matches_single_band(
     for box in (None, (1, 1, size[0] - 1, size[1])):
         expected = Image.merge(mode, [b.reduce(factor, box) for b in im.split()])
         assert_image_equal(im.reduce(factor, box), expected)
+
+
+@pytest.mark.parametrize("factor", (2, 4))
+@pytest.mark.parametrize("size", ((1, 1), (5, 9), (67, 23), (130, 37)))
+def test_l_matches_rgb_band(factor: int, size: tuple[int, int]) -> None:
+    # 1-byte and 4-byte images have separate kernels with the same
+    # arithmetic per channel.
+    im = hopper("L").resize(size)
+    expected = Image.merge("RGB", (im, im, im)).reduce(factor)
+    assert_image_equal(im.reduce(factor), expected.getchannel(0))
+    box = (1, 2, size[0] - 1, size[1]) if size[0] > 2 else None
+    expected = Image.merge("RGB", (im, im, im)).reduce(factor, box)
+    assert_image_equal(im.reduce(factor, box), expected.getchannel(0))

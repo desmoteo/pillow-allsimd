@@ -328,7 +328,27 @@ _ImagingResampleHorizontal_8bpc(
     if (imIn->image8) {
         // Verify caller allocated distinct buffers.
         assert(imIn->image8 != imOut->image8);
-        for (yy = 0; yy < ysize; yy++) {
+        yy = 0;
+#if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD) && defined(IMAGING_SIMD_SSE4)
+        for (; yy < ysize - 3; yy += 4) {
+            ImagingResampleHorizontalConvolution1u4x(
+                imOut->image8[yy], imOut->image8[yy + 1],
+                imOut->image8[yy + 2], imOut->image8[yy + 3],
+                imIn->image8[yy + offset], imIn->image8[yy + offset + 1],
+                imIn->image8[yy + offset + 2], imIn->image8[yy + offset + 3],
+                xsize, bounds, kk, ksize, coefs_precision
+            );
+        }
+#endif
+#if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD)
+        for (; yy < ysize; yy++) {
+            ImagingResampleHorizontalConvolution1u(
+                imOut->image8[yy], imIn->image8[yy + offset],
+                xsize, bounds, kk, ksize, coefs_precision
+            );
+        }
+#endif
+        for (; yy < ysize; yy++) {
             // Restrict safe: imIn and imOut are distinct.
             UINT8 *restrict lineIn = imIn->image8[yy + offset];
             UINT8 *restrict lineOut = imOut->image8[yy];

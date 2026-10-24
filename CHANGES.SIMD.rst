@@ -21,6 +21,11 @@ Unreleased
 - UnsharpMask: SIMD post-pass, about 1.7x faster
 - ImageChops.multiply, screen: exact division by 255 without a divide;
   SSE4, AVX2 and NEON kernels. 6.4x to 12x faster on x86
+- Resize of 1-byte images (L): SIMD horizontal pass, SSE4 and NEON;
+  2.4x to 8x faster on x86
+- Reduce of 1-byte images: SSE4 and NEON 2x2 and 4x4, 6.4x to 7.7x faster
+- BoxBlur, GaussianBlur of 1-byte images: horizontal pass four rows at a
+  time on x86, 1.9x to 3x faster
 - Released the GIL in AlphaComposite, Bands, Blend and Chops
 - From Pillow 13.0: I;16 filters keep the high byte and clamp to 0..65535;
   BoxBlur and GaussianBlur reject NaN, infinite and >= 2**31 radii;

@@ -625,3 +625,127 @@ ImagingReduce_4u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscal
 #endif
 }
 #endif
+
+/* 2x2 and 4x4 for images with 1-byte pixels. Bytes are summed in pairs,
+   rows added, and the sums rounded with the scalar code's
+   (sum + N/2) >> log2(N). The scalar loop finishes each row. Returns 0 for
+   other scales; the caller then uses the scalar code. */
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+#define REDUCE_SIMD_1U8
+
+static void
+ImagingReduce2x2_1u8(Imaging imOut, Imaging imIn, int box[4]) {
+    int x, y;
+    int xsize = box[2] / 2;
+
+    for (y = 0; y < box[3] / 2; y++) {
+        int yy = box[1] + y * 2;
+        const UINT8 *line0 = (UINT8 *)imIn->image8[yy + 0] + box[0];
+        const UINT8 *line1 = (UINT8 *)imIn->image8[yy + 1] + box[0];
+        UINT8 *out = imOut->image8[y];
+        x = 0;
+#if defined(IMAGING_SIMD_SSE4)
+        {
+            __m128i ones = _mm_set1_epi8(1);
+            __m128i two = _mm_set1_epi16(2);
+            for (; x < xsize - 15; x += 16) {
+                const __m128i *p0 = (const __m128i *)&line0[x * 2];
+                const __m128i *p1 = (const __m128i *)&line1[x * 2];
+                // [16] sums of 2x2 blocks
+                __m128i lo = _mm_add_epi16(
+                    _mm_maddubs_epi16(_mm_loadu_si128(p0), ones),
+                    _mm_maddubs_epi16(_mm_loadu_si128(p1), ones)
+                );
+                __m128i hi = _mm_add_epi16(
+                    _mm_maddubs_epi16(_mm_loadu_si128(p0 + 1), ones),
+                    _mm_maddubs_epi16(_mm_loadu_si128(p1 + 1), ones)
+                );
+                lo = _mm_srli_epi16(_mm_add_epi16(lo, two), 2);
+                hi = _mm_srli_epi16(_mm_add_epi16(hi, two), 2);
+                _mm_storeu_si128((__m128i *)&out[x], _mm_packus_epi16(lo, hi));
+            }
+        }
+#else
+        for (; x < xsize - 15; x += 16) {
+            uint16x8_t lo = vpadalq_u8(
+                vpaddlq_u8(vld1q_u8(&line0[x * 2])), vld1q_u8(&line1[x * 2])
+            );
+            uint16x8_t hi = vpadalq_u8(
+                vpaddlq_u8(vld1q_u8(&line0[x * 2 + 16])), vld1q_u8(&line1[x * 2 + 16])
+            );
+            vst1q_u8(&out[x], vcombine_u8(vrshrn_n_u16(lo, 2), vrshrn_n_u16(hi, 2)));
+        }
+#endif
+        for (; x < xsize; x++) {
+            UINT32 ss =
+                line0[x * 2] + line0[x * 2 + 1] + line1[x * 2] + line1[x * 2 + 1];
+            out[x] = (ss + 2) >> 2;
+        }
+    }
+}
+
+static void
+ImagingReduce4x4_1u8(Imaging imOut, Imaging imIn, int box[4]) {
+    int x, y, r;
+    int xsize = box[2] / 4;
+
+    for (y = 0; y < box[3] / 4; y++) {
+        int yy = box[1] + y * 4;
+        const UINT8 *lines[4];
+        UINT8 *out = imOut->image8[y];
+        for (r = 0; r < 4; r++) {
+            lines[r] = (UINT8 *)imIn->image8[yy + r] + box[0];
+        }
+        x = 0;
+#if defined(IMAGING_SIMD_SSE4)
+        {
+            __m128i ones = _mm_set1_epi8(1);
+            __m128i eight = _mm_set1_epi16(8);
+            for (; x < xsize - 7; x += 8) {
+                // [16] sums of 2x4 blocks, then of 4x4 blocks
+                __m128i lo = _mm_setzero_si128(), hi = lo;
+                for (r = 0; r < 4; r++) {
+                    const __m128i *p = (const __m128i *)&lines[r][x * 4];
+                    lo = _mm_add_epi16(lo, _mm_maddubs_epi16(_mm_loadu_si128(p), ones));
+                    hi = _mm_add_epi16(
+                        hi, _mm_maddubs_epi16(_mm_loadu_si128(p + 1), ones)
+                    );
+                }
+                lo = _mm_srli_epi16(_mm_add_epi16(_mm_hadd_epi16(lo, hi), eight), 4);
+                _mm_storel_epi64((__m128i *)&out[x], _mm_packus_epi16(lo, lo));
+            }
+        }
+#else
+        for (; x < xsize - 7; x += 8) {
+            uint16x8_t lo = vpaddlq_u8(vld1q_u8(&lines[0][x * 4]));
+            uint16x8_t hi = vpaddlq_u8(vld1q_u8(&lines[0][x * 4 + 16]));
+            for (r = 1; r < 4; r++) {
+                lo = vpadalq_u8(lo, vld1q_u8(&lines[r][x * 4]));
+                hi = vpadalq_u8(hi, vld1q_u8(&lines[r][x * 4 + 16]));
+            }
+            vst1_u8(&out[x], vrshrn_n_u16(vpaddq_u16(lo, hi), 4));
+        }
+#endif
+        for (; x < xsize; x++) {
+            UINT32 ss = 0;
+            for (r = 0; r < 4; r++) {
+                ss += lines[r][x * 4] + lines[r][x * 4 + 1] + lines[r][x * 4 + 2] +
+                      lines[r][x * 4 + 3];
+            }
+            out[x] = (ss + 8) >> 4;
+        }
+    }
+}
+
+static int
+ImagingReduce_1u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscale) {
+    if (xscale == 2 && yscale == 2) {
+        ImagingReduce2x2_1u8(imOut, imIn, box);
+    } else if (xscale == 4 && yscale == 4) {
+        ImagingReduce4x4_1u8(imOut, imIn, box);
+    } else {
+        return 0;
+    }
+    return 1;
+}
+#endif

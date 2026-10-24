@@ -4,6 +4,8 @@ import pytest
 
 from PIL import Image, ImageFilter
 
+from .helper import assert_image_equal, hopper
+
 sample = Image.new("L", (7, 5))
 # fmt: off
 sample.putdata(sum([
@@ -324,3 +326,14 @@ def box_blur_axes(
     image: Image.Image, radius: tuple[float, float], n: int
 ) -> Image.Image:
     return image._new(image.im.box_blur(radius, n))
+
+
+@pytest.mark.parametrize("radius", (0.5, 1, 2.6, 5, 40))
+@pytest.mark.parametrize("size", ((1, 1), (3, 9), (17, 6), (67, 23)))
+def test_l_matches_rgb_band(radius: float, size: tuple[int, int]) -> None:
+    # 1-byte images are blurred several rows at a time with the 4-byte
+    # code; rows left over use the 1-byte code. Both must agree.
+    im = hopper("L").resize(size)
+    rgb = Image.merge("RGB", (im, im, im))
+    for f in (ImageFilter.BoxBlur(radius), ImageFilter.GaussianBlur(radius)):
+        assert_image_equal(im.filter(f), rgb.filter(f).getchannel(0))

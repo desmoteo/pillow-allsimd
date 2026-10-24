@@ -85,3 +85,34 @@ The full tables, including the scalar build, cache misses per operation and ever
 ### Not worth pursuing
 - `split RGBA`, `convert RGB->L` and chops are close to memory bandwidth: 15–25% of their data references miss the last-level cache, and they run at 2–3 ms for 16–48 MB of traffic.
 - `colorlut` spends its time in table gathers; it is already 5–8x upstream.
+
+## Outcome
+
+Each item was implemented, checked for byte-identical output against the scalar code, and timed. Timing used alternating A/B runs: the median ratio over 10–16 pairs, pinned to one P-core. The machine was shared with other heavy jobs at the time, so single-run ratios ranged widely; medians below 15% are treated as noise.
+
+### Kept
+
+| Item | Change | SSE4 | AVX2 |
+|---|---|---:|---:|
+| 1 | `resize` on L: horizontal kernel for 1-byte pixels; SSE4 does 4 rows at once, NEON 1 row | 1/4 bicubic 8.0x, ×1.5 lanczos 2.6x, ×2 bicubic 2.4x | 8.3x, 2.8x |
+| 5 | `reduce` on L: 2×2 and 4×4 kernels, SSE4 and NEON | 2×2 7.3x, 4×4 6.5x | 7.7x, 6.4x |
+| 2 (part) | Box and Gaussian blur on L: the horizontal pass runs 4 rows at once through the 4-byte code (SSE4 builds) | Gaussian 2.4x, box 3.0x | 1.9x, 1.9x |
+
+- Instruction counts: `resize L 1/4` 175M → 27M, `resize L x1.5 lanczos` 537M → 222M, `reduce L 2` 25M → 1.7M, `gaussian L r=5` 332M → 156M.
+- Output:
+  - x86: identical to the previous builds on about 2,800 battery outputs (all filters, boxes, odd sizes, widths 1 to 1031) and in the full test suite.
+  - arm64 under emulation: the NEON resize and reduce kernels match the scalar arm64 build on the same battery.
+- New tests compare each L operation with band 0 of the same operation on an RGB image made of three copies. They pass on stock Pillow 12.3 too.
+
+### Measured and dropped
+
+- **3, Blend on SSE4.** The premise was wrong: GCC already vectorises `ImagingBlend` at SSE4 (57.5M instructions, against 68.7M for the SSE2 build). AVX2 is faster only because of its wider vectors. Two exact float kernels were slower than the compiler's code (1.01x and 0.84x), and AVX2 got slower too (0.62x).
+- **6, Merge RGB on SSE4.** An explicit unpack kernel was exact but no faster: 0.82–0.84x of scalar, against 0.86–0.90x before. The operation is limited by writing 16 MB of output, not by the shuffles.
+- **2 (vertical part), column strips in the box-blur vertical pass.** 0.90–1.11x across strip sizes of 512–4096 bytes. The L1 misses valgrind counts are served from L2 with hardware prefetching, which its cache model leaves out.
+- **2 (horizontal, RGB), two rows per AVX2 vector.** Gaussian 1.08x, box 0.98x, unsharp 0.84x. A 256-bit `pmulld` costs about as much per element as two 128-bit ones, and packing the two rows adds work.
+- **4, column strips in the vertical resample pass, upscaling only.** Lanczos ×1.5 gained 1.18x and ×2 bicubic 1.14–1.45x, but vertical-only upscales lost 11–21% and ×2 bilinear lost 11%. Not a reliable improvement.
+
+### Lessons for the next profile
+
+- Compare instruction counts between builds of the same C code before writing intrinsics. A slow SSE4 time can be the compiler's best at that vector width.
+- Valgrind's cache misses mark where data leaves L1, not where time goes. Cache-blocking changes need real timings on a quiet machine before they are kept.
