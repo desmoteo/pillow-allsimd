@@ -369,6 +369,90 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
     }
 }
 
+#elif defined(IMAGING_SIMD_NEON)
+
+/* Shifts and saturates four 32-bit sums to bytes, as the SSE4 code does
+   with srai, packs_epi32 and packus_epi16. */
+static inline UINT32
+neon_resample_pack(int32x4_t sss, int coefs_precision) {
+    int16x4_t s16 = vqmovn_s32(vshlq_s32(sss, vdupq_n_s32(-coefs_precision)));
+    uint8x8_t u8 = vqmovun_s16(vcombine_s16(s16, s16));
+    return vget_lane_u32(vreinterpret_u32_u8(u8), 0);
+}
+
+/* Adds sum(pixel[x] * k[x]) for one output pixel of a 4-byte row to sss. */
+static inline int32x4_t
+neon_resample_horiz_px(const UINT8 *in, const INT16 *k, int xmax, int32x4_t sss) {
+    int x = 0;
+    int32x4_t sss1 = vdupq_n_s32(0);
+
+    for (; x < xmax - 3; x += 4) {
+        uint8x16_t source = vld1q_u8(in + x * 4);
+        int16x8_t lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(source)));
+        int16x8_t hi = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(source)));
+        sss = vmlal_n_s16(sss, vget_low_s16(lo), k[x]);
+        sss1 = vmlal_n_s16(sss1, vget_high_s16(lo), k[x + 1]);
+        sss = vmlal_n_s16(sss, vget_low_s16(hi), k[x + 2]);
+        sss1 = vmlal_n_s16(sss1, vget_high_s16(hi), k[x + 3]);
+    }
+    for (; x < xmax - 1; x += 2) {
+        int16x8_t pix = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(in + x * 4)));
+        sss = vmlal_n_s16(sss, vget_low_s16(pix), k[x]);
+        sss1 = vmlal_n_s16(sss1, vget_high_s16(pix), k[x + 1]);
+    }
+    for (; x < xmax; x++) {
+        UINT32 v;
+        memcpy(&v, in + x * 4, sizeof(v));
+        int16x4_t pix = vreinterpret_s16_u16(
+            vget_low_u16(vmovl_u8(vreinterpret_u8_u32(vdup_n_u32(v)))));
+        sss = vmlal_n_s16(sss, pix, k[x]);
+    }
+    return vaddq_s32(sss, sss1);
+}
+
+void
+ImagingResampleHorizontalConvolution8u4x(
+    UINT32 *restrict lineOut0, UINT32 *restrict lineOut1,
+    UINT32 *restrict lineOut2, UINT32 *restrict lineOut3,
+    UINT32 *restrict lineIn0, UINT32 *restrict lineIn1,
+    UINT32 *restrict lineIn2, UINT32 *restrict lineIn3,
+    int xsize, int *xbounds, INT16 *kk, int kmax, int coefs_precision)
+{
+    int xmin, xmax, xx;
+    INT16 *k;
+    int32x4_t initial = vdupq_n_s32(1 << (coefs_precision - 1));
+
+    for (xx = 0; xx < xsize; xx++) {
+        xmin = xbounds[xx * 2 + 0];
+        xmax = xbounds[xx * 2 + 1];
+        k = &kk[xx * kmax];
+        lineOut0[xx] = neon_resample_pack(neon_resample_horiz_px(
+            (UINT8 *)&lineIn0[xmin], k, xmax, initial), coefs_precision);
+        lineOut1[xx] = neon_resample_pack(neon_resample_horiz_px(
+            (UINT8 *)&lineIn1[xmin], k, xmax, initial), coefs_precision);
+        lineOut2[xx] = neon_resample_pack(neon_resample_horiz_px(
+            (UINT8 *)&lineIn2[xmin], k, xmax, initial), coefs_precision);
+        lineOut3[xx] = neon_resample_pack(neon_resample_horiz_px(
+            (UINT8 *)&lineIn3[xmin], k, xmax, initial), coefs_precision);
+    }
+}
+
+void
+ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
+    UINT32 *restrict lineIn,
+    int xsize, int *xbounds, INT16 *kk, int kmax, int coefs_precision)
+{
+    int xmin, xmax, xx;
+    int32x4_t initial = vdupq_n_s32(1 << (coefs_precision - 1));
+
+    for (xx = 0; xx < xsize; xx++) {
+        xmin = xbounds[xx * 2 + 0];
+        xmax = xbounds[xx * 2 + 1];
+        lineOut[xx] = neon_resample_pack(neon_resample_horiz_px(
+            (UINT8 *)&lineIn[xmin], &kk[xx * kmax], xmax, initial), coefs_precision);
+    }
+}
+
 #else
 
 /* Portable version of the kernels above, with the same arithmetic:
