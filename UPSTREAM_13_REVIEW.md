@@ -227,4 +227,14 @@ Jetson run at `07d3ea375`, with the upstream column again within 1% of earlier r
 - **Kept: NEON reduce for large factors** (xscale 5..512 or yscale above 16). `reduce RGB 5`: 4.12 → 2.70 ms (1.53x the scalar build); `reduce RGB 8`: 3.92 → 1.93 ms (2.03x).
 - **Dropped: L blur four rows at a time** through the 4-byte line code, which gives 2.4–3x on x86. On the Jetson it was 1–5% slower than GCC's 1-byte code (gaussian L 29.95 vs 29.55 ms, box L 10.21 vs 9.77 ms). After the revert both match the scalar build (29.58 and 9.76 ms).
 
-No x86 SIMD code is now missing on arm64 except the float 3×3/5×5 filter kernels, which only kernels too large for 16-bit fixed point use.
+No x86 SIMD code is now missing on arm64.
+
+### NEON float 3×3/5×5 filters
+
+- Used for kernels whose coefficients don't fit 16-bit fixed point, including the built-in `FIND_EDGES`, `CONTOUR` and `EDGE_ENHANCE_MORE`. One kernel (`FilterSIMD_NxNf.c`) covers 1- and 4-byte pixels, 16 bytes at a time.
+- Each kernel row is a multiply followed by fused multiply-adds, then added to the sum, as GCC compiles the generic code for arm64.
+- Results: under emulation, 768 battery outputs were checked against the scalar arm64 build (GCC 12).
+  - Kernels with exact coefficients match bit for bit.
+  - One inexact 3×3 kernel differs by 1 in 16–40 bytes of a 333×211 image, about 0.05%, because GCC fuses that loop slightly differently.
+  - For comparison, the x86 SSE4/AVX2 float kernels differ from x86 scalar by 1 in up to 1.4% of bytes for inexact kernels.
+- Exactness here depends on the compiler's fusion choices, which can change between GCC versions. Making it exact would mean compiling the generic code without fused multiply-adds, which would also change arm64 scalar output.

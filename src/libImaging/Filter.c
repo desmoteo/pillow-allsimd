@@ -67,6 +67,10 @@ clip32(float in) {
 #include "FilterSIMD_5x5f_4u8.c"
 #include "FilterSIMD_5x5i_4u8.c"
 #endif
+#if defined(IMAGING_SIMD_NEON)
+#include <math.h>
+#include "FilterSIMD_NxNf.c"
+#endif
 #if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
 #include "FilterSIMD_NxNi.c"
 #define FILTER_SIMD
@@ -514,7 +518,7 @@ ImagingFilter5x5(Imaging imOut, Imaging im, const float *kernel, float offset) {
 
 #if defined(FILTER_SIMD)
 /* 8-bit images: integer kernels when the coefficients fit 16 bits,
-   float kernels otherwise (SSE4 only). Returns 0 if the image has to
+   float kernels otherwise. Returns 0 if the image has to
    go to the generic code. */
 static int
 ImagingFilterSIMD(
@@ -570,7 +574,8 @@ ImagingFilterSIMD(
     }
 #else
     if (!fast_path) {
-        return 0;
+        ImagingFilterNxNf_neon(imOut, im, kernel, offset, xsize, im->image8 ? 1 : 4);
+        return 1;
     }
     if (xsize == 3) {
         if (im->image8) {
