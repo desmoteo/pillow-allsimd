@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from PIL import Image
 
 from .helper import hopper
@@ -45,3 +47,17 @@ def test_histogram_masked() -> None:
     assert histogram("RGBA") == (1024, 0, 8192)
     assert histogram("CMYK") == (1024, 0, 8192)
     assert histogram("YCbCr") == (768, 0, 1009)
+
+
+@pytest.mark.parametrize("mode", ("1", "L", "P", "LA", "RGB", "RGBA", "CMYK"))
+@pytest.mark.parametrize("size", ((1, 1), (3, 2), (5, 3), (130, 7)))
+def test_histogram_counts(mode: str, size: tuple[int, int]) -> None:
+    # Pixels are counted in several tables that are added up at the end.
+    im = hopper("RGB").resize(size).convert(mode)
+    bands = len(im.getbands())
+    expected = [0] * (256 * bands)
+    for value in im.get_flattened_data():
+        values = value if isinstance(value, tuple) else (value,)
+        for band, v in enumerate(values):
+            expected[band * 256 + v] += 1
+    assert im.histogram() == expected

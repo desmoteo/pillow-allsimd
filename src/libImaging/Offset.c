@@ -18,7 +18,7 @@
 
 Imaging
 ImagingOffset(Imaging im, int xoffset, int yoffset) {
-    int x, y;
+    int y;
     Imaging imOut;
 
     if (!im) {
@@ -45,20 +45,24 @@ ImagingOffset(Imaging im, int xoffset, int yoffset) {
         yoffset += im->ysize;
     }
 
-#define OFFSET(image)                               \
-    for (y = 0; y < im->ysize; y++) {               \
-        for (x = 0; x < im->xsize; x++) {           \
-            int yi = (y + yoffset) % im->ysize;     \
-            int xi = (x + xoffset) % im->xsize;     \
-            imOut->image[y][x] = im->image[yi][xi]; \
-        }                                           \
+    /* Each output row is input row (y + yoffset) % ysize rotated left by
+       xoffset pixels: two copies per row. */
+    ImagingSectionCookie cookie;
+    ImagingSectionEnter(&cookie);
+    // xoffset is in 0 .. 2 * xsize here; the per-pixel % did the rest.
+    xoffset %= im->xsize;
+    {
+        size_t pixelsize = im->pixelsize;
+        size_t head = (size_t)(im->xsize - xoffset) * pixelsize;
+        size_t tail = (size_t)xoffset * pixelsize;
+        for (y = 0; y < im->ysize; y++) {
+            const char *in = im->image[(y + yoffset) % im->ysize];
+            char *out = imOut->image[y];
+            memcpy(out, in + tail, head);
+            memcpy(out + head, in, tail);
+        }
     }
-
-    if (im->image8) {
-        OFFSET(image8)
-    } else {
-        OFFSET(image32)
-    }
+    ImagingSectionLeave(&cookie);
 
     return imOut;
 }
