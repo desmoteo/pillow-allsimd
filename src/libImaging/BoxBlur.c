@@ -342,30 +342,6 @@ ImagingBoxBlurColumns(
             (__m128i *)&out[b],
             _mm_packus_epi16(_mm_packs_epi32(r[0], r[1]), _mm_packs_epi32(r[2], r[3])));
     }
-#elif defined(IMAGING_SIMD_NEON)
-    uint32x4_t wws = vdupq_n_u32(ww);
-    uint32x4_t fws = vdupq_n_u32(fw);
-    for (; b < size - 15; b += 16) {
-        uint8x16_t add8 = vld1q_u8(&add[b]);
-        uint8x16_t sub8 = vld1q_u8(&sub[b]);
-        uint8x16_t far8 = vld1q_u8(&far[b]);
-        uint16x8_t a16[2] = {vmovl_u8(vget_low_u8(add8)), vmovl_high_u8(add8)};
-        uint16x8_t s16[2] = {vmovl_u8(vget_low_u8(sub8)), vmovl_high_u8(sub8)};
-        uint16x8_t f16[2] = {vmovl_u8(vget_low_u8(far8)), vmovl_high_u8(far8)};
-        uint16x4_t r[4];
-        for (int k = 0; k < 4; k++) {
-            uint32x4_t a = k & 1 ? vmovl_high_u16(a16[k / 2]) : vmovl_u16(vget_low_u16(a16[k / 2]));
-            uint32x4_t s = k & 1 ? vmovl_high_u16(s16[k / 2]) : vmovl_u16(vget_low_u16(s16[k / 2]));
-            uint32x4_t f = k & 1 ? vmovl_high_u16(f16[k / 2]) : vmovl_u16(vget_low_u16(f16[k / 2]));
-            uint32x4_t c = vld1q_u32(&acc[b + k * 4]);
-            c = vsubq_u32(vaddq_u32(c, a), s);
-            vst1q_u32(&acc[b + k * 4], c);
-            c = vmlaq_u32(vmulq_u32(c, wws), vaddq_u32(s, f), fws);
-            r[k] = vmovn_u32(vshrq_n_u32(vaddq_u32(c, vdupq_n_u32(1 << 23)), 24));
-        }
-        vst1q_u8(&out[b], vcombine_u8(
-            vmovn_u16(vcombine_u16(r[0], r[1])), vmovn_u16(vcombine_u16(r[2], r[3]))));
-    }
 #endif
 
     for (; b < size; b++) {
