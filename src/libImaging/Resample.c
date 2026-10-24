@@ -329,7 +329,7 @@ _ImagingResampleHorizontal_8bpc(
         // Verify caller allocated distinct buffers.
         assert(imIn->image8 != imOut->image8);
         yy = 0;
-#if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD) && defined(IMAGING_SIMD_SSE4)
+#if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD)
         for (; yy < ysize - 3; yy += 4) {
             ImagingResampleHorizontalConvolution1u4x(
                 imOut->image8[yy], imOut->image8[yy + 1],
