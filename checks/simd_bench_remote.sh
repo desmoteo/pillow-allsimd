@@ -22,6 +22,8 @@
 #   --rounds N        benchmark rounds (default: 5)
 #   --size WxH        benchmark image size (default: 2560x1600)
 #   --only NAME       only operations containing NAME (repeatable)
+#   --set SET         operation set of simd_bench.py: simd (default), extra
+#                     or all
 #   --cpu N           pin the benchmark to CPU N (Linux hosts with taskset)
 #   --no-upstream     skip the upstream Pillow baseline (no PyPI access needed
 #                     for it; build tools must then already be installed)
@@ -53,7 +55,7 @@ die() { echo "error: $*" >&2; exit 1; }
 log() { echo "==> $*" >&2; }
 
 HOST="" USER_OPT="" PORT="" IDENTITY="" PY="python3" REF="HEAD"
-WORKDIR="pillow-simd-bench" ROUNDS=5 SIZE="2560x1600" CPU="" UPSTREAM=1
+WORKDIR="pillow-simd-bench" ROUNDS=5 SIZE="2560x1600" CPU="" UPSTREAM=1 SET="simd"
 OUT="bench-results" KEEP=0 FORCE=0 BUILDS="" DOCKER=0 DOCKER_BASE="python:3.12-slim"
 ONLY=()
 SSH_EXTRA=()
@@ -72,6 +74,7 @@ while [ $# -gt 0 ]; do
         --rounds) ROUNDS=$2; shift 2 ;;
         --size) SIZE=$2; shift 2 ;;
         --only) ONLY+=("$2"); shift 2 ;;
+        --set) SET=$2; shift 2 ;;
         --cpu) CPU=$2; shift 2 ;;
         --no-upstream) UPSTREAM=0; shift ;;
         --out) OUT=$2; shift 2 ;;
@@ -216,7 +219,7 @@ for b in $BUILDS; do
     VARIANTS+=(--variant "${b%%=*}=${b%%=*}")
 done
 
-ARGS=("${VARIANTS[@]}" --rounds "$ROUNDS" --size "$SIZE" --check --json results.json)
+ARGS=("${VARIANTS[@]}" --set "$SET" --rounds "$ROUNDS" --size "$SIZE" --check --json results.json)
 [ -n "$CPU" ] && ARGS+=(--cpu "$CPU")
 for o in "${ONLY[@]+"${ONLY[@]}"}"; do ARGS+=(--only "$o"); done
 QARGS=$(printf ' %q' "${ARGS[@]}")
