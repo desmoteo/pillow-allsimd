@@ -49,6 +49,36 @@ filter_pack16(__m128i s0, __m128i s1, __m128i s2, __m128i s3) {
     }
 #define FILTER_MLA16x1(s0, s1, s2, s3, p, k) FILTER_MLA16x2(s0, s1, s2, s3, p, p, k, 0)
 
+#if defined(IMAGING_SIMD_AVX2)
+/* The same for 32 bytes. The 16-bit pairs are interleaved within each
+   128-bit lane: s0 holds pixels 0-3 and 8-11, s1 4-7 and 12-15, s2 16-19
+   and 24-27, s3 20-23 and 28-31. */
+#define FILTER_MLA32x2(s0, s1, s2, s3, pa, pb, k0, k1)                                \
+    {                                                                                 \
+        __m256i kk_ = _mm256_set1_epi32(((UINT32)(UINT16)(k1) << 16) | (UINT16)(k0)); \
+        __m256i alo_ = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *)(pa)));        \
+        __m256i ahi_ = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *)((pa) + 16))); \
+        __m256i blo_ = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *)(pb)));        \
+        __m256i bhi_ = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i *)((pb) + 16))); \
+        s0 = mm256_dpwssd(s0, _mm256_unpacklo_epi16(alo_, blo_), kk_);                \
+        s1 = mm256_dpwssd(s1, _mm256_unpackhi_epi16(alo_, blo_), kk_);                \
+        s2 = mm256_dpwssd(s2, _mm256_unpacklo_epi16(ahi_, bhi_), kk_);                \
+        s3 = mm256_dpwssd(s3, _mm256_unpackhi_epi16(ahi_, bhi_), kk_);                \
+    }
+
+/* Shifts and saturates 32 sums to bytes, back in pixel order. */
+static inline __m256i
+filter_pack32(__m256i s0, __m256i s1, __m256i s2, __m256i s3) {
+    __m256i lo = _mm256_packs_epi32(
+        _mm256_srai_epi32(s0, PRECISION_BITS), _mm256_srai_epi32(s1, PRECISION_BITS)
+    );
+    __m256i hi = _mm256_packs_epi32(
+        _mm256_srai_epi32(s2, PRECISION_BITS), _mm256_srai_epi32(s3, PRECISION_BITS)
+    );
+    return _mm256_permute4x64_epi64(_mm256_packus_epi16(lo, hi), 0xd8);
+}
+#endif
+
 #else
 typedef int32x4_t filter_acc;
 #define FILTER_ACC_INIT(v) vdupq_n_s32(v)
@@ -114,6 +144,26 @@ ImagingFilterNxN_simd(
 
         memcpy(out, in0, R * bpp);
         x = R;
+#if defined(IMAGING_SIMD_AVX2)
+        if (bpp == 1) {
+            for (; x < xsize - R - 31; x += 32) {
+                __m256i s0 = _mm256_set1_epi32(offset), s1 = s0, s2 = s0, s3 = s0;
+                for (r = 0; r < size; r++) {
+                    const INT16 *k = &kernel[r * size];
+                    const UINT8 *p = rows[r] + x - R;
+                    for (d = 0; d < size - 1; d += 2) {
+                        FILTER_MLA32x2(
+                            s0, s1, s2, s3, p + d, p + d + 1, k[d], k[d + 1]
+                        );
+                    }
+                    FILTER_MLA32x2(s0, s1, s2, s3, p + d, p + d, k[d], 0);
+                }
+                _mm256_storeu_si256(
+                    (__m256i *)(out + x), filter_pack32(s0, s1, s2, s3)
+                );
+            }
+        }
+#endif
         for (; x < xsize - R - (step - 1); x += step) {
             filter_acc s0 = FILTER_ACC_INIT(offset), s1 = s0, s2 = s0, s3 = s0;
             for (r = 0; r < size; r++) {
@@ -149,6 +199,7 @@ ImagingFilterNxN_simd(
 
 #undef FILTER_MLA16x2
 #undef FILTER_MLA16x1
+#undef FILTER_MLA32x2
 #undef FILTER_STORE16
 
 /* Separate entry points so the compiler unrolls each size fully. */

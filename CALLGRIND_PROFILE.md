@@ -188,6 +188,32 @@ Not SIMD problems:
 - 5×5 float kernels on 4-byte images have no AVX2 path; 3×3 has one and is 1.24x faster than SSE4 (`FIND_EDGES`). Kernels with coefficients large enough to need the float path are uncommon.
 - The integer filters are item 3 above.
 
-### Open finding: rotate nearest is slower in the AVX2 build
+### Rotate nearest was slower in the AVX2 build
 
-Repeated with 9 alternating rounds: `rotate RGB 30 nearest` takes 24.3 ms in the SSE4 build and 33.4 ms in the AVX2 build (scalar 23.6 ms). `convert RGB->CMYK` is 3.6 against 4.3 ms. Neither function has hand-written AVX2 code, GCC reports no vectorised loop in `affine_fixed`, and its code uses no 256-bit registers; callgrind counts 7% more instructions and the same cache misses. Hardware counters were not available on this machine (`perf_event_paranoid` = 4), so the cause, probably code layout or instruction scheduling of the VEX-encoded loop, is not confirmed.
+Repeated with 9 alternating rounds: `rotate RGB 30 nearest` took 24.3 ms in the SSE4 build and 33.4 ms in the AVX2 build (scalar 23.6 ms); `convert RGB->CMYK` 3.6 against 4.3 ms. Neither function has hand-written AVX2 code, GCC reports no vectorised loop in `affine_fixed`, and its code uses no 256-bit registers; callgrind counted 7% more instructions and the same cache misses. Hardware counters were not available (`perf_event_paranoid` = 4). After the transforms were tiled (below), both builds take 8.8 ms, so the difference came from the order of memory accesses, not from the instructions. `convert RGB->CMYK` is unexplained.
+
+### Outcome
+
+Each change was checked for byte-identical output against the previous build of the same instruction set and, where possible, against Pillow 12.3.0, then timed with alternating rounds on one P-core.
+
+| Change | Before | After |
+|---|---:|---:|
+| ModeFilter: histogram updated by columns; windows below 16 values check only their own values; otherwise a vectorised maximum, then its first value | size 3: 1195 ms; sizes 5–17: 1247–2119 ms | 94 ms (13x); 363–442 ms (3.4–4.8x) |
+| Transforms in 64×64 output tiles (generic and fixed-point nearest paths) | rotate 30° nearest RGB: 26 ms (SSE4), 41 ms (AVX2) | 8.7 ms, 8.8 ms |
+| Bilinear and bicubic filters for 3- and 4-band images: channels in one AVX2 vector of doubles (two with SSE4); direct calls for affine transforms | rotate 30° RGB bilinear 99 / 97 ms, bicubic 263 / 260 ms (SSE4 / AVX2) | 61 / 49 ms, 188 / 119 ms |
+| | perspective RGBA bilinear 180 / 162 ms | 104 / 81 ms |
+| Integer filters on L images: AVX2, 32 pixels per step | 3×3 4.1 ms, 5×5 10.2 ms | 2.1 ms, 4.9 ms (AVX-VNNI 1.9, 4.5 ms) |
+
+- ModeFilter: identical to Pillow 12.3.0 on 1,896 cases (sizes 1–21, images 1×1 to 300×200, 2 to 256 levels, L and P), and a new test compares with a Python reference.
+- Transforms: identical to the previous code and to Pillow 12.3.0 on 1,728 rotate, affine, perspective and quad cases in 8 modes, and to the previous code on 1,794 cases with nearest, L, LA, I, F, I;16, P and CMYK. The bilinear and bicubic arithmetic is per channel in `double`, in the same order as the scalar filters; x86 builds don't contract it to FMA. arm64 keeps the scalar filters, since GCC contracts them to FMA there. A new test compares each band of a transformed RGB, RGBX and CMYK image with the same transform of an L image.
+- The tiles alone make the scalar build 4x faster on nearest and 1.2x on bilinear and bicubic rotation.
+
+### Measured and dropped
+
+- **Integer filters on 4-byte images, 8 pixels per AVX2 step** (checklist item 4.6). The existing AVX2 kernel duplicates each 128-bit load into both lanes but gives each lane a different kernel alignment, so every 256-bit multiply-add already makes two output pixels. Running the SSE4 scheme in each lane on 8 consecutive pixels saves shuffles but not multiply-adds: 0.93x (3×3) and 1.02x (5×5) with AVX2, 0.89x and 0.46x with AVX-VNNI. The AVX2 kernel is bound by its multiply-add and add pairs, which AVX-VNNI fuses; that is the 2.1x gap, not idle lanes.
+- **Searching the counts of ModeFilter in blocks of 16** to find the first maximum: slower than the plain loop (410 against 330 ms).
+
+### Lessons
+
+- `Filter.c` includes the kernel files, and the build checks only `Filter.c`'s timestamp: after editing a kernel file, delete `build/` before rebuilding, or the old code is measured.
+- A rotation is limited by where it reads, not by its arithmetic: the SIMD filters cut instructions by a third (bilinear) to a half (bicubic) but time much less, until the output was tiled.
