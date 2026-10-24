@@ -348,3 +348,36 @@ def test_float_kernel_l_matches_rgb_band(
     im = hopper("L").resize(size)
     rgb = Image.merge("RGB", (im, im, im))
     assert_image_equal(im.filter(kernel), rgb.filter(kernel).getchannel(0))
+
+
+def _mode_reference(im: Image.Image, size: int) -> list[int]:
+    # The most frequent value of each window clipped to the image, the
+    # lowest one on a tie; the pixel itself unless it occurs more than twice.
+    w, h = im.size
+    m = size // 2
+    px = im.load()
+    assert px is not None
+    result = []
+    for y in range(h):
+        for x in range(w):
+            counts = [0] * 256
+            for yy in range(max(y - m, 0), min(y + m, h - 1) + 1):
+                for xx in range(max(x - m, 0), min(x + m, w - 1) + 1):
+                    value = px[xx, yy]
+                    assert isinstance(value, int)
+                    counts[value] += 1
+            best = max(counts)
+            value = px[x, y]
+            assert isinstance(value, int)
+            result.append(counts.index(best) if best > 2 else value)
+    return result
+
+
+@pytest.mark.parametrize("filter_size", (1, 3, 5, 6, 9))
+@pytest.mark.parametrize("size", ((1, 1), (7, 1), (1, 6), (5, 3), (23, 11)))
+def test_modefilter_matches_reference(filter_size: int, size: tuple[int, int]) -> None:
+    # Few distinct values give many ties; windows below 16 values check their
+    # own values, larger ones scan all counts.
+    im = hopper("L").resize(size).point(lambda v: v // 64 * 60)
+    out = im.filter(ImageFilter.ModeFilter(filter_size))
+    assert list(out.get_flattened_data()) == _mode_reference(im, filter_size)

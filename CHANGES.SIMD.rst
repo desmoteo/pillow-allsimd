@@ -37,6 +37,10 @@ New and faster kernels
 - RankFilter, MinFilter, MaxFilter, MedianFilter on 1-byte images: a
   sorting network for 3x3 windows (any rank) and row-then-column minimum
   and maximum for any size, 14x to 130x faster; the GIL is released
+- ModeFilter: the window histogram is updated by columns, and windows
+  of fewer than 16 values check only their own values; 13x faster for
+  size 3, 3.4x to 4.8x for sizes 5 to 17; output unchanged; the GIL is
+  released
 - Histogram of 8-bit images: counts split over several tables, 1.2x to
   2.4x faster
 - ImageChops.offset: two row copies instead of a modulo per pixel, 13x
