@@ -39,6 +39,9 @@ jobs:
           "3.14",
         ]
 
+    # CodSpeed rejects uploads from repositories not registered with it, so
+    # forks run this only after setting the repository variable CODSPEED=true.
+    if: github.repository_owner == 'python-pillow' || vars.CODSPEED == 'true'
     runs-on: ubuntu-latest
     name: Benchmark Python ${{ matrix.python-version }}
 

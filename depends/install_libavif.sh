@@ -5,7 +5,7 @@ version=1.4.2
 
 if [[ "$GHA_LIBAVIF_CACHE_HIT" == "true" ]]; then
 
-    LIBDIR=/usr/lib/x86_64-linux-gnu
+    LIBDIR=/usr/lib/$(gcc -dumpmachine)
 
     # Copy cached files into place
     sudo cp ~/cache-libavif/lib/* $LIBDIR/
@@ -73,7 +73,7 @@ else
 
     if [ -n "$GITHUB_ACTIONS" ] && [ "$(uname)" != "Darwin" ]; then
         # Copy to cache
-        LIBDIR=/usr/lib/x86_64-linux-gnu
+        LIBDIR=/usr/lib/$(gcc -dumpmachine)
         rm -rf ~/cache-libavif
         mkdir -p ~/cache-libavif/lib
         mkdir -p ~/cache-libavif/include
