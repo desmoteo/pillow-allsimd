@@ -26,6 +26,9 @@ env:
 
 jobs:
   Fuzzing:
+    # CIFuzz builds the OSS-Fuzz "pillow" project, which tracks
+    # python-pillow/Pillow; elsewhere it finds no matching repository.
+    if: github.repository_owner == 'python-pillow' || vars.CIFUZZ == 'true'
     runs-on: ubuntu-latest
     steps:
     - name: Build Fuzzers
