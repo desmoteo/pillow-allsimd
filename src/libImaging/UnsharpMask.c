@@ -24,11 +24,12 @@ static void
 ImagingUnsharpMaskRow(UINT8 *out, const UINT8 *in, int size, int percent, int threshold) {
     int x = 0, diff;
 
-#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+    /* arm64 uses the loop below, which compilers vectorize with a
+       multiply-high for the division; that beat NEON float division. */
+#if defined(IMAGING_SIMD_SSE4)
     /* diff * percent / 100 via float division: while |diff * percent| is
        below 2^24 the quotient truncates to the integer division result. */
     if (percent >= -65535 && percent <= 65535) {
-#if defined(IMAGING_SIMD_SSE4)
         __m128i pct = _mm_set1_epi32(percent);
         __m128i thr = _mm_set1_epi32(threshold);
         __m128 hundred = _mm_set1_ps(100.0f);
@@ -54,35 +55,6 @@ ImagingUnsharpMaskRow(UINT8 *out, const UINT8 *in, int size, int percent, int th
             __m128i hi = _mm_packs_epi32(res[2], res[3]);
             _mm_storeu_si128((__m128i *)&out[x], _mm_packus_epi16(lo, hi));
         }
-#else
-        int32x4_t pct = vdupq_n_s32(percent);
-        int32x4_t thr = vdupq_n_s32(threshold);
-        float32x4_t hundred = vdupq_n_f32(100.0f);
-        for (; x < size - 15; x += 16) {
-            uint8x16_t src = vld1q_u8(&in[x]);
-            uint8x16_t blur = vld1q_u8(&out[x]);
-            int16x8_t v16[2] = {
-                vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(src))),
-                vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(src)))};
-            int16x8_t b16[2] = {
-                vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(blur))),
-                vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(blur)))};
-            int16x4_t res[4];
-            for (int i = 0; i < 4; i++) {
-                int16x4_t vs = i & 1 ? vget_high_s16(v16[i / 2]) : vget_low_s16(v16[i / 2]);
-                int16x4_t bs = i & 1 ? vget_high_s16(b16[i / 2]) : vget_low_s16(b16[i / 2]);
-                int32x4_t v = vmovl_s16(vs);
-                int32x4_t d = vsubl_s16(vs, bs);
-                int32x4_t q = vcvtq_s32_f32(
-                    vdivq_f32(vcvtq_f32_s32(vmulq_s32(d, pct)), hundred));
-                uint32x4_t mask = vcgtq_s32(vabsq_s32(d), thr);
-                res[i] = vqmovn_s32(vbslq_s32(mask, vaddq_s32(v, q), v));
-            }
-            vst1q_u8(&out[x], vcombine_u8(
-                vqmovun_s16(vcombine_s16(res[0], res[1])),
-                vqmovun_s16(vcombine_s16(res[2], res[3]))));
-        }
-#endif
     }
 #endif
 
