@@ -40,10 +40,10 @@ filter_pack16(__m128i s0, __m128i s1, __m128i s2, __m128i s3) {
         __m128i ahi_ = _mm_cvtepu8_epi16(_mm_srli_si128(a_, 8));              \
         __m128i blo_ = _mm_cvtepu8_epi16(b_);                                 \
         __m128i bhi_ = _mm_cvtepu8_epi16(_mm_srli_si128(b_, 8));              \
-        s0 = _mm_add_epi32(s0, _mm_madd_epi16(_mm_unpacklo_epi16(alo_, blo_), kk_)); \
-        s1 = _mm_add_epi32(s1, _mm_madd_epi16(_mm_unpackhi_epi16(alo_, blo_), kk_)); \
-        s2 = _mm_add_epi32(s2, _mm_madd_epi16(_mm_unpacklo_epi16(ahi_, bhi_), kk_)); \
-        s3 = _mm_add_epi32(s3, _mm_madd_epi16(_mm_unpackhi_epi16(ahi_, bhi_), kk_)); \
+        s0 = mm_dpwssd(s0, _mm_unpacklo_epi16(alo_, blo_), kk_); \
+        s1 = mm_dpwssd(s1, _mm_unpackhi_epi16(alo_, blo_), kk_); \
+        s2 = mm_dpwssd(s2, _mm_unpacklo_epi16(ahi_, bhi_), kk_); \
+        s3 = mm_dpwssd(s3, _mm_unpackhi_epi16(ahi_, bhi_), kk_); \
     }
 #define FILTER_MLA16x1(s0, s1, s2, s3, p, k) FILTER_MLA16x2(s0, s1, s2, s3, p, p, k, 0)
 

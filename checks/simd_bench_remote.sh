@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Benchmarks pillow-simd on a remote arm64 machine over SSH.
+# Benchmarks pillow-simd on a remote arm64 or x86-64 machine over SSH.
 #
-# Copies a git ref of this repository to the host, builds it twice (NEON and
-# scalar, -C simd=auto / -C simd=disable), installs upstream Pillow from PyPI
-# as a baseline, then runs checks/simd_bench.py with an output comparison and
-# copies the results back.
+# Copies a git ref of this repository to the host and builds it several
+# times: on arm64 NEON and scalar (-C simd=auto / disable); on x86-64 scalar,
+# SSE4, AVX2, and AVX-VNNI if the host has it. Installs upstream Pillow from
+# PyPI as a baseline, then runs checks/simd_bench.py with an output
+# comparison and copies the results back.
 #
 # Usage: checks/simd_bench_remote.sh [options] HOST
 #
@@ -26,7 +27,9 @@
 #                     for it; build tools must then already be installed)
 #   --out DIR         local directory for results (default: bench-results)
 #   --keep            keep the working directory on the host
-#   --force           run even if the host is not arm64
+#   --builds "N=OPT .."  builds to compare, each a name and a -C simd= value,
+#                     e.g. "avx2=avx2 avxvnni=avxvnni" (default: per host)
+#   --force           run even if the host is neither arm64 nor x86-64
 #
 # Requirements on the host: SSH access, Python 3.10+ with headers and venv,
 # a C compiler, and PyPI access to install setuptools/pybind11 into a venv
@@ -44,7 +47,7 @@ log() { echo "==> $*" >&2; }
 
 HOST="" USER_OPT="" PORT="" IDENTITY="" PY="python3" REF="HEAD"
 WORKDIR="pillow-simd-bench" ROUNDS=5 SIZE="2560x1600" CPU="" UPSTREAM=1
-OUT="bench-results" KEEP=0 FORCE=0
+OUT="bench-results" KEEP=0 FORCE=0 BUILDS=""
 ONLY=()
 SSH_EXTRA=()
 
@@ -57,6 +60,7 @@ while [ $# -gt 0 ]; do
         -o) SSH_EXTRA+=(-o "$2"); shift 2 ;;
         --python) PY=$2; shift 2 ;;
         --ref) REF=$2; shift 2 ;;
+        --builds) BUILDS=$2; shift 2 ;;
         --workdir) WORKDIR=$2; shift 2 ;;
         --rounds) ROUNDS=$2; shift 2 ;;
         --size) SIZE=$2; shift 2 ;;
@@ -99,9 +103,16 @@ log "connecting to $HOST"
 ARCH=$(rsh uname -m) || die "cannot connect to $HOST"
 OS=$(rsh uname -s)
 case "$ARCH" in
-    aarch64|arm64) ;;
-    *) [ "$FORCE" = 1 ] || die "$HOST is $ARCH, not arm64 (use --force to run anyway)" ;;
+    aarch64|arm64) DEFAULT_BUILDS="scalar=disable neon=auto" ;;
+    x86_64|amd64)
+        DEFAULT_BUILDS="scalar=disable sse4=sse4 avx2=avx2"
+        if rsh "grep -qw avx_vnni /proc/cpuinfo" 2>/dev/null; then
+            DEFAULT_BUILDS="$DEFAULT_BUILDS avxvnni=avxvnni"
+        fi ;;
+    *) [ "$FORCE" = 1 ] || die "$HOST is $ARCH, not arm64 or x86-64 (use --force to run anyway)"
+       DEFAULT_BUILDS="auto=auto scalar=disable" ;;
 esac
+BUILDS=${BUILDS:-$DEFAULT_BUILDS}
 log "host: $OS $ARCH"
 
 log "checking $PY, headers and compiler on the host"
@@ -143,8 +154,9 @@ build() {  # name simd-option
         grep 'SIMD kernels' ../build-$1.log | sed 's/^ *//'
     " || die "build of $1 failed (log above, full log in $WORKDIR/build-$1.log)"
 }
-build neon auto
-build scalar disable
+for b in $BUILDS; do
+    build "${b%%=*}" "${b#*=}"
+done
 
 VARIANTS=()
 if [ "$UPSTREAM" = 1 ]; then
@@ -158,7 +170,9 @@ if [ "$UPSTREAM" = 1 ]; then
         log "warning: could not install upstream Pillow, continuing without it"
     fi
 fi
-VARIANTS+=(--variant "scalar=scalar" --variant "neon=neon")
+for b in $BUILDS; do
+    VARIANTS+=(--variant "${b%%=*}=${b%%=*}")
+done
 
 ARGS=("${VARIANTS[@]}" --rounds "$ROUNDS" --size "$SIZE" --check --json results.json)
 [ -n "$CPU" ] && ARGS+=(--cpu "$CPU")
@@ -173,7 +187,9 @@ rsh "cd $WORKDIR && venv/bin/python -I simd_bench.py$QARGS" | tee "$DEST/report.
 
 log "copying results to $DEST"
 rsh "cd $WORKDIR && cat results.json" > "$DEST/results.json"
-rsh "cd $WORKDIR && cat build-neon.log" > "$DEST/build-neon.log"
+for b in $BUILDS; do
+    rsh "cd $WORKDIR && cat build-${b%%=*}.log" > "$DEST/build-${b%%=*}.log"
+done
 echo "commit $COMMIT, host $HOST ($OS $ARCH)" > "$DEST/info.txt"
 
 if [ "$KEEP" = 0 ]; then

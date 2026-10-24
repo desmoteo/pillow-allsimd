@@ -1025,11 +1025,13 @@ class pil_build_ext(build_ext):
         """Add the compile flags for the SIMD kernels in PIL._imaging.
 
         -C simd=auto (default) picks SSE4.1 on x86 and NEON on arm64,
-        -C simd=avx2 adds AVX2 on x86, -C simd=disable builds scalar code.
+        -C simd=avx2 adds AVX2 on x86, -C simd=avxvnni adds AVX2 and AVX-VNNI
+        (Intel Alder Lake, Sapphire Rapids and newer, AMD Zen 5),
+        -C simd=disable builds scalar code.
         Flags are appended, so the optimisation flags are kept.
         """
         requested = configuration.get("simd", ["auto"])[-1]
-        if requested not in ("auto", "sse4", "avx2", "neon", "disable"):
+        if requested not in ("auto", "sse4", "avx2", "avxvnni", "neon", "disable"):
             msg = f"Unknown option '-C simd={requested}'"
             raise ValueError(msg)
 
@@ -1047,14 +1049,20 @@ class pil_build_ext(build_ext):
             if requested == "neon":
                 msg = "'-C simd=neon' requires an arm64 target"
                 raise ValueError(msg)
-            if requested == "avx2":
+            if requested == "avxvnni":
+                if msvc:
+                    msg = "'-C simd=avxvnni' is not supported with MSVC"
+                    raise ValueError(msg)
+                args = ["-msse4.1", "-mavx2", "-mavxvnni"]
+                simd = "SSE4.1 + AVX2 + AVX-VNNI"
+            elif requested == "avx2":
                 args = ["/arch:AVX2"] if msvc else ["-msse4.1", "-mavx2"]
                 simd = "SSE4.1 + AVX2"
             else:
                 args = [] if msvc else ["-msse4.1"]
                 simd = "SSE4.1"
         elif arm64:
-            if requested in ("sse4", "avx2"):
+            if requested in ("sse4", "avx2", "avxvnni"):
                 msg = f"'-C simd={requested}' requires an x86 target"
                 raise ValueError(msg)
             # NEON is part of the AArch64 baseline, no flag needed.
