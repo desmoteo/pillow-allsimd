@@ -398,7 +398,7 @@ ImagingBoxBlurColumns(
     UINT32 *acc,
     const UINT8 *add,
     const UINT8 *sub,
-    const UINT8 *far,
+    const UINT8 *far_row,
     int size,
     UINT32 ww,
     UINT32 fw
@@ -412,7 +412,7 @@ ImagingBoxBlurColumns(
     for (; b < size - 15; b += 16) {
         __m128i add8 = _mm_loadu_si128((__m128i *)&add[b]);
         __m128i sub8 = _mm_loadu_si128((__m128i *)&sub[b]);
-        __m128i far8 = _mm_loadu_si128((__m128i *)&far[b]);
+        __m128i far8 = _mm_loadu_si128((__m128i *)&far_row[b]);
         __m128i r[4];
 #define COLUMNS_4(k)                                                           \
     {                                                                          \
@@ -441,7 +441,7 @@ ImagingBoxBlurColumns(
 
     for (; b < size; b++) {
         acc[b] += add[b] - sub[b];
-        UINT32 bulk = acc[b] * ww + (sub[b] + far[b]) * fw;
+        UINT32 bulk = acc[b] * ww + (sub[b] + far_row[b]) * fw;
         out[b] = (UINT8)((bulk + (1 << 23)) >> 24);
     }
 }
