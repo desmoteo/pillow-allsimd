@@ -256,6 +256,8 @@ ImagingPutBand(Imaging imOut, Imaging imIn, int band) {
     // so they're distinct images with disparate buffers.
     int xsize = imIn->xsize;
     int ysize = imIn->ysize;
+    ImagingSectionCookie cookie;
+    ImagingSectionEnter(&cookie);
     for (y = 0; y < ysize; y++) {
         UINT8 *restrict in = imIn->image8[y];
         UINT8 *restrict out = (UINT8 *)imOut->image[y] + band;
@@ -264,6 +266,7 @@ ImagingPutBand(Imaging imOut, Imaging imIn, int band) {
             out += 4;
         }
     }
+    ImagingSectionLeave(&cookie);
 
     return imOut;
 }
@@ -291,6 +294,8 @@ ImagingFillBand(Imaging imOut, int band, int color) {
     /* Insert color into image */
     int xsize = imOut->xsize;
     int ysize = imOut->ysize;
+    ImagingSectionCookie cookie;
+    ImagingSectionEnter(&cookie);
     for (y = 0; y < ysize; y++) {
         UINT8 *restrict out = (UINT8 *)imOut->image[y] + band;
         for (x = 0; x < xsize; x++) {
@@ -298,6 +303,7 @@ ImagingFillBand(Imaging imOut, int band, int color) {
             out += 4;
         }
     }
+    ImagingSectionLeave(&cookie);
 
     return imOut;
 }
@@ -346,12 +352,21 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
     // allocation, so none of in0..in3/out alias each other.
     int xsize = imOut->xsize;
     int ysize = imOut->ysize;
+    ImagingSectionCookie cookie;
+    ImagingSectionEnter(&cookie);
     if (imOut->bands == 2) {
         for (y = 0; y < ysize; y++) {
             UINT8 *restrict in0 = bands[0]->image8[y];
             UINT8 *restrict in1 = bands[1]->image8[y];
             UINT32 *restrict out = (UINT32 *)imOut->image32[y];
-            for (x = 0; x < xsize; x++) {
+            x = 0;
+#if defined(IMAGING_SIMD_NEON)
+            for (; x < xsize - 15; x += 16) {
+                uint8x16x4_t px = {{vld1q_u8(in0 + x), vdupq_n_u8(0), vdupq_n_u8(0), vld1q_u8(in1 + x)}};
+                vst4q_u8((UINT8 *)&out[x], px);
+            }
+#endif
+            for (; x < xsize; x++) {
                 out[x] = MAKE_UINT32(in0[x], 0, 0, in1[x]);
             }
         }
@@ -361,7 +376,14 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             UINT8 *restrict in1 = bands[1]->image8[y];
             UINT8 *restrict in2 = bands[2]->image8[y];
             UINT32 *restrict out = (UINT32 *)imOut->image32[y];
-            for (x = 0; x < xsize; x++) {
+            x = 0;
+#if defined(IMAGING_SIMD_NEON)
+            for (; x < xsize - 15; x += 16) {
+                uint8x16x4_t px = {{vld1q_u8(in0 + x), vld1q_u8(in1 + x), vld1q_u8(in2 + x), vdupq_n_u8(0)}};
+                vst4q_u8((UINT8 *)&out[x], px);
+            }
+#endif
+            for (; x < xsize; x++) {
                 out[x] = MAKE_UINT32(in0[x], in1[x], in2[x], 0);
             }
         }
@@ -372,11 +394,19 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             UINT8 *restrict in2 = bands[2]->image8[y];
             UINT8 *restrict in3 = bands[3]->image8[y];
             UINT32 *restrict out = (UINT32 *)imOut->image32[y];
-            for (x = 0; x < xsize; x++) {
+            x = 0;
+#if defined(IMAGING_SIMD_NEON)
+            for (; x < xsize - 15; x += 16) {
+                uint8x16x4_t px = {{vld1q_u8(in0 + x), vld1q_u8(in1 + x), vld1q_u8(in2 + x), vld1q_u8(in3 + x)}};
+                vst4q_u8((UINT8 *)&out[x], px);
+            }
+#endif
+            for (; x < xsize; x++) {
                 out[x] = MAKE_UINT32(in0[x], in1[x], in2[x], in3[x]);
             }
         }
     }
+    ImagingSectionLeave(&cookie);
 
     return imOut;
 }

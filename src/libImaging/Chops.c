@@ -27,7 +27,9 @@
         return NULL;                                    \
     }                                                   \
     int ysize = imOut->ysize;                           \
+    ImagingSectionCookie cookie;                        \
     int linesize = imOut->linesize;                     \
+    ImagingSectionEnter(&cookie);                       \
     for (y = 0; y < ysize; y++) {                       \
         UINT8 *restrict out = (UINT8 *)imOut->image[y]; \
         UINT8 *restrict in1 = (UINT8 *)imIn1->image[y]; \
@@ -43,6 +45,7 @@
             }                                           \
         }                                               \
     }                                                   \
+    ImagingSectionLeave(&cookie);                       \
     return imOut;
 
 // restrict safety: imIn1/imIn2 are read-only, and imOut is always freshly allocated
@@ -54,7 +57,9 @@
         return NULL;                                    \
     }                                                   \
     int ysize = imOut->ysize;                           \
+    ImagingSectionCookie cookie;                        \
     int linesize = imOut->linesize;                     \
+    ImagingSectionEnter(&cookie);                       \
     for (y = 0; y < ysize; y++) {                       \
         UINT8 *restrict out = (UINT8 *)imOut->image[y]; \
         UINT8 *restrict in1 = (UINT8 *)imIn1->image[y]; \
@@ -63,6 +68,7 @@
             out[x] = operation;                         \
         }                                               \
     }                                                   \
+    ImagingSectionLeave(&cookie);                       \
     return imOut;
 
 static Imaging

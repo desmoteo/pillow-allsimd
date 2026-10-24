@@ -51,6 +51,8 @@ ImagingBlend(Imaging imIn1, Imaging imIn2, float alpha) {
     int ysize = imIn1->ysize;
     int linesize = imIn1->linesize;
 
+    ImagingSectionCookie cookie;
+    ImagingSectionEnter(&cookie);
     if (alpha >= 0 && alpha <= 1.0) {
         /* Interpolate between bands */
         for (y = 0; y < ysize; y++) {
@@ -81,6 +83,7 @@ ImagingBlend(Imaging imIn1, Imaging imIn2, float alpha) {
             }
         }
     }
+    ImagingSectionLeave(&cookie);
 
     return imOut;
 }
