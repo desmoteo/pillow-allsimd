@@ -59,6 +59,10 @@ clip32(float in) {
 #include "FilterSIMD_5x5f_u8.c"
 #include "FilterSIMD_5x5f_4u8.c"
 #include "FilterSIMD_5x5i_4u8.c"
+#define FILTER_SIMD
+#elif defined(IMAGING_SIMD_NEON)
+#include "FilterSIMD_neon.c"
+#define FILTER_SIMD
 #endif
 
 Imaging
@@ -479,10 +483,11 @@ ImagingFilter5x5(Imaging imOut, Imaging im, const float *kernel, float offset) {
     memcpy(imOut->image[y + 1], im->image[y + 1], im->linesize);
 }
 
-#if defined(IMAGING_SIMD_SSE4)
+#if defined(FILTER_SIMD)
 /* 8-bit images: integer kernels when the coefficients fit 16 bits,
-   float kernels otherwise. */
-static void
+   float kernels otherwise (SSE4 only). Returns 0 if the image has to
+   go to the generic code. */
+static int
 ImagingFilterSIMD(
     Imaging imOut, Imaging im, int xsize, int ysize, const FLOAT32 *kernel,
     FLOAT32 offset
@@ -512,6 +517,7 @@ ImagingFilterSIMD(
         norm_offset = tmp;
     }
 
+#if defined(IMAGING_SIMD_SSE4)
     if (xsize == 3) {
         if (im->image8) {
             ImagingFilter3x3f_u8(imOut, im, kernel, offset);
@@ -529,6 +535,25 @@ ImagingFilterSIMD(
             ImagingFilter5x5f_4u8(imOut, im, kernel, offset);
         }
     }
+#else
+    if (!fast_path) {
+        return 0;
+    }
+    if (xsize == 3) {
+        if (im->image8) {
+            ImagingFilter3x3i_u8_neon(imOut, im, norm_kernel, norm_offset);
+        } else {
+            ImagingFilter3x3i_4u8_neon(imOut, im, norm_kernel, norm_offset);
+        }
+    } else {
+        if (im->image8) {
+            ImagingFilter5x5i_u8_neon(imOut, im, norm_kernel, norm_offset);
+        } else {
+            ImagingFilter5x5i_4u8_neon(imOut, im, norm_kernel, norm_offset);
+        }
+    }
+#endif
+    return 1;
 }
 #endif
 
@@ -556,15 +581,18 @@ ImagingFilter(Imaging im, int xsize, int ysize, const FLOAT32 *kernel, FLOAT32 o
     }
 
     ImagingSectionEnter(&cookie);
-#if defined(IMAGING_SIMD_SSE4)
+    int done = 0;
+#if defined(FILTER_SIMD)
     if (im->type == IMAGING_TYPE_UINT8) {
-        ImagingFilterSIMD(imOut, im, xsize, ysize, kernel, offset);
-    } else
+        done = ImagingFilterSIMD(imOut, im, xsize, ysize, kernel, offset);
+    }
 #endif
-    if (xsize == 3) {
-        ImagingFilter3x3(imOut, im, kernel, offset);
-    } else {
-        ImagingFilter5x5(imOut, im, kernel, offset);
+    if (!done) {
+        if (xsize == 3) {
+            ImagingFilter3x3(imOut, im, kernel, offset);
+        } else {
+            ImagingFilter5x5(imOut, im, kernel, offset);
+        }
     }
     ImagingSectionLeave(&cookie);
     return imOut;
