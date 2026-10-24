@@ -59,9 +59,9 @@ clip32(float in) {
 #include "FilterSIMD_5x5f_u8.c"
 #include "FilterSIMD_5x5f_4u8.c"
 #include "FilterSIMD_5x5i_4u8.c"
-#define FILTER_SIMD
-#elif defined(IMAGING_SIMD_NEON)
-#include "FilterSIMD_neon.c"
+#endif
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+#include "FilterSIMD_NxNi.c"
 #define FILTER_SIMD
 #endif
 
@@ -519,7 +519,9 @@ ImagingFilterSIMD(
 
 #if defined(IMAGING_SIMD_SSE4)
     if (xsize == 3) {
-        if (im->image8) {
+        if (im->image8 && fast_path) {
+            ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset);
+        } else if (im->image8) {
             ImagingFilter3x3f_u8(imOut, im, kernel, offset);
         } else if (fast_path) {
             ImagingFilter3x3i_4u8(imOut, im, norm_kernel, norm_offset);
@@ -527,7 +529,9 @@ ImagingFilterSIMD(
             ImagingFilter3x3f_4u8(imOut, im, kernel, offset);
         }
     } else {
-        if (im->image8) {
+        if (im->image8 && fast_path) {
+            ImagingFilter5x5i_u8_simd(imOut, im, norm_kernel, norm_offset);
+        } else if (im->image8) {
             ImagingFilter5x5f_u8(imOut, im, kernel, offset);
         } else if (fast_path) {
             ImagingFilter5x5i_4u8(imOut, im, norm_kernel, norm_offset);
@@ -541,15 +545,15 @@ ImagingFilterSIMD(
     }
     if (xsize == 3) {
         if (im->image8) {
-            ImagingFilter3x3i_u8_neon(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset);
         } else {
-            ImagingFilter3x3i_4u8_neon(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter3x3i_4u8_simd(imOut, im, norm_kernel, norm_offset);
         }
     } else {
         if (im->image8) {
-            ImagingFilter5x5i_u8_neon(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter5x5i_u8_simd(imOut, im, norm_kernel, norm_offset);
         } else {
-            ImagingFilter5x5i_4u8_neon(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter5x5i_4u8_simd(imOut, im, norm_kernel, norm_offset);
         }
     }
 #endif
