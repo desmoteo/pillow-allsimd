@@ -1,6 +1,6 @@
 # Pillow 12.3 and 13.0 as a source of optimizations for pillow-simd
 
-Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/x86-fixes-arm64-neon` (HEAD `2e6edeec2`).
+Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/x86-fixes-arm64-neon`; review written at `2e6edeec2`, step 1 of section 5 done in `311d9e4e5`.
 
 ## Sources and method
 
@@ -13,10 +13,10 @@ Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_AS
 ## Summary
 
 1. **Rebase pillow-simd onto 13.0 rather than cherry-pick.** 13.0 rewrote much of the scalar C so compilers vectorise it, added free-threading locks, a new `IMAGING_TYPE_I16` and two resampling filters, and changed several internal return conventions. Cherry-picking would leave the fork diverging on every file we touch.
-2. **Four upstream bug fixes affect code this branch changed** and should be taken in any case:
+2. **Four upstream bug fixes affect code this branch changed.** All four are now ported (`311d9e4e5`):
    - The `I;16` filter computation.
    - Box-blur radius validation (our new vertical pass loops over the radius, so a huge radius hangs).
-   - LA histograms.
+   - Masked LA histograms.
    - Filter expansion overflow checks.
 3. **13.0 has a few scalar ideas worth applying inside our SIMD code too:**
    - vertical-first resampling when the height shrinks much more than the width,
@@ -53,10 +53,10 @@ Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills
 
 | Area | 12.3 behaviour (and this branch) | 13.0 | Action |
 |---|---|---|---|
-| `I;16` 3×3/5×5 filters (`kernel_i16`) | High byte shifted right (`>> 8`) instead of left, and each byte clipped separately: a flat `I;16` image of 1000 filters to 233 | `<< 8`, clamped to 0..65535 with `clip16`; `IMAGING_TYPE_I16` loop separate from the 8-bit loop | Port. `test_i16_uses_generic_kernel` (commit `cf334ba71`) pins 12.3's wrong values and must be updated |
-| BoxBlur radius | NaN and radii ≥ 2^31 accepted; converting them to `int` is undefined | Rejected with `ValueError` | Port. Matters more here: `ImagingVerticalBoxBlur` loops from `-radius-1` to `radius`, so a huge radius hangs |
-| `ImagingExpand` (filter margin) | Size check can overflow | 64-bit check; empty images handled | Port |
-| Histogram of LA images | Second band counted from byte 1 (padding), not byte 3 (alpha) | Byte 3 for two-band images | Port (scalar) |
+| `I;16` 3×3/5×5 filters (`kernel_i16`) | High byte shifted right (`>> 8`) instead of left, and each byte clipped separately: a flat `I;16` image of 1000 filters to 233 | `<< 8`, clamped to 0..65535 with `clip16`; `IMAGING_TYPE_I16` loop separate from the 8-bit loop | Ported. `test_i16_uses_generic_kernel` (commit `cf334ba71`) pinned 12.3's wrong values; it now compares against an `I` image |
+| BoxBlur radius | NaN, infinite and ≥ 2^31 radii accepted; converting them to `int` is undefined (NaN segfaults GaussianBlur) | Rejected with `ValueError` | Ported. Matters more here: `ImagingVerticalBoxBlur` loops from `-radius-1` to `radius`, so a huge radius hangs |
+| `ImagingExpand` (filter margin) | Size check can overflow, and divides by zero for margin 0 (SIGFPE) | 64-bit check; empty images handled | Ported |
+| Masked histogram of LA images | Second band counted from byte 1 (padding), not byte 3 (alpha); the unmasked path was already right | Byte 3 for two-band images | Ported (scalar) |
 
 ## 3. 13.0 ideas to reuse, mapped to pillow-simd
 
@@ -144,7 +144,7 @@ Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills
 
 All four fixes from section 2 are ported, with 13.0's tests:
 - `Filter.c`: the `I;16` loop is separate from the 8-bit loop, as in 13.0, but still keyed on `IMAGING_TYPE_SPECIAL` until the rebase. `test_i16_uses_generic_kernel` now compares against the same values in an `I` image, not 12.3's output.
-- `BoxBlur.c` and `ImageFilter.BoxBlur`: NaN, infinite and ≥ 2^31 radii raise `ValueError`.
+- `BoxBlur.c` and `ImageFilter.BoxBlur`: NaN, infinite and ≥ 2^31 radii raise `ValueError`, for `GaussianBlur` and `UnsharpMask` too since they go through `ImagingBoxBlur`.
 - `ImagingExpand`: 64-bit size check. Stock 12.3 crashed with SIGFPE both on huge margins and on `MinFilter(1)` applied to a zero-size image.
 - `Histo.c`: the masked path counts byte 3 for LA. The unmasked path was already correct in 12.3.
 
