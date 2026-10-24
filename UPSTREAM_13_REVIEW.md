@@ -243,3 +243,27 @@ No x86 SIMD code is now missing on arm64.
   - One inexact 3×3 kernel differs by 1 in 16–40 bytes of a 333×211 image, about 0.05%, because GCC fuses that loop slightly differently.
   - For comparison, the x86 SSE4/AVX2 float kernels differ from x86 scalar by 1 in up to 1.4% of bytes for inexact kernels.
 - Exactness here depends on the compiler's fusion choices, which can change between GCC versions. Making it exact would mean compiling the generic code without fused multiply-adds, which would also change arm64 scalar output.
+
+## Newer x86 instruction sets: Xeon Gold 5512U (Emerald Rapids)
+
+Both runs used `checks/simd_bench_remote.sh --docker` (ms, 2560×1600, best of 5). All builds differ from upstream in the same 9 operations, with the same values: the 3 resize rows that also differ in the scalar build, and the known x86 rounding of RGB→L/LA, RGBa→RGBA, alpha_composite and the 5×5 integer filters.
+
+**AVX-VNNI vs AVX2** (`-C simd=avxvnni`: one `vpdpwssd` instead of `pmaddwd` + `paddd`):
+
+| Operation | AVX2 | AVX-VNNI | Gain |
+|---|---:|---:|---:|
+| filter RGB 5×5 SMOOTH_MORE | 13.57 | 8.41 | 1.61x |
+| filter RGB 3×3 SHARPEN | 5.20 | 4.02 | 1.29x |
+| filter L 5×5 / 3×3 | 8.77 / 3.51 | 6.88 / 2.85 | 1.27x / 1.23x |
+| resize L / RGB ×1.5 lanczos | 13.95 / 27.16 | 12.38 / 25.02 | 1.13x / 1.09x |
+| resize RGB 1/4 bicubic | 3.14 | 2.91 | 1.08x |
+
+Unchanged operations are within ±10% from run to run.
+
+**AVX-512 through the compiler** (`-C simd=native`: `-march=native -ffp-contract=off`; `native512`: also `-mprefer-vector-width=512`), against AVX-VNNI:
+- `blend RGB`: 4.86 → 3.21 ms with native512 (1.51x); native alone gains nothing.
+- `median 3 L`: 5.78 → 5.10 ms with native512 (1.13x).
+- `filter RGB 5×5` and ColorLUT: 1.08x with either.
+- Everything else within ±3%.
+
+Conclusion: hand-written AVX-512 kernels are not worth their cost. The heavy operations are 6–25x upstream already and near memory speed, and the compiler's AVX-512 found little more. For a build that only has to run on such a Xeon, `-C simd=native512` is the fastest; for portable builds, `avxvnni` (Intel Alder Lake / Sapphire Rapids and newer, AMD Zen 5) or `avx2`.
