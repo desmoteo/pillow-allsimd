@@ -507,3 +507,134 @@ ImagingResampleHorizontalConvolution8u4x(
 }
 
 #endif
+
+/* 1-byte pixels. Taps go 8, 4 and 2 at a time as 16-bit products summed
+   into 32 bits, then one at a time. Integer sums don't depend on the order,
+   so the results match the scalar code. */
+#if defined(IMAGING_SIMD_SSE4)
+#define RESAMPLE_HORIZONTAL_1BAND_SIMD
+
+/* Four rows at once: they share the coefficient loads and one set of
+   horizontal sums per output pixel. The output rows may be the same row,
+   with the same input row for each. */
+static void
+ImagingResampleHorizontalConvolution1u4x(
+    UINT8 *lineOut0, UINT8 *lineOut1, UINT8 *lineOut2, UINT8 *lineOut3,
+    const UINT8 *lineIn0, const UINT8 *lineIn1,
+    const UINT8 *lineIn2, const UINT8 *lineIn3,
+    int xsize, int *xbounds, INT16 *kk, int kmax, int coefs_precision)
+{
+    int xmin, xmax, xx, x;
+    const INT16 *k;
+    __m128i initial = _mm_set1_epi32(1 << (coefs_precision - 1));
+
+    for (xx = 0; xx < xsize; xx++) {
+        const UINT8 *in0, *in1, *in2, *in3;
+        __m128i sss0 = _mm_setzero_si128(), sss1 = sss0, sss2 = sss0, sss3 = sss0;
+        __m128i mmk, sss;
+
+        xmin = xbounds[xx * 2 + 0];
+        xmax = xbounds[xx * 2 + 1];
+        k = &kk[xx * kmax];
+        in0 = lineIn0 + xmin;
+        in1 = lineIn1 + xmin;
+        in2 = lineIn2 + xmin;
+        in3 = lineIn3 + xmin;
+        x = 0;
+
+#define MM_LOAD8(p) _mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)(p)))
+#define MM_LOAD4(p) _mm_cvtepu8_epi16(_mm_cvtsi32_si128(mm_load_si32(p)))
+#define MM_LOAD2(p) _mm_cvtsi32_si128((p)[0] | ((p)[1] << 16))
+#define MM_LOAD1(p) _mm_cvtsi32_si128((p)[0])
+#define MM_TAPS(load, n)                                               \
+    sss0 = _mm_add_epi32(sss0, _mm_madd_epi16(load(in0 + x), mmk));    \
+    sss1 = _mm_add_epi32(sss1, _mm_madd_epi16(load(in1 + x), mmk));    \
+    sss2 = _mm_add_epi32(sss2, _mm_madd_epi16(load(in2 + x), mmk));    \
+    sss3 = _mm_add_epi32(sss3, _mm_madd_epi16(load(in3 + x), mmk));    \
+    x += n;
+
+        while (x < xmax - 7) {
+            mmk = _mm_loadu_si128((const __m128i *)&k[x]);
+            MM_TAPS(MM_LOAD8, 8)
+        }
+        if (x < xmax - 3) {
+            mmk = _mm_loadl_epi64((const __m128i *)&k[x]);
+            MM_TAPS(MM_LOAD4, 4)
+        }
+        if (x < xmax - 1) {
+            mmk = _mm_cvtsi32_si128(mm_load_si32(&k[x]));
+            MM_TAPS(MM_LOAD2, 2)
+        }
+        if (x < xmax) {
+            mmk = _mm_cvtsi32_si128((UINT16)k[x]);
+            MM_TAPS(MM_LOAD1, 1)
+        }
+#undef MM_TAPS
+#undef MM_LOAD2
+#undef MM_LOAD1
+#undef MM_LOAD4
+#undef MM_LOAD8
+
+        // [32] sum3 sum2 sum1 sum0
+        sss = _mm_hadd_epi32(_mm_hadd_epi32(sss0, sss1), _mm_hadd_epi32(sss2, sss3));
+        sss = _mm_srai_epi32(_mm_add_epi32(sss, initial), coefs_precision);
+        sss = _mm_packus_epi16(_mm_packs_epi32(sss, sss), sss);
+        lineOut0[xx] = (UINT8)_mm_extract_epi8(sss, 0);
+        lineOut1[xx] = (UINT8)_mm_extract_epi8(sss, 1);
+        lineOut2[xx] = (UINT8)_mm_extract_epi8(sss, 2);
+        lineOut3[xx] = (UINT8)_mm_extract_epi8(sss, 3);
+    }
+}
+
+static void
+ImagingResampleHorizontalConvolution1u(
+    UINT8 *restrict lineOut, const UINT8 *lineIn,
+    int xsize, int *xbounds, INT16 *kk, int kmax, int coefs_precision)
+{
+    ImagingResampleHorizontalConvolution1u4x(
+        lineOut, lineOut, lineOut, lineOut, lineIn, lineIn, lineIn, lineIn,
+        xsize, xbounds, kk, kmax, coefs_precision);
+}
+
+#elif defined(IMAGING_SIMD_NEON)
+#define RESAMPLE_HORIZONTAL_1BAND_SIMD
+
+static void
+ImagingResampleHorizontalConvolution1u(
+    UINT8 *restrict lineOut, const UINT8 *lineIn,
+    int xsize, int *xbounds, INT16 *kk, int kmax, int coefs_precision)
+{
+    int xmin, xmax, xx, x;
+
+    for (xx = 0; xx < xsize; xx++) {
+        const INT16 *k = &kk[xx * kmax];
+        const UINT8 *in;
+        int32x4_t sss = vdupq_n_s32(0);
+        int ss;
+
+        xmin = xbounds[xx * 2 + 0];
+        xmax = xbounds[xx * 2 + 1];
+        in = lineIn + xmin;
+        for (x = 0; x < xmax - 7; x += 8) {
+            int16x8_t pix = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(in + x)));
+            int16x8_t mmk = vld1q_s16(&k[x]);
+            sss = vmlal_s16(sss, vget_low_s16(pix), vget_low_s16(mmk));
+            sss = vmlal_high_s16(sss, pix, mmk);
+        }
+        if (x < xmax - 3) {
+            UINT32 v;
+            memcpy(&v, in + x, sizeof(v));
+            int16x4_t pix = vreinterpret_s16_u16(
+                vget_low_u16(vmovl_u8(vreinterpret_u8_u32(vdup_n_u32(v)))));
+            sss = vmlal_s16(sss, pix, vld1_s16(&k[x]));
+            x += 4;
+        }
+        ss = (1 << (coefs_precision - 1)) + vaddvq_s32(sss);
+        for (; x < xmax; x++) {
+            ss += in[x] * k[x];
+        }
+        lineOut[xx] = clip8(ss, coefs_precision);
+    }
+}
+
+#endif

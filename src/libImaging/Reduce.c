@@ -1479,6 +1479,12 @@ ImagingReduce(Imaging imIn, int xscale, int yscale, int box[4]) {
                 break;
             }
 #endif
+#if defined(REDUCE_SIMD_1U8)
+            if (imIn->image8 && ImagingReduce_1u8(imOut, imIn, box, xscale, yscale)) {
+                ImagingReduceCorners(imOut, imIn, box, xscale, yscale);
+                break;
+            }
+#endif
             if (xscale == 1) {
                 if (yscale == 2) {
                     ImagingReduce1x2(imOut, imIn, box);
