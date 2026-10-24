@@ -137,6 +137,9 @@ jobs:
 
       - name: Upload coverage
         uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
+        env:
+          # Let Cygwin bash run the action's scripts despite CRLF line endings.
+          SHELLOPTS: igncr
         with:
           files: ./coverage.xml
           flags: GHA_Cygwin

@@ -139,7 +139,8 @@ jobs:
         if [ $REVERSE ]; then
           python3 -m pip install pytest-reverse
         fi
-        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+        # All Ubuntu runners, arm64 too, install wl-clipboard (.ci/install.sh).
+        if [[ "${{ matrix.os }}" == ubuntu-* ]]; then
           xvfb-run -s '-screen 0 1024x768x24' sway&
           export WAYLAND_DISPLAY=wayland-1
           .ci/test.sh
