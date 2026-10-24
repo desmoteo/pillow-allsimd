@@ -13,14 +13,19 @@ aptget_update()
         return 1
     fi
 }
-aptget_update || aptget_update retry || aptget_update retry
+if [[ $(uname) != CYGWIN* ]]; then
+    aptget_update || aptget_update retry || aptget_update retry
+fi
 
 set -e
 
-sudo apt-get -qq install libfreetype6-dev liblcms2-dev libtiff-dev python3-tk\
-                         ghostscript libjpeg-turbo8-dev libopenjp2-7-dev\
-                         cmake meson imagemagick libharfbuzz-dev libfribidi-dev\
-                         sway wl-clipboard libopenblas-dev nasm
+# On Cygwin, the libraries come from Cygwin packages (test-cygwin.yml).
+if [[ $(uname) != CYGWIN* ]]; then
+    sudo apt-get -qq install libfreetype6-dev liblcms2-dev libtiff-dev python3-tk\
+                             ghostscript libjpeg-turbo8-dev libopenjp2-7-dev\
+                             cmake meson imagemagick libharfbuzz-dev libfribidi-dev\
+                             sway wl-clipboard libopenblas-dev nasm
+fi
 
 python3 -m pip install --upgrade pip
 python3 -m pip install --upgrade wheel
@@ -35,24 +40,26 @@ python3 -m pip install -U pytest-timeout
 python3 -m pip install --only-binary=:all: numpy || true
 python3 -m pip install --only-binary=:all: pyarrow || true
 
-# PyQt6 doesn't support PyPy3
-if [[ $GHA_PYTHON_VERSION == 3.* ]]; then
-    sudo apt-get -qq install libegl1 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxkbcommon-x11-0
-    # pyqt6 doesn't yet support free-threading; only install if a wheel is available
-    python3 -m pip install --only-binary=:all: pyqt6 || true
+if [[ $(uname) != CYGWIN* ]]; then
+    # PyQt6 doesn't support PyPy3
+    if [[ $GHA_PYTHON_VERSION == 3.* ]]; then
+        sudo apt-get -qq install libegl1 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxkbcommon-x11-0
+        # pyqt6 doesn't yet support free-threading; only install if a wheel is available
+        python3 -m pip install --only-binary=:all: pyqt6 || true
+    fi
+
+    # webp
+    pushd depends && ./install_webp.sh && popd
+
+    # libimagequant
+    pushd depends && ./install_imagequant.sh && popd
+
+    # raqm
+    pushd depends && sudo ./install_raqm.sh && popd
+
+    # libavif
+    pushd depends && ./install_libavif.sh && popd
 fi
-
-# webp
-pushd depends && ./install_webp.sh && popd
-
-# libimagequant
-pushd depends && ./install_imagequant.sh && popd
-
-# raqm
-pushd depends && sudo ./install_raqm.sh && popd
-
-# libavif
-pushd depends && ./install_libavif.sh && popd
 
 # extra test images
 pushd depends && ./install_extra_test_images.sh && popd
