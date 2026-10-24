@@ -116,3 +116,78 @@ Each item was implemented, checked for byte-identical output against the scalar 
 
 - Compare instruction counts between builds of the same C code before writing intrinsics. A slow SSE4 time can be the compiler's best at that vector width.
 - Valgrind's cache misses mark where data leaves L1, not where time goes. Cache-blocking changes need real timings on a quiet machine before they are kept.
+
+## Operations without SIMD kernels
+
+A second pass over common operations that have no kernel of their own, to find where one would pay. Same method and machine as above, on `79435324e`. These operations are the `extra` set of `checks/simd_bench.py` (`--set extra`; `--set all` runs both sets). Builds: upstream Pillow 12.3.0 wheel, SSE4, AVX2. Valgrind 3.22 cannot run AVX-VNNI code, so the AVX-VNNI build was timed but not counted.
+
+Instructions in millions (Ir) and native time in ms, best of 5 rounds, 2560×1600.
+
+| Operation | upstream ms | SSE4 ms | AVX2 ms | upstream Ir | SSE4 Ir | AVX2 Ir |
+|---|---:|---:|---:|---:|---:|---:|
+| rotate RGB 30 nearest | 44.0 | 29.3 | 45.9 | 121 | 113 | 121 |
+| rotate RGB 30 bilinear | 99.5 | 97.5 | 107.7 | 988 | 1013 | 950 |
+| rotate RGB 30 bicubic | 264.1 | 259.4 | 271.9 | 2471 | 2559 | 2350 |
+| perspective RGBA bilinear | 186.1 | 152.5 | 139.7 | 1581 | 1400 | 1276 |
+| transpose RGB ROTATE_90 | 5.38 | 4.88 | 4.95 | 44 | 43 | 43 |
+| transpose RGB FLIP_LR | 2.35 | 2.19 | 2.20 | 37 | 33 | 33 |
+| transpose L TRANSPOSE | 3.41 | 3.42 | 3.43 | 40 | 41 | 41 |
+| resize RGB 1/4 nearest | 0.29 | 0.29 | 0.29 | 3 | 3 | 3 |
+| resize F 1/4 bicubic | 12.7 | 13.9 | 14.1 | 212 | 211 | 190 |
+| resize I;16 1/4 bicubic | 26.9 | 28.3 | 28.3 | 354 | 350 | 330 |
+| convert RGB->RGBA | 7.21 | 3.64 | 3.70 | 27 | 19 | 19 |
+| convert RGBA->RGB | 7.21 | 3.66 | 3.71 | 27 | 19 | 19 |
+| convert L->RGB | 3.31 | 3.31 | 3.31 | 41 | 41 | 41 |
+| convert P->RGB | 4.44 | 4.50 | 4.48 | 70 | 70 | 70 |
+| convert RGB->YCbCr | 11.7 | 11.7 | 11.7 | 145 | 164 | 164 |
+| convert YCbCr->RGB | 13.5 | 14.1 | 14.1 | 181 | 209 | 209 |
+| convert RGB->HSV | 110.2 | 117.8 | 121.3 | 369 | 422 | 396 |
+| convert RGB->CMYK | 9.85 | 3.67 | 4.34 | 51 | 27 | 27 |
+| convert L->F | 0.97 | 0.97 | 1.00 | 7 | 6 | 3 |
+| convert L->1 dither | 26.9 | 27.9 | 27.7 | 139 | 125 | 125 |
+| convert RGB->P adaptive | 6875.0 | 6662.1 | 7156.3 | 6093 | 6257 | 6277 |
+| quantize RGB fastoctree | 37.8 | 37.9 | 36.4 | 478 | 486 | 441 |
+| paste RGB mask 1-bit L | 16.0 | 12.6 | 8.40 | 160 | 111 | 63 |
+| composite RGB mask L | 15.9 | 12.7 | 8.18 | 160 | 111 | 63 |
+| paste RGBA over RGB | 16.0 | 12.1 | 7.39 | 167 | 105 | 58 |
+| putalpha RGBA | 9.08 | 6.91 | 7.05 | 38 | 30 | 33 |
+| point RGB lut | 5.85 | 5.82 | 5.78 | 70 | 66 | 66 |
+| autocontrast RGB | 20.5 | 12.7 | 12.3 | 116 | 113 | 113 |
+| equalize RGB | 20.5 | 12.8 | 12.6 | 116 | 113 | 113 |
+| getextrema RGB | 4.71 | 3.39 | 3.43 | 49 | 25 | 25 |
+| chops add | 13.3 | 10.2 | 6.54 | 113 | 89 | 43 |
+| chops difference | 8.45 | 6.69 | 4.12 | 96 | 69 | 33 |
+| chops lighter | 6.79 | 5.16 | 3.55 | 73 | 52 | 25 |
+| filter RGB 5x5 float | 308.7 | 40.8 | 36.0 | 2038 | 444 | 369 |
+| filter L 5x5 float | 113.5 | 20.3 | 20.3 | 577 | 198 | 172 |
+| filter RGB EDGE_ENHANCE | 168.5 | 15.0 | 12.1 | 776 | 180 | 98 |
+| mode 3 L | 1046.1 | 1050.3 | 1048.4 | 8515 | 8499 | 8499 |
+| expand RGB 20 | 2.41 | 2.52 | 2.43 | 34 | 34 | 34 |
+| thumbnail RGB 1/8 | 8.81 | 4.21 | 3.99 | 91 | 53 | 49 |
+
+A plain copy of the 16 MB image (`expand`) takes about 2.4 ms. Operations within about 2x of that are limited by memory traffic and have little to gain from wider vectors: transposes, point, L/P→RGB, getextrema, RGB→L, split, merge, pack and unpack, reduce.
+
+### Candidates, by expected gain
+
+1. **ModeFilter is brute force** (1.05 s, 8.5G instructions, the same as upstream). For every pixel, `ImagingModeFilter` clears a 256-entry histogram, fills it from the window and scans all 256 bins; the source says so in a FIXME. Counting only the values in the window (at most 9 for size 3) and keeping the same tie-break (lowest value) and the `maxcount > 2` rule gives the same output. Portable C, like the rank filters; expected 20x or more.
+2. **Rotate and transform with bilinear or bicubic filters** (100–260 ms, 1–2.5G instructions). Each pixel calls the filter through a function pointer, loops over the bands, clips the coordinates per band and interpolates in `double`. The arithmetic is per channel and in the same order for every channel, so the four channels of a pixel fit one AVX2 `__m256d` (two SSE2 or NEON `float64x2_t`) and give bit-identical results as long as the compiler does not contract to FMA. Expected 2–3x on RGB and RGBA.
+3. **Integer 3×3 and 5×5 filters on AVX2** (checklist item 4.6, still open). AVX-VNNI is 2.1x faster than AVX2 on `filter RGB 5x5 SMOOTH_MORE` (8.9 vs 18.7 ms), so the AVX2 kernel is bound by its multiply-adds: it loads 128 bits and duplicates them into both lanes. Full 256-bit loads should give 1.5–2x on AVX2. The L-image kernel (`FilterSIMD_NxNi.c`) has no 256-bit path at all; 4.1 ms (3×3) and 10.3 ms (5×5) for 4 MB of input are compute-bound too.
+4. **RGB→HSV** (118 ms, 3M mispredicts per image in `rgb2hsv_row`). Float with branches per pixel; a branch-free SIMD version is possible but HSV is rarely used.
+5. **YCbCr↔RGB** (12–14 ms, 5x a copy). Table lookups per channel; SIMD needs gathers or a proof that the tables are exactly linear.
+
+Not SIMD problems:
+- `convert("P", ADAPTIVE)` (6.7 s): median cut. Time is in `ImagingQuantize`, sorting by `pixel_cmp`, hash-table lookups and `malloc`/`free`. `Quantize.FASTOCTREE` takes 38 ms.
+- `convert("1")` with dithering (28 ms): Floyd–Steinberg error diffusion is sequential along each row.
+- `paste`/`composite` with a mask and `ImageChops` add, difference, lighter: GCC vectorises them already, and the AVX2 build is 1.5–2x faster than SSE4 from vector width alone. As with `blend`, a hand-written SSE4 kernel is unlikely to beat the compiler.
+- `resize` on `F` and `I;16` (13–28 ms): float and 32-bit convolution, only worth it for scientific or medical workflows.
+
+### SSE4-only kernels and AVX2
+
+- Reduce, RGB→L, split, get_channel, pack and unpack run close to memory speed: AVX2 would not help.
+- Box and Gaussian blur and unsharp mask are compute-bound (18–62 ms), but their horizontal pass is a running sum along each row. Two RGB rows per AVX2 vector were measured and dropped (see Outcome above).
+- 5×5 float kernels on 4-byte images have no AVX2 path; 3×3 has one and is 1.24x faster than SSE4 (`FIND_EDGES`). Kernels with coefficients large enough to need the float path are uncommon.
+- The integer filters are item 3 above.
+
+### Open finding: rotate nearest is slower in the AVX2 build
+
+Repeated with 9 alternating rounds: `rotate RGB 30 nearest` takes 24.3 ms in the SSE4 build and 33.4 ms in the AVX2 build (scalar 23.6 ms). `convert RGB->CMYK` is 3.6 against 4.3 ms. Neither function has hand-written AVX2 code, GCC reports no vectorised loop in `affine_fixed`, and its code uses no 256-bit registers; callgrind counts 7% more instructions and the same cache misses. Hardware counters were not available on this machine (`perf_event_paranoid` = 4), so the cause, probably code layout or instruction scheduling of the VEX-encoded loop, is not confirmed.
