@@ -297,3 +297,30 @@ def test_gaussian_one_axis_channel_order(radius: tuple[int, int]) -> None:
     im = Image.new("RGBA", (16, 9), (200, 50, 10, 255))
     out = im.filter(ImageFilter.GaussianBlur(radius))
     assert out.getpixel((8, 4)) == (200, 50, 10, 255)
+
+
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA"))
+@pytest.mark.parametrize(
+    "size, radius",
+    (
+        ((1, 9), (0.3, 0)),
+        ((9, 1), (0, 0.3)),
+        ((1, 9), (0.5, 0)),
+        ((1, 9), (2.5, 0)),
+        ((9, 1), (0, 2.5)),
+    ),
+)
+@pytest.mark.parametrize("n", (1, 3))
+def test_one_pixel_line(
+    mode: str, size: tuple[int, int], radius: tuple[float, float], n: int
+) -> None:
+    # Blurring along a 1-pixel dimension only sees the pixel itself.
+    bands = len(Image.new(mode, (1, 1)).getbands())
+    im = Image.frombytes(mode, size, bytes((i * 29) % 256 for i in range(9 * bands)))
+    assert box_blur_axes(im, radius, n).tobytes() == im.tobytes()
+
+
+def box_blur_axes(
+    image: Image.Image, radius: tuple[float, float], n: int
+) -> Image.Image:
+    return image._new(image.im.box_blur(radius, n))
