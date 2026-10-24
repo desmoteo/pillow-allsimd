@@ -36,6 +36,7 @@ def operations(Image, ImageChops, ImageFilter, w: int, h: int) -> dict:
     rnd = random.Random(SEED)
     rgb = Image.frombytes("RGB", (w, h), rnd.randbytes(w * h * 3))
     rgb2 = Image.frombytes("RGB", (w, h), rnd.randbytes(w * h * 3))
+    rgb_bytes = rgb2.tobytes()
     L = Image.frombytes("L", (w, h), rnd.randbytes(w * h))
     rgba = rgb.convert("RGBA")
     rgba.putalpha(Image.frombytes("L", (w, h), rnd.randbytes(w * h)))
@@ -78,6 +79,12 @@ def operations(Image, ImageChops, ImageFilter, w: int, h: int) -> dict:
         "chops multiply": lambda: ImageChops.multiply(rgb, rgb2),
         "chops screen": lambda: ImageChops.screen(rgb, rgb2),
         "chops multiply L": lambda: ImageChops.multiply(L, L),
+        "median 3 L": lambda: L.filter(ImageFilter.MedianFilter(3)),
+        "max 3 RGB": lambda: rgb.filter(ImageFilter.MaxFilter(3)),
+        "histogram RGB": lambda: rgb.histogram(),
+        "chops offset RGB": lambda: ImageChops.offset(rgb, 100, 50),
+        "frombytes RGB": lambda: Image.frombytes("RGB", (w, h), rgb_bytes),
+        "tobytes RGB": lambda: rgb.tobytes(),
     }
 
 
@@ -110,8 +117,15 @@ def worker(path: str, mode: str, size: tuple[int, int], only: list[str]) -> None
             result["ops"][name] = best * 1000
         else:
             out = op()
-            images = out if isinstance(out, (list, tuple)) else [out]
-            data = b"".join(im.tobytes() for im in images)
+            if isinstance(out, bytes):
+                data = out
+            else:
+                items = out if isinstance(out, (list, tuple)) else [out]
+                # Images, or the counts of a histogram as 4-byte values.
+                data = b"".join(
+                    v.to_bytes(4, "little") if isinstance(v, int) else v.tobytes()
+                    for v in items
+                )
             result["ops"][name] = base64.b64encode(data).decode()
     print(json.dumps(result))
 
