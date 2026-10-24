@@ -207,3 +207,16 @@ Open on arm64:
   ColorLUT on NEON keeps the portable code's arithmetic, so its output is identical to upstream. The SSE4 kernel uses its own precision.
 - Left as is: `convert RGB->LA` is bound by memory bandwidth (0.99x), and `convert RGBA->RGBa` is 6% behind the upstream wheel.
 - The portable build is slower than the upstream wheel for `convert RGBA->RGBa` (0.32x), `merge RGB` (0.70x) and `convert RGB->L` (0.80x). The NEON build is unaffected, but builds without NEON pay this.
+
+## Rank filters, histogram, offset and RGB pack/unpack (`bc77919ef`)
+
+From a callgrind profile of 45 more common operations. These changes are plain C, or SSE4 and NEON for pack/unpack, so they help both architectures. Output is identical to the previous code, and the I;16 offset is now correct (it read and wrote past every row).
+
+| Operation (ms) | x86 before | x86 SSE4 | Jetson upstream | Jetson NEON |
+|---|---:|---:|---:|---:|
+| median 3 L | 563.1 | 10.5 (54x) | 442.7 | 16.9 (26x) |
+| max 3 RGB | 1180.6 | 36.7 (32x) | 964.0 | 67.7 (14x) |
+| histogram RGB | 13.8 | 5.8 (2.4x) | 12.5 | 10.2 (1.2x) |
+| chops offset RGB | 22.1 | 1.7 (13x) | 26.8 | 1.9 (14x) |
+| frombytes RGB | 6.8 | 5.5 (1.2x) | 3.5 | 2.4 (1.5x) |
+| tobytes RGB | 4.0 | 3.2 (1.3x) | 3.6 | 3.1 (1.1x) |
