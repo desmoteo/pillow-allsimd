@@ -395,13 +395,19 @@ _ImagingResampleVertical_8bpc(
     if (imIn->image8) {
         // Verify caller allocated distinct buffers.
         assert(imIn->image8 != imOut->image8);
+        // The vertical kernel works on bytes, so it handles 1-byte pixels
+        // four at a time; the last xsize % 4 use the same arithmetic.
+        int words = xsize / 4;
         for (yy = 0; yy < ysize; yy++) {
             // Restrict safe: imOut is a fresh allocation.
             UINT8 *restrict lineOut = imOut->image8[yy];
             k = &kk[yy * ksize];
             ymin = bounds[yy * 2 + 0];
             ymax = bounds[yy * 2 + 1];
-            for (xx = 0; xx < xsize; xx++) {
+            ImagingResampleVerticalConvolution8u(
+                (UINT32 *)lineOut, imIn, ymin, ymax, k, coefs_precision, words
+            );
+            for (xx = words * 4; xx < xsize; xx++) {
                 ss0 = 1 << (coefs_precision -1);
                 for (y = 0; y < ymax; y++) {
                     ss0 += ((UINT8)imIn->image8[y + ymin][xx]) * k[y];
@@ -418,7 +424,7 @@ _ImagingResampleVertical_8bpc(
             ymax = bounds[yy * 2 + 1];
             ImagingResampleVerticalConvolution8u(
                 (UINT32 *) imOut->image32[yy], imIn,
-                ymin, ymax, k, coefs_precision
+                ymin, ymax, k, coefs_precision, xsize
             );
         }
     }

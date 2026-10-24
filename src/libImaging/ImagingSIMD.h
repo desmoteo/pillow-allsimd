@@ -33,6 +33,14 @@
 #endif /* IMAGING_SIMD_DISABLE */
 
 #if defined(IMAGING_SIMD_SSE4)
+/* Unaligned 32-bit load. */
+static INT32 inline
+mm_load_si32(const void *ptr) {
+    INT32 v;
+    memcpy(&v, ptr, sizeof(v));
+    return v;
+}
+
 static __m128i inline
 mm_cvtepu8_epi32(const void *ptr) {
     INT32 v;
