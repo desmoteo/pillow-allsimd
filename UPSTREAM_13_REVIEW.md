@@ -138,7 +138,12 @@ Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills
    - add mutexes to the SIMD entry points (3.6);
    - check the 16-bit coefficients with MKS2021.
 5. **NEON ColorLUT (4.2) and NEON reduce 3/4 (4.3)**, then the horizontal box blur (4.4).
-6. **Re-run `checks/simd_bench_remote.sh`** on the Jetson after each step, and on a second arm64 machine (Apple M-series or Graviton) before deciding the final NEON/portable split.
+6. **Items from [CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md)**, which are not in this review:
+   - a SIMD horizontal resample for 1-band images;
+   - column strips for the vertical box-blur and resample passes;
+   - an SSE4 blend kernel;
+   - SIMD reduce for L images.
+7. **Re-run `checks/simd_bench_remote.sh`** on the Jetson after each step, and on a second arm64 machine (Apple M-series or Graviton) before deciding the final NEON/portable split.
 
 ## Status of step 1
 
