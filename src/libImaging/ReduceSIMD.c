@@ -356,7 +356,6 @@ ImagingReduce1x3_4u8(Imaging imOut, Imaging imIn, int box[4]) {
                 _mm_add_epi32(mm_cvtepu8_epi32(&line2[xx * 4]), mm_amend)
             );
 
-            mm_ss0 = _mm_add_epi32(mm_ss0, mm_amend);
             mm_ss0 = _mm_mullo_epi32(mm_ss0, mm_multiplier);
             mm_ss0 = _mm_srli_epi32(mm_ss0, 24);
             mm_ss0 = _mm_packs_epi32(mm_ss0, mm_ss0);
@@ -458,11 +457,98 @@ ImagingReduce3x3_4u8(Imaging imOut, Imaging imIn, int box[4]) {
     }
 }
 
+#elif defined(IMAGING_SIMD_NEON)
+#define REDUCE_SIMD
+
+/* 16 input pixels per row are de-interleaved, pairs of neighbours summed
+   and the sums rounded with the scalar code's (sum + N/2) / N, so the
+   scalar loops can finish the row. */
+
+static void
+ImagingReduce2x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
+    int x, y, c;
+    int xsize = box[2] / 2;
+
+    for (y = 0; y < box[3] / 2; y++) {
+        int yy = box[1] + y * 2;
+        UINT8 *line0 = (UINT8 *)imIn->image[yy + 0];
+        UINT8 *line1 = (UINT8 *)imIn->image[yy + 1];
+        UINT8 *out = (UINT8 *)imOut->image[y];
+        for (x = 0; x < xsize - 7; x += 8) {
+            int xx = box[0] + x * 2;
+            uint8x16x4_t p0 = vld4q_u8(&line0[xx * 4]);
+            uint8x16x4_t p1 = vld4q_u8(&line1[xx * 4]);
+            uint8x8x4_t o;
+            for (c = 0; c < 4; c++) {
+                o.val[c] = vrshrn_n_u16(vpadalq_u8(vpaddlq_u8(p0.val[c]), p1.val[c]), 2);
+            }
+            vst4_u8(&out[x * 4], o);
+        }
+        for (; x < xsize; x++) {
+            int xx = box[0] + x * 2;
+            for (c = 0; c < 4; c++) {
+                UINT32 ss = line0[xx * 4 + c] + line0[xx * 4 + 4 + c] +
+                            line1[xx * 4 + c] + line1[xx * 4 + 4 + c];
+                out[x * 4 + c] = (ss + 2) >> 2;
+            }
+        }
+    }
+}
+
+static void
+ImagingReduce2x1_4u8(Imaging imOut, Imaging imIn, int box[4]) {
+    int x, y, c;
+    int xsize = box[2] / 2;
+
+    for (y = 0; y < box[3]; y++) {
+        UINT8 *line = (UINT8 *)imIn->image[box[1] + y];
+        UINT8 *out = (UINT8 *)imOut->image[y];
+        for (x = 0; x < xsize - 7; x += 8) {
+            int xx = box[0] + x * 2;
+            uint8x16x4_t p = vld4q_u8(&line[xx * 4]);
+            uint8x8x4_t o;
+            for (c = 0; c < 4; c++) {
+                o.val[c] = vrshrn_n_u16(vpaddlq_u8(p.val[c]), 1);
+            }
+            vst4_u8(&out[x * 4], o);
+        }
+        for (; x < xsize; x++) {
+            int xx = box[0] + x * 2;
+            for (c = 0; c < 4; c++) {
+                out[x * 4 + c] = (line[xx * 4 + c] + line[xx * 4 + 4 + c] + 1) >> 1;
+            }
+        }
+    }
+}
+
+static void
+ImagingReduce1x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
+    int x, y;
+    int size = box[2] * 4;
+
+    for (y = 0; y < box[3] / 2; y++) {
+        int yy = box[1] + y * 2;
+        UINT8 *line0 = (UINT8 *)imIn->image[yy + 0] + box[0] * 4;
+        UINT8 *line1 = (UINT8 *)imIn->image[yy + 1] + box[0] * 4;
+        UINT8 *out = (UINT8 *)imOut->image[y];
+        // Every byte is averaged with the one below: (a + b + 1) >> 1.
+        for (x = 0; x < size - 15; x += 16) {
+            vst1q_u8(&out[x], vrhaddq_u8(vld1q_u8(&line0[x]), vld1q_u8(&line1[x])));
+        }
+        for (; x < size; x++) {
+            out[x] = (line0[x] + line1[x] + 1) >> 1;
+        }
+    }
+}
+
 #endif
 
 #if defined(REDUCE_SIMD)
-static void
+/* Returns 0 if there is no kernel for these scales; the caller then uses
+   the scalar code. */
+static int
 ImagingReduce_4u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscale) {
+#if defined(IMAGING_SIMD_SSE4)
     if (xscale == 1) {
         if (yscale == 2) {
             ImagingReduce1x2_4u8(imOut, imIn, box);
@@ -486,5 +572,18 @@ ImagingReduce_4u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscal
     } else {
         ImagingReduceNxN_4u8(imOut, imIn, box, xscale, yscale);
     }
+    return 1;
+#else
+    if (xscale == 1 && yscale == 2) {
+        ImagingReduce1x2_4u8(imOut, imIn, box);
+    } else if (xscale == 2 && yscale == 1) {
+        ImagingReduce2x1_4u8(imOut, imIn, box);
+    } else if (xscale == 2 && yscale == 2) {
+        ImagingReduce2x2_4u8(imOut, imIn, box);
+    } else {
+        return 0;
+    }
+    return 1;
+#endif
 }
 #endif

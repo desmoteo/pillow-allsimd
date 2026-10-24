@@ -1474,8 +1474,7 @@ ImagingReduce(Imaging imIn, int xscale, int yscale, int box[4]) {
     switch (imIn->type) {
         case IMAGING_TYPE_UINT8:
 #if defined(REDUCE_SIMD)
-            if (!imIn->image8) {
-                ImagingReduce_4u8(imOut, imIn, box, xscale, yscale);
+            if (!imIn->image8 && ImagingReduce_4u8(imOut, imIn, box, xscale, yscale)) {
                 ImagingReduceCorners(imOut, imIn, box, xscale, yscale);
                 break;
             }

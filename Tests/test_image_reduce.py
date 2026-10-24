@@ -4,7 +4,7 @@ import pytest
 
 from PIL import Image, ImageMath, ImageMode
 
-from .helper import convert_to_comparable, skip_unless_feature
+from .helper import assert_image_equal, convert_to_comparable, skip_unless_feature
 
 codecs = dir(Image.core)
 
@@ -287,3 +287,22 @@ def test_mode_F(factor: int | tuple[int, int]) -> None:
 def test_jpeg2k() -> None:
     with Image.open("Tests/images/test-card-lossless.jp2") as im:
         assert im.reduce(2).size == (320, 240)
+
+
+@pytest.mark.parametrize("mode", ("RGB", "CMYK"))
+@pytest.mark.parametrize(
+    "factor",
+    ((1, 2), (2, 1), (2, 2), (1, 3), (3, 1), (3, 3), (4, 4), (5, 5), (2, 3), (7, 5)),
+)
+@pytest.mark.parametrize("size", ((67, 23), (16, 8), (5, 3)))
+def test_multiband_matches_single_band(
+    mode: str, factor: tuple[int, int], size: tuple[int, int]
+) -> None:
+    # The 4-byte kernels must give each channel the same result as the
+    # 1-byte code does for that channel alone.
+    im = Image.frombytes(
+        mode, size, bytes((i * 37 + i // 7) % 256 for i in range(size[0] * size[1] * 4))
+    )
+    for box in (None, (1, 1, size[0] - 1, size[1])):
+        expected = Image.merge(mode, [b.reduce(factor, box) for b in im.split()])
+        assert_image_equal(im.reduce(factor, box), expected)
