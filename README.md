@@ -49,17 +49,22 @@ The following image operations are currently SIMD-accelerated:
 - Resize (convolution-based resampling), including L images: SSE4, AVX2, AVX-VNNI, NEON;
   F, I and I;16 images in vectors of doubles: SSE4, AVX2, NEON
 - Reduce: SSE4 (any factor), NEON (horizontal factors up to 512); 2x2 and 4x4 for L images on both
-- Gaussian and box blur: SSE4 (L images four rows at a time); NEON for the
-  horizontal pass of 4-byte images
+- Gaussian and box blur: running sums in SSE4, AVX2 (two rows at a time) and
+  NEON for the horizontal pass, SSE4 and AVX2 for the vertical pass (L images
+  four rows at a time on SSE4, eight on AVX2); radii below 2 and integer radii
+  up to 4 without running sums: SSE4, AVX2, NEON. The vertical passes of a
+  Gaussian blur run in one sweep down the image
 - Unsharp mask: SSE4, NEON
 - Alpha composition: SSE4, AVX2
 - RGBA → RGBa (alpha premultiplication): SSE4, AVX2, NEON
 - RGBa → RGBA (division by alpha): SSE4, AVX2, NEON
 - RGB → L, LA and I, RGBA → LA (grayscale): SSE4, NEON
-- RGB → HSV: SSE4
-- RGB ↔ YCbCr: SSE4, NEON
-- 3x3 and 5x5 kernel filters with integer kernels (coefficients that fit 16 bits):
-  SSE4, AVX2, AVX-VNNI, NEON
+- L → RGB, RGB ↔ RGBA, RGB → CMYK: NEON (portable C that compilers vectorize
+  elsewhere)
+- RGB → HSV: SSE4, AVX2, NEON
+- RGB ↔ YCbCr: SSE4, AVX2, NEON
+- 3x3 and 5x5 kernel filters with integer kernels (exact in 16-bit fixed point,
+  at the highest precision that keeps them exact): SSE4, AVX2, AVX-VNNI, NEON
 - 3x3 and 5x5 kernel filters with float kernels (large coefficients): SSE4,
   AVX2 (3x3 only), NEON on 4-byte images; SSE4, AVX2 (3x3 only) on L images
 - Rotate and transforms with bilinear and bicubic filters, 3- and 4-band
@@ -67,7 +72,11 @@ The following image operations are currently SIMD-accelerated:
 - Transposes, 90 and 270 degree rotations, flips and 180 degree rotation:
   SSE4, NEON
 - 3D color lookup tables: SSE4, AVX2, NEON
-- `ImageChops.multiply` and `screen`: SSE4, AVX2, NEON
+- `ImageChops.multiply` and `screen`, and `add` and `subtract` with scale 1
+  and offset 0: SSE4, AVX2, NEON
+- Rank filters on 1- and 4-byte images: median 3x3 and 5x5 in registers, min
+  and max of any size in one pass: SSE4, AVX2, NEON; other ranks up to 11x11
+  through sorting networks in portable C that compilers vectorize
 - `point()` tables that are byte operations (invert, posterize, solarize):
   SSE4, AVX2, NEON
 - Palette mapping (quantize, convert to an adaptive palette), nearest-entry
@@ -78,13 +87,14 @@ The following image operations are currently SIMD-accelerated:
 - RGB pack and unpack (`frombytes`, `tobytes`, codecs): SSE4, NEON
 - Split and get_channel: SSE4, NEON; merge: NEON
 
-On arm64, alpha composition and the vertical blur pass use the portable C
-code, which GCC vectorizes better than hand-written NEON on a Cortex-A78AE.
+On arm64, alpha composition and the vertical running-sum blur pass use the
+portable C code, which GCC vectorizes better than hand-written NEON on a
+Cortex-A78AE.
 For the horizontal blur of 4-byte images and the unsharp mask row, NEON is
 faster with GCC 12 and 14 (not with GCC 11).
-Rank filters (min, max, median), the mode filter, histograms,
-`ImageChops.offset`, floodfill and text rendering (a per-font glyph cache)
-have faster portable C code on every architecture.
+The mode filter, histograms, `ImageChops.offset`, floodfill, polygon fills
+and text rendering (per-font caches of glyphs and advances) have faster
+portable C code on every architecture.
 Other architectures build the portable C code.
 
 
