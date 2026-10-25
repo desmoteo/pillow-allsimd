@@ -164,23 +164,181 @@ void static inline ImagingLineBoxBlur32x2(
 }
 #endif
 
-/* Radius below 1: each pixel and its two neighbours, edges repeated. */
+#if defined(IMAGING_SIMD_SSE4)
+/* Up to this radius the passes use ImagingBoxBlurDirect, above it running
+   sums; without SSE4 only for radius 0, where it's the simpler code. */
+#define BOX_DIRECT_MAX 1
+#else
+#define BOX_DIRECT_MAX 0
+#endif
+
+/* Radius below 1 without SIMD: in chunks of a fixed length, with restrict
+   pointers, which GCC vectorizes at -O2 too. */
+#define BOX_ZERO_CHUNK 32
+static inline void
+ImagingBoxBlurZeroChunk(
+    UINT8 *restrict out,
+    const UINT8 *restrict in,
+    const UINT8 *restrict before,
+    const UINT8 *restrict after,
+    UINT32 ww,
+    UINT32 fw
+) {
+    for (int i = 0; i < BOX_ZERO_CHUNK; i++) {
+        UINT32 bulk = in[i] * ww + (before[i] + after[i]) * fw;
+        out[i] = (UINT8)((bulk + (1 << 23)) >> 24);
+    }
+}
+
+/* The box around each byte directly, from count = 2 * radius + 3 sources:
+   out[i] = (src[1][i] + ... + src[count - 2][i]) * ww
+            + (src[0][i] + src[count - 1][i]) * fw, rounded,
+   the same arithmetic as the running sums. The sources are rows (vertical
+   passes) or one row shifted by whole pixels (horizontal passes). With no
+   running sum, it vectorizes across the row. */
+static void
+ImagingBoxBlurDirect(
+    UINT8 *restrict out, const UINT8 **src, int count, int n, UINT32 ww, UINT32 fw
+) {
+    int i = 0, j;
+#if defined(IMAGING_SIMD_SSE4)
+    /* The products exactly, with the weights split in 12-bit halves:
+       pmaddwd makes two 16-bit products and their sum in one instruction,
+       where pmulld takes two for one product.
+       ww * c + fw * e = ((wh * c + fh * e) << 12) + (wl * c + fl * e),
+       with no step above 2^32: the weights add up to at most 2^24, and
+       c, at most 255 * (2 * BOX_DIRECT_MAX + 1), fits in 16 bits. */
+    const int wh = (int)((fw >> 12) << 16 | (ww >> 12));
+    const int wl = (int)((fw & 0xfff) << 16 | (ww & 0xfff));
+#define BOX_DIRECT_PAIRS(P, v, h, l, b23)                                      \
+    P##_srli_epi32(                                                            \
+        P##_add_epi32(                                                         \
+            P##_add_epi32(                                                     \
+                P##_slli_epi32(P##_madd_epi16(v, h), 12), P##_madd_epi16(v, l) \
+            ),                                                                 \
+            b23                                                                \
+        ),                                                                     \
+        24                                                                     \
+    )
+/* c and e, the sums of the box and of the two far sources, at offset o */
+#define BOX_DIRECT_SUMS(P, load, o)               \
+    c = load(src[1] + (o));                       \
+    for (j = 2; j < count - 1; j++) {             \
+        c = P##_add_epi16(c, load(src[j] + (o))); \
+    }                                             \
+    e = P##_add_epi16(load(src[0] + (o)), load(src[count - 1] + (o)));
+#if defined(IMAGING_SIMD_AVX2)
+    {
+        __m256i h = _mm256_set1_epi32(wh), l = _mm256_set1_epi32(wl);
+        __m256i b23 = _mm256_set1_epi32(1 << 23);
+        for (; i <= n - 32; i += 32) {
+            __m256i r[2], c, e;
+            int k;
+            for (k = 0; k < 2; k++) {
+                /* bytes 0-7 in the low 128-bit lane, 8-15 in the high one */
+                BOX_DIRECT_SUMS(_mm256, mm256_cvtepu8_epi16, i + k * 16)
+                r[k] = _mm256_packus_epi32(
+                    BOX_DIRECT_PAIRS(_mm256, _mm256_unpacklo_epi16(c, e), h, l, b23),
+                    BOX_DIRECT_PAIRS(_mm256, _mm256_unpackhi_epi16(c, e), h, l, b23)
+                );
+            }
+            /* 64-bit groups 0-7, 16-23, 8-15, 24-31 */
+            _mm256_storeu_si256(
+                (__m256i *)(out + i),
+                _mm256_permute4x64_epi64(_mm256_packus_epi16(r[0], r[1]), 0xd8)
+            );
+        }
+    }
+#endif
+    {
+        __m128i h = _mm_set1_epi32(wh), l = _mm_set1_epi32(wl);
+        __m128i b23 = _mm_set1_epi32(1 << 23);
+        for (; i <= n - 16; i += 16) {
+            __m128i r[2], c, e;
+            int k;
+            for (k = 0; k < 2; k++) {
+                BOX_DIRECT_SUMS(_mm, mm_cvtepu8_epi16, i + k * 8)
+                r[k] = _mm_packus_epi32(
+                    BOX_DIRECT_PAIRS(_mm, _mm_unpacklo_epi16(c, e), h, l, b23),
+                    BOX_DIRECT_PAIRS(_mm, _mm_unpackhi_epi16(c, e), h, l, b23)
+                );
+            }
+            _mm_storeu_si128((__m128i *)(out + i), _mm_packus_epi16(r[0], r[1]));
+        }
+    }
+#undef BOX_DIRECT_SUMS
+#undef BOX_DIRECT_PAIRS
+#endif
+    if (count == 3) {
+        for (; i <= n - BOX_ZERO_CHUNK; i += BOX_ZERO_CHUNK) {
+            ImagingBoxBlurZeroChunk(
+                out + i, src[1] + i, src[0] + i, src[2] + i, ww, fw
+            );
+        }
+    }
+    for (; i < n; i++) {
+        UINT32 c = 0;
+        for (j = 1; j < count - 1; j++) {
+            c += src[j][i];
+        }
+        UINT32 bulk = c * ww + (src[0][i] + src[count - 1][i]) * fw;
+        out[i] = (UINT8)((bulk + (1 << 23)) >> 24);
+    }
+}
+
+/* Radius 0: a row of n bytes, step bytes per pixel, edge pixels repeated. */
+static void
+ImagingLineBoxBlurZero(
+    UINT8 *restrict out, const UINT8 *restrict in, int n, int step, UINT32 ww, UINT32 fw
+) {
+    const UINT8 *src[3];
+    if (n <= step) {
+        src[0] = src[1] = src[2] = in;
+        ImagingBoxBlurDirect(out, src, 3, n, ww, fw);
+        return;
+    }
+    src[0] = src[1] = in, src[2] = in + step;
+    ImagingBoxBlurDirect(out, src, 3, step, ww, fw);
+    src[0] = in, src[1] = in + step, src[2] = in + 2 * step;
+    ImagingBoxBlurDirect(out + step, src, 3, n - 2 * step, ww, fw);
+    src[0] = in + n - 2 * step, src[1] = src[2] = in + n - step;
+    ImagingBoxBlurDirect(out + n - step, src, 3, step, ww, fw);
+}
+
+/* Radius 1 to BOX_DIRECT_MAX: a row of n bytes, step bytes per pixel, edge
+   pixels repeated, through pad, which has room for radius + 1 more pixels
+   on either side. The running sums give the same result: they treat the
+   edges as repeated pixels too, for any radius. */
+static void
+ImagingLineBoxBlurDirect(
+    UINT8 *restrict out,
+    const UINT8 *restrict in,
+    int n,
+    int step,
+    int radius,
+    UINT32 ww,
+    UINT32 fw,
+    UINT8 *restrict pad
+) {
+    const UINT8 *src[2 * BOX_DIRECT_MAX + 3];
+    int edge = (radius + 1) * step, j;
+    for (j = 0; j < edge; j += step) {
+        memcpy(pad + j, in, step);
+        memcpy(pad + edge + n + j, in + n - step, step);
+    }
+    memcpy(pad + edge, in, n);
+    for (j = 0; j < 2 * radius + 3; j++) {
+        src[j] = pad + j * step;
+    }
+    ImagingBoxBlurDirect(out, src, 2 * radius + 3, n, ww, fw);
+}
+
 void static inline ImagingLineBoxBlurZero32(
     UINT32 *lineOut, UINT32 *lineIn, int lastx, UINT32 ww, UINT32 fw
 ) {
-    int x;
-    px4 wws = px4_set1(ww);
-    px4 fws = px4_set1(fw);
-
-    for (x = 0; x <= lastx; x++) {
-        int left = x > 0 ? x - 1 : 0;
-        int right = x < lastx ? x + 1 : lastx;
-        px4 bulk = px4_add(
-            px4_mul(px4_add(px4_load(&lineIn[left]), px4_load(&lineIn[right])), fws),
-            px4_mul(px4_load(&lineIn[x]), wws)
-        );
-        lineOut[x] = px4_round24(bulk);
-    }
+    ImagingLineBoxBlurZero(
+        (UINT8 *)lineOut, (UINT8 *)lineIn, (lastx + 1) * 4, 4, ww, fw
+    );
 }
 
 void static inline ImagingLineBoxBlur8(
@@ -249,18 +407,10 @@ void static inline ImagingLineBoxBlur8(
 #undef SAVE
 }
 
-/* Radius below 1: each pixel and its two neighbours, edges repeated. */
 void static inline ImagingLineBoxBlurZero8(
     UINT8 *lineOut, UINT8 *lineIn, int lastx, UINT32 ww, UINT32 fw
 ) {
-    int x;
-
-    for (x = 0; x <= lastx; x++) {
-        int left = x > 0 ? x - 1 : 0;
-        int right = x < lastx ? x + 1 : lastx;
-        UINT32 bulk = lineIn[x] * ww + (lineIn[left] + lineIn[right]) * fw;
-        lineOut[x] = (UINT8)((bulk + (1 << 23)) >> 24);
-    }
+    ImagingLineBoxBlurZero(lineOut, lineIn, lastx + 1, 1, ww, fw);
 }
 
 #if defined(IMAGING_SIMD_SSE4)
@@ -336,13 +486,17 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
     int edgeA = MIN(radius + 1, imIn->xsize);
     int edgeB = MAX(imIn->xsize - radius - 1, 0);
 
-    /* Two row buffers the passes alternate between. */
+    /* Two row buffers the passes alternate between, and one for
+       ImagingLineBoxBlurDirect. */
     UINT32 *buf[2];
+    UINT8 *pad;
     buf[0] = calloc(imIn->xsize, sizeof(UINT32));
     buf[1] = calloc(imIn->xsize, sizeof(UINT32));
-    if (buf[0] == NULL || buf[1] == NULL) {
+    pad = malloc((imIn->xsize + 2 * (BOX_DIRECT_MAX + 1)) * sizeof(UINT32));
+    if (buf[0] == NULL || buf[1] == NULL || pad == NULL) {
         free(buf[0]);
         free(buf[1]);
+        free(pad);
         return ImagingError_MemoryError();
     }
 
@@ -355,10 +509,21 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
             type *dst_ = (p == passes - 1 && src_ != (type *)(out))    \
                              ? (type *)(out)                           \
                              : (type *)buf[p % 2];                     \
-            if (radius) {                                              \
-                blur(dst_, src_, lastx, radius, edgeA, edgeB, ww, fw); \
-            } else {                                                   \
+            if (radius == 0) {                                         \
                 zero(dst_, src_, lastx, ww, fw);                       \
+            } else if (radius <= BOX_DIRECT_MAX) {                     \
+                ImagingLineBoxBlurDirect(                              \
+                    (UINT8 *)dst_,                                     \
+                    (UINT8 *)src_,                                     \
+                    imIn->xsize * (int)sizeof(type),                   \
+                    sizeof(type),                                      \
+                    radius,                                            \
+                    ww,                                                \
+                    fw,                                                \
+                    pad                                                \
+                );                                                     \
+            } else {                                                   \
+                blur(dst_, src_, lastx, radius, edgeA, edgeB, ww, fw); \
             }                                                          \
             src_ = dst_;                                               \
         }                                                              \
@@ -377,13 +542,21 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
             int last_ = p == passes - 1;                                    \
             UINT32 *d0_ = last_ && s0_ != (out0) ? (out0) : pair[p % 2][0]; \
             UINT32 *d1_ = last_ && s1_ != (out1) ? (out1) : pair[p % 2][1]; \
-            if (radius) {                                                   \
+            if (radius == 0) {                                              \
+                ImagingLineBoxBlurZero32(d0_, s0_, lastx, ww, fw);          \
+                ImagingLineBoxBlurZero32(d1_, s1_, lastx, ww, fw);          \
+            } else if (radius <= BOX_DIRECT_MAX) {                          \
+                int n_ = imIn->xsize * 4;                                   \
+                ImagingLineBoxBlurDirect(                                   \
+                    (UINT8 *)d0_, (UINT8 *)s0_, n_, 4, radius, ww, fw, pad  \
+                );                                                          \
+                ImagingLineBoxBlurDirect(                                   \
+                    (UINT8 *)d1_, (UINT8 *)s1_, n_, 4, radius, ww, fw, pad  \
+                );                                                          \
+            } else {                                                        \
                 ImagingLineBoxBlur32x2(                                     \
                     d0_, d1_, s0_, s1_, lastx, radius, edgeA, edgeB, ww, fw \
                 );                                                          \
-            } else {                                                        \
-                ImagingLineBoxBlurZero32(d0_, s0_, lastx, ww, fw);          \
-                ImagingLineBoxBlurZero32(d1_, s1_, lastx, ww, fw);          \
             }                                                               \
             s0_ = d0_;                                                      \
             s1_ = d1_;                                                      \
@@ -403,6 +576,7 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
             }
             free(buf[0]);
             free(buf[1]);
+            free(pad);
             return ImagingError_MemoryError();
         }
     }
@@ -425,6 +599,7 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
             free(lineOut4b);
             free(buf[0]);
             free(buf[1]);
+            free(pad);
 #if defined(IMAGING_SIMD_AVX2)
             for (p = 0; p < 4; p++) {
                 free(pair[p / 2][p % 2]);
@@ -539,6 +714,7 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
 
     free(buf[0]);
     free(buf[1]);
+    free(pad);
 #if defined(IMAGING_SIMD_AVX2)
 #undef BLUR_PASSES_2
     for (p = 0; p < 4; p++) {
@@ -689,6 +865,17 @@ ImagingVerticalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius) {
     }
     for (y = 0; y <= lasty; y++) {
         long long yl = y;
+        if (radius <= BOX_DIRECT_MAX) {
+            /* No running sum: the rows of the box directly. */
+            const UINT8 *src[2 * BOX_DIRECT_MAX + 3];
+            for (i = 0; i < 2 * radius + 3; i++) {
+                src[i] = ROW(yl - radius - 1 + i);
+            }
+            ImagingBoxBlurDirect(
+                (UINT8 *)imOut->image[y], src, 2 * radius + 3, size, ww, fw
+            );
+            continue;
+        }
         ImagingBoxBlurColumns(
             (UINT8 *)imOut->image[y],
             acc,
@@ -775,17 +962,27 @@ BoxBlurEnsure(BoxBlurCascade *c, int k, int upto) {
                 c, k - 1, y + radius + 1 < lasty ? (int)(y + radius + 1) : lasty
             );
         }
-        ImagingBoxBlurColumns(
-            k == c->passes - 1 ? (UINT8 *)c->imOut->image[y]
-                               : st->ring + (size_t)(y % c->ringRows) * size,
-            st->acc,
-            BoxBlurInputRow(c, k, y + radius),
-            BoxBlurInputRow(c, k, y - radius - 1),
-            BoxBlurInputRow(c, k, y + radius + 1),
-            size,
-            c->ww,
-            c->fw
-        );
+        UINT8 *out = k == c->passes - 1 ? (UINT8 *)c->imOut->image[y]
+                                        : st->ring + (size_t)(y % c->ringRows) * size;
+        if (radius <= BOX_DIRECT_MAX) {
+            /* As in ImagingVerticalBoxBlur. */
+            const UINT8 *src[2 * BOX_DIRECT_MAX + 3];
+            for (i = 0; i < 2 * radius + 3; i++) {
+                src[i] = BoxBlurInputRow(c, k, y - radius - 1 + i);
+            }
+            ImagingBoxBlurDirect(out, src, 2 * radius + 3, size, c->ww, c->fw);
+        } else {
+            ImagingBoxBlurColumns(
+                out,
+                st->acc,
+                BoxBlurInputRow(c, k, y + radius),
+                BoxBlurInputRow(c, k, y - radius - 1),
+                BoxBlurInputRow(c, k, y + radius + 1),
+                size,
+                c->ww,
+                c->fw
+            );
+        }
         st->next++;
     }
 }
