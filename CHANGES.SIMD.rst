@@ -25,6 +25,17 @@ Based on Pillow 13.0.0
   contrast and brightness as lookup tables (1.5x)
 - PNG encoding: vector row filters (level 1 1.7x); RGB <-> YCbCr without
   table lookups (1.6x, 3.1x)
+- Text: rendered glyphs and their boxes are cached per font (text 5.9x,
+  stroked text 17x, textbbox 2.1x)
+- Palette mapping (quantize, convert to an adaptive palette): a colour cache
+  and, for max coverage, a vector nearest-entry search (1.2x to 1.7x)
+- Transposes and 90 degree rotations in register blocks (L 3.2x, RGB 1.4x);
+  flips and rotate 180 by vector row reversal (RGB 1.4x, L 10x)
+- Resampling of F, I and I;16 images in vectors of doubles, every sum in
+  the scalar code's order (1.8x to 5.5x)
+- Arcs, chords and pie slices are clipped without allocating (1.25x);
+  alpha_composite() with an offset composites in place (2.2x); tobytes()
+  encodes in one chunk (1.9x)
 - x86: RGBa -> RGBA is exact (colour above alpha gave 0, alpha 0 gave
   colour 0); slightly slower
 - ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a
