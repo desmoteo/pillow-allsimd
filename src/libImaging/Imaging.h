@@ -559,6 +559,16 @@ ImagingDrawPolygon(
     Imaging mask
 );
 extern int
+ImagingDrawPolygonInside(
+    Imaging im,
+    int points,
+    int *xy,
+    const void *ink,
+    const void *mask_ink,
+    int width,
+    int op
+);
+extern int
 ImagingDrawRectangle(
     Imaging im,
     int x0,

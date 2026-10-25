@@ -101,6 +101,9 @@ Based on Pillow 13.0.0
 - ImageDraw: thin lines and rectangle outlines write their pixels directly
   again, as before Pillow 13.0, instead of through a function pointer per
   pixel (500 bounding boxes 2 px wide: 1.6x)
+- ImageDraw.polygon() with an outline wider than 1 px: the mask that keeps
+  the outline inside the polygon covers only the polygon, not the whole
+  image (100 ROI polygons on 2560x1600: 6.6x). Same pixels
 
 Build
 

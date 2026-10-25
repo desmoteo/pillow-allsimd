@@ -946,6 +946,88 @@ ImagingDrawPolygon(
     return 0;
 }
 
+/* The outline of a polygon, width wide around its edges and kept inside
+   it: wide lines masked by the polygon's fill, as ImageDraw.polygon() drew
+   them with an image-sized mask. Here the mask covers only the polygon's
+   bounding box, widened by the lines' reach, and is addressed with the
+   image's coordinates, so the pixels are the same; allocating and clearing
+   a whole image per polygon took most of the time. mask_ink is the ink the
+   mask is filled with (only whether its byte is 0 matters). */
+int
+ImagingDrawPolygonInside(
+    Imaging im,
+    int count,
+    int *xy,
+    const void *ink,
+    const void *mask_ink,
+    int width,
+    int op
+) {
+    struct ImagingMemoryInstance mask;
+    UINT8 *buf, *zero, **rows;
+    int i, y, x0, y0, x1, y1, margin, rw, result;
+
+    if (count <= 0) {
+        return 0;
+    }
+    x0 = x1 = xy[0];
+    y0 = y1 = xy[1];
+    for (i = 1; i < count; i++) {
+        x0 = xy[i * 2] < x0 ? xy[i * 2] : x0;
+        x1 = xy[i * 2] > x1 ? xy[i * 2] : x1;
+        y0 = xy[i * 2 + 1] < y0 ? xy[i * 2 + 1] : y0;
+        y1 = xy[i * 2 + 1] > y1 ? xy[i * 2 + 1] : y1;
+    }
+    /* A wide line reaches about width / 2 + 1 pixels from its segment. */
+    margin = width + 2;
+    x0 = x0 - margin > 0 ? x0 - margin : 0;
+    y0 = y0 - margin > 0 ? y0 - margin : 0;
+    x1 = x1 + margin + 1 < im->xsize ? x1 + margin + 1 : im->xsize;
+    y1 = y1 + margin + 1 < im->ysize ? y1 + margin + 1 : im->ysize;
+    if (x0 >= x1 || y0 >= y1) {
+        /* nothing it draws can reach the image */
+        return 0;
+    }
+
+    rw = x1 - x0;
+    buf = calloc((size_t)(y1 - y0), rw);
+    zero = calloc(1, rw);
+    rows = malloc(sizeof(*rows) * (im->ysize > 0 ? im->ysize : 1));
+    if (!buf || !zero || !rows) {
+        free(buf);
+        free(zero);
+        free(rows);
+        (void)ImagingError_MemoryError();
+        return -1;
+    }
+    /* Row y of the mask holds pixels x0 to x1 - 1 at their image x;
+       the rows outside the box, which nothing reaches, read as zero. */
+    for (y = 0; y < im->ysize; y++) {
+        UINT8 *row = y >= y0 && y < y1 ? buf + (size_t)(y - y0) * rw : zero;
+        rows[y] = (UINT8 *)((uintptr_t)row - (uintptr_t)x0);
+    }
+    memset(&mask, 0, sizeof(mask));
+    mask.mode = IMAGING_MODE_L;
+    mask.type = IMAGING_TYPE_UINT8;
+    mask.bands = 1;
+    mask.pixelsize = 1;
+    mask.xsize = im->xsize;
+    mask.ysize = im->ysize;
+    mask.linesize = rw;
+    mask.image8 = rows;
+    mask.image = (char **)rows;
+
+    result = ImagingDrawPolygon(&mask, count, xy, mask_ink, 1, 1, 0, NULL);
+    if (result == 0) {
+        result = ImagingDrawPolygon(im, count, xy, ink, 0, width, op, &mask);
+    }
+
+    free(rows);
+    free(zero);
+    free(buf);
+    return result;
+}
+
 int
 ImagingDrawBitmap(Imaging im, int x0, int y0, Imaging bitmap, const void *ink, int op) {
     return ImagingFill2(
