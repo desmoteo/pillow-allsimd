@@ -124,7 +124,11 @@ OS=$(rsh uname -s)
 case "$ARCH" in
     aarch64|arm64) DEFAULT_BUILDS="scalar=disable neon=auto" ;;
     x86_64|amd64)
-        DEFAULT_BUILDS="scalar=disable sse4=sse4 avx2=avx2"
+        # AVX2 and AVX-VNNI builds only where the CPU can run them.
+        DEFAULT_BUILDS="scalar=disable sse4=sse4"
+        if rsh "grep -qw avx2 /proc/cpuinfo" 2>/dev/null; then
+            DEFAULT_BUILDS="$DEFAULT_BUILDS avx2=avx2"
+        fi
         if rsh "grep -qw avx_vnni /proc/cpuinfo" 2>/dev/null; then
             DEFAULT_BUILDS="$DEFAULT_BUILDS avxvnni=avxvnni"
         fi ;;
@@ -191,9 +195,17 @@ VERSION=$(git -C "$REPO" show "$COMMIT:src/PIL/_version.py" \
 
 if [ "$DOCKER" = 0 ]; then
     log "setting up a venv with build tools"
-    renv "$PY -m venv venv
-        venv/bin/python -m pip install -q --upgrade pip setuptools wheel pybind11
-    " || die "could not install build tools into the venv (no PyPI access?)"
+    if [ "$UPSTREAM" = 1 ]; then
+        renv "$PY -m venv venv
+            venv/bin/python -m pip install -q --upgrade pip setuptools wheel pybind11
+        " || die "could not install build tools into the venv (no PyPI access?)"
+    else
+        # Without PyPI access: use the host's build tools, install only missing ones.
+        renv "$PY -m venv --system-site-packages venv
+            venv/bin/python -c 'import setuptools, wheel, pybind11' 2>/dev/null ||
+                venv/bin/python -m pip install -q --upgrade setuptools wheel pybind11
+        " || die "setuptools, wheel and pybind11 are needed on the host for --no-upstream"
+    fi
 fi
 
 build() {  # name simd-option
