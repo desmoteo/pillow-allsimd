@@ -845,6 +845,35 @@ def test_variation_set_by_axes(font: ImageFont.FreeTypeFont) -> None:
     _check_text(font, "Tests/images/variation_tiny_axes.png", 32.5)
 
 
+def test_glyph_cache_variation(font: ImageFont.FreeTypeFont) -> None:
+    # Rendered glyphs are cached per font, so a variation change must give
+    # what a new font with that variation gives.
+    def text(f: ImageFont.FreeTypeFont, **kwargs: Any) -> bytes:
+        im = Image.new("L", (300, 100))
+        ImageDraw.Draw(im).text((10, 10), "AaBb Variable", fill=255, font=f, **kwargs)
+        return im.tobytes()
+
+    font = ImageFont.truetype("Tests/fonts/AdobeVFPrototype.ttf", 36)
+    first = text(font)
+    assert text(font) == first
+    stroked = text(font, stroke_width=2)
+    assert text(font, stroke_width=2) == stroked
+    bbox = font.getbbox("AaBb Variable")
+    assert font.getbbox("AaBb Variable") == bbox
+
+    font.set_variation_by_axes([500, 50])
+    fresh = ImageFont.truetype("Tests/fonts/AdobeVFPrototype.ttf", 36)
+    fresh.set_variation_by_axes([500, 50])
+    assert text(font) == text(fresh) != first
+    assert text(font, stroke_width=2) == text(fresh, stroke_width=2)
+    assert font.getbbox("AaBb Variable") == fresh.getbbox("AaBb Variable")
+
+    font.set_variation_by_name("Bold")
+    fresh = ImageFont.truetype("Tests/fonts/AdobeVFPrototype.ttf", 36)
+    fresh.set_variation_by_name("Bold")
+    assert text(font) == text(fresh)
+
+
 @pytest.mark.parametrize(
     "anchor, left, top",
     (
