@@ -88,12 +88,13 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$HOST" ] || usage 2
 [ -n "$USER_OPT" ] && HOST="$USER_OPT@${HOST#*@}"
-# WORKDIR goes unquoted into remote commands, rm -rf included: only allow a
-# plain relative path.
-case "$WORKDIR" in
-    "" | /* | *..* | *[!A-Za-z0-9._/-]*)
-        die "--workdir must be a relative path of letters, digits, '.', '_', '-' and '/'" ;;
-esac
+# WORKDIR goes unquoted into remote commands, rm -rf included, and is
+# mounted into the container with --docker: only allow a relative path below
+# the home directory whose components start with a letter, digit or '_'
+# (so not '.', './', '..', a hidden name or an option).
+if ! [[ $WORKDIR =~ ^[A-Za-z0-9_][A-Za-z0-9._-]*(/[A-Za-z0-9_][A-Za-z0-9._-]*)*/?$ ]]; then
+    die "--workdir must be a relative path whose parts start with a letter, digit or '_'"
+fi
 
 REPO=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 COMMIT=$(git -C "$REPO" rev-parse --short "$REF^{commit}") || die "unknown ref $REF"
