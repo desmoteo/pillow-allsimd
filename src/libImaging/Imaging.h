@@ -376,6 +376,8 @@ ImagingPutBand(Imaging im, Imaging imIn, int band);
 extern Imaging
 ImagingRankFilter(Imaging im, int size, int rank);
 extern Imaging
+ImagingRankFilterSameSize(Imaging im, int size, int rank);
+extern Imaging
 ImagingRotate90(Imaging imOut, Imaging imIn);
 extern Imaging
 ImagingRotate180(Imaging imOut, Imaging imIn);
