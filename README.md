@@ -98,6 +98,16 @@ portable C code on every architecture.
 Other architectures build the portable C code.
 
 
+## Exact and fast modes
+
+By default every build gives Pillow's pixels. Fast mode, off unless you set
+`PILLOW_SIMD_FAST=1` or call `Image.set_fast()`, lets some operations use
+faster kernels whose results differ by a few levels at most (the Gaussian
+blur so far: 3.3x at radius 1). See the
+[fast mode reference](docs/reference/fast_mode.rst) and
+[SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md).
+
+
 ## Design documents
 
 Notes on the SIMD work, kept with the code they describe:
@@ -121,6 +131,8 @@ Notes on the SIMD work, kept with the code they describe:
 - [APPROXIMATE_KERNELS_PLAN.md](APPROXIMATE_KERNELS_PLAN.md): a proposed
   opt-in fast mode with approximate kernels beside the exact ones, chosen at
   run time.
+- [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md): the fast-mode kernels, how
+  each keeps its results the same on every build, their accuracy and speed.
 - [SIMD_EXPLAINER_PLAN.md](SIMD_EXPLAINER_PLAN.md): the outline of a detailed
   explanation of every optimization on both architectures.
 

@@ -199,6 +199,14 @@ extern void
 ImagingSetFast(int flags);
 extern int
 ImagingGetFast(void);
+extern float
+ImagingGaussianBlurBoxRadius(float radius, int passes);
+extern int
+ImagingGaussianBlurFastApplies(
+    Imaging imOut, Imaging imIn, float xradius, float yradius
+);
+extern Imaging
+ImagingGaussianBlurFast(Imaging imOut, Imaging imIn, float xradius, float yradius);
 
 extern Imaging
 ImagingNew(ModeID mode, int xsize, int ysize);

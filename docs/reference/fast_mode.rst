@@ -57,11 +57,28 @@ deduplicate images by their content.
 Operations with a fast kernel
 -----------------------------
 
-None yet: this release adds the switch. The first fast kernels planned are
-the Gaussian blur, RGB↔YCbCr and RGB→HSV conversions, and the affine,
-perspective and quad transforms. Each will be listed here with its speed-up
-on x86-64 and arm64, its largest difference from the exact result, and its
-error against a float reference.
+Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
+285H (AVX2) and an NVIDIA Jetson Orin (NEON).
+
+.. list-table::
+   :header-rows: 1
+
+   * - Operation
+     - Fast kernel
+     - Speed-up (x86-64, arm64)
+     - Difference from the exact result
+   * - :py:class:`~PIL.ImageFilter.GaussianBlur` and
+       :py:class:`~PIL.ImageFilter.UnsharpMask`, radius up to 6, 8-bit
+       modes (L, LA, La, RGB, RGBA, RGBa, RGBX, CMYK)
+     - Pillow's three box passes as one kernel with 8-bit weights, in one
+       pass over the image; the bands near the edges are the exact result
+     - radius 0.5: 4.0x, 4.4x; 1: 3.3x, 3.2x; 2: 2.5x, 2.6x; 4: 1.5x, 2.3x
+     - at most 3 levels, 0.1 to 0.7 on average; closer to a true Gaussian
+       than the exact result
+
+Other operations, and other arguments of these, use the exact kernels in
+fast mode too. More fast kernels are planned: RGB↔YCbCr and RGB→HSV
+conversions, and the affine, perspective and quad transforms.
 
 Functions
 ---------
