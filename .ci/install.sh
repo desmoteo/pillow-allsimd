@@ -37,6 +37,7 @@ if [[ $(uname) != CYGWIN* ]]; then
         python3-tk
         sway
         wl-clipboard
+        xdg-utils  # wl-copy infers MIME types with xdg-mime; not on arm64 runners
     )
     sudo apt-get -qq install --no-install-recommends "${packages[@]}"
 fi
