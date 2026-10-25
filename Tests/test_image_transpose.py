@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+from PIL import Image
 from PIL.Image import Transpose
 
 from . import helper
 from .helper import assert_image_equal
-
-TYPE_CHECKING = False
-if TYPE_CHECKING:
-    from PIL import Image
 
 HOPPER = {
     mode: helper.hopper(mode).crop((0, 0, 121, 127)).copy()
@@ -150,3 +147,34 @@ def test_roundtrip(mode: str) -> None:
         im.transpose(Transpose.TRANSVERSE),
         transpose(Transpose.ROTATE_180, Transpose.TRANSPOSE),
     )
+
+
+@pytest.mark.parametrize("mode", ("L", "RGBA", "I", "I;16"))
+@pytest.mark.parametrize(
+    "size", ((1, 1), (3, 5), (8, 8), (37, 29), (530, 13), (11, 523), (520, 515))
+)
+def test_rotations_match_columns(mode: str, size: tuple[int, int]) -> None:
+    # Pixels that differ, in blocks and at the edges, across chunks
+    xsize, ysize = size
+    data = bytes((i * 7 + i // 251) & 255 for i in range(xsize * ysize * 4))
+    im = Image.frombytes(
+        mode, size, data[: xsize * ysize * {"L": 1, "I;16": 2}.get(mode, 4)]
+    )
+    pixels = memoryview(im.tobytes()).cast({"L": "B", "I;16": "H"}.get(mode, "I"))
+
+    def column(x: int, reverse: bool) -> bytes:
+        values = pixels[x::xsize]
+        return values[::-1].tobytes() if reverse else values.tobytes()
+
+    expected = {
+        Transpose.TRANSPOSE: (False, False),
+        Transpose.ROTATE_90: (True, False),
+        Transpose.ROTATE_270: (False, True),
+        Transpose.TRANSVERSE: (True, True),
+    }
+    for method, (flip_x, flip_y) in expected.items():
+        out = im.transpose(method)
+        assert out.size == (ysize, xsize)
+        assert out.tobytes() == b"".join(
+            column(xsize - 1 - x if flip_x else x, flip_y) for x in range(xsize)
+        )

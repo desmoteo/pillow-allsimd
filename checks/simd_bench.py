@@ -467,6 +467,10 @@ def api_operations(
         "transpose RGB TRANSVERSE": lambda: rgb.transpose(Image.Transpose.TRANSVERSE),
         "transpose L ROTATE_90": lambda: L.transpose(Image.Transpose.ROTATE_90),
         "transpose RGB FLIP_TB": lambda: rgb.transpose(Image.Transpose.FLIP_TOP_BOTTOM),
+        "transpose RGB ROTATE_270": lambda: rgb.transpose(Image.Transpose.ROTATE_270),
+        "transpose RGB ROTATE_180": lambda: rgb.transpose(Image.Transpose.ROTATE_180),
+        "transpose RGB TRANSPOSE": lambda: rgb.transpose(Image.Transpose.TRANSPOSE),
+        "transpose L FLIP_LR": lambda: L.transpose(Image.Transpose.FLIP_LEFT_RIGHT),
         "alpha_composite dest offset": lambda: (
             lambda o: (o.alpha_composite(rgba, (w // 4, h // 4)), o)[1]
         )(rgba.copy()),

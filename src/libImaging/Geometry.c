@@ -14,6 +14,173 @@
 /* -------------------------------------------------------------------- */
 /* Transpose operations                                                 */
 
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+#define TRANSPOSE_SIMD
+
+/* Column k of the 4 x 4 block of 32-bit pixels whose rows start at in[]
+   to out[k]. */
+static inline void
+transpose_4x4_32(INT32 *const in[4], INT32 *const out[4]) {
+#if defined(IMAGING_SIMD_SSE4)
+    __m128i a = _mm_loadu_si128((const __m128i *)in[0]);
+    __m128i b = _mm_loadu_si128((const __m128i *)in[1]);
+    __m128i c = _mm_loadu_si128((const __m128i *)in[2]);
+    __m128i d = _mm_loadu_si128((const __m128i *)in[3]);
+    __m128i ab01 = _mm_unpacklo_epi32(a, b), cd01 = _mm_unpacklo_epi32(c, d);
+    __m128i ab23 = _mm_unpackhi_epi32(a, b), cd23 = _mm_unpackhi_epi32(c, d);
+    _mm_storeu_si128((__m128i *)out[0], _mm_unpacklo_epi64(ab01, cd01));
+    _mm_storeu_si128((__m128i *)out[1], _mm_unpackhi_epi64(ab01, cd01));
+    _mm_storeu_si128((__m128i *)out[2], _mm_unpacklo_epi64(ab23, cd23));
+    _mm_storeu_si128((__m128i *)out[3], _mm_unpackhi_epi64(ab23, cd23));
+#else
+    uint32x4x2_t ab = vtrnq_u32(
+        vld1q_u32((const uint32_t *)in[0]), vld1q_u32((const uint32_t *)in[1])
+    );
+    uint32x4x2_t cd = vtrnq_u32(
+        vld1q_u32((const uint32_t *)in[2]), vld1q_u32((const uint32_t *)in[3])
+    );
+    vst1q_u32(
+        (uint32_t *)out[0],
+        vcombine_u32(vget_low_u32(ab.val[0]), vget_low_u32(cd.val[0]))
+    );
+    vst1q_u32(
+        (uint32_t *)out[1],
+        vcombine_u32(vget_low_u32(ab.val[1]), vget_low_u32(cd.val[1]))
+    );
+    vst1q_u32(
+        (uint32_t *)out[2],
+        vcombine_u32(vget_high_u32(ab.val[0]), vget_high_u32(cd.val[0]))
+    );
+    vst1q_u32(
+        (uint32_t *)out[3],
+        vcombine_u32(vget_high_u32(ab.val[1]), vget_high_u32(cd.val[1]))
+    );
+#endif
+}
+
+/* The same for an 8 x 8 block of 8-bit pixels. */
+static inline void
+transpose_8x8_8(UINT8 *const in[8], UINT8 *const out[8]) {
+#if defined(IMAGING_SIMD_SSE4)
+    __m128i ab = _mm_unpacklo_epi8(
+        _mm_loadl_epi64((const __m128i *)in[0]), _mm_loadl_epi64((const __m128i *)in[1])
+    );
+    __m128i cd = _mm_unpacklo_epi8(
+        _mm_loadl_epi64((const __m128i *)in[2]), _mm_loadl_epi64((const __m128i *)in[3])
+    );
+    __m128i ef = _mm_unpacklo_epi8(
+        _mm_loadl_epi64((const __m128i *)in[4]), _mm_loadl_epi64((const __m128i *)in[5])
+    );
+    __m128i gh = _mm_unpacklo_epi8(
+        _mm_loadl_epi64((const __m128i *)in[6]), _mm_loadl_epi64((const __m128i *)in[7])
+    );
+    /* Columns 0-3 and 4-7 of rows a-d, then of rows e-h. */
+    __m128i ad03 = _mm_unpacklo_epi16(ab, cd), ad47 = _mm_unpackhi_epi16(ab, cd);
+    __m128i eh03 = _mm_unpacklo_epi16(ef, gh), eh47 = _mm_unpackhi_epi16(ef, gh);
+    __m128i c01 = _mm_unpacklo_epi32(ad03, eh03), c23 = _mm_unpackhi_epi32(ad03, eh03);
+    __m128i c45 = _mm_unpacklo_epi32(ad47, eh47), c67 = _mm_unpackhi_epi32(ad47, eh47);
+    _mm_storel_epi64((__m128i *)out[0], c01);
+    _mm_storel_epi64((__m128i *)out[1], _mm_unpackhi_epi64(c01, c01));
+    _mm_storel_epi64((__m128i *)out[2], c23);
+    _mm_storel_epi64((__m128i *)out[3], _mm_unpackhi_epi64(c23, c23));
+    _mm_storel_epi64((__m128i *)out[4], c45);
+    _mm_storel_epi64((__m128i *)out[5], _mm_unpackhi_epi64(c45, c45));
+    _mm_storel_epi64((__m128i *)out[6], c67);
+    _mm_storel_epi64((__m128i *)out[7], _mm_unpackhi_epi64(c67, c67));
+#else
+    uint8x8x2_t ab = vtrn_u8(vld1_u8(in[0]), vld1_u8(in[1]));
+    uint8x8x2_t cd = vtrn_u8(vld1_u8(in[2]), vld1_u8(in[3]));
+    uint8x8x2_t ef = vtrn_u8(vld1_u8(in[4]), vld1_u8(in[5]));
+    uint8x8x2_t gh = vtrn_u8(vld1_u8(in[6]), vld1_u8(in[7]));
+    /* Columns 0 and 4, 2 and 6, 1 and 5, 3 and 7 of rows a-d, then e-h. */
+    uint16x4x2_t ad0 =
+        vtrn_u16(vreinterpret_u16_u8(ab.val[0]), vreinterpret_u16_u8(cd.val[0]));
+    uint16x4x2_t ad1 =
+        vtrn_u16(vreinterpret_u16_u8(ab.val[1]), vreinterpret_u16_u8(cd.val[1]));
+    uint16x4x2_t eh0 =
+        vtrn_u16(vreinterpret_u16_u8(ef.val[0]), vreinterpret_u16_u8(gh.val[0]));
+    uint16x4x2_t eh1 =
+        vtrn_u16(vreinterpret_u16_u8(ef.val[1]), vreinterpret_u16_u8(gh.val[1]));
+    uint32x2x2_t c04 =
+        vtrn_u32(vreinterpret_u32_u16(ad0.val[0]), vreinterpret_u32_u16(eh0.val[0]));
+    uint32x2x2_t c15 =
+        vtrn_u32(vreinterpret_u32_u16(ad1.val[0]), vreinterpret_u32_u16(eh1.val[0]));
+    uint32x2x2_t c26 =
+        vtrn_u32(vreinterpret_u32_u16(ad0.val[1]), vreinterpret_u32_u16(eh0.val[1]));
+    uint32x2x2_t c37 =
+        vtrn_u32(vreinterpret_u32_u16(ad1.val[1]), vreinterpret_u32_u16(eh1.val[1]));
+    vst1_u8(out[0], vreinterpret_u8_u32(c04.val[0]));
+    vst1_u8(out[1], vreinterpret_u8_u32(c15.val[0]));
+    vst1_u8(out[2], vreinterpret_u8_u32(c26.val[0]));
+    vst1_u8(out[3], vreinterpret_u8_u32(c37.val[0]));
+    vst1_u8(out[4], vreinterpret_u8_u32(c04.val[1]));
+    vst1_u8(out[5], vreinterpret_u8_u32(c15.val[1]));
+    vst1_u8(out[6], vreinterpret_u8_u32(c26.val[1]));
+    vst1_u8(out[7], vreinterpret_u8_u32(c37.val[1]));
+#endif
+}
+
+/* The 90 degree transposes of 8-bit and 32-bit images: imOut's row x,
+   column y is imIn's column x, row y, mirrored on each axis whose flip
+   is set (rotate 90 mirrors x, rotate 270 y, transverse both). In bands
+   of 64 bytes' worth of rows, each left to right in columns of BS x BS
+   blocks of INT pixels: a column of blocks fills 64 bytes of each of its
+   output rows, whole cache lines when they are aligned, and the blocks
+   next to it read the rest of the input's cache lines. */
+#define TRANSPOSE_BLOCKS(name, INT, image, BS, kernel)                            \
+    static void name(Imaging imOut, Imaging imIn, int flipx, int flipy) {         \
+        enum { BAND = 64 / sizeof(INT) };                                         \
+        int xsize = imIn->xsize, ysize = imIn->ysize;                             \
+        int xb = xsize / BS * BS, yb = ysize / BS * BS;                           \
+        int x, y, yy, h, k;                                                       \
+                                                                                  \
+        for (y = 0; y < yb; y += h) {                                             \
+            INT *rows[BAND];                                                      \
+            h = yb - y < BAND ? yb - y : BAND;                                    \
+            for (k = 0; k < h; k++) {                                             \
+                rows[k] = imIn->image[y + k];                                     \
+            }                                                                     \
+            for (x = 0; x < xb; x += BS) {                                        \
+                INT *outrows[BS], *in[BS], *out[BS];                              \
+                for (k = 0; k < BS; k++) {                                        \
+                    outrows[k] = imOut->image[flipx ? xsize - 1 - x - k : x + k]; \
+                }                                                                 \
+                for (yy = 0; yy < h; yy += BS) {                                  \
+                    /* The block's output columns start at oy. With flipy,        \
+                       the rows are read last first, to come in order. */         \
+                    int oy = flipy ? ysize - y - yy - BS : y + yy;                \
+                    for (k = 0; k < BS; k++) {                                    \
+                        in[k] = rows[flipy ? yy + BS - 1 - k : yy + k] + x;       \
+                        out[k] = outrows[k] + oy;                                 \
+                    }                                                             \
+                    kernel(in, out);                                              \
+                }                                                                 \
+            }                                                                     \
+        }                                                                         \
+        /* The pixels left over at the image's edges. */                          \
+        for (y = 0; y < ysize; y++) {                                             \
+            int oy = flipy ? ysize - 1 - y : y;                                   \
+            for (x = y < yb ? xb : 0; x < xsize; x++) {                           \
+                int ox = flipx ? xsize - 1 - x : x;                               \
+                imOut->image[ox][oy] = imIn->image[y][x];                         \
+            }                                                                     \
+        }                                                                         \
+    }
+
+TRANSPOSE_BLOCKS(transpose_blocks8, UINT8, image8, 8, transpose_8x8_8)
+TRANSPOSE_BLOCKS(transpose_blocks32, INT32, image32, 4, transpose_4x4_32)
+#undef TRANSPOSE_BLOCKS
+
+static void
+transpose_blocks(Imaging imOut, Imaging imIn, int flipx, int flipy) {
+    if (imIn->pixelsize == 1) {
+        transpose_blocks8(imOut, imIn, flipx, flipy);
+    } else {
+        transpose_blocks32(imOut, imIn, flipx, flipy);
+    }
+}
+#endif
+
 Imaging
 ImagingFlipLeftRight(Imaging imOut, Imaging imIn) {
     ImagingSectionCookie cookie;
@@ -137,14 +304,21 @@ ImagingRotate90(Imaging imOut, Imaging imIn) {
     ImagingSectionEnter(&cookie);
     MUTEX_LOCK(&imIn->mutex);
 
-    if (imIn->image8) {
-        if (isModeI16(imIn->mode)) {
-            ROTATE_90(UINT16, image8);
+#if defined(TRANSPOSE_SIMD)
+    if (imIn->pixelsize == 1 || imIn->pixelsize == 4) {
+        transpose_blocks(imOut, imIn, 1, 0);
+    } else
+#endif
+    {
+        if (imIn->image8) {
+            if (isModeI16(imIn->mode)) {
+                ROTATE_90(UINT16, image8);
+            } else {
+                ROTATE_90(UINT8, image8);
+            }
         } else {
-            ROTATE_90(UINT8, image8);
+            ROTATE_90(INT32, image32);
         }
-    } else {
-        ROTATE_90(INT32, image32);
     }
 
     MUTEX_UNLOCK(&imIn->mutex);
@@ -200,14 +374,21 @@ ImagingTranspose(Imaging imOut, Imaging imIn) {
     ImagingSectionEnter(&cookie);
     MUTEX_LOCK(&imIn->mutex);
 
-    if (imIn->image8) {
-        if (isModeI16(imIn->mode)) {
-            TRANSPOSE(UINT16, image8);
+#if defined(TRANSPOSE_SIMD)
+    if (imIn->pixelsize == 1 || imIn->pixelsize == 4) {
+        transpose_blocks(imOut, imIn, 0, 0);
+    } else
+#endif
+    {
+        if (imIn->image8) {
+            if (isModeI16(imIn->mode)) {
+                TRANSPOSE(UINT16, image8);
+            } else {
+                TRANSPOSE(UINT8, image8);
+            }
         } else {
-            TRANSPOSE(UINT8, image8);
+            TRANSPOSE(INT32, image32);
         }
-    } else {
-        TRANSPOSE(INT32, image32);
     }
 
     MUTEX_UNLOCK(&imIn->mutex);
@@ -265,14 +446,21 @@ ImagingTransverse(Imaging imOut, Imaging imIn) {
     ImagingSectionEnter(&cookie);
     MUTEX_LOCK(&imIn->mutex);
 
-    if (imIn->image8) {
-        if (isModeI16(imIn->mode)) {
-            TRANSVERSE(UINT16, image8);
+#if defined(TRANSPOSE_SIMD)
+    if (imIn->pixelsize == 1 || imIn->pixelsize == 4) {
+        transpose_blocks(imOut, imIn, 1, 1);
+    } else
+#endif
+    {
+        if (imIn->image8) {
+            if (isModeI16(imIn->mode)) {
+                TRANSVERSE(UINT16, image8);
+            } else {
+                TRANSVERSE(UINT8, image8);
+            }
         } else {
-            TRANSVERSE(UINT8, image8);
+            TRANSVERSE(INT32, image32);
         }
-    } else {
-        TRANSVERSE(INT32, image32);
     }
 
     MUTEX_UNLOCK(&imIn->mutex);
@@ -377,14 +565,21 @@ ImagingRotate270(Imaging imOut, Imaging imIn) {
     ImagingSectionEnter(&cookie);
     MUTEX_LOCK(&imIn->mutex);
 
-    if (imIn->image8) {
-        if (isModeI16(imIn->mode)) {
-            ROTATE_270(UINT16, image8);
+#if defined(TRANSPOSE_SIMD)
+    if (imIn->pixelsize == 1 || imIn->pixelsize == 4) {
+        transpose_blocks(imOut, imIn, 0, 1);
+    } else
+#endif
+    {
+        if (imIn->image8) {
+            if (isModeI16(imIn->mode)) {
+                ROTATE_270(UINT16, image8);
+            } else {
+                ROTATE_270(UINT8, image8);
+            }
         } else {
-            ROTATE_270(UINT8, image8);
+            ROTATE_270(INT32, image32);
         }
-    } else {
-        ROTATE_270(INT32, image32);
     }
 
     MUTEX_UNLOCK(&imIn->mutex);
