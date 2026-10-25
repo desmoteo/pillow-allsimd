@@ -127,6 +127,112 @@ im_point_32_8(Imaging imOut, Imaging imIn, im_point_context *context) {
     }
 }
 
+/* Tables that are one simple operation on every byte, as ImageOps
+   invert, posterize and solarize make. When all bands use the same one,
+   whole rows are transformed with a loop compilers vectorise. */
+enum point_byte_op { POINT_TABLE, POINT_XOR, POINT_AND, POINT_SOLARIZE };
+
+static enum point_byte_op
+point_byte_op(const UINT8 *table, int bands, UINT8 *arg) {
+    int i, b, t;
+    for (b = 1; b < bands; b++) {
+        if (memcmp(table, table + 256 * b, 256)) {
+            return POINT_TABLE;
+        }
+    }
+    for (i = 0; i < 256 && table[i] == (i ^ table[0]); i++) {
+    }
+    if (i == 256) {
+        *arg = table[0];
+        return POINT_XOR;
+    }
+    for (i = 0; i < 256 && table[i] == (i & table[255]); i++) {
+    }
+    if (i == 256) {
+        *arg = table[255];
+        return POINT_AND;
+    }
+    // i below the threshold t, 255 - i from it
+    for (t = 0; t < 256 && table[t] == t; t++) {
+    }
+    for (i = t; i < 256 && table[i] == 255 - i; i++) {
+    }
+    if (i == 256) {
+        *arg = (UINT8)t;
+        return POINT_SOLARIZE;
+    }
+    return POINT_TABLE;
+}
+
+/* One row. Compilers don't vectorise these loops at -O2, which would need
+   a scalar epilogue; the SIMD loops leave the last bytes to them. */
+static void
+point_byte_row(UINT8 *out, const UINT8 *in, int n, enum point_byte_op op, UINT8 arg) {
+    int x = 0;
+#if defined(IMAGING_SIMD_AVX2)
+    __m256i a32 = _mm256_set1_epi8((char)arg);
+    for (; x < n - 31; x += 32) {
+        __m256i v = _mm256_loadu_si256((const __m256i *)(in + x));
+        if (op == POINT_XOR) {
+            v = _mm256_xor_si256(v, a32);
+        } else if (op == POINT_AND) {
+            v = _mm256_and_si256(v, a32);
+        } else {
+            // v >= arg as max(v, arg) == v, then v ^ 255 there
+            v = _mm256_xor_si256(v, _mm256_cmpeq_epi8(_mm256_max_epu8(v, a32), v));
+        }
+        _mm256_storeu_si256((__m256i *)(out + x), v);
+    }
+#endif
+#if defined(IMAGING_SIMD_SSE4)
+    __m128i a16 = _mm_set1_epi8((char)arg);
+    for (; x < n - 15; x += 16) {
+        __m128i v = _mm_loadu_si128((const __m128i *)(in + x));
+        if (op == POINT_XOR) {
+            v = _mm_xor_si128(v, a16);
+        } else if (op == POINT_AND) {
+            v = _mm_and_si128(v, a16);
+        } else {
+            v = _mm_xor_si128(v, _mm_cmpeq_epi8(_mm_max_epu8(v, a16), v));
+        }
+        _mm_storeu_si128((__m128i *)(out + x), v);
+    }
+#elif defined(IMAGING_SIMD_NEON)
+    uint8x16_t a16 = vdupq_n_u8(arg);
+    for (; x < n - 15; x += 16) {
+        uint8x16_t v = vld1q_u8(in + x);
+        if (op == POINT_XOR) {
+            v = veorq_u8(v, a16);
+        } else if (op == POINT_AND) {
+            v = vandq_u8(v, a16);
+        } else {
+            v = veorq_u8(v, vcgeq_u8(v, a16));
+        }
+        vst1q_u8(out + x, v);
+    }
+#endif
+    for (; x < n; x++) {
+        if (op == POINT_XOR) {
+            out[x] = in[x] ^ arg;
+        } else if (op == POINT_AND) {
+            out[x] = in[x] & arg;
+        } else {
+            // 255 - v is v ^ 255
+            out[x] = in[x] ^ (in[x] >= arg ? 255 : 0);
+        }
+    }
+}
+
+static void
+point_byte_rows(Imaging imOut, Imaging imIn, enum point_byte_op op, UINT8 arg) {
+    int y;
+    for (y = 0; y < imIn->ysize; y++) {
+        point_byte_row(
+            (UINT8 *)imOut->image[y], (UINT8 *)imIn->image[y], imIn->linesize, op, arg
+        );
+    }
+}
+
 Imaging
 ImagingPoint(Imaging imIn, ModeID mode, const void *table) {
     /* lookup table transform */
@@ -156,6 +262,23 @@ ImagingPoint(Imaging imIn, ModeID mode, const void *table) {
     } else {
         // Reject F modes and modes based on I;16
         goto mode_mismatch;
+    }
+
+    if (imIn->type == IMAGING_TYPE_UINT8 && imIn->mode == mode) {
+        UINT8 arg;
+        enum point_byte_op op = point_byte_op(table, imIn->bands, &arg);
+        if (op != POINT_TABLE) {
+            // Every byte of every row is written, padding included.
+            imOut = ImagingNewDirty(mode, imIn->xsize, imIn->ysize);
+            if (!imOut) {
+                return NULL;
+            }
+            ImagingCopyPalette(imOut, imIn);
+            ImagingSectionEnter(&cookie);
+            point_byte_rows(imOut, imIn, op, arg);
+            ImagingSectionLeave(&cookie);
+            return imOut;
+        }
     }
 
     imOut = ImagingNew(mode, imIn->xsize, imIn->ysize);

@@ -95,3 +95,23 @@ def test_raising_length() -> None:
     im = Image.new("L", (1, 1))
     with pytest.raises(RuntimeError):
         im.point(RaisingLengthSequence(), "F")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("mode", ("L", "LA", "RGB", "RGBA"))
+@pytest.mark.parametrize("width", (256, 1, 15, 17, 33))
+def test_byte_operation_tables(mode: str, width: int) -> None:
+    # Tables equal to one operation on every byte (invert, posterize,
+    # solarize) take a faster path; tables differing in one entry don't.
+    bands = len(mode)
+    data = bytes((i * 37 + i // 256) % 256 for i in range(width * 16 * bands))
+    im = Image.frombytes(mode, (width, 16), data)
+    tables = [[i ^ c for i in range(256)] for c in (0, 1, 255, 0x5A)]
+    tables += [[i & (256 - 2**b) for i in range(256)] for b in range(9)]
+    tables += [[i if i < t else 255 - i for i in range(256)] for t in (0, 1, 128, 255)]
+    near = [i ^ 255 for i in range(256)]
+    near[200] = 7
+    tables.append(near)
+    for table in tables:
+        out = im.point(table * bands)
+        expected = bytes(table[v] for v in data)
+        assert out.tobytes() == expected
