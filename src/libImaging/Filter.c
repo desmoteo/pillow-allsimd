@@ -530,6 +530,47 @@ ImagingFilter5x5(Imaging imOut, Imaging im, const float *kernel, float offset) {
 }
 
 #if defined(FILTER_SIMD)
+/* The n coefficients and the offset scaled by 1 << precision for the
+   integer kernels. Returns 0 if a coefficient doesn't fit 16 bits, or with
+   exact, if one of them or the offset isn't an integer once scaled. */
+static int
+filter_int_kernel(
+    const FLOAT32 *kernel,
+    int n,
+    FLOAT32 offset,
+    int precision,
+    int exact,
+    INT16 *norm_kernel,
+    INT32 *norm_offset
+) {
+    int i;
+    FLOAT32 tmp;
+    for (i = 0; i < n; i++) {
+        tmp = kernel[i] * (1 << precision);
+        if (exact && (tmp >= 32768 || tmp <= -32769 || tmp != floorf(tmp))) {
+            return 0;
+        }
+        tmp += (tmp >= 0) ? 0.5 : -0.5;
+        if (tmp >= 32768 || tmp <= -32769) {
+            return 0;
+        }
+        norm_kernel[i] = tmp;
+    }
+    tmp = offset * (1 << precision);
+    if (exact && (tmp >= 1 << 30 || tmp <= -1 << 30 || tmp != floorf(tmp))) {
+        return 0;
+    }
+    tmp += (tmp >= 0) ? 0.5 : -0.5;
+    if (tmp >= 1 << 30) {
+        *norm_offset = 1 << 30;
+    } else if (tmp <= -1 << 30) {
+        *norm_offset = -1 << 30;
+    } else {
+        *norm_offset = tmp;
+    }
+    return 1;
+}
+
 /* 8-bit images: integer kernels when the coefficients fit 16 bits,
    float kernels otherwise. Returns 0 if the image has to
    go to the generic code. */
@@ -542,49 +583,54 @@ ImagingFilterSIMD(
     const FLOAT32 *kernel,
     FLOAT32 offset
 ) {
-    int i;
     int fast_path = 1;
-    FLOAT32 tmp;
+    int precision = PRECISION_BITS;
     INT16 norm_kernel[25];
     INT32 norm_offset;
 
-    for (i = 0; i < xsize * ysize; i++) {
-        tmp = kernel[i] * (1 << PRECISION_BITS);
-        tmp += (tmp >= 0) ? 0.5 : -0.5;
-        if (tmp >= 32768 || tmp <= -32769) {
-            fast_path = 0;
-            break;
+    /* The coefficients in 16 bits, scaled by 1 << PRECISION_BITS and
+       rounded. If one doesn't fit, as coefficients of 4 and more don't
+       (FIND_EDGES, CONTOUR, EDGE_ENHANCE), the largest precision at which
+       all of them and the offset are exact: the sums are then exact, and
+       rounded half up as by the code without SIMD, so the result is the
+       same. */
+    if (!filter_int_kernel(
+            kernel, xsize * ysize, offset, precision, 0, norm_kernel, &norm_offset
+        )) {
+        for (precision = PRECISION_BITS - 1; precision >= 1; precision--) {
+            if (filter_int_kernel(
+                    kernel,
+                    xsize * ysize,
+                    offset,
+                    precision,
+                    1,
+                    norm_kernel,
+                    &norm_offset
+                )) {
+                break;
+            }
         }
-        norm_kernel[i] = tmp;
-    }
-    tmp = offset * (1 << PRECISION_BITS);
-    tmp += (tmp >= 0) ? 0.5 : -0.5;
-    if (tmp >= 1 << 30) {
-        norm_offset = 1 << 30;
-    } else if (tmp <= -1 << 30) {
-        norm_offset = -1 << 30;
-    } else {
-        norm_offset = tmp;
+        fast_path = precision >= 1;
     }
 
 #if defined(IMAGING_SIMD_SSE4)
     if (xsize == 3) {
         if (im->image8 && fast_path) {
-            ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset, precision);
         } else if (im->image8) {
             ImagingFilter3x3f_u8(imOut, im, kernel, offset);
         } else if (fast_path) {
-            ImagingFilter3x3i_4u8(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter3x3i_4u8(imOut, im, norm_kernel, norm_offset, precision);
         } else {
             ImagingFilter3x3f_4u8(imOut, im, kernel, offset);
         }
     } else {
         if (im->image8 && fast_path) {
-            ImagingFilter5x5i_u8_simd(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter5x5i_u8_simd(imOut, im, norm_kernel, norm_offset, precision);
         } else if (im->image8) {
             ImagingFilter5x5f_u8(imOut, im, kernel, offset);
         } else if (fast_path) {
-            ImagingFilter5x5i_4u8(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter5x5i_4u8(imOut, im, norm_kernel, norm_offset, precision);
         } else {
             ImagingFilter5x5f_4u8(imOut, im, kernel, offset);
         }
@@ -602,15 +648,15 @@ ImagingFilterSIMD(
     }
     if (xsize == 3) {
         if (im->image8) {
-            ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset, precision);
         } else {
-            ImagingFilter3x3i_4u8_simd(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter3x3i_4u8_simd(imOut, im, norm_kernel, norm_offset, precision);
         }
     } else {
         if (im->image8) {
-            ImagingFilter5x5i_u8_simd(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter5x5i_u8_simd(imOut, im, norm_kernel, norm_offset, precision);
         } else {
-            ImagingFilter5x5i_4u8_simd(imOut, im, norm_kernel, norm_offset);
+            ImagingFilter5x5i_4u8_simd(imOut, im, norm_kernel, norm_offset, precision);
         }
     }
 #endif
