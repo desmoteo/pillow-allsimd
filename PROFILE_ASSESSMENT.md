@@ -101,6 +101,30 @@ The x86 SIMD unpremultiply (RGBa → RGBA), inherited from upstream pillow-simd,
 
 **Cost.** AVX2 1.75 → 2.84 ms and SSE4 2.0 → 5.2 ms at 2560×1600; Pillow takes 33 ms. RGBA resize, rotate and perspective change by 1–2%.
 
+
+## Progress (2026-10-29)
+
+Done since this profile, with output unchanged (1280×800 unless noted, ms before / AVX2):
+
+| Item | Commit | Result |
+|---|---|---|
+| 1. Rank filters up to 11×11 by sorting network | `00df40576` | median 5: 1926 → 29.6 at 2560×1600 (65x) |
+| 10. Rank filters without the expanded copy | `4abb19ab3` | median 3 L 2.36 → 0.95, median 3 RGB 8.07 → 3.96 |
+| 6. Span fill and RGBA ink blend in ImageDraw | `205b37abf` | rectangles 6.45 → 2.85, polygons 45.8 → 28.4, RGBA ink 9.15 → 4.50 |
+| 8. invert, posterize, solarize as byte operations | `45e5d58b6` | 1.38 → 0.42 |
+| 9. ImageEnhance contrast and brightness as tables; `point()` without zero-filling | `ef475f463` | contrast 3.58 → 2.19, brightness 1.95 → 1.28, equalize 2.91 → 1.93 |
+| 2. PNG row filters | `f4dec230f` | level 1: 89.1 → 51.3; default level 436 → 399 |
+| 5. Masked fills (text, `bitmap()`) | `b63f28373` | `ImagingFill2` 154M → 15M instructions; text 93.9 → 88.1 |
+| 4. `floodfill` in C | `b8d1e31d3` | 86.3 → 1.39 |
+| 12. RGB ↔ YCbCr without tables | `ed826e396` | at 2560×1600: to YCbCr 11.65 → 7.45, to RGB 14.06 → 4.50 |
+
+On x86, a vector 256-entry byte table (`pshufb`) was measured slower than the scalar lookup, which runs at 0.56 cycles per byte. So item 8 recognises the tables instead of vectorising the lookup.
+
+Open:
+- zlib-ng (item 2): not installed here, and building it from source was not done.
+- The glyph cache (item 5).
+- Items 3, 7, 9 (fused `alpha_composite`), 11, 13–19.
+
 ## Recommendations
 
 Ranked by expected gain for typical use. Times are ms at 1280×800 (SIMD build / 13.0 wheel). Estimates are rough, made before implementation.
