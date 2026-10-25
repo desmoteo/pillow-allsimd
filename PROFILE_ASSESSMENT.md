@@ -147,6 +147,7 @@ Open:
 
 | Change | Commit | Result |
 |---|---|---|
+| Perspective coordinates per tile row in one vectorised loop; quad transforms inlined | `f0783f5be`, `8fa913767` | perspective RGB bilinear 62 → 44, bicubic 131 → 90, L nearest 23 → 13; quad 61 → 50 |
 | Horizontal resample without `vpdpwssd` chains (AVX-VNNI); 3-band portable resample | `b87e97786` | VNNI 26×16 shrinks 1.3–1.6x; scalar 1.2x, level with 13.0 |
 | `rgb2cmyk`, `l2rgb`, `rgb2rgba` a pixel at a time (x86); chops add/subtract in integers, lighter/darker unclipped | `410467263`, `1a25b8186` | CMYK 3.48 → 1.20, L→RGB 2.67 → 1.67, RGB↔RGBA 3.73 → 2.35, add 5.18 → 3.32 |
 | Transparent huge pages for image blocks where THP is in `madvise` mode | `410467263`, `53f7762e8` | box blur 1.47x, lighter 1.6x, large passes a few % |
@@ -173,7 +174,7 @@ Still behind the other libraries:
 - Gaussian blur at small radii: OpenCV uses a direct convolution, whose output differs.
 - Median 5×5 with SSE4 only: 16 registers spill.
 - HSV: about 2.6x behind OpenCV, whose integer method gives different values.
-- Perspective transforms on x86: about 2x behind.
+- Perspective transforms on x86: about 1.4x behind after the vectorised coordinates.
 - PNG encoding: libvips' default filter and zlib settings differ.
 
 ## Recommendations
