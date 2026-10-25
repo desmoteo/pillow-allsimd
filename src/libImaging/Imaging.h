@@ -474,6 +474,10 @@ ImagingDrawArc(
 extern int
 ImagingDrawBitmap(Imaging im, int x0, int y0, Imaging bitmap, const void *ink, int op);
 extern int
+ImagingFloodFill(
+    Imaging im, int x, int y, const int *background, const int *border, double thresh
+);
+extern int
 ImagingDrawChord(
     Imaging im,
     int x0,

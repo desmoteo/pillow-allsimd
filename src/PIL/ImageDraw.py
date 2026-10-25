@@ -833,6 +833,15 @@ def floodfill(
         pixel[x, y] = value
     except (ValueError, IndexError):
         return  # seed point outside image
+    # Negative coordinates wrap around for the seed only; the search then
+    # starts from the coordinates as given.
+    if (
+        x >= 0
+        and y >= 0
+        and _floodfill_in_c(image, pixel[x, y], value, background, border, thresh)
+    ):
+        image.im.floodfill(x, y, background, border, float(thresh))
+        return
     edge = {(x, y)}
     # use a set to keep record of current and previous edge pixels
     # to reduce memory consumption
@@ -859,6 +868,43 @@ def floodfill(
                         new_edge.add((s, t))
         full_edge = edge  # discard pixels processed
         edge = new_edge
+
+
+# Modes of 8-bit bands that the C flood fill reads as PixelAccess does.
+_FLOODFILL_MODES = {
+    "1", "L", "P", "LA", "La", "PA", "RGB", "RGBA", "RGBa", "RGBX", "CMYK",
+    "YCbCr", "LAB", "HSV",
+}  # fmt: skip
+
+
+def _floodfill_in_c(
+    image: Image.Image,
+    stored: float | tuple[int, ...] | None,
+    value: float | tuple[int, ...],
+    background: float | tuple[int, ...] | None,
+    border: float | tuple[int, ...] | None,
+    thresh: float,
+) -> bool:
+    """Whether the C fill gives the pixels of the search in floodfill(): the
+    seed must read back as value, so that filled pixels compare as the
+    search compares them, and border must have a pixel's shape."""
+
+    def pixel_like(v: object) -> bool:
+        if isinstance(background, tuple):
+            return (
+                isinstance(v, tuple)
+                and len(v) == len(background)
+                and all(type(b) is int for b in v)
+            )
+        return type(v) is int
+
+    return (
+        image.mode in _FLOODFILL_MODES
+        and isinstance(thresh, (int, float))
+        and stored == value
+        and pixel_like(background)
+        and (border is None or pixel_like(border))
+    )
 
 
 def _compute_regular_polygon_vertices(

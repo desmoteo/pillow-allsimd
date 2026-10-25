@@ -2034,3 +2034,139 @@ ImagingDrawOutline(
 
     return 0;
 }
+
+/* Flood fill of 8-bit images from (x, y), whose pixel already holds the
+   fill value: the 4-connected pixels that match are set to its bytes.
+   They match if the sum of |band - background[band]| is at most thresh,
+   or, with border, if they equal neither the fill value nor border.
+   Filled pixels never match again, so any order gives the same pixels as
+   ImageDraw.floodfill's search. Bands are as PixelAccess reads them.
+   Returns -1 if out of memory, 0 otherwise. */
+
+typedef struct {
+    int x, y;
+} flood_point;
+
+static inline void
+flood_bands(Imaging im, int x, int y, int *v) {
+    if (im->image8) {
+        v[0] = im->image8[y][x];
+    } else {
+        const UINT8 *p = (UINT8 *)im->image[y] + x * 4;
+        if (im->bands == 2) {
+            v[0] = p[0], v[1] = p[3];
+        } else {
+            int b;
+            for (b = 0; b < im->bands; b++) {
+                v[b] = p[b];
+            }
+        }
+    }
+}
+
+static inline int
+flood_match(
+    Imaging im,
+    int x,
+    int y,
+    const int *fill,
+    const int *background,
+    const int *border,
+    double thresh
+) {
+    int v[4], b, diff = 0, same_fill = 1, same_border = 1;
+    flood_bands(im, x, y, v);
+    if (!border) {
+        for (b = 0; b < im->bands; b++) {
+            diff += abs(v[b] - background[b]);
+        }
+        return diff <= thresh;
+    }
+    for (b = 0; b < im->bands; b++) {
+        same_fill &= v[b] == fill[b];
+        same_border &= v[b] == border[b];
+    }
+    return !same_fill && !same_border;
+}
+
+int
+ImagingFloodFill(
+    Imaging im, int x, int y, const int *background, const int *border, double thresh
+) {
+    int fill[4];
+    UINT8 value[4];
+    flood_point *stack;
+    size_t top = 0, cap = 1024;
+    int pixelsize = im->image8 ? 1 : 4;
+
+    if (x < 0 || y < 0 || x >= im->xsize || y >= im->ysize) {
+        return 0;
+    }
+    flood_bands(im, x, y, fill);
+    memcpy(
+        value, im->image8 ? &im->image8[y][x] : (UINT8 *)im->image[y] + x * 4, pixelsize
+    );
+    stack = malloc(cap * sizeof(*stack));
+    if (!stack) {
+        return -1;
+    }
+    stack[top].x = x, stack[top].y = y, top++;
+
+#define FLOOD_SET(xx, yy)                                                     \
+    memcpy(                                                                   \
+        im->image8 ? &im->image8[yy][xx] : (UINT8 *)im->image[yy] + (xx) * 4, \
+        value,                                                                \
+        pixelsize                                                             \
+    )
+#define FLOOD_MATCH(xx, yy) flood_match(im, xx, yy, fill, background, border, thresh)
+
+    while (top > 0) {
+        int sx, sy, x0, x1, dy;
+        top--;
+        sx = stack[top].x, sy = stack[top].y;
+        // The seed already holds the fill value; other spans start on a match.
+        if ((sx != x || sy != y) && !FLOOD_MATCH(sx, sy)) {
+            continue;
+        }
+        x0 = x1 = sx;
+        while (x0 > 0 && FLOOD_MATCH(x0 - 1, sy)) {
+            x0--;
+        }
+        while (x1 < im->xsize - 1 && FLOOD_MATCH(x1 + 1, sy)) {
+            x1++;
+        }
+        for (int xx = x0; xx <= x1; xx++) {
+            FLOOD_SET(xx, sy);
+        }
+        // One seed per run of matching pixels in the rows above and below.
+        for (dy = -1; dy <= 1; dy += 2) {
+            int ny = sy + dy, xx, in_run = 0;
+            if (ny < 0 || ny >= im->ysize) {
+                continue;
+            }
+            for (xx = x0; xx <= x1; xx++) {
+                if (FLOOD_MATCH(xx, ny)) {
+                    if (!in_run) {
+                        if (top == cap) {
+                            flood_point *grown =
+                                realloc(stack, 2 * cap * sizeof(*stack));
+                            if (!grown) {
+                                free(stack);
+                                return -1;
+                            }
+                            stack = grown, cap *= 2;
+                        }
+                        stack[top].x = xx, stack[top].y = ny, top++;
+                        in_run = 1;
+                    }
+                } else {
+                    in_run = 0;
+                }
+            }
+        }
+    }
+#undef FLOOD_SET
+#undef FLOOD_MATCH
+    free(stack);
+    return 0;
+}
