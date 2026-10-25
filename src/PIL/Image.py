@@ -889,6 +889,14 @@ class Image:
             from . import ImageFile
 
             bufsize = max(ImageFile.MAXBLOCK, self.size[0] * 4)  # see RawEncode.c
+            if encoder_name == "raw" and encoder_args == self.mode != "1":
+                # Room for all the rows, so that there is one chunk and
+                # nothing to join
+                modedesc = ImageMode.getmode(self.mode)
+                itemsize = int(modedesc.typestr[-1])
+                bufsize = max(
+                    bufsize, self.width * self.height * len(modedesc.bands) * itemsize
+                )
 
             output = []
             while True:

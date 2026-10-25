@@ -290,9 +290,9 @@ ImagingPackRGB(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingPackXRGB(UINT8 *out, const UINT8 *in, int pixels) {
-    int i;
+    int i = permute4(out, in, pixels, PERMUTE_00, R, G, B);
     /* XRGB, triplets with left padding */
-    for (i = 0; i < pixels; i++) {
+    for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = 0;
         out[1] = in[R];
         out[2] = in[G];
@@ -304,9 +304,26 @@ ImagingPackXRGB(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingPackBGR(UINT8 *out, const UINT8 *in, int pixels) {
-    int i;
+    int i = 0;
+#if defined(IMAGING_SIMD_SSE4)
+    /* As ImagingPackRGB, with the bytes of each pixel reversed. */
+    __m128i to_bgr =
+        _mm_setr_epi8(2, 1, 0, 6, 5, 4, 10, 9, 8, 14, 13, 12, -1, -1, -1, -1);
+    for (; i < pixels - 5; i += 4) {
+        __m128i v = _mm_loadu_si128((const __m128i *)(in + i * 4));
+        _mm_storeu_si128((__m128i *)out, _mm_shuffle_epi8(v, to_bgr));
+        out += 12;
+    }
+#elif defined(IMAGING_SIMD_NEON)
+    for (; i < pixels - 15; i += 16) {
+        uint8x16x4_t rgbx = vld4q_u8(in + i * 4);
+        uint8x16x3_t bgr = {{rgbx.val[2], rgbx.val[1], rgbx.val[0]}};
+        vst3q_u8(out, bgr);
+        out += 48;
+    }
+#endif
     /* RGB, reversed bytes */
-    for (i = 0; i < pixels; i++) {
+    for (in += i * 4; i < pixels; i++) {
         out[0] = in[B];
         out[1] = in[G];
         out[2] = in[R];
@@ -317,9 +334,9 @@ ImagingPackBGR(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingPackBGRX(UINT8 *out, const UINT8 *in, int pixels) {
-    int i;
+    int i = permute4(out, in, pixels, B, G, R, PERMUTE_00);
     /* BGRX, reversed bytes with right padding */
-    for (i = 0; i < pixels; i++) {
+    for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = in[B];
         out[1] = in[G];
         out[2] = in[R];
@@ -331,9 +348,9 @@ ImagingPackBGRX(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingPackXBGR(UINT8 *out, const UINT8 *in, int pixels) {
-    int i;
+    int i = permute4(out, in, pixels, PERMUTE_00, B, G, R);
     /* XBGR, reversed bytes with left padding */
-    for (i = 0; i < pixels; i++) {
+    for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = 0;
         out[1] = in[B];
         out[2] = in[G];
@@ -358,9 +375,9 @@ ImagingPackCMYK2RGB(UINT8 *out, const UINT8 *in, int xsize) {
 
 void
 ImagingPackBGRA(UINT8 *out, const UINT8 *in, int pixels) {
-    int i;
+    int i = permute4(out, in, pixels, B, G, R, A);
     /* BGRA, reversed bytes with right alpha */
-    for (i = 0; i < pixels; i++) {
+    for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = in[B];
         out[1] = in[G];
         out[2] = in[R];
@@ -372,9 +389,9 @@ ImagingPackBGRA(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingPackABGR(UINT8 *out, const UINT8 *in, int pixels) {
-    int i;
+    int i = permute4(out, in, pixels, A, B, G, R);
     /* ABGR, reversed bytes with left alpha */
-    for (i = 0; i < pixels; i++) {
+    for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = in[A];
         out[1] = in[B];
         out[2] = in[G];

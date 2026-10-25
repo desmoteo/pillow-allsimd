@@ -485,8 +485,12 @@ def api_operations(
         "getchannel": lambda: rgb.getchannel(1),
         "merge RGBA": lambda: Image.merge("RGBA", rgba.split()),
         "tobytes RGBA BGRA": lambda: rgba.tobytes("raw", "BGRA"),
-        "frombytes RGB BGR": lambda: Image.frombytes(
-            "RGB", (w, h), rgb.tobytes(), "raw", "BGR"
+        "tobytes RGB BGR": lambda: rgb.tobytes("raw", "BGR"),
+        "frombytes RGB BGR": lambda b=rgb.tobytes(): Image.frombytes(
+            "RGB", (w, h), b, "raw", "BGR"
+        ),
+        "frombytes RGBA BGRA": lambda b=rgba.tobytes(): Image.frombytes(
+            "RGBA", (w, h), b, "raw", "BGRA"
         ),
         "pixel access 20k": pixel_access,
         "get_flattened_data L": lambda: list(L.get_flattened_data())[:: w + 1],

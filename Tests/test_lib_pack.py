@@ -858,3 +858,57 @@ class TestLibUnpack:
         im = Image.new("P", (9, 1))
         with pytest.raises(ValueError, match="not enough image data"):
             im.frombytes(data, decoder_name, rawmode)
+
+
+# Each raw mode's bytes, as indices into an RGBA pixel's, None for a pad
+# byte: 0 when packed, and alpha 255 when unpacked to a mode without it.
+BYTE_ORDERS = {
+    "BGR": (2, 1, 0),
+    "BGRX": (2, 1, 0, None),
+    "XRGB": (None, 0, 1, 2),
+    "XBGR": (None, 2, 1, 0),
+    "BGXR": (2, 1, None, 0),
+    "BGRA": (2, 1, 0, 3),
+    "ABGR": (3, 2, 1, 0),
+    "ARGB": (3, 0, 1, 2),
+    "BGAR": (2, 1, 3, 0),
+}
+
+
+@pytest.mark.parametrize(
+    "mode, rawmode",
+    [("RGB", rawmode) for rawmode in ("BGR", "BGRX", "XRGB", "XBGR", "BGXR")]
+    + [("RGBA", rawmode) for rawmode in ("BGR", "BGRA", "ABGR", "ARGB", "BGAR")],
+)
+def test_unpack_byte_orders(mode: str, rawmode: str) -> None:
+    order = BYTE_ORDERS[rawmode]
+    for width in range(1, 41):
+        data = bytes((i * 37 + 11) & 255 for i in range(width * len(order)))
+        im = Image.frombytes(mode, (width, 1), data, "raw", rawmode)
+        for x in range(width):
+            pixel = data[x * len(order) : (x + 1) * len(order)]
+            expected = [255] * 4
+            for i, band in enumerate(order):
+                if band is not None:
+                    expected[band] = pixel[i]
+            assert im.getpixel((x, 0)) == tuple(expected[: len(mode)])
+
+
+@pytest.mark.parametrize(
+    "mode, rawmode",
+    [("RGB", rawmode) for rawmode in ("BGR", "BGRX", "XRGB", "XBGR")]
+    + [("RGBA", rawmode) for rawmode in ("BGR", "BGRA", "ABGR")],
+)
+def test_pack_byte_orders(mode: str, rawmode: str) -> None:
+    order = BYTE_ORDERS[rawmode]
+    for width in range(1, 41):
+        data = bytes((i * 37 + 11) & 255 for i in range(width * 4))
+        im = Image.frombytes(
+            mode, (width, 1), data, "raw", "RGBX" if mode == "RGB" else "RGBA"
+        )
+        expected = bytes(
+            0 if band is None else data[x * 4 + band]
+            for x in range(width)
+            for band in order
+        )
+        assert im.tobytes("raw", rawmode) == expected
