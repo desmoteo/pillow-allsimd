@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Generator
 from contextlib import contextmanager
 
 import pytest
@@ -11,8 +10,11 @@ from .helper import (
     assert_image_equal,
     assert_image_similar,
     hopper,
-    mark_if_feature_version,
 )
+
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class TestImagingResampleVulnerability:
@@ -117,10 +119,8 @@ class TestImagingCoreResampleAccuracy:
     def test_reduce_box(self, mode: str) -> None:
         case = self.make_case(mode, (8, 8), 0xE1)
         case = case.resize((4, 4), Image.Resampling.BOX)
-        # fmt: off
         data = ("e1 e1"
-                "e1 e1")
-        # fmt: on
+                "e1 e1")  # fmt: skip
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (4, 4)))
 
@@ -128,10 +128,8 @@ class TestImagingCoreResampleAccuracy:
     def test_reduce_bilinear(self, mode: str) -> None:
         case = self.make_case(mode, (8, 8), 0xE1)
         case = case.resize((4, 4), Image.Resampling.BILINEAR)
-        # fmt: off
         data = ("e1 c9"
-                "c9 b7")
-        # fmt: on
+                "c9 b7")  # fmt: skip
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (4, 4)))
 
@@ -139,10 +137,8 @@ class TestImagingCoreResampleAccuracy:
     def test_reduce_hamming(self, mode: str) -> None:
         case = self.make_case(mode, (8, 8), 0xE1)
         case = case.resize((4, 4), Image.Resampling.HAMMING)
-        # fmt: off
         data = ("e1 da"
-                "da d3")
-        # fmt: on
+                "da d3")  # fmt: skip
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (4, 4)))
 
@@ -150,11 +146,9 @@ class TestImagingCoreResampleAccuracy:
     def test_reduce_bicubic(self, mode: str) -> None:
         case = self.make_case(mode, (12, 12), 0xE1)
         case = case.resize((6, 6), Image.Resampling.BICUBIC)
-        # fmt: off
         data = ("e1 e3 d4"
                 "e3 e5 d6"
-                "d4 d6 c9")
-        # fmt: on
+                "d4 d6 c9")  # fmt: skip
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (6, 6)))
 
@@ -162,11 +156,35 @@ class TestImagingCoreResampleAccuracy:
     def test_reduce_lanczos(self, mode: str) -> None:
         case = self.make_case(mode, (16, 16), 0xE1)
         case = case.resize((8, 8), Image.Resampling.LANCZOS)
-        # fmt: off
         data = ("e1 e0 e4 d7"
                 "e0 df e3 d6"
                 "e4 e3 e7 da"
-                "d7 d6 d9 ce")
+                "d7 d6 d9 ce")  # fmt: skip
+        for channel in case.split():
+            self.check_case(channel, self.make_sample(data, (8, 8)))
+
+    @pytest.mark.parametrize("mode", ("RGBX", "RGB", "La", "L"))
+    def test_reduce_mks2013(self, mode: str) -> None:
+        case = self.make_case(mode, (16, 16), 0xE1)
+        case = case.resize((8, 8), Image.Resampling.MKS2013)
+        # fmt: off
+        data = ("e1 e1 e9 dc"
+                "e1 e1 e9 dc"
+                "e9 e9 f1 e3"
+                "dc dc e4 d8")
+        # fmt: on
+        for channel in case.split():
+            self.check_case(channel, self.make_sample(data, (8, 8)))
+
+    @pytest.mark.parametrize("mode", ("RGBX", "RGB", "La", "L"))
+    def test_reduce_mks2021(self, mode: str) -> None:
+        case = self.make_case(mode, (16, 16), 0xE1)
+        case = case.resize((8, 8), Image.Resampling.MKS2021)
+        # fmt: off
+        data = ("e1 e1 e3 d7"
+                "e1 e1 e3 d7"
+                "e3 e3 e5 d9"
+                "d7 d7 d9 ce")
         # fmt: on
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (8, 8)))
@@ -175,10 +193,8 @@ class TestImagingCoreResampleAccuracy:
     def test_enlarge_box(self, mode: str) -> None:
         case = self.make_case(mode, (2, 2), 0xE1)
         case = case.resize((4, 4), Image.Resampling.BOX)
-        # fmt: off
         data = ("e1 e1"
-                "e1 e1")
-        # fmt: on
+                "e1 e1")  # fmt: skip
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (4, 4)))
 
@@ -186,10 +202,8 @@ class TestImagingCoreResampleAccuracy:
     def test_enlarge_bilinear(self, mode: str) -> None:
         case = self.make_case(mode, (2, 2), 0xE1)
         case = case.resize((4, 4), Image.Resampling.BILINEAR)
-        # fmt: off
         data = ("e1 b0"
-                "b0 98")
-        # fmt: on
+                "b0 98")  # fmt: skip
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (4, 4)))
 
@@ -197,10 +211,8 @@ class TestImagingCoreResampleAccuracy:
     def test_enlarge_hamming(self, mode: str) -> None:
         case = self.make_case(mode, (2, 2), 0xE1)
         case = case.resize((4, 4), Image.Resampling.HAMMING)
-        # fmt: off
         data = ("e1 d2"
-                "d2 c5")
-        # fmt: on
+                "d2 c5")  # fmt: skip
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (4, 4)))
 
@@ -208,12 +220,10 @@ class TestImagingCoreResampleAccuracy:
     def test_enlarge_bicubic(self, mode: str) -> None:
         case = self.make_case(mode, (4, 4), 0xE1)
         case = case.resize((8, 8), Image.Resampling.BICUBIC)
-        # fmt: off
         data = ("e1 e5 ee b9"
                 "e5 e9 f3 bc"
                 "ee f3 fd c1"
-                "b9 bc c1 a2")
-        # fmt: on
+                "b9 bc c1 a2")  # fmt: skip
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (8, 8)))
 
@@ -231,6 +241,36 @@ class TestImagingCoreResampleAccuracy:
         )
         for channel in case.split():
             self.check_case(channel, self.make_sample(data, (12, 12)), strict=False)
+
+    @pytest.mark.parametrize("mode", ("RGBX", "RGB", "La", "L"))
+    def test_enlarge_mks2013(self, mode: str) -> None:
+        case = self.make_case(mode, (6, 6), 0xE1)
+        case = case.resize((12, 12), Image.Resampling.MKS2013)
+        data = (
+            "e1 e1 e2 ef fb be"
+            "e1 e1 e2 ef fb be"
+            "e2 e2 e3 f1 fd bf"
+            "ef ef f0 ff ff c7"
+            "fb fb fc ff ff cf"
+            "be be bf c7 cf a8"
+        )
+        for channel in case.split():
+            self.check_case(channel, self.make_sample(data, (12, 12)))
+
+    @pytest.mark.parametrize("mode", ("RGBX", "RGB", "La", "L"))
+    def test_enlarge_mks2021(self, mode: str) -> None:
+        case = self.make_case(mode, (6, 6), 0xE1)
+        case = case.resize((12, 12), Image.Resampling.MKS2021)
+        data = (
+            "e3 e1 df e9 f5 bb"
+            "e1 df dd e7 f3 b9"
+            "df dd db e5 f1 b8"
+            "e9 e7 e5 ef fc be"
+            "f5 f3 f0 fc ff c5"
+            "bb ba b8 bf c6 a3"
+        )
+        for channel in case.split():
+            self.check_case(channel, self.make_sample(data, (12, 12)))
 
     def test_box_filter_correct_range(self) -> None:
         im = Image.new("RGB", (8, 8), "#1688ff").resize(
@@ -315,6 +355,8 @@ class TestCoreResampleAlphaCorrect:
         self.run_levels_case(case.resize((512, 32), Image.Resampling.HAMMING))
         self.run_levels_case(case.resize((512, 32), Image.Resampling.BICUBIC))
         self.run_levels_case(case.resize((512, 32), Image.Resampling.LANCZOS))
+        self.run_levels_case(case.resize((512, 32), Image.Resampling.MKS2013))
+        self.run_levels_case(case.resize((512, 32), Image.Resampling.MKS2021))
 
     @pytest.mark.xfail(reason="Current implementation isn't precise enough")
     def test_levels_la(self) -> None:
@@ -324,6 +366,8 @@ class TestCoreResampleAlphaCorrect:
         self.run_levels_case(case.resize((512, 32), Image.Resampling.HAMMING))
         self.run_levels_case(case.resize((512, 32), Image.Resampling.BICUBIC))
         self.run_levels_case(case.resize((512, 32), Image.Resampling.LANCZOS))
+        self.run_levels_case(case.resize((512, 32), Image.Resampling.MKS2013))
+        self.run_levels_case(case.resize((512, 32), Image.Resampling.MKS2021))
 
     def make_dirty_case(
         self, mode: str, clean_pixel: tuple[int, ...], dirty_pixel: tuple[int, ...]
@@ -366,6 +410,12 @@ class TestCoreResampleAlphaCorrect:
         self.run_dirty_case(
             case.resize((20, 20), Image.Resampling.LANCZOS), (255, 255, 0)
         )
+        self.run_dirty_case(
+            case.resize((20, 20), Image.Resampling.MKS2013), (255, 255, 0)
+        )
+        self.run_dirty_case(
+            case.resize((20, 20), Image.Resampling.MKS2021), (255, 255, 0)
+        )
 
     def test_dirty_pixels_la(self) -> None:
         case = self.make_dirty_case("LA", (255, 128), (0, 0))
@@ -374,11 +424,13 @@ class TestCoreResampleAlphaCorrect:
         self.run_dirty_case(case.resize((20, 20), Image.Resampling.HAMMING), (255,))
         self.run_dirty_case(case.resize((20, 20), Image.Resampling.BICUBIC), (255,))
         self.run_dirty_case(case.resize((20, 20), Image.Resampling.LANCZOS), (255,))
+        self.run_dirty_case(case.resize((20, 20), Image.Resampling.MKS2013), (255,))
+        self.run_dirty_case(case.resize((20, 20), Image.Resampling.MKS2021), (255,))
 
 
 class TestCoreResamplePasses:
     @contextmanager
-    def count(self, diff: int) -> Generator[None, None, None]:
+    def count(self, diff: int) -> Generator[None]:
         count = Image.core.get_stats()["new_count"]
         yield
         assert Image.core.get_stats()["new_count"] - count == diff
@@ -459,6 +511,8 @@ class TestCoreResampleBox:
             Image.Resampling.HAMMING,
             Image.Resampling.BICUBIC,
             Image.Resampling.LANCZOS,
+            Image.Resampling.MKS2013,
+            Image.Resampling.MKS2021,
         ),
     )
     def test_wrong_arguments(self, resample: Image.Resampling) -> None:
@@ -491,9 +545,7 @@ class TestCoreResampleBox:
     def resize_tiled(
         self, im: Image.Image, dst_size: tuple[int, int], xtiles: int, ytiles: int
     ) -> Image.Image:
-        def split_range(
-            size: int, tiles: int
-        ) -> Generator[tuple[int, int], None, None]:
+        def split_range(size: int, tiles: int) -> Generator[tuple[int, int]]:
             scale = size / tiles
             for i in range(tiles):
                 yield int(round(scale * i)), int(round(scale * (i + 1)))
@@ -508,9 +560,6 @@ class TestCoreResampleBox:
                 tiled.paste(tile, (x0, y0))
         return tiled
 
-    @mark_if_feature_version(
-        pytest.mark.valgrind_known_error, "libjpeg_turbo", "2.0", reason="Known Failing"
-    )
     def test_tiles(self) -> None:
         with Image.open("Tests/images/flower.jpg") as im:
             assert im.size == (480, 360)
@@ -521,9 +570,6 @@ class TestCoreResampleBox:
                 tiled = self.resize_tiled(im, dst_size, *tiles)
                 assert_image_similar(reference, tiled, 0.01)
 
-    @mark_if_feature_version(
-        pytest.mark.valgrind_known_error, "libjpeg_turbo", "2.0", reason="Known Failing"
-    )
     def test_subsample(self) -> None:
         # This test shows advantages of the subpixel resizing
         # after supersampling (e.g. during JPEG decoding).

@@ -165,7 +165,7 @@ ImagingRankFilter(Imaging im, int size, int rank) {
     int x, y;
     int i, margin, size2;
 
-    if (!im || im->bands != 1 || im->type == IMAGING_TYPE_SPECIAL) {
+    if (!im || im->bands != 1 || im->type == IMAGING_TYPE_I16) {
         return (Imaging)ImagingError_ModeError();
     }
 
@@ -185,7 +185,8 @@ ImagingRankFilter(Imaging im, int size, int rank) {
         return (Imaging)ImagingError_ValueError("bad rank value");
     }
 
-    imOut = ImagingNew(im->mode, im->xsize - 2 * margin, im->ysize - 2 * margin);
+    // Every output pixel is written by the rank loop below
+    imOut = ImagingNewDirty(im->mode, im->xsize - 2 * margin, im->ysize - 2 * margin);
     if (!imOut) {
         return NULL;
     }

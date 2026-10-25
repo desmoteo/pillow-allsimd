@@ -16,51 +16,56 @@
 
 #include "Imaging.h"
 
+/**
+ * Copy `im` into a newly allocated image,
+ * wrapping every pixel by (xoffset, yoffset) modulo the image size.
+ *
+ * Contract: im is read-only.
+ */
 Imaging
 ImagingOffset(Imaging im, int xoffset, int yoffset) {
-    int y;
-    Imaging imOut;
-
     if (!im) {
         return (Imaging)ImagingError_ModeError();
     }
 
-    imOut = ImagingNewDirty(im->mode, im->xsize, im->ysize);
+    int xsize = im->xsize, ysize = im->ysize;
+
+    Imaging imOut = ImagingNewDirty(im->mode, xsize, ysize);
     if (!imOut) {
         return NULL;
     }
 
     ImagingCopyPalette(imOut, im);
 
-    /* make offsets positive to avoid negative coordinates */
-    xoffset %= im->xsize;
-    xoffset = im->xsize - xoffset;
+    if (xsize == 0 || ysize == 0) {
+        return imOut;
+    }
+
+    xoffset %= xsize;
     if (xoffset < 0) {
-        xoffset += im->xsize;
+        xoffset += xsize;
     }
 
-    yoffset %= im->ysize;
-    yoffset = im->ysize - yoffset;
+    yoffset %= ysize;
     if (yoffset < 0) {
-        yoffset += im->ysize;
+        yoffset += ysize;
     }
 
-    /* Each output row is input row (y + yoffset) % ysize rotated left by
-       xoffset pixels: two copies per row. */
+    int head = xoffset * im->pixelsize;
+    int tail = im->linesize - head;
+
     ImagingSectionCookie cookie;
     ImagingSectionEnter(&cookie);
-    // xoffset is in 0 .. 2 * xsize here; the per-pixel % did the rest.
-    xoffset %= im->xsize;
-    {
-        size_t pixelsize = im->pixelsize;
-        size_t head = (size_t)(im->xsize - xoffset) * pixelsize;
-        size_t tail = (size_t)xoffset * pixelsize;
-        for (y = 0; y < im->ysize; y++) {
-            const char *in = im->image[(y + yoffset) % im->ysize];
-            char *out = imOut->image[y];
-            memcpy(out, in + tail, head);
-            memcpy(out + head, in, tail);
+    // Restrict safe: im is read-only, imOut is write-only and a new allocation.
+    for (int y = 0; y < ysize; y++) {
+        int yi = y - yoffset;
+        if (yi < 0) {
+            yi += ysize;
         }
+        const char *restrict in = im->image[yi];
+        char *restrict out = imOut->image[y];
+        memcpy(out, in + tail, head);
+        memcpy(out + head, in, tail);
     }
     ImagingSectionLeave(&cookie);
 

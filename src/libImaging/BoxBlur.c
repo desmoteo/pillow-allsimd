@@ -1,8 +1,7 @@
 #include "Imaging.h"
 #include "ImagingPx4.h"
 
-#define MAX(x, y) (((x) > (y)) ? (x) : (y))
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+typedef UINT8 pixel[4];
 
 void static inline ImagingLineBoxBlur32(
     UINT32 *lineOut,
@@ -271,9 +270,6 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius) {
     if (lineOut == NULL) {
         return ImagingError_MemoryError();
     }
-
-    // printf(">>> radius: %d edges: %d %d, weights: %d %d\n",
-    //     radius, edgeA, edgeB, ww, fw);
 
     ImagingSectionEnter(&cookie);
 
