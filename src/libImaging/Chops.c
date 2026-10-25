@@ -97,7 +97,8 @@ create(Imaging im1, Imaging im2, const ModeID mode) {
  */
 Imaging
 ImagingChopLighter(Imaging imIn1, Imaging imIn2) {
-    CHOP((in1[x] > in2[x]) ? in1[x] : in2[x]);
+    /* Never out of range: no clipping, which lets it vectorize. */
+    CHOP2((in1[x] > in2[x]) ? in1[x] : in2[x], IMAGING_MODE_UNKNOWN);
 }
 
 /**
@@ -107,7 +108,7 @@ ImagingChopLighter(Imaging imIn1, Imaging imIn2) {
  */
 Imaging
 ImagingChopDarker(Imaging imIn1, Imaging imIn2) {
-    CHOP((in1[x] < in2[x]) ? in1[x] : in2[x]);
+    CHOP2((in1[x] < in2[x]) ? in1[x] : in2[x], IMAGING_MODE_UNKNOWN);
 }
 
 /**
@@ -279,9 +280,36 @@ ImagingChopScreen(Imaging imIn1, Imaging imIn2) {
  *
  * Contract: imIn1 and imIn2 are read-only and may alias each other.
  */
+/* (in1 + in2) / scale + offset for add (sign 1) and subtract (sign -1),
+   clipped. With scale 1 that is integer arithmetic, which vectorizes;
+   otherwise a table of the same float expression for every sum, instead
+   of a division per byte. */
+static Imaging
+chop_add_subtract(Imaging imIn1, Imaging imIn2, float scale, int offset, int sign) {
+    if (scale == 1.0 && offset > -1024 && offset < 1024) {
+        if (sign > 0) {
+            CHOP((int)in1[x] + (int)in2[x] + offset);
+        } else {
+            CHOP((int)in1[x] - (int)in2[x] + offset);
+        }
+    } else {
+        UINT8 table[511];
+        int i;
+        for (i = 0; i < 511; i++) {
+            int temp = (i - 255 * (sign < 0)) / scale + offset;
+            table[i] = temp <= 0 ? 0 : temp >= 255 ? 255 : temp;
+        }
+        if (sign > 0) {
+            CHOP2(table[(int)in1[x] + (int)in2[x]], IMAGING_MODE_UNKNOWN);
+        } else {
+            CHOP2(table[(int)in1[x] - (int)in2[x] + 255], IMAGING_MODE_UNKNOWN);
+        }
+    }
+}
+
 Imaging
 ImagingChopAdd(Imaging imIn1, Imaging imIn2, float scale, int offset) {
-    CHOP(((int)in1[x] + (int)in2[x]) / scale + offset);
+    return chop_add_subtract(imIn1, imIn2, scale, offset, 1);
 }
 
 /**
@@ -292,7 +320,7 @@ ImagingChopAdd(Imaging imIn1, Imaging imIn2, float scale, int offset) {
  */
 Imaging
 ImagingChopSubtract(Imaging imIn1, Imaging imIn2, float scale, int offset) {
-    CHOP(((int)in1[x] - (int)in2[x]) / scale + offset);
+    return chop_add_subtract(imIn1, imIn2, scale, offset, -1);
 }
 
 /**

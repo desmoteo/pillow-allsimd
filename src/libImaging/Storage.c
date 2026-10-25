@@ -35,6 +35,11 @@
  */
 
 #include "Imaging.h"
+
+#if defined(__linux__)
+#include <stdint.h>
+#include <sys/mman.h>
+#endif
 #include <string.h>
 
 /* --------------------------------------------------------------------
@@ -344,6 +349,25 @@ ImagingMemoryClearCache(ImagingMemoryArena arena, int new_size) {
     }
 }
 
+/* Large blocks may use transparent huge pages, as numpy's arrays do: a
+   pass over a 16 MB image then touches 8 pages instead of 4096, with fewer
+   TLB misses and no prefetch stop every 4 KB. Linux only, and only where
+   the system allows it (THP "madvise" or "always"). */
+#define HUGEPAGE_SIZE (2 * 1024 * 1024)
+static void
+memory_advise_hugepages(void *ptr, size_t size) {
+#if defined(__linux__) && defined(MADV_HUGEPAGE)
+    uintptr_t start =
+        ((uintptr_t)ptr + HUGEPAGE_SIZE - 1) & ~(uintptr_t)(HUGEPAGE_SIZE - 1);
+    uintptr_t end = ((uintptr_t)ptr + size) & ~(uintptr_t)(HUGEPAGE_SIZE - 1);
+    if (ptr && end > start) {
+        madvise((void *)start, end - start, MADV_HUGEPAGE);
+    }
+#else
+    (void)ptr, (void)size;
+#endif
+}
+
 ImagingMemoryBlock
 memory_get_block(ImagingMemoryArena arena, int requested_size, int dirty) {
     ImagingMemoryBlock block = {NULL, 0};
@@ -375,6 +399,7 @@ memory_get_block(ImagingMemoryArena arena, int requested_size, int dirty) {
         } else {
             block.ptr = calloc(1, requested_size);
         }
+        memory_advise_hugepages(block.ptr, requested_size);
         arena->stats_allocated_blocks += 1;
     }
     block.size = requested_size;
