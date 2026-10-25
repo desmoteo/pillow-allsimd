@@ -113,7 +113,7 @@ filter_pack16(int32x4_t s0, int32x4_t s1, int32x4_t s2, int32x4_t s3, int precis
 #endif
 
 /* size is 3 or 5; bpp is 1 or 4 bytes per pixel. */
-static inline void
+SIMD_FORCE_INLINE void
 ImagingFilterNxN_simd(
     Imaging imOut,
     Imaging im,
