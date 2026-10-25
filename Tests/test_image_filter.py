@@ -326,3 +326,24 @@ def test_min_max_filter_any_size(filter_size: int, size: tuple[int, int]) -> Non
     assert list(out.get_flattened_data()) == _rank_reference(im, filter_size, 0)
     out = im.filter(ImageFilter.MaxFilter(filter_size))
     assert list(out.get_flattened_data()) == _rank_reference(im, filter_size, last)
+
+
+@pytest.mark.parametrize(
+    "kernel",
+    (
+        ImageFilter.FIND_EDGES,
+        ImageFilter.CONTOUR,
+        ImageFilter.EDGE_ENHANCE_MORE,
+        ImageFilter.Kernel((3, 3), (0.3, 1.7, 0.2, 2.9, 0.8, 1.1, 0.4, 0.6, 0.1), 0.07),
+        ImageFilter.Kernel((5, 5), [((i * 7) % 11) - 4.5 for i in range(25)], 1, 20),
+    ),
+)
+@pytest.mark.parametrize("size", ((5, 5), (19, 7), (67, 23)))
+def test_float_kernel_l_matches_rgb_band(
+    kernel: ImageFilter.Kernel, size: tuple[int, int]
+) -> None:
+    # Kernels too large for 16-bit fixed point use float code, separate for
+    # 1-byte and 4-byte images, with the same arithmetic per channel.
+    im = hopper("L").resize(size)
+    rgb = Image.merge("RGB", (im, im, im))
+    assert_image_equal(im.filter(kernel), rgb.filter(kernel).getchannel(0))

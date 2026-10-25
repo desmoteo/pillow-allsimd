@@ -70,6 +70,8 @@ def operations(Image, ImageChops, ImageFilter, w: int, h: int) -> dict:
         "filter RGB 5x5 SMOOTH_MORE": lambda: rgb.filter(ImageFilter.SMOOTH_MORE),
         "filter L 3x3 SHARPEN": lambda: L.filter(ImageFilter.SHARPEN),
         "filter L 5x5 SMOOTH_MORE": lambda: L.filter(ImageFilter.SMOOTH_MORE),
+        "filter RGB 3x3 FIND_EDGES": lambda: rgb.filter(ImageFilter.FIND_EDGES),
+        "filter L 3x3 CONTOUR": lambda: L.filter(ImageFilter.CONTOUR),
         "convert RGB->L": lambda: rgb.convert("L"),
         "convert RGB->LA": lambda: rgb.convert("LA"),
         "convert RGBA->RGBa": lambda: rgba.convert("RGBa"),
