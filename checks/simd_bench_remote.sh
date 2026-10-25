@@ -158,7 +158,9 @@ DOCKERFILE
     " >/dev/null || die "could not build the image (no access to $DOCKER_BASE, Debian or PyPI?)"
     BPY="python3" BUILD_PY="python3"
     renv() {
+        # As the SSH user, so that a failed run leaves nothing it can't remove.
         ssh "${SSH_OPTS[@]}" "$HOST" "mkdir -p $WORKDIR && cd $WORKDIR && $ENGINE run --rm -i \
+            --user \$(id -u):\$(id -g) -e HOME=/tmp \
             -v \"\$PWD:/work:Z\" -w /work $PROXY_ARGS $IMAGE bash -s" <<< "set -e; $1"
     }
 else
@@ -257,10 +259,6 @@ done
 echo "commit $COMMIT, host $HOST ($OS $ARCH)" > "$DEST/info.txt"
 
 if [ "$KEEP" = 0 ]; then
-    if [ "$DOCKER" = 1 ]; then
-        # Files written in the container may belong to its root user.
-        renv "rm -rf /work/* /work/.[!.]*" || true
-    fi
     rsh "rm -rf $WORKDIR"
 else
     log "kept $HOST:$WORKDIR"
