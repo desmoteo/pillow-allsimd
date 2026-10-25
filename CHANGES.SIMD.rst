@@ -98,6 +98,9 @@ Based on Pillow 13.0.0
   their coefficients in registers (1.1x AVX2)
 - Text: glyph advances cached for the basic layout (3.3x x86, 4.2x arm64);
   polygons: scan-line intersections sorted without qsort (1.25x)
+- ImageDraw: thin lines and rectangle outlines write their pixels directly
+  again, as before Pillow 13.0, instead of through a function pointer per
+  pixel (500 bounding boxes 2 px wide: 1.6x)
 
 Build
 
