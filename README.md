@@ -46,30 +46,45 @@ In fact, Uploadcare has been running Pillow-SIMD since 2015.
 
 The following image operations are currently SIMD-accelerated:
 
-- Resize (convolution-based resampling), including L images: SSE4, AVX2, AVX-VNNI, NEON
+- Resize (convolution-based resampling), including L images: SSE4, AVX2, AVX-VNNI, NEON;
+  F, I and I;16 images in vectors of doubles: SSE4, AVX2, NEON
 - Reduce: SSE4 (any factor), NEON (horizontal factors up to 512); 2x2 and 4x4 for L images on both
-- Gaussian and box blur: SSE4 (L images four rows at a time); portable C on arm64
-- Unsharp mask: SSE4; portable C on arm64
-- Alpha composition: SSE4, AVX2; portable C on arm64
+- Gaussian and box blur: SSE4 (L images four rows at a time); NEON for the
+  horizontal pass of 4-byte images
+- Unsharp mask: SSE4, NEON
+- Alpha composition: SSE4, AVX2
 - RGBA → RGBa (alpha premultiplication): SSE4, AVX2, NEON
 - RGBa → RGBA (division by alpha): SSE4, AVX2, NEON
 - RGB → L, LA and I, RGBA → LA (grayscale): SSE4, NEON
 - RGB → HSV: SSE4
+- RGB ↔ YCbCr: SSE4, NEON
 - 3x3 and 5x5 kernel filters with integer kernels (coefficients that fit 16 bits):
   SSE4, AVX2, AVX-VNNI, NEON
 - 3x3 and 5x5 kernel filters with float kernels (large coefficients): SSE4,
   AVX2 (3x3 only), NEON on 4-byte images; SSE4, AVX2 (3x3 only) on L images
 - Rotate and transforms with bilinear and bicubic filters, 3- and 4-band
   images: SSE4, AVX2; every architecture transforms in cache-friendly tiles
+- Transposes, 90 and 270 degree rotations, flips and 180 degree rotation:
+  SSE4, NEON
 - 3D color lookup tables: SSE4, AVX2, NEON
 - `ImageChops.multiply` and `screen`: SSE4, AVX2, NEON
+- `point()` tables that are byte operations (invert, posterize, solarize):
+  SSE4, AVX2, NEON
+- Palette mapping (quantize, convert to an adaptive palette), nearest-entry
+  search: SSE4, AVX2, NEON
+- ImageDraw span fill and RGBA ink blend: SSE4, AVX2, NEON; masked fills for
+  text and `bitmap()`: SSE4, NEON
+- PNG encoding row filters: SSE4, NEON
 - RGB pack and unpack (`frombytes`, `tobytes`, codecs): SSE4, NEON
 - Split and get_channel: SSE4, NEON; merge: NEON
 
-On arm64, blur, unsharp mask and alpha composition use the portable C code
-because on a Cortex-A78AE it was faster than hand-written NEON.
-Rank filters (min, max, median), the mode filter, histograms and
-`ImageChops.offset` have faster portable C code on every architecture.
+On arm64, alpha composition and the vertical blur pass use the portable C
+code, which GCC vectorizes better than hand-written NEON on a Cortex-A78AE.
+For the horizontal blur of 4-byte images and the unsharp mask row, NEON is
+faster with GCC 12 and 14 (not with GCC 11).
+Rank filters (min, max, median), the mode filter, histograms,
+`ImageChops.offset`, floodfill and text rendering (a per-font glyph cache)
+have faster portable C code on every architecture.
 Other architectures build the portable C code.
 
 

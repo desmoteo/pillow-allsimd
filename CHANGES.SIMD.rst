@@ -104,7 +104,7 @@ New and faster kernels
   faster
 - RGB pack and unpack (frombytes, tobytes, codecs): SSE4 and NEON,
   1.1x to 1.7x faster
-- arm64: blur, unsharp mask and alpha composition use the portable C
+- arm64: alpha composition and the vertical blur pass use the portable C
   code, which GCC vectorises better than the previous NEON kernels did
 - Released the GIL in AlphaComposite, Bands, Blend and Chops
 
