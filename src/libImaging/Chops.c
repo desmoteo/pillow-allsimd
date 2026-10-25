@@ -280,12 +280,76 @@ ImagingChopScreen(Imaging imIn1, Imaging imIn2) {
  *
  * Contract: imIn1 and imIn2 are read-only and may alias each other.
  */
+/* in1 + in2 (sign 1) or in1 - in2 (sign -1), clipped to 0-255: one
+   saturating instruction per vector. Compilers don't find it themselves. */
+static void
+chop_saturate_row(
+    UINT8 *restrict out,
+    const UINT8 *restrict in1,
+    const UINT8 *restrict in2,
+    int n,
+    int sign
+) {
+    int x = 0;
+
+#if defined(IMAGING_SIMD_AVX2)
+    for (; x < n - 31; x += 32) {
+        __m256i a = _mm256_loadu_si256((const __m256i *)(in1 + x));
+        __m256i b = _mm256_loadu_si256((const __m256i *)(in2 + x));
+        _mm256_storeu_si256(
+            (__m256i *)(out + x),
+            sign > 0 ? _mm256_adds_epu8(a, b) : _mm256_subs_epu8(a, b)
+        );
+    }
+#endif
+#if defined(IMAGING_SIMD_SSE4)
+    for (; x < n - 15; x += 16) {
+        __m128i a = _mm_loadu_si128((const __m128i *)(in1 + x));
+        __m128i b = _mm_loadu_si128((const __m128i *)(in2 + x));
+        _mm_storeu_si128(
+            (__m128i *)(out + x), sign > 0 ? _mm_adds_epu8(a, b) : _mm_subs_epu8(a, b)
+        );
+    }
+#elif defined(IMAGING_SIMD_NEON)
+    for (; x < n - 15; x += 16) {
+        uint8x16_t a = vld1q_u8(in1 + x);
+        uint8x16_t b = vld1q_u8(in2 + x);
+        vst1q_u8(out + x, sign > 0 ? vqaddq_u8(a, b) : vqsubq_u8(a, b));
+    }
+#endif
+
+    for (; x < n; x++) {
+        int v = sign > 0 ? in1[x] + in2[x] : in1[x] - in2[x];
+        out[x] = v <= 0 ? 0 : v >= 255 ? 255 : v;
+    }
+}
+
 /* (in1 + in2) / scale + offset for add (sign 1) and subtract (sign -1),
-   clipped. With scale 1 that is integer arithmetic, which vectorizes;
-   otherwise a table of the same float expression for every sum, instead
-   of a division per byte. */
+   clipped. With scale 1 that is integer arithmetic, which vectorizes, and
+   with offset 0 as well, a saturating add or subtract; otherwise a table of
+   the same float expression for every sum, instead of a division per byte. */
 static Imaging
 chop_add_subtract(Imaging imIn1, Imaging imIn2, float scale, int offset, int sign) {
+    if (scale == 1.0 && offset == 0) {
+        int y;
+        ImagingSectionCookie cookie;
+        Imaging imOut = create(imIn1, imIn2, IMAGING_MODE_UNKNOWN);
+        if (!imOut) {
+            return NULL;
+        }
+        ImagingSectionEnter(&cookie);
+        for (y = 0; y < imOut->ysize; y++) {
+            chop_saturate_row(
+                (UINT8 *)imOut->image[y],
+                (UINT8 *)imIn1->image[y],
+                (UINT8 *)imIn2->image[y],
+                imOut->linesize,
+                sign
+            );
+        }
+        ImagingSectionLeave(&cookie);
+        return imOut;
+    }
     if (scale == 1.0 && offset > -1024 && offset < 1024) {
         if (sign > 0) {
             CHOP((int)in1[x] + (int)in2[x] + offset);
