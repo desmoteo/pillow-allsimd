@@ -262,7 +262,7 @@ typedef uint8x16_t rank_vec;
 static inline void
 RankFilterMedianVec_u8(Imaging imOut, Imaging im, int size, int margin, int ps) {
     int rowbytes = im->xsize * ps, outbytes = imOut->xsize * ps;
-    int x, y, i, j;
+    int x, y, i;
     UINT8 window[5][RANK_VEC + 16], result[RANK_VEC];
 
     for (y = 0; y < imOut->ysize; y++) {
@@ -276,12 +276,11 @@ RankFilterMedianVec_u8(Imaging imOut, Imaging im, int size, int margin, int ps) 
             /* Byte x of the output takes bytes base + j * ps of each row,
                j = 0 .. size - 1. */
             int base = x - margin * ps;
+            const UINT8 *src[5];
             rank_vec p[25], t;
             if (base >= 0 && base + (size - 1) * ps + RANK_VEC <= rowbytes) {
                 for (i = 0; i < size; i++) {
-                    for (j = 0; j < size; j++) {
-                        p[i * size + j] = RANK_LOAD(rows[i] + base + j * ps);
-                    }
+                    src[i] = rows[i] + base;
                 }
             } else {
                 /* The first and last vectors of a row: copy the window,
@@ -302,11 +301,29 @@ RankFilterMedianVec_u8(Imaging imOut, Imaging im, int size, int margin, int ps) 
                     RankFillPixels(
                         window[i] + end, rows[i] + rowbytes - ps, ps, n - end
                     );
-                    for (j = 0; j < size; j++) {
-                        p[i * size + j] = RANK_LOAD(window[i] + j * ps);
-                    }
+                    src[i] = window[i];
                 }
             }
+            /* Constant indices into p only: with any variable one, p would
+               live in memory instead of registers, as it does at -O2 if the
+               loads are a loop that the compiler doesn't unroll. */
+#define RANK_LOAD3(i)                        \
+    p[(i) * 3] = RANK_LOAD(src[i]);          \
+    p[(i) * 3 + 1] = RANK_LOAD(src[i] + ps); \
+    p[(i) * 3 + 2] = RANK_LOAD(src[i] + 2 * ps);
+#define RANK_LOAD5(i)                            \
+    p[(i) * 5] = RANK_LOAD(src[i]);              \
+    p[(i) * 5 + 1] = RANK_LOAD(src[i] + ps);     \
+    p[(i) * 5 + 2] = RANK_LOAD(src[i] + 2 * ps); \
+    p[(i) * 5 + 3] = RANK_LOAD(src[i] + 3 * ps); \
+    p[(i) * 5 + 4] = RANK_LOAD(src[i] + 4 * ps);
+            if (size == 3) {
+                RANK_LOAD3(0) RANK_LOAD3(1) RANK_LOAD3(2)
+            } else {
+                RANK_LOAD5(0) RANK_LOAD5(1) RANK_LOAD5(2) RANK_LOAD5(3) RANK_LOAD5(4)
+            }
+#undef RANK_LOAD3
+#undef RANK_LOAD5
             if (size == 3) {
                 RANK_SORT(1, 2) RANK_SORT(4, 5) RANK_SORT(7, 8);
                 RANK_SORT(0, 1) RANK_SORT(3, 4) RANK_SORT(6, 7);
@@ -374,6 +391,41 @@ RankFilterMedian5_u8(Imaging imOut, Imaging im, int margin, int ps) {
 }
 #endif
 
+#if defined(RANK_VEC)
+/* out[x] = the minimum or maximum of src[0][x] .. src[count - 1][x]: one
+   pass over the line with all sources at once, where the loops below make
+   count passes, and need -O3 to be vectorized at all. */
+static void
+RankMinMaxLine(UINT8 *restrict out, const UINT8 **src, int count, int n, int is_max) {
+    int x = 0, j;
+    if (is_max) {
+        for (; x + RANK_VEC <= n; x += RANK_VEC) {
+            rank_vec v = RANK_LOAD(src[0] + x);
+            for (j = 1; j < count; j++) {
+                v = RANK_VMAX(v, RANK_LOAD(src[j] + x));
+            }
+            RANK_STORE(out + x, v);
+        }
+    } else {
+        for (; x + RANK_VEC <= n; x += RANK_VEC) {
+            rank_vec v = RANK_LOAD(src[0] + x);
+            for (j = 1; j < count; j++) {
+                v = RANK_VMIN(v, RANK_LOAD(src[j] + x));
+            }
+            RANK_STORE(out + x, v);
+        }
+    }
+    for (; x < n; x++) {
+        UINT8 v = src[0][x];
+        for (j = 1; j < count; j++) {
+            UINT8 s = src[j][x];
+            v = is_max ? (s > v ? s : v) : (s < v ? s : v);
+        }
+        out[x] = v;
+    }
+}
+#endif
+
 /* Minimum (rank 0) or maximum (rank size * size - 1) of any size: of each
    row's size neighbours, then of size of those row results. The row
    results go to a ring of size rows, so the work stays in cache. Returns 0
@@ -383,17 +435,21 @@ RankFilterMinMax_u8(
     Imaging imOut, Imaging im, int size, int is_max, int margin, int ps
 ) {
     int xsize = imOut->xsize * ps, ysize = imOut->ysize;
-    int x, y, k, j;
+    int y, k, j;
     UINT8 *ring, *padded = NULL;
+    const UINT8 **src;
     if (xsize == 0 || ysize == 0) {
         return 1;
     }
     ring = malloc((size_t)xsize * size);
+    src = malloc(size * sizeof(*src));
     if (margin) {
         padded = malloc((size_t)xsize + 2 * margin * ps);
     }
-    if (!ring || (margin && !padded)) {
+    if (!ring || !src || (margin && !padded)) {
         free(ring);
+        free(src);
+        free(padded);
         return 0;
     }
 
@@ -417,31 +473,38 @@ RankFilterMinMax_u8(
             );                                                                 \
             in = padded;                                                       \
         }                                                                      \
-        memcpy(row, in, xsize);                                                \
-        for (j = 1; j < size; j++) {                                           \
-            /* restrict: without it, GCC's -O2 cost model leaves the loop */   \
-            /* scalar rather than check that the rows don't overlap */         \
-            const UINT8 *restrict src = in + j * ps;                           \
-            for (x = 0; x < xsize; x++) {                                      \
-                row[x] = op(row[x], src[x]);                                   \
-            }                                                                  \
-        }                                                                      \
+        RANK_LINE(op, row, in + j * ps);                                       \
     } while (0)
-#define RANK_MINMAX(op)                                   \
-    for (k = 0; k < size - 1; k++) {                      \
-        RANK_HROW(op, k);                                 \
-    }                                                     \
-    for (y = 0; y < ysize; y++) {                         \
-        UINT8 *restrict out = (UINT8 *)imOut->image[y];   \
-        RANK_HROW(op, y + size - 1);                      \
-        memcpy(out, RANK_SLOT(y), xsize);                 \
-        for (j = 1; j < size; j++) {                      \
-            const UINT8 *restrict row = RANK_SLOT(y + j); \
-            for (x = 0; x < xsize; x++) {                 \
-                out[x] = op(out[x], row[x]);              \
-            }                                             \
-        }                                                 \
+#define RANK_MINMAX(op)                                 \
+    for (k = 0; k < size - 1; k++) {                    \
+        RANK_HROW(op, k);                               \
+    }                                                   \
+    for (y = 0; y < ysize; y++) {                       \
+        UINT8 *restrict out = (UINT8 *)imOut->image[y]; \
+        RANK_HROW(op, y + size - 1);                    \
+        RANK_LINE(op, out, RANK_SLOT(y + j));           \
     }
+#if defined(RANK_VEC)
+/* dst = op of source(j) for j = 0 .. size - 1 */
+#define RANK_LINE(op, dst, source) \
+    for (j = 0; j < size; j++) {   \
+        src[j] = (source);         \
+    }                              \
+    RankMinMaxLine(dst, src, size, xsize, is_max);
+#else
+#define RANK_LINE(op, dst, source)                                          \
+    j = 0;                                                                  \
+    memcpy(dst, (source), xsize);                                           \
+    for (j = 1; j < size; j++) {                                            \
+        /* restrict: without it, GCC's cost model leaves the loop scalar */ \
+        /* rather than check that the rows don't overlap */                 \
+        const UINT8 *restrict s_ = (source);                                \
+        UINT8 *restrict d_ = (dst);                                         \
+        for (int x_ = 0; x_ < xsize; x_++) {                                \
+            d_[x_] = op(d_[x_], s_[x_]);                                    \
+        }                                                                   \
+    }
+#endif
 #define RANK_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define RANK_MAX(a, b) ((a) > (b) ? (a) : (b))
     if (is_max) {
@@ -451,11 +514,13 @@ RankFilterMinMax_u8(
     }
 #undef RANK_MIN
 #undef RANK_MAX
+#undef RANK_LINE
 #undef RANK_MINMAX
 #undef RANK_HROW
 #undef RANK_SLOT
 
     free(ring);
+    free(src);
     free(padded);
     return 1;
 }
