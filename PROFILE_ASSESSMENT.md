@@ -141,6 +141,41 @@ Open:
 - zlib-ng (item 2): not installed here, and building it from source was not done.
 - Items 11, 15, 17–19.
 
+## Second round (2026-10-30): compared with OpenCV, libvips and ImageMagick
+
+[desmoteo/pillow-simd-perf](https://desmoteo.github.io/pillow-simd-perf/) times 109 operations in Pillow, Pillow-SIMD, OpenCV, libvips and ImageMagick, each single-threaded. It runs on x86-64 and on the Jetson. The cases where another library was faster pointed at the changes below, all with output unchanged. Times are ms at 2560×1600, AVX2, laptop with turbo off (before → after).
+
+| Change | Commit | Result |
+|---|---|---|
+| Horizontal resample without `vpdpwssd` chains (AVX-VNNI); 3-band portable resample | `b87e97786` | VNNI 26×16 shrinks 1.3–1.6x; scalar 1.2x, level with 13.0 |
+| `rgb2cmyk`, `l2rgb`, `rgb2rgba` a pixel at a time (x86); chops add/subtract in integers, lighter/darker unclipped | `410467263`, `1a25b8186` | CMYK 3.48 → 1.20, L→RGB 2.67 → 1.67, RGB↔RGBA 3.73 → 2.35, add 5.18 → 3.32 |
+| Transparent huge pages for image blocks where THP is in `madvise` mode | `410467263`, `53f7762e8` | box blur 1.47x, lighter 1.6x, large passes a few % |
+| Rank filters: all bands of 4-byte pixels in one pass; min/max in a ring of rows, both passes vectorised; median 3×3 in registers | `079be19ef` | RGB min/max 3×3 37 → 3.3, median 3×3 RGB 31 → 6.0, L 4.0 → 1.4 |
+| Median 5×5 in registers (Devillard's 99-comparator network, checked by the 0-1 principle) | `43e0402a3` | L 11.8 → 4.6, RGB 47 → 19.6 |
+| Box and Gaussian blur: passes fused per row and in one vertical sweep; AVX2 kernels for both directions | `b8b29e0da` | Gaussian RGB 57 → 28, box blur 27.6 → 11.8, unsharp mask 65 → 36 |
+| RGB → HSV in AVX2, eight pixels per step | `4a10d619c` | 20.2 → 9.4 |
+
+Over the whole set, the AVX2 build went from 3.79x to 4.83x the speed of Pillow 13.0 (geometric mean), and the scalar build from 1.39x to 1.62x. On the Jetson, NEON went from 2.07x to 2.21x.
+
+Learned on the way:
+- GCC at `-O2` uses its "very cheap" vectorisation cost model, which leaves a loop scalar rather than add a runtime overlap check. The min/max horizontal pass was scalar for that reason; `restrict` locals fixed it.
+- On arm64, GCC turns byte stores of interleaved channels into `st4`. The whole-pixel versions that help x86 were 1.5–3.4x slower there, so they are x86-only.
+- Filtering the padding byte of 3-band images costs a quarter more work. The all-bands rank path is used only where that is cheaper than band by band: minimum, maximum, the vector medians, and 4-band images (`ImagingRankFilterAllBands`).
+- On the Jetson, THP is `always` and defrag is `madvise`. There, `MADV_HUGEPAGE` only added synchronous compaction, so the advice is given only in `madvise` mode.
+
+Tried and dropped:
+- NEON bilinear and bicubic transform filters: bilinear was 4% faster, but bicubic 12% and perspective 9% slower than GCC's FMA code for the scalar filters.
+- HSV with reciprocals instead of float divisions: not exact.
+- HSV with ×1/6 instead of ÷6: exact, but no faster.
+- Choosing the resample pass order per build: the vertical pass is cheaper in the scalar build and the horizontal pass in the SIMD builds, so builds would give different pixels.
+
+Still behind the other libraries:
+- Gaussian blur at small radii: OpenCV uses a direct convolution, whose output differs.
+- Median 5×5 with SSE4 only: 16 registers spill.
+- HSV: about 2.6x behind OpenCV, whose integer method gives different values.
+- Perspective transforms on x86: about 2x behind.
+- PNG encoding: libvips' default filter and zlib settings differ.
+
 ## Recommendations
 
 Ranked by expected gain for typical use. Times are ms at 1280×800 (SIMD build / 13.0 wheel). Estimates are rough, made before implementation.
