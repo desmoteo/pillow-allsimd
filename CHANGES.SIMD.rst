@@ -45,6 +45,11 @@ Based on Pillow 13.0.0
   compiler vectorizes (1.6x to 2.9x; the AVX2 build's CMYK was 15% slower
   than SSE4); ImageChops add and subtract with scale 1 in integers, other
   scales by table, lighter and darker without clipping (add 1.6x)
+- BoxBlur, GaussianBlur, UnsharpMask: the passes of each direction run
+  together, every horizontal pass on a row while it is in cache, the
+  vertical ones in one sweep with a ring of rows per pass; AVX2 blurs two
+  rows at once horizontally and 32 bytes per step vertically. Same
+  output. AVX2: Gaussian RGB 2x, box blur 2.3x, unsharp mask 1.8x
 - Rank filters (min, max, median, any rank up to 11x11) on RGB, RGBA,
   CMYK, LA and other 4-byte modes run all bands in one pass instead of
   splitting and merging; min and max keep their row results in a ring of
