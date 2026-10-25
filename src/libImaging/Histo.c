@@ -56,6 +56,51 @@ ImagingHistogramNew(Imaging im) {
     return h;
 }
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+/* Counts the bytes of an unmasked 8-bit image into histogram, with 13.0's
+   loops: on arm64 (Cortex-A78AE, GCC 12 and 14) they are 1.1x faster than
+   the four tables used elsewhere. Returns 1. */
+static int
+histogram_u8(long *histogram, Imaging im) {
+    int xsize = im->xsize, ysize = im->ysize;
+    if (im->image8) {
+        for (int y = 0; y < ysize; y++) {
+            const UINT8 *in = im->image8[y];
+            for (int x = 0; x < xsize; x++) {
+                histogram[in[x]]++;
+            }
+        }
+    } else if (im->bands == 2) {
+        for (int y = 0; y < ysize; y++) {
+            const UINT8 *in = (UINT8 *)im->image[y];
+            for (int x = 0; x < xsize; x++, in += 4) {
+                histogram[in[0]]++;
+                histogram[in[3] + 256]++;
+            }
+        }
+    } else if (im->bands == 3) {
+        for (int y = 0; y < ysize; y++) {
+            const UINT8 *in = (UINT8 *)im->image[y];
+            for (int x = 0; x < xsize; x++, in += 4) {
+                histogram[in[0]]++;
+                histogram[in[1] + 256]++;
+                histogram[in[2] + 512]++;
+            }
+        }
+    } else {
+        for (int y = 0; y < ysize; y++) {
+            const UINT8 *in = (UINT8 *)im->image[y];
+            for (int x = 0; x < xsize; x++, in += 4) {
+                histogram[in[0]]++;
+                histogram[in[1] + 256]++;
+                histogram[in[2] + 512]++;
+                histogram[in[3] + 768]++;
+            }
+        }
+    }
+    return 1;
+}
+#else
 /* Counts the bytes of an unmasked 8-bit image into histogram. Neighbouring
    pixels go to different tables, which are added up at the end, so that
    increments of the same bin don't wait for each other. Returns 0 if out
@@ -120,6 +165,7 @@ histogram_u8(long *histogram, Imaging im) {
     free(t);
     return 1;
 }
+#endif
 
 /**
  * Compute a histogram of `im`'s value distribution,
