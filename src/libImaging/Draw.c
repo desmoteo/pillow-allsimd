@@ -1118,16 +1118,27 @@ typedef struct clip_node {
     struct clip_node *r;
 } clip_node;
 
-// Linked list for the ends of the clipped horizontal segments.
+// The ends of the clipped horizontal segments, sorted by X.
 // Since the segment is always horizontal, we don't need to store Y coordinate.
-typedef struct event_list {
-    int32_t x;
-    int8_t type;  // used internally, 1 for the left end (smaller X), -1 for the
-                  // right end; pointless in output since the output segments
-                  // are disjoint, therefore the types would always come in pairs
-                  // and interchange (1 -1 1 -1 ...)
-    struct event_list *next;
+// A tree has at most 7 nodes, so at most 8 leaves of one segment each.
+#define CLIP_EVENTS 16
+typedef struct {
+    int32_t x[CLIP_EVENTS];
+    int8_t type[CLIP_EVENTS];  // used internally, 1 for the left end (smaller X),
+                               // -1 for the right end; pointless in output since
+                               // the output segments are disjoint, therefore the
+                               // types would always come in pairs and interchange
+                               // (1 -1 1 -1 ...)
+    int count;
 } event_list;
+
+static inline void
+event_add(event_list *events, int32_t x, int8_t type) {
+    assert(events->count < CLIP_EVENTS);
+    events->x[events->count] = x;
+    events->type[events->count] = type;
+    events->count++;
+}
 
 // Mirrors all the clipping nodes of the tree relative to the y = x line.
 void
@@ -1147,30 +1158,13 @@ clip_tree_transpose(clip_node *root) {
 // non-intersecting segments sorted by X coordinate.
 // Combining nodes (AND, OR) may also accept sequences for intersecting
 // segments, i.e. something like correct bracket sequences.
-int
-clip_tree_do_clip(
-    clip_node *root, int32_t x0, int32_t y, int32_t x1, event_list **ret
-) {
+void
+clip_tree_do_clip(clip_node *root, int32_t x0, int32_t y, int32_t x1, event_list *ret) {
+    ret->count = 0;
     if (root == NULL) {
-        event_list *start = malloc(sizeof(event_list));
-        if (!start) {
-            ImagingError_MemoryError();
-            return -1;
-        }
-        event_list *end = malloc(sizeof(event_list));
-        if (!end) {
-            free(start);
-            ImagingError_MemoryError();
-            return -1;
-        }
-        start->x = x0;
-        start->type = 1;
-        start->next = end;
-        end->x = x1;
-        end->type = -1;
-        end->next = NULL;
-        *ret = start;
-        return 0;
+        event_add(ret, x0, 1);
+        event_add(ret, x1, -1);
+        return;
     }
     if (root->type == CT_CLIP) {
         double eps = 1e-9;
@@ -1193,85 +1187,45 @@ clip_tree_do_clip(
             }
         }
         if (x0 <= x1) {
-            event_list *start = malloc(sizeof(event_list));
-            if (!start) {
-                ImagingError_MemoryError();
-                return -1;
-            }
-            event_list *end = malloc(sizeof(event_list));
-            if (!end) {
-                free(start);
-                ImagingError_MemoryError();
-                return -1;
-            }
-            start->x = x0;
-            start->type = 1;
-            start->next = end;
-            end->x = x1;
-            end->type = -1;
-            end->next = NULL;
-            *ret = start;
-        } else {
-            *ret = NULL;
+            event_add(ret, x0, 1);
+            event_add(ret, x1, -1);
         }
-        return 0;
+        return;
     }
     if (root->type == CT_OR || root->type == CT_AND) {
-        event_list *l1;
-        event_list *l2;
-        if (clip_tree_do_clip(root->l, x0, y, x1, &l1) < 0) {
-            return -1;
-        }
-        if (clip_tree_do_clip(root->r, x0, y, x1, &l2) < 0) {
-            while (l1) {
-                l2 = l1->next;
-                free(l1);
-                l1 = l2;
-            }
-            return -1;
-        }
-        *ret = NULL;
-        event_list *tail = NULL;
+        event_list l1, l2;
+        int i1 = 0, i2 = 0;
+        clip_tree_do_clip(root->l, x0, y, x1, &l1);
+        clip_tree_do_clip(root->r, x0, y, x1, &l2);
         int32_t k1 = 0;
         int32_t k2 = 0;
-        while (l1 != NULL || l2 != NULL) {
-            event_list *t;
-            if (l2 == NULL ||
-                (l1 != NULL &&
-                 (l1->x < l2->x || (l1->x == l2->x && l1->type > l2->type)))) {
-                t = l1;
-                k1 += t->type;
+        while (i1 < l1.count || i2 < l2.count) {
+            int32_t x;
+            int8_t type;
+            // The type of the last end kept, 0 if none.
+            int8_t tail = ret->count > 0 ? ret->type[ret->count - 1] : 0;
+            if (i2 == l2.count || (i1 < l1.count && (l1.x[i1] < l2.x[i2] ||
+                                                     (l1.x[i1] == l2.x[i2] &&
+                                                      l1.type[i1] > l2.type[i2])))) {
+                x = l1.x[i1];
+                type = l1.type[i1++];
+                k1 += type;
                 assert(k1 >= 0);
-                l1 = l1->next;
             } else {
-                t = l2;
-                k2 += t->type;
+                x = l2.x[i2];
+                type = l2.type[i2++];
+                k2 += type;
                 assert(k2 >= 0);
-                l2 = l2->next;
             }
-            t->next = NULL;
-            if ((root->type == CT_OR &&
-                 ((t->type == 1 && (tail == NULL || tail->type == -1)) ||
-                  (t->type == -1 && k1 == 0 && k2 == 0))) ||
+            if ((root->type == CT_OR && ((type == 1 && (tail == 0 || tail == -1)) ||
+                                         (type == -1 && k1 == 0 && k2 == 0))) ||
                 (root->type == CT_AND &&
-                 ((t->type == 1 && (tail == NULL || tail->type == -1) && k1 > 0 &&
-                   k2 > 0) ||
-                  (t->type == -1 && tail != NULL && tail->type == 1 &&
-                   (k1 == 0 || k2 == 0))))) {
-                if (tail == NULL) {
-                    *ret = t;
-                } else {
-                    tail->next = t;
-                }
-                tail = t;
-            } else {
-                free(t);
+                 ((type == 1 && (tail == 0 || tail == -1) && k1 > 0 && k2 > 0) ||
+                  (type == -1 && tail == 1 && (k1 == 0 || k2 == 0))))) {
+                event_add(ret, x, type);
             }
         }
-        return 0;
     }
-    *ret = NULL;
-    return 0;
 }
 
 // One more layer of processing on top of the regular ellipse.
@@ -1282,7 +1236,8 @@ typedef struct {
     clip_node *root;
     clip_node nodes[7];
     int32_t node_count;
-    event_list *head;
+    event_list events;  // of the current row
+    int32_t event_pos;  // the next one to output
     int32_t y;
 } clip_ellipse_state;
 
@@ -1314,7 +1269,7 @@ arc_init(clip_ellipse_state *s, int32_t a, int32_t b, int32_t w, float al, float
         // a >= b, based on "wide" ellipse
         ellipse_init(&s->st, a, b, w);
 
-        s->head = NULL;
+        s->events.count = s->event_pos = 0;
         s->node_count = 0;
         normalize_angles(&al, &ar);
 
@@ -1379,7 +1334,7 @@ chord_line_init(
 ) {
     ellipse_init(&s->st, a, b, a + b + 1);
 
-    s->head = NULL;
+    s->events.count = s->event_pos = 0;
     s->node_count = 0;
 
     // line equation for chord
@@ -1407,7 +1362,7 @@ pie_side_init(
 ) {
     ellipse_init(&s->st, a, b, a + b + 1);
 
-    s->head = NULL;
+    s->events.count = s->event_pos = 0;
     s->node_count = 0;
 
     double xl = a * cos(al * M_PI / 180.0);
@@ -1450,7 +1405,7 @@ void
 chord_init(clip_ellipse_state *s, int32_t a, int32_t b, int32_t w, float al, float ar) {
     ellipse_init(&s->st, a, b, w);
 
-    s->head = NULL;
+    s->events.count = s->event_pos = 0;
     s->node_count = 0;
 
     // line equation for chord
@@ -1469,7 +1424,7 @@ void
 pie_init(clip_ellipse_state *s, int32_t a, int32_t b, int32_t w, float al, float ar) {
     ellipse_init(&s->st, a, b, w);
 
-    s->head = NULL;
+    s->events.count = s->event_pos = 0;
     s->node_count = 0;
 
     // line equations for pie sides
@@ -1509,37 +1464,21 @@ pie_init(clip_ellipse_state *s, int32_t a, int32_t b, int32_t w, float al, float
     }
 }
 
-void
-clip_ellipse_free(clip_ellipse_state *s) {
-    while (s->head != NULL) {
-        event_list *t = s->head;
-        s->head = s->head->next;
-        free(t);
-    }
-}
-
 int8_t
 clip_ellipse_next(
     clip_ellipse_state *s, int32_t *ret_x0, int32_t *ret_y, int32_t *ret_x1
 ) {
     int32_t x0, y, x1;
-    while (s->head == NULL && ellipse_next(&s->st, &x0, &y, &x1) >= 0) {
-        if (clip_tree_do_clip(s->root, x0, y, x1, &s->head) < 0) {
-            return -2;
-        }
+    while (s->event_pos == s->events.count && ellipse_next(&s->st, &x0, &y, &x1) >= 0) {
+        clip_tree_do_clip(s->root, x0, y, x1, &s->events);
+        s->event_pos = 0;
         s->y = y;
     }
-    if (s->head != NULL) {
+    if (s->event_pos < s->events.count) {
         *ret_y = s->y;
-        event_list *t = s->head;
-        s->head = s->head->next;
-        *ret_x0 = t->x;
-        free(t);
-        t = s->head;
-        assert(t != NULL);
-        s->head = s->head->next;
-        *ret_x1 = t->x;
-        free(t);
+        *ret_x0 = s->events.x[s->event_pos++];
+        assert(s->event_pos < s->events.count);
+        *ret_x1 = s->events.x[s->event_pos++];
         return 0;
     }
     return -1;
@@ -1614,7 +1553,6 @@ clipEllipseNew(
             im, x0 + (X0 + a) / 2, y0 + (Y + b) / 2, x0 + (X1 + a) / 2, ink, NULL
         );
     }
-    clip_ellipse_free(&st);
     return next_code == -1 ? 0 : -1;
 }
 static int
