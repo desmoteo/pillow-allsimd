@@ -39,9 +39,9 @@ Unreleased
 - RGB pack and unpack (frombytes, tobytes, codecs): SSE4 and NEON,
   1.2x to 1.4x faster
 - arm64: NEON reduce for large factors (2x for reduce 8) and NEON float
-  3x3 and 5x5 filters for kernels too large for 16-bit fixed point (such
-  as FIND_EDGES and CONTOUR). Like the x86 float kernels, these can differ
-  by 1 from the scalar code for inexact coefficients
+  3x3 and 5x5 filters on 4-byte images for kernels too large for 16-bit
+  fixed point (FIND_EDGES on RGB 1.7x). Like the x86 float kernels, these
+  can differ by 1 from the scalar code for inexact coefficients
 - Released the GIL in AlphaComposite, Bands, Blend and Chops
 - From Pillow 13.0: I;16 filters keep the high byte and clamp to 0..65535;
   BoxBlur and GaussianBlur reject NaN, infinite and >= 2**31 radii;

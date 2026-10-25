@@ -231,7 +231,12 @@ No x86 SIMD code is now missing on arm64.
 
 ### NEON float 3×3/5×5 filters
 
-- Used for kernels whose coefficients don't fit 16-bit fixed point, including the built-in `FIND_EDGES`, `CONTOUR` and `EDGE_ENHANCE_MORE`. One kernel (`FilterSIMD_NxNf.c`) covers 1- and 4-byte pixels, 16 bytes at a time.
+- Used for kernels whose coefficients don't fit 16-bit fixed point, including the built-in `FIND_EDGES`, `CONTOUR` and `EDGE_ENHANCE_MORE`. The kernel (`FilterSIMD_NxNf.c`) works 16 bytes at a time and could also do 1-byte pixels.
+- Jetson Orin at `a6d6e1645`:
+  - `FIND_EDGES` on RGB: 151.6 → 90.5 ms (1.68x the scalar build).
+  - `CONTOUR` on L: 15.5 → 22.9 ms, slower, because GCC already vectorises the generic 1-byte code well.
+
+  Since `a6d6e1645`, NEON is used only for 4-byte images, and L stays on the generic code, so its output equals the scalar build's.
 - Each kernel row is a multiply followed by fused multiply-adds, then added to the sum, as GCC compiles the generic code for arm64.
 - Results: under emulation, 768 battery outputs were checked against the scalar arm64 build (GCC 12).
   - Kernels with exact coefficients match bit for bit.

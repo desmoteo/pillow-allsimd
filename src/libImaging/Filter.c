@@ -574,7 +574,13 @@ ImagingFilterSIMD(
     }
 #else
     if (!fast_path) {
-        ImagingFilterNxNf_neon(imOut, im, kernel, offset, xsize, im->image8 ? 1 : 4);
+        /* 1-byte images keep the generic code, which GCC vectorises well:
+           on the Jetson Orin it was 1.5x faster than the NEON float kernel
+           (CONTOUR on L: 15.5 vs 22.9 ms). 4-byte images gain 1.7x. */
+        if (im->image8) {
+            return 0;
+        }
+        ImagingFilterNxNf_neon(imOut, im, kernel, offset, xsize, 4);
         return 1;
     }
     if (xsize == 3) {
