@@ -178,3 +178,18 @@ def test_rotations_match_columns(mode: str, size: tuple[int, int]) -> None:
         assert out.tobytes() == b"".join(
             column(xsize - 1 - x if flip_x else x, flip_y) for x in range(xsize)
         )
+
+
+@pytest.mark.parametrize("mode", ("L", "RGBA", "I", "I;16"))
+@pytest.mark.parametrize("size", ((1, 1), (3, 2), (15, 3), (16, 2), (17, 4), (37, 29)))
+def test_flips_match_rows(mode: str, size: tuple[int, int]) -> None:
+    xsize, ysize = size
+    data = bytes((i * 7 + i // 251) & 255 for i in range(xsize * ysize * 4))
+    im = Image.frombytes(
+        mode, size, data[: xsize * ysize * {"L": 1, "I;16": 2}.get(mode, 4)]
+    )
+    pixels = memoryview(im.tobytes()).cast({"L": "B", "I;16": "H"}.get(mode, "I"))
+    rows = [pixels[y * xsize : (y + 1) * xsize][::-1].tobytes() for y in range(ysize)]
+
+    assert im.transpose(Transpose.FLIP_LEFT_RIGHT).tobytes() == b"".join(rows)
+    assert im.transpose(Transpose.ROTATE_180).tobytes() == b"".join(rows[::-1])
