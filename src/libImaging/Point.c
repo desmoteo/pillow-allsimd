@@ -49,6 +49,7 @@ im_point_2x8_2x8(Imaging imOut, Imaging imIn, im_point_context *context) {
         UINT8 *out = (UINT8 *)imOut->image[y];
         for (x = 0; x < imIn->xsize; x++) {
             out[0] = table[in[0]];
+            out[1] = out[2] = 0;  // the padding, as a zero-filled image has it
             out[3] = table[in[3] + 256];
             in += 4;
             out += 4;
@@ -68,6 +69,7 @@ im_point_3x8_3x8(Imaging imOut, Imaging imIn, im_point_context *context) {
             out[0] = table[in[0]];
             out[1] = table[in[1] + 256];
             out[2] = table[in[2] + 512];
+            out[3] = 0;  // the padding, as a zero-filled image has it
             in += 4;
             out += 4;
         }
@@ -281,7 +283,8 @@ ImagingPoint(Imaging imIn, ModeID mode, const void *table) {
         }
     }
 
-    imOut = ImagingNew(mode, imIn->xsize, imIn->ysize);
+    // Every handler below writes every byte, padding included.
+    imOut = ImagingNewDirty(mode, imIn->xsize, imIn->ysize);
     if (!imOut) {
         return NULL;
     }
