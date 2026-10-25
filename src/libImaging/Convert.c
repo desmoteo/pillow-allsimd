@@ -256,44 +256,97 @@ rgba2la_4(UINT8 *out, const UINT8 *in) {
     _mm_storeu_si128((__m128i *)out, _mm_or_si128(pix, alpha));
 }
 
-/* Removes premultiplication from four pixels with an approximate
-   reciprocal of alpha. Alpha 0 gives colour 0. */
+/* Removes premultiplication with the scalar code's result: 255 * c / alpha
+   truncated and clipped to 255, and c unchanged where alpha is 0 or 255.
+   c is first clipped to alpha, which gives 255 as the clip would. The
+   quotient from an approximate reciprocal is within 1 of the exact one,
+   and one step with the remainder 255 * c - q * alpha corrects it; every
+   value fits 16 bits. The macro works on 128- or 256-bit vectors of whole
+   pixels: P is _mm or _mm256, V the vector type, SI si128 or si256, and
+   the last three the byte shuffles for alpha and the two factor halves. */
+#define UNPREMULTIPLY(P, V, SI, source, out, ALPHA_BYTES, FACTOR_LO, FACTOR_HI)       \
+    {                                                                                 \
+        V zero = P##_setzero_##SI();                                                  \
+        V alpha = P##_shuffle_epi8(source, ALPHA_BYTES);                              \
+        V c = P##_min_epu8(source, alpha);                                            \
+        /* 255.5 * 256 / alpha as 16-bit factors, one per channel */                  \
+        V f = P##_cvtps_epi32(                                                        \
+            P##_mul_ps(                                                               \
+                P##_set1_ps(255.5 * 256),                                             \
+                P##_rcp_ps(P##_cvtepi32_ps(P##_srli_epi32(source, 24)))               \
+            )                                                                         \
+        );                                                                            \
+        V f0 = P##_shuffle_epi8(f, FACTOR_LO);                                        \
+        V f1 = P##_shuffle_epi8(f, FACTOR_HI);                                        \
+        V c0 = P##_unpacklo_epi8(c, zero), c1 = P##_unpackhi_epi8(c, zero);           \
+        V a0 = P##_unpacklo_epi8(alpha, zero);                                        \
+        V a1 = P##_unpackhi_epi8(alpha, zero);                                        \
+        V q0 = P##_mulhi_epu16(P##_slli_epi16(c0, 8), f0);                            \
+        V q1 = P##_mulhi_epu16(P##_slli_epi16(c1, 8), f1);                            \
+        /* remainders, modulo 2^16; their true values are within +-510 */             \
+        V r0 = P##_sub_epi16(                                                         \
+            P##_sub_epi16(P##_slli_epi16(c0, 8), c0), P##_mullo_epi16(q0, a0)         \
+        );                                                                            \
+        V r1 = P##_sub_epi16(                                                         \
+            P##_sub_epi16(P##_slli_epi16(c1, 8), c1), P##_mullo_epi16(q1, a1)         \
+        );                                                                            \
+        V one = P##_set1_epi16(1);                                                    \
+        q0 = P##_sub_epi16(q0, P##_cmpgt_epi16(r0, P##_sub_epi16(a0, one)));          \
+        q1 = P##_sub_epi16(q1, P##_cmpgt_epi16(r1, P##_sub_epi16(a1, one)));          \
+        q0 = P##_add_epi16(q0, P##_cmpgt_epi16(zero, r0));                            \
+        q1 = P##_add_epi16(q1, P##_cmpgt_epi16(zero, r1));                            \
+        V res = P##_packus_epi16(q0, q1);                                             \
+        /* the source bytes for alpha itself and where alpha is 0 or 255 */           \
+        V keep = P##_or_##SI(                                                         \
+            P##_or_##SI(                                                              \
+                P##_cmpeq_epi8(alpha, zero), P##_cmpeq_epi8(alpha, P##_set1_epi8(-1)) \
+            ),                                                                        \
+            P##_set1_epi32((int)0xff000000)                                           \
+        );                                                                            \
+        out = P##_blendv_epi8(res, source, keep);                                     \
+    }
+
 static inline void
 rgba2rgbA_4(UINT8 *out, const UINT8 *in) {
-    __m128 mmaf;
-    __m128i pix0, pix1, mma;
-    __m128i mma0, mma1;
-    __m128i source = _mm_loadu_si128((__m128i *)in);
-
-    mma = _mm_and_si128(
-        source, _mm_set_epi8(0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0, 0, 0)
-    );
-
-    mmaf = _mm_cvtepi32_ps(_mm_srli_epi32(source, 24));
-    mmaf = _mm_mul_ps(_mm_set1_ps(255.5 * 256), _mm_rcp_ps(mmaf));
-    mma1 = _mm_cvtps_epi32(mmaf);
-
-    mma0 = _mm_shuffle_epi8(
-        mma1, _mm_set_epi8(5, 4, 5, 4, 5, 4, 5, 4, 1, 0, 1, 0, 1, 0, 1, 0)
-    );
-    mma1 = _mm_shuffle_epi8(
-        mma1, _mm_set_epi8(13, 12, 13, 12, 13, 12, 13, 12, 9, 8, 9, 8, 9, 8, 9, 8)
-    );
-
-    pix0 = _mm_unpacklo_epi8(_mm_setzero_si128(), source);
-    pix1 = _mm_unpackhi_epi8(_mm_setzero_si128(), source);
-
-    pix0 = _mm_mulhi_epu16(pix0, mma0);
-    pix1 = _mm_mulhi_epu16(pix1, mma1);
-
-    source = _mm_packus_epi16(pix0, pix1);
-    source = _mm_blendv_epi8(
+    __m128i source = _mm_loadu_si128((__m128i *)in), result;
+    UNPREMULTIPLY(
+        _mm,
+        __m128i,
+        si128,
         source,
-        mma,
-        _mm_set_epi8(0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0, 0, 0)
+        result,
+        _mm_set_epi8(15, 15, 15, 15, 11, 11, 11, 11, 7, 7, 7, 7, 3, 3, 3, 3),
+        _mm_set_epi8(5, 4, 5, 4, 5, 4, 5, 4, 1, 0, 1, 0, 1, 0, 1, 0),
+        _mm_set_epi8(13, 12, 13, 12, 13, 12, 13, 12, 9, 8, 9, 8, 9, 8, 9, 8)
     );
-    _mm_storeu_si128((__m128i *)out, source);
+    _mm_storeu_si128((__m128i *)out, result);
 }
+
+#if defined(IMAGING_SIMD_AVX2)
+/* Eight pixels: the shuffles use the same byte indices in both lanes. */
+static inline void
+rgba2rgbA_8(UINT8 *out, const UINT8 *in) {
+    __m256i source = _mm256_loadu_si256((__m256i *)in), result;
+    UNPREMULTIPLY(
+        _mm256,
+        __m256i,
+        si256,
+        source,
+        result,
+        _mm256_broadcastsi128_si256(
+            _mm_set_epi8(15, 15, 15, 15, 11, 11, 11, 11, 7, 7, 7, 7, 3, 3, 3, 3)
+        ),
+        _mm256_broadcastsi128_si256(
+            _mm_set_epi8(5, 4, 5, 4, 5, 4, 5, 4, 1, 0, 1, 0, 1, 0, 1, 0)
+        ),
+        _mm256_broadcastsi128_si256(
+            _mm_set_epi8(13, 12, 13, 12, 13, 12, 13, 12, 9, 8, 9, 8, 9, 8, 9, 8)
+        )
+    );
+    _mm256_storeu_si256((__m256i *)out, result);
+}
+#endif
+#undef UNPREMULTIPLY
 #endif
 
 #if defined(IMAGING_SIMD_NEON)
@@ -852,180 +905,10 @@ rgba2rgbA(UINT8 *out, const UINT8 *in, int xsize) {
     int x = 0;
 
 #if defined(IMAGING_SIMD_AVX2)
-
     for (; x < xsize - 7; x += 8) {
-        __m256 mmaf;
-        __m256i pix0, pix1, mma;
-        __m256i mma0, mma1;
-        __m256i source = _mm256_loadu_si256((__m256i *)&in[x * 4]);
-
-        mma = _mm256_and_si256(
-            source,
-            _mm256_set_epi8(
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0
-            )
-        );
-
-        mmaf = _mm256_cvtepi32_ps(_mm256_srli_epi32(source, 24));
-        mmaf = _mm256_mul_ps(_mm256_set1_ps(255.5 * 256), _mm256_rcp_ps(mmaf));
-        mma1 = _mm256_cvtps_epi32(mmaf);
-
-        mma0 = _mm256_shuffle_epi8(
-            mma1,
-            _mm256_set_epi8(
-                5,
-                4,
-                5,
-                4,
-                5,
-                4,
-                5,
-                4,
-                1,
-                0,
-                1,
-                0,
-                1,
-                0,
-                1,
-                0,
-                5,
-                4,
-                5,
-                4,
-                5,
-                4,
-                5,
-                4,
-                1,
-                0,
-                1,
-                0,
-                1,
-                0,
-                1,
-                0
-            )
-        );
-        mma1 = _mm256_shuffle_epi8(
-            mma1,
-            _mm256_set_epi8(
-                13,
-                12,
-                13,
-                12,
-                13,
-                12,
-                13,
-                12,
-                9,
-                8,
-                9,
-                8,
-                9,
-                8,
-                9,
-                8,
-                13,
-                12,
-                13,
-                12,
-                13,
-                12,
-                13,
-                12,
-                9,
-                8,
-                9,
-                8,
-                9,
-                8,
-                9,
-                8
-            )
-        );
-
-        pix0 = _mm256_unpacklo_epi8(_mm256_setzero_si256(), source);
-        pix1 = _mm256_unpackhi_epi8(_mm256_setzero_si256(), source);
-
-        pix0 = _mm256_mulhi_epu16(pix0, mma0);
-        pix1 = _mm256_mulhi_epu16(pix1, mma1);
-
-        source = _mm256_packus_epi16(pix0, pix1);
-        source = _mm256_blendv_epi8(
-            source,
-            mma,
-            _mm256_set_epi8(
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0,
-                0xff,
-                0,
-                0,
-                0
-            )
-        );
-        _mm256_storeu_si256((__m256i *)&out[x * 4], source);
+        rgba2rgbA_8(out + x * 4, in + x * 4);
     }
-
 #endif
-
 #if defined(IMAGING_SIMD_SSE4)
     CONVERT_ROW(rgba2rgbA_4, 4, out + x * 4, in + x * 4, xsize - x, 4, 4);
 #else
