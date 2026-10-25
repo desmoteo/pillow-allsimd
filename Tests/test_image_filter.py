@@ -434,3 +434,50 @@ def test_rankfilter_same_size(
         expected = im.im.expand(filter_size // 2).rankfilter(filter_size, rank)
         out = im.im.rankfilter(filter_size, rank, True)
         assert_image_equal(im._new(out), im._new(expected))
+
+
+@pytest.mark.parametrize(
+    "mode", ("RGB", "RGBA", "RGBX", "RGBa", "CMYK", "YCbCr", "LAB", "HSV", "LA", "La")
+)
+@pytest.mark.parametrize("filter_size", (3, 5))
+@pytest.mark.parametrize("size", ((1, 1), (7, 3), (45, 13)))
+def test_rankfilter_all_bands_at_once(
+    mode: str, filter_size: int, size: tuple[int, int]
+) -> None:
+    # Multiband images are filtered in one pass, with the same result as
+    # each band alone.
+    im = Image.frombytes(mode, size, bytes(range(256)) * 20, "raw", mode)
+    n = filter_size * filter_size
+    for rank in (0, 1, n // 2, n - 1):
+        f = ImageFilter.RankFilter(filter_size, rank)
+        expected = Image.merge(mode, [band.filter(f) for band in im.split()])
+        assert_image_equal(im.filter(f), expected)
+
+
+@pytest.mark.parametrize("width", (1, 2, 15, 16, 17, 31, 32, 33, 65))
+def test_median3_matches_reference(width: int) -> None:
+    im = Image.frombytes(
+        "L", (width, 3), bytes((i * 37) % 251 for i in range(width * 3))
+    )
+    px = im.load()
+    assert px is not None
+    expected = Image.new("L", im.size)
+    for y in range(im.height):
+        for x in range(width):
+            window = sorted(
+                px[min(max(x + j, 0), width - 1), min(max(y + i, 0), im.height - 1)]
+                for i in (-1, 0, 1)
+                for j in (-1, 0, 1)
+            )
+            expected.putpixel((x, y), window[4])
+    assert_image_equal(im.filter(ImageFilter.MedianFilter(3)), expected)
+
+
+def test_rankfilter_subclass_filter_is_used() -> None:
+    class Inverted(ImageFilter.MedianFilter):
+        def filter(self, image):  # type: ignore[no-untyped-def]
+            return super().filter(image).point(list(range(255, -1, -1)), None)
+
+    im = hopper("RGB")
+    expected = Image.merge("RGB", [band.filter(Inverted(3)) for band in im.split()])
+    assert_image_equal(im.filter(Inverted(3)), expected)

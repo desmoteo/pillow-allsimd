@@ -120,6 +120,31 @@ class RankFilter(Filter):
         # the fast paths do without the expanded copy.
         return image.rankfilter(self.size, self.rank, True)
 
+    # Modes of several 8-bit bands in 4-byte pixels.
+    _BAND_MODES = (
+        "RGB",
+        "RGBA",
+        "RGBX",
+        "RGBa",
+        "CMYK",
+        "YCbCr",
+        "LAB",
+        "HSV",
+        "LA",
+        "La",
+    )
+
+    def _filter_bands(self, image: _imaging.ImagingCore) -> _imaging.ImagingCore | None:
+        """All bands of a multiband image at once, the same pixels as each
+        band alone, where the C fast paths can; otherwise None."""
+        if (
+            type(self).filter is RankFilter.filter
+            and image.mode in self._BAND_MODES
+            and 3 <= self.size <= 11
+        ):
+            return image.rankfilter(self.size, self.rank, True)
+        return None
+
 
 class MedianFilter(RankFilter):
     """

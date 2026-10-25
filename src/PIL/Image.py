@@ -1465,6 +1465,10 @@ class Image:
         multiband = isinstance(filter, ImageFilter.MultibandFilter)
         if self.im.bands == 1 or multiband:
             return self._new(filter.filter(self.im))
+        if isinstance(filter, ImageFilter.RankFilter):
+            im = filter._filter_bands(self.im)
+            if im is not None:
+                return self._new(im)
 
         ims = [
             self._new(filter.filter(self.im.getband(c))) for c in range(self.im.bands)
