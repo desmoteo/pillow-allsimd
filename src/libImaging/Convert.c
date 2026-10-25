@@ -178,7 +178,19 @@ l2rgb(UINT8 *restrict out, const UINT8 *restrict in, int xsize) {
         vst4q_u8(out, px);
     }
 #endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+    /* The byte loop, which GCC turns into st4 at -O3 where the whole pixels
+       stay scalar: those were 0.79x in the scalar build on the Jetson Orin. */
+    for (; xsize > 0; xsize--) {
+        UINT8 v = *in++;
+        *out++ = v;
+        *out++ = v;
+        *out++ = v;
+        *out++ = 255;
+    }
+#else
     CONVERT_PIXELS(l2rgb_pixel, out, in, xsize, 1, 4);
+#endif
 }
 
 static void
