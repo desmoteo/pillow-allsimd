@@ -220,3 +220,11 @@ From a callgrind profile of 45 more common operations. These changes are plain C
 | chops offset RGB | 22.1 | 1.7 (13x) | 26.8 | 1.9 (14x) |
 | frombytes RGB | 6.8 | 5.5 (1.2x) | 3.5 | 2.4 (1.5x) |
 | tobytes RGB | 4.0 | 3.2 (1.3x) | 3.6 | 3.1 (1.1x) |
+
+## x86 work ported to arm64 (`a85f87dfb`, `07d3ea375`)
+
+Jetson run at `07d3ea375`, with the upstream column again within 1% of earlier runs and the same 7 operations differing from upstream:
+- **Kept: NEON reduce for large factors** (xscale 5..512 or yscale above 16). `reduce RGB 5`: 4.12 → 2.70 ms (1.53x the scalar build); `reduce RGB 8`: 3.92 → 1.93 ms (2.03x).
+- **Dropped: L blur four rows at a time** through the 4-byte line code, which gives 2.4–3x on x86. On the Jetson it was 1–5% slower than GCC's 1-byte code (gaussian L 29.95 vs 29.55 ms, box L 10.21 vs 9.77 ms). After the revert both match the scalar build (29.58 and 9.76 ms).
+
+No x86 SIMD code is now missing on arm64 except the float 3×3/5×5 filter kernels, which only kernels too large for 16-bit fixed point use.
