@@ -98,6 +98,33 @@ portable C code on every architecture.
 Other architectures build the portable C code.
 
 
+## Design documents
+
+Notes on the SIMD work, kept with the code they describe:
+
+- [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md),
+  [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md) and
+  [ACCELERATION_OPTIONS_ASSESSMENT.md](ACCELERATION_OPTIONS_ASSESSMENT.md):
+  the starting assessments of the x86 kernels, the arm64 port and other
+  acceleration options.
+- [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md): Pillow 12.3 and 13.0 as a
+  source of fixes and optimizations.
+- [CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md),
+  [PROFILE_ASSESSMENT.md](PROFILE_ASSESSMENT.md) and
+  [PROFILE_TABLES.md](PROFILE_TABLES.md): where the time goes, from
+  instruction counts, cache misses and timings over the whole API.
+- [PERFORMANCE_GAPS.md](PERFORMANCE_GAPS.md): where OpenCV and libvips are
+  still faster, and why.
+- [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md): how OpenCV,
+  KleidiCV, Carotene and libvips implement those kernels, approximate ones
+  included, measured for speed and accuracy.
+- [APPROXIMATE_KERNELS_PLAN.md](APPROXIMATE_KERNELS_PLAN.md): a proposed
+  opt-in fast mode with approximate kernels beside the exact ones, chosen at
+  run time.
+- [SIMD_EXPLAINER_PLAN.md](SIMD_EXPLAINER_PLAN.md): the outline of a detailed
+  explanation of every optimization on both architectures.
+
+
 ## Benchmarks
 
 Tons of tests can be found on the [Pillow Performance][pillow-perf-page] page.
