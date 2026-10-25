@@ -3,11 +3,12 @@
 
 Prints one MD5 per area (quantize, resample F/I/I;16, transposes, raw
 pack/unpack, YCbCr, PNG filters, masked paste, alpha_composite, point and
-ImageEnhance, ImageDraw, rank filters, unpremultiply), each over many sizes
-and modes. Builds whose kernels are exact give the same hashes: SIMD and
-scalar on one architecture, and x86 and arm64 except where arm64 compilers
-fuse multiply-adds (resample F/I/I;16). The x86 alpha_composite kernel is
-known to differ by 1 from the portable one.
+ImageEnhance, ImageDraw, rank filters, transforms, blur and unsharp mask,
+8-bit resize and reduce, chops and conversions, unpremultiply), each over
+many sizes and modes. Builds whose kernels are exact give the same hashes:
+SIMD and scalar on one architecture, and x86 and arm64 except where arm64
+compilers fuse multiply-adds (resample F/I/I;16, transforms). The x86
+alpha_composite kernel is known to differ by 1 from the portable one.
 
 Inputs are made with frombytes only, since RGB to L conversions and RGB
 resizes differ between SIMD and scalar builds. Run from the repository root
@@ -325,6 +326,89 @@ def _(upd: Update) -> None:
             upd(im.filter(ImageFilter.MinFilter(size)).tobytes())
             upd(im.filter(ImageFilter.MaxFilter(size)).tobytes())
             upd(im.filter(ImageFilter.RankFilter(size, size * size // 3)).tobytes())
+
+
+@section("transform")
+def _(upd: Update) -> None:
+    for mode in ("L", "LA", "RGB", "RGBA", "I", "F"):
+        for size in ((1, 1), (9, 7), (61, 37)):
+            im = noise(mode, size, size[0] + 3)
+            w, hh = size
+            for flt in (R.NEAREST, R.BILINEAR, R.BICUBIC):
+                for angle in (0, 30, 90.5, 200):
+                    upd(im.rotate(angle, flt).tobytes())
+                    upd(im.rotate(angle, flt, expand=True).tobytes())
+                upd(
+                    im.transform(
+                        (w + 5, hh + 3),
+                        Image.Transform.PERSPECTIVE,
+                        (1.1, 0.1, -2, 0.05, 1.05, 1, 0.001, 0.002),
+                        flt,
+                    ).tobytes()
+                )
+                upd(
+                    im.transform(
+                        size,
+                        Image.Transform.QUAD,
+                        (0, 0, 2, hh - 1, w, hh, w - 3, 1),
+                        flt,
+                    ).tobytes()
+                )
+
+
+@section("blur/unsharp")
+def _(upd: Update) -> None:
+    for mode in ("L", "LA", "RGB", "RGBA"):
+        for size in ((1, 1), (5, 9), (67, 23), (203, 71)):
+            im = noise(mode, size, size[1])
+            for r in (0.4, 1, 2.5, 7, 40):
+                upd(im.filter(ImageFilter.BoxBlur(r)).tobytes())
+                upd(im.filter(ImageFilter.GaussianBlur(r)).tobytes())
+                upd(im.filter(ImageFilter.GaussianBlur((r, r / 3))).tobytes())
+            if mode in ("L", "RGB"):
+                for args in ((2, 150, 3), (1, 300, 0), (5, 80, 10)):
+                    upd(im.filter(ImageFilter.UnsharpMask(*args)).tobytes())
+
+
+@section("resize 8-bit")
+def _(upd: Update) -> None:
+    for mode in ("L", "LA", "RGB"):
+        for w, hh in ((1, 1), (13, 7), (97, 61), (301, 17)):
+            im = noise(mode, (w, hh), w)
+            for size in (
+                (w * 2 + 1, hh),
+                (w, hh * 3),
+                (max(1, w // 3), max(1, hh // 2)),
+            ):
+                for flt in (R.BILINEAR, R.BICUBIC, R.LANCZOS):
+                    upd(im.resize(size, flt).tobytes())
+            for n in (2, 3, (2, 1), (1, 3)):
+                upd(im.reduce(n).tobytes())
+
+
+@section("chops/convert")
+def _(upd: Update) -> None:
+    from PIL import ImageChops
+
+    for size in ((1, 1), (35, 9), (130, 31)):
+        a, b = noise("RGB", size, 21), noise("RGB", size, 22)
+        for scale, offset in ((1.0, 0), (1.0, -30), (2.0, 7), (0.6, 0)):
+            upd(ImageChops.add(a, b, scale, offset).tobytes())
+            upd(ImageChops.subtract(a, b, scale, offset).tobytes())
+        for f in (
+            ImageChops.lighter,
+            ImageChops.darker,
+            ImageChops.difference,
+            ImageChops.multiply,
+            ImageChops.screen,
+        ):
+            upd(f(a, b).tobytes())
+        lum = noise("L", size, 23)
+        for mode in ("RGB", "RGBA", "LA"):
+            upd(lum.convert(mode).tobytes())
+        for mode in ("RGBA", "CMYK", "HSV"):
+            upd(a.convert(mode).tobytes())
+        upd(noise("RGBA", size, 24).convert("RGB").tobytes())
 
 
 @section("unpremultiply")
