@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import array
 import colorsys
 import itertools
+import math
 
 from PIL import Image
 
@@ -153,3 +155,47 @@ def test_hsv_to_rgb() -> None:
         3,
         "B conversion is wrong",
     )
+
+
+def _f32(v: float) -> float:
+    # Rounds to single precision. For +, -, * and / of single precision
+    # values, rounding the double result gives the single precision result.
+    return array.array("f", [v])[0]
+
+
+def _rgb2hsv_reference(r: int, g: int, b: int) -> tuple[int, int, int]:
+    # The float and double steps of rgb2hsv_row in Convert.c.
+    maxc, minc = max(r, g, b), min(r, g, b)
+    if maxc == minc:
+        return 0, 0, maxc
+    cr = float(maxc - minc)
+    s = _f32(cr / maxc)
+    rc, gc, bc = (_f32((maxc - c) / cr) for c in (r, g, b))
+    if r == maxc:
+        h = _f32(bc - gc)
+    elif g == maxc:
+        h = _f32(2.0 + rc - bc)
+    else:
+        h = _f32(4.0 + gc - rc)
+    h = _f32(math.fmod(h / 6.0 + 1.0, 1.0))
+    return int(h * 255.0), int(s * 255.0), maxc
+
+
+def test_rgb_to_hsv_exact() -> None:
+    # Every value of each channel against others nearby and far, so that
+    # near-ties and all hue cases are covered, and a coarse grid. 79 pixels
+    # per row exercise the last pixels of a row too.
+    colors: list[tuple[int, int, int]] = [
+        c
+        for v in range(256)
+        for w in range(0, 256, 15)
+        for c in ((v, w, v ^ 1), (w, v, (v + 7) % 256), ((w * 3) % 256, v, v))
+    ]
+    grid = [*range(0, 256, 9), 254, 255]
+    colors += [(r, g, b) for r in grid for g in grid for b in grid]
+    width = 79
+    colors += [(0, 0, 0)] * (-len(colors) % width)
+    im = Image.new("RGB", (width, len(colors) // width))
+    im.putdata(colors)
+    expected = [_rgb2hsv_reference(*c) for c in colors]
+    assert list(im.convert("HSV").get_flattened_data()) == expected

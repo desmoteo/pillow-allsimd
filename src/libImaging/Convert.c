@@ -528,7 +528,12 @@ rgb2hsv_row(UINT8 *out, const UINT8 *in) {  // following colorsys.py
             h = 4.0 + gc - rc;
         }
         // incorrect hue happens if h/6 is negative.
-        h = fmod((h / 6.0 + 1.0), 1.0);
+        // h is in [-1, 5], so h / 6.0 + 1.0 is in [5/6, 11/6] and fmod(.., 1.0)
+        // subtracts 1 exactly when it is at least 1.
+        {
+            double hd = h / 6.0 + 1.0;
+            h = hd >= 1.0 ? hd - 1.0 : hd;
+        }
 
         uh = (UINT8)CLIP8((int)(h * 255.0));
         us = (UINT8)CLIP8((int)(s * 255.0));
@@ -538,13 +543,83 @@ rgb2hsv_row(UINT8 *out, const UINT8 *in) {  // following colorsys.py
     out[2] = uv;
 }
 
+#if defined(IMAGING_SIMD_SSE4)
+/* (int)(v * 255.0) for four values given as two pairs of doubles. */
+static inline __m128i
+rgb2hsv_scale(__m128d lo, __m128d hi) {
+    __m128d k = _mm_set1_pd(255.0);
+    return _mm_unpacklo_epi64(
+        _mm_cvttpd_epi32(_mm_mul_pd(lo, k)), _mm_cvttpd_epi32(_mm_mul_pd(hi, k))
+    );
+}
+
+/* rgb2hsv_row for four RGBX pixels: the same float and double operations,
+   with the three hue cases computed and selected in the same priority. */
+static inline void
+rgb2hsv_4(UINT8 *out, const UINT8 *in) {
+    __m128i pix = _mm_loadu_si128((const __m128i *)in);
+    __m128i mask = _mm_set1_epi32(0xff);
+    __m128i r = _mm_and_si128(pix, mask);
+    __m128i g = _mm_and_si128(_mm_srli_epi32(pix, 8), mask);
+    __m128i b = _mm_and_si128(_mm_srli_epi32(pix, 16), mask);
+    __m128i maxc = _mm_max_epi32(r, _mm_max_epi32(g, b));
+    __m128i minc = _mm_min_epi32(r, _mm_min_epi32(g, b));
+    __m128i flat = _mm_cmpeq_epi32(maxc, minc);
+    __m128 cr = _mm_cvtepi32_ps(_mm_sub_epi32(maxc, minc));
+    __m128 s = _mm_div_ps(cr, _mm_cvtepi32_ps(maxc));
+    __m128 rc = _mm_div_ps(_mm_cvtepi32_ps(_mm_sub_epi32(maxc, r)), cr);
+    __m128 gc = _mm_div_ps(_mm_cvtepi32_ps(_mm_sub_epi32(maxc, g)), cr);
+    __m128 bc = _mm_div_ps(_mm_cvtepi32_ps(_mm_sub_epi32(maxc, b)), cr);
+    /* 2.0 + rc - bc and 4.0 + gc - rc are double, rounded back to float. */
+    __m128d rc0 = _mm_cvtps_pd(rc), rc1 = _mm_cvtps_pd(_mm_movehl_ps(rc, rc));
+    __m128d gc0 = _mm_cvtps_pd(gc), gc1 = _mm_cvtps_pd(_mm_movehl_ps(gc, gc));
+    __m128d bc0 = _mm_cvtps_pd(bc), bc1 = _mm_cvtps_pd(_mm_movehl_ps(bc, bc));
+    __m128d two = _mm_set1_pd(2.0), four = _mm_set1_pd(4.0);
+    __m128 hg = _mm_movelh_ps(
+        _mm_cvtpd_ps(_mm_sub_pd(_mm_add_pd(two, rc0), bc0)),
+        _mm_cvtpd_ps(_mm_sub_pd(_mm_add_pd(two, rc1), bc1))
+    );
+    __m128 hb = _mm_movelh_ps(
+        _mm_cvtpd_ps(_mm_sub_pd(_mm_add_pd(four, gc0), rc0)),
+        _mm_cvtpd_ps(_mm_sub_pd(_mm_add_pd(four, gc1), rc1))
+    );
+    __m128 h = _mm_blendv_ps(
+        _mm_blendv_ps(hb, hg, _mm_castsi128_ps(_mm_cmpeq_epi32(g, maxc))),
+        _mm_sub_ps(bc, gc),
+        _mm_castsi128_ps(_mm_cmpeq_epi32(r, maxc))
+    );
+    /* fmod(h / 6.0 + 1.0, 1.0), as in rgb2hsv_row. */
+    __m128d one = _mm_set1_pd(1.0), six = _mm_set1_pd(6.0);
+    __m128d h0 = _mm_add_pd(_mm_div_pd(_mm_cvtps_pd(h), six), one);
+    __m128d h1 = _mm_add_pd(_mm_div_pd(_mm_cvtps_pd(_mm_movehl_ps(h, h)), six), one);
+    h0 = _mm_blendv_pd(h0, _mm_sub_pd(h0, one), _mm_cmpge_pd(h0, one));
+    h1 = _mm_blendv_pd(h1, _mm_sub_pd(h1, one), _mm_cmpge_pd(h1, one));
+    /* stored in the float h before h * 255.0 */
+    h0 = _mm_cvtps_pd(_mm_cvtpd_ps(h0));
+    h1 = _mm_cvtps_pd(_mm_cvtpd_ps(h1));
+    /* h and s are in [0, 1), so CLIP8 changes nothing. */
+    __m128i uh = _mm_andnot_si128(flat, rgb2hsv_scale(h0, h1));
+    __m128i us = _mm_andnot_si128(
+        flat, rgb2hsv_scale(_mm_cvtps_pd(s), _mm_cvtps_pd(_mm_movehl_ps(s, s)))
+    );
+    __m128i hsv =
+        _mm_or_si128(_mm_or_si128(uh, _mm_slli_epi32(us, 8)), _mm_slli_epi32(maxc, 16));
+    hsv = _mm_or_si128(hsv, _mm_andnot_si128(_mm_set1_epi32(0xffffff), pix));
+    _mm_storeu_si128((__m128i *)out, hsv);
+}
+#endif
+
 static void
 rgb2hsv(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(IMAGING_SIMD_SSE4)
+    CONVERT_ROW(rgb2hsv_4, 4, out, in, xsize, 4, 4);
+#else
     int x;
     for (x = 0; x < xsize; x++, in += 4, out += 4) {
         rgb2hsv_row(out, in);
         out[3] = in[3];
     }
+#endif
 }
 
 static void
