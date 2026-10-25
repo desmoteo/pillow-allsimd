@@ -215,6 +215,69 @@ On arm64 under qemu (`--platform linux/arm64`), the filter, resample, resize, re
 
 Python 3.10, which the Jetson runs, is no longer supported. `checks/simd_test_remote.sh` runs the test suite there in a container with a newer Python. `checks/simd_bench_remote.sh --docker` does the same for benchmarks.
 
+## Performance after the merge (2026-10-29)
+
+Baseline: the Pillow 13.0.0 wheel from PyPI. 2560×1600 images, best of 5 rounds, `checks/simd_bench.py --set all`, pinned to one CPU. Reports are in the git-ignored `bench-results/`.
+
+**Geometric mean over all operations, speed-up against the 13.0 wheel:**
+
+| Machine | scalar | SSE4 | AVX2 | AVX-VNNI | NEON | pre-merge build |
+|---|---:|---:|---:|---:|---:|---:|
+| x86-64 laptop, Python 3.14, GCC 13 (82 ops) | 1.37x | 2.75x | 3.12x | 3.17x | | 3.05x (AVX2) |
+| Jetson Orin, Python 3.12 container, GCC 14 (86 ops, `ff08470e7`) | 1.25x | | | | 1.85x | 1.81x (NEON, same container) |
+
+On the same compiler, the merge cost nothing on average: AVX2 is 1.02x and NEON 1.02x the pre-merge build. The only operations more than 8% slower are flip left-right on x86 (0.91x), and `frombytes RGB` (0.85x) and `ROTATE_90` (0.88x) on arm64; see "Not faster than the wheel" below. The merge gained 13.0's scalar rewrites:
+
+| Operation (ms) | x86 AVX2 pre → now | arm64 NEON pre → now |
+|---|---:|---:|
+| convert P→RGB | 4.41 → 1.65 | 8.04 → 3.61 |
+| chops difference | 4.32 → 2.43 | 6.26 → 3.10 |
+
+**Selected operations (ms):**
+
+| Operation | x86 13.0 wheel | x86 AVX2 | arm64 13.0 wheel | arm64 NEON |
+|---|---:|---:|---:|---:|
+| resize RGB 1/4 bicubic | 33.4 | 3.40 | 34.5 | 14.8 |
+| resize L 1/4 bicubic | 15.4 | 1.80 | 14.5 | 4.24 |
+| resize RGB 1/4 MKS2021 | 70.4 | 6.67 | 76.7 | 29.7 |
+| resize L 1/4 MKS2021 | 34.3 | 3.11 | 30.1 | 8.16 |
+| resize RGB to 1/8 height, Lanczos (vertical first) | 49.7 | 5.53 | 73.2 | 18.7 |
+| reduce L 2 | 1.63 | 0.21 | 2.32 | 0.21 |
+| gaussian RGB r=5 | 139.9 | 53.4 | 158.2 | 84.7 * |
+| unsharp RGB | 229.7 | 63.0 | 234.6 | 102.6 * |
+| filter L 3×3 SHARPEN | 48.9 | 2.08 | 47.4 | 6.09 |
+| filter RGB 5×5 SMOOTH_MORE | 168.6 | 18.8 | 227.2 | 65.9 |
+| convert RGBa→RGBA | 33.7 | 1.75 | 38.6 | 11.1 |
+| colorlut RGB 17 | 101.1 | 13.0 | 104.2 | 52.4 |
+| chops multiply | 18.7 | 2.47 | 14.0 | 3.65 |
+| median 3 L | 546 | 9.6 | 453 | 13.3 |
+| mode 3 L | 1039 | 77.7 | 1251 | 99.1 |
+
+\* after `a0fe1ba89`, see below.
+
+**Not faster than the wheel:**
+- Resize of F and I;16, YCbCr→RGB, L→1 dither, transposes, `chops offset`, `point` and `histogram` on x86 are within ±5%; none of them has a SIMD path.
+- On arm64 `getextrema` is 4% slower with identical code.
+- `ROTATE_90` on arm64 is 13.0's code now and 12% slower than 12.3's loop under GCC 14, though within 1% of the wheel.
+- `frombytes RGB` lost 15% with 13.0 on both the wheel and this build; it is still 1.6x the wheel.
+
+**arm64 kernels re-timed with newer compilers (`a0fe1ba89`).**
+
+`2e6edeec2` replaced three NEON kernels with the portable code, based on the host's GCC 11. In containers with GCC 12 (Debian 12) and GCC 14 (Debian 13), with the upstream column stable to 0.3%:
+
+| Operation (ms, GCC 14 / GCC 12) | portable | all three NEON kernels back | kept: 4-byte horizontal pass and unsharp row |
+|---|---:|---:|---:|
+| gaussian RGB r=5 | 107.3 / 112.2 | 91.1 / 93.4 | 84.7 / 87.6 |
+| box RGB r=2 | 35.6 / 37.1 | 30.3 / 31.0 | 28.2 / 29.0 |
+| unsharp RGB | 134.7 / 142.8 | 108.9 / 111.1 | 102.6 / 105.3 |
+| gaussian L r=5 | 28.5 / 28.9 | 29.9 / 30.3 | 28.4 / 28.8 |
+| alpha_composite | 22.0 / 21.3 | 25.1 / 26.4 | 21.9 / 21.3 |
+| histogram RGB (13.0's loops on arm64) | 10.3 / 10.0 | | 9.28 / 8.86 |
+
+- The NEON vertical pass (shared by L and RGB) and NEON alpha composite stay removed.
+- GCC 11 was not re-measured: a Python 3.11+ build environment with GCC 11 is needed, and the Debian 11 image no longer installs packages.
+- Outputs are identical to the scalar build and to the 13.0 wheel.
+
 ## Caveats
 
 - Upstream speed-up figures are quoted from the 13.0 release notes, not measured here.
