@@ -38,6 +38,27 @@
 #define L(rgb) ((INT32)(rgb)[0] * 299 + (INT32)(rgb)[1] * 587 + (INT32)(rgb)[2] * 114)
 #define L24(rgb) ((rgb)[0] * 19595 + (rgb)[1] * 38470 + (rgb)[2] * 7471 + 0x8000)
 
+/* Runs pixel(out, in) over a row in chunks of a fixed length. With restrict
+   pointers, GCC vectorizes the chunks at -O2 too, which adds no aliasing
+   checks or remainder loops. The addresses are pointers, not "in + x * 4"
+   for an int x: under -fno-strict-overflow, which Python's CFLAGS have, that
+   may wrap, and GCC then vectorizes it at no level. */
+#define CONVERT_CHUNK 16
+#define CONVERT_PIXELS(pixel, out, in, xsize, in_bytes, out_bytes)       \
+    {                                                                    \
+        int n_ = (xsize);                                                \
+        for (; n_ >= CONVERT_CHUNK; n_ -= CONVERT_CHUNK) {               \
+            for (int i_ = 0; i_ < CONVERT_CHUNK; i_++) {                 \
+                pixel((out) + i_ * (out_bytes), (in) + i_ * (in_bytes)); \
+            }                                                            \
+            (in) += CONVERT_CHUNK * (in_bytes);                          \
+            (out) += CONVERT_CHUNK * (out_bytes);                        \
+        }                                                                \
+        for (; n_ > 0; n_--, (in) += (in_bytes), (out) += (out_bytes)) { \
+            pixel((out), (in));                                          \
+        }                                                                \
+    }
+
 /* ------------------- */
 /* 1 (bit) conversions */
 /* ------------------- */
@@ -140,25 +161,15 @@ la2lA(UINT8 *out, const UINT8 *in, int xsize) {
     }
 }
 
+static inline void
+l2rgb_pixel(UINT8 *restrict out, const UINT8 *restrict in) {
+    UINT32 v = MAKE_UINT32(in[0], in[0], in[0], 255);
+    memcpy(out, &v, sizeof(v));
+}
+
 static void
-l2rgb(UINT8 *out, const UINT8 *in, int xsize) {
-    int x;
-#if defined(IMAGING_SIMD_SSE4)
-    /* Whole pixels, which compilers vectorize for x86; byte stores they
-       don't. On arm64 they turn the byte stores into st4, which is faster. */
-    for (x = 0; x < xsize; x++) {
-        UINT32 v = MAKE_UINT32(in[x], in[x], in[x], 255);
-        memcpy(out + x * 4, &v, sizeof(v));
-    }
-#else
-    for (x = 0; x < xsize; x++) {
-        UINT8 v = *in++;
-        *out++ = v;
-        *out++ = v;
-        *out++ = v;
-        *out++ = 255;
-    }
-#endif
+l2rgb(UINT8 *restrict out, const UINT8 *restrict in, int xsize) {
+    CONVERT_PIXELS(l2rgb_pixel, out, in, xsize, 1, 4);
 }
 
 static void
@@ -823,27 +834,17 @@ hsv2rgb(UINT8 *out, const UINT8 *in, int xsize) {  // following colorsys.py
 /* RGBA conversions */
 /* ---------------- */
 
+static inline void
+rgb2rgba_pixel(UINT8 *restrict out, const UINT8 *restrict in) {
+    UINT32 v;
+    memcpy(&v, in, sizeof(v));
+    v |= MAKE_UINT32(0, 0, 0, 255);
+    memcpy(out, &v, sizeof(v));
+}
+
 static void
-rgb2rgba(UINT8 *out, const UINT8 *in, int xsize) {
-    int x;
-#if defined(IMAGING_SIMD_SSE4)
-    /* As in l2rgb. */
-    const UINT32 alpha = MAKE_UINT32(0, 0, 0, 255);
-    for (x = 0; x < xsize; x++) {
-        UINT32 v;
-        memcpy(&v, in + x * 4, sizeof(v));
-        v |= alpha;
-        memcpy(out + x * 4, &v, sizeof(v));
-    }
-#else
-    for (x = 0; x < xsize; x++) {
-        *out++ = *in++;
-        *out++ = *in++;
-        *out++ = *in++;
-        *out++ = 255;
-        in++;
-    }
-#endif
+rgb2rgba(UINT8 *restrict out, const UINT8 *restrict in, int xsize) {
+    CONVERT_PIXELS(rgb2rgba_pixel, out, in, xsize, 4, 4);
 }
 
 static void
@@ -1119,21 +1120,20 @@ la2cmyk(UINT8 *out, const UINT8 *in, int xsize) {
     }
 }
 
+static inline void
+rgb2cmyk_pixel(UINT8 *restrict out, const UINT8 *restrict in) {
+    UINT32 v;
+    memcpy(&v, in, sizeof(v));
+    v = ~v & MAKE_UINT32(255, 255, 255, 0);
+    memcpy(out, &v, sizeof(v));
+}
+
 static void
-rgb2cmyk(UINT8 *out, const UINT8 *in, int xsize) {
+rgb2cmyk(UINT8 *restrict out, const UINT8 *restrict in, int xsize) {
     /* Note: no undercolour removal. A pixel at a time, which the compiler
        vectorizes the same way for every target; byte by byte, its AVX2
        code was 15% slower than its SSE4 code. */
-    const UINT32 mask = MAKE_UINT32(255, 255, 255, 0);
-    int x;
-    for (x = 0; x < xsize; x++) {
-        UINT32 v;
-        memcpy(&v, in, sizeof(v));
-        v = ~v & mask;
-        memcpy(out, &v, sizeof(v));
-        in += 4;
-        out += 4;
-    }
+    CONVERT_PIXELS(rgb2cmyk_pixel, out, in, xsize, 4, 4);
 }
 
 void
