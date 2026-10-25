@@ -29,6 +29,15 @@ Unreleased
 - arm64: NEON reduce for 4-byte images with factors up to 4 horizontally
   (2.7x to 2.8x faster for 3 and 4) and NEON ColorLUT (1.5x), with output
   identical to the scalar code
+- RankFilter, MinFilter, MaxFilter, MedianFilter on 1-byte images: a
+  sorting network for 3x3 windows (any rank) and row-then-column minimum
+  and maximum for any size, 30x to 130x faster; the GIL is released
+- Histogram of 8-bit images: counts split over several tables, 1.5x to
+  2.4x faster
+- ImageChops.offset: two row copies instead of a modulo per pixel, 13x
+  faster; fixed reads and writes past the end of each row for I;16 images
+- RGB pack and unpack (frombytes, tobytes, codecs): SSE4 and NEON,
+  1.2x to 1.4x faster
 - Released the GIL in AlphaComposite, Bands, Blend and Chops
 - From Pillow 13.0: I;16 filters keep the high byte and clamp to 0..65535;
   BoxBlur and GaussianBlur reject NaN, infinite and >= 2**31 radii;

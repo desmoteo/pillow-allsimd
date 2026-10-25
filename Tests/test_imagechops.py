@@ -267,6 +267,21 @@ def test_multiply_white() -> None:
     assert_image_equal(new, im1)
 
 
+@pytest.mark.parametrize("mode", ("1", "L", "LA", "RGB", "RGBA", "I", "F", "I;16"))
+@pytest.mark.parametrize(
+    "xoffset, yoffset", ((0, 0), (3, 2), (-4, 9), (13, 7), (-27, -15), (100, -50))
+)
+def test_offset_wraps(mode: str, xoffset: int, yoffset: int) -> None:
+    im = hopper("RGB" if mode in ("LA", "RGB", "RGBA") else "L").resize((13, 7))
+    im = im.convert(mode)
+    new = ImageChops.offset(im, xoffset, yoffset)
+    w, h = im.size
+    for y in range(h):
+        for x in range(w):
+            expected = im.getpixel((x, y))
+            assert new.getpixel(((x + xoffset) % w, (y + yoffset) % h)) == expected
+
+
 def test_offset() -> None:
     # Arrange
     xoffset = 45

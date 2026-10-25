@@ -286,3 +286,43 @@ def test_consistency_i16_high_byte(mode: str) -> None:
     for _ in range(5):
         im = im.filter(ImageFilter.SMOOTH)
         assert im.getpixel((4, 4)) == 1000
+
+
+def _rank_reference(im: Image.Image, size: int, rank: int) -> list[int]:
+    # Sorts each window in Python; edges are repeated as ImageFilter does.
+    w, h = im.size
+    m = size // 2
+    px = im.load()
+    assert px is not None
+    result = []
+    for y in range(h):
+        for x in range(w):
+            window = sorted(
+                px[min(max(x + i, 0), w - 1), min(max(y + j, 0), h - 1)]
+                for j in range(-m, m + 1)
+                for i in range(-m, m + 1)
+            )
+            result.append(window[rank])
+    return result
+
+
+@pytest.mark.parametrize("mode", ("L", "1"))
+@pytest.mark.parametrize("size", ((1, 1), (5, 3), (70, 4), (259, 3)))
+def test_rankfilter_3x3_all_ranks(mode: str, size: tuple[int, int]) -> None:
+    # 1-byte images use a sorting network for 3x3 windows.
+    im = hopper("L").resize(size).convert(mode)
+    for rank in range(9):
+        out = im.filter(ImageFilter.RankFilter(3, rank))
+        assert list(out.get_flattened_data()) == _rank_reference(im, 3, rank)
+
+
+@pytest.mark.parametrize("filter_size", (3, 5, 7))
+@pytest.mark.parametrize("size", ((1, 1), (6, 9), (71, 5)))
+def test_min_max_filter_any_size(filter_size: int, size: tuple[int, int]) -> None:
+    # 1-byte images do minimum and maximum filters by rows, then columns.
+    im = hopper("L").resize(size)
+    last = filter_size * filter_size - 1
+    out = im.filter(ImageFilter.MinFilter(filter_size))
+    assert list(out.get_flattened_data()) == _rank_reference(im, filter_size, 0)
+    out = im.filter(ImageFilter.MaxFilter(filter_size))
+    assert list(out.get_flattened_data()) == _rank_reference(im, filter_size, last)
