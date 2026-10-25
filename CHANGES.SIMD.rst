@@ -41,6 +41,10 @@ Based on Pillow 13.0.0
   kernels (2560x1600 to 26x16) 1.3x to 1.6x faster, now level with AVX2;
   RGB in the portable build sums three channels, not four (1.2x, level with
   Pillow 13.0 for big shrinks)
+- Perspective transforms: the coordinates of a tile row are computed in
+  one loop the compiler vectorizes, so the two divisions per pixel run
+  several at once (1.4x RGB bilinear and bicubic, 1.8x L nearest, AVX2);
+  quad transforms with the bilinear filter inlined (1.2x). Same output
 - RGB -> HSV: AVX2 kernel for 8 pixels, the same operations per lane as
   the SSE4 one; identical for all 16.7 million RGB values; 2.2x
 - RGB -> CMYK, L -> RGB/LA, RGB <-> RGBA a pixel at a time, which the
