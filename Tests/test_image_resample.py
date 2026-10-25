@@ -743,3 +743,34 @@ def test_l_matches_rgb_band(
     im = hopper("L").resize(size)
     expected = Image.merge("RGB", (im, im, im)).resize(new_size, resample)
     assert_image_equal(im.resize(new_size, resample), expected.getchannel(0))
+
+
+@pytest.mark.parametrize("mode", ("F", "I", "I;16", "I;16B"))
+@pytest.mark.parametrize(
+    "resample", (Image.Resampling.BILINEAR, Image.Resampling.LANCZOS)
+)
+def test_wide_modes_rows_and_columns_alike(
+    mode: str, resample: Image.Resampling
+) -> None:
+    # Rows are resized four at a time and columns in blocks, the rest one
+    # at a time: identical rows or columns must stay identical either way.
+    values = [0, 1, 7, 255, 256, 1000, 65535, 3, 40000, 12, 9, 65534, 77]
+    if mode == "F":
+        values += [float("inf"), float("nan"), -0.0, -1.5e38]
+    elif mode == "I":
+        values += [-(2**31), 2**31 - 1, -70000]
+    line = Image.new(mode, (len(values), 1))
+    for x, value in enumerate(values):
+        line.putpixel((x, 0), value)
+
+    rows = line.resize((len(values), 11), Image.Resampling.NEAREST)
+    out = rows.resize((len(values) * 2 + 1, 11), resample).tobytes()
+    width = len(out) // 11
+    assert all(out[y * width : (y + 1) * width] == out[:width] for y in range(11))
+
+    columns = rows.transpose(Image.Transpose.TRANSPOSE)
+    out = columns.resize((11, len(values) * 2 + 1), resample)
+    transposed = out.transpose(Image.Transpose.TRANSPOSE).tobytes()
+    assert all(
+        transposed[y * width : (y + 1) * width] == transposed[:width] for y in range(11)
+    )
