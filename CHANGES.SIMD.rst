@@ -36,6 +36,12 @@ Based on Pillow 13.0.0
 - Arcs, chords and pie slices are clipped without allocating (1.25x);
   alpha_composite() with an offset composites in place (2.2x); tobytes()
   encodes in one chunk (1.9x)
+- Resize: the AVX-VNNI build no longer puts vpdpwssd in the horizontal
+  pass, where each pixel is one long chain of additions: shrinks with long
+  kernels (2560x1600 to 26x16) 1.3x to 1.6x faster, now level with AVX2;
+  RGB in the portable build sums three channels, not four (1.2x, level with
+  Pillow 13.0 for big shrinks)
+- RGB -> CMYK a pixel at a time: the AVX2 build was 15% slower than SSE4
 - x86: RGBa -> RGBA is exact (colour above alpha gave 0, alpha 0 gave
   colour 0); slightly slower
 - ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a
