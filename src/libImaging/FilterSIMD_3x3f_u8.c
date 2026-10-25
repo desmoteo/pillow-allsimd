@@ -37,6 +37,67 @@ ImagingFilter3x3f_u8(Imaging imOut, Imaging im, const float *kernel, float offse
         out0[0] = in0[0];
         out1[0] = in1[0];
         x = 1;
+#if defined(IMAGING_SIMD_AVX2)
+        /* 8 pixels per step: each 128-bit lane repeats the SSE4 step below
+           for 4 pixels, x to x + 3 and x + 4 to x + 7, with the same
+           operations in the same order. */
+        {
+            __m256 k00 = _mm256_broadcast_ps(&kernel00),
+                   k01 = _mm256_broadcast_ps(&kernel01);
+            __m256 k10 = _mm256_broadcast_ps(&kernel10),
+                   k11 = _mm256_broadcast_ps(&kernel11);
+            __m256 k20 = _mm256_broadcast_ps(&kernel20),
+                   k21 = _mm256_broadcast_ps(&kernel21);
+            __m256 off8 = _mm256_set1_ps(offset);
+#define MM256_LOAD(p, x) _mm256_cvtepi32_ps(mm256_cvtepu8_epi32(&(p)[x]))
+#define MM256_SUM3(a, b, c, ka, kb, kc)                            \
+    _mm256_add_ps(                                                 \
+        _mm256_add_ps(_mm256_mul_ps(a, ka), _mm256_mul_ps(b, kb)), \
+        _mm256_mul_ps(c, kc)                                       \
+    )
+            for (; x < im->xsize - 8; x += 8) {
+                __m256 p0, p1, p2, p3, s0, s1, s2, s3, s4, s5;
+                __m256i si;
+                __m128i packed;
+
+                p0 = MM256_LOAD(in1, x - 1);
+                p1 = MM256_LOAD(in0, x - 1);
+                p2 = MM256_LOAD(in_1, x - 1);
+                s0 = MM256_SUM3(p0, p1, p2, k00, k10, k20);
+                s1 = MM256_SUM3(p0, p1, p2, k01, k11, k21);
+                s0 = _mm256_hadd_ps(s0, s1);
+                p3 = MM256_LOAD(in2, x - 1);
+                s3 = MM256_SUM3(p3, p0, p1, k00, k10, k20);
+                s4 = MM256_SUM3(p3, p0, p1, k01, k11, k21);
+                s3 = _mm256_hadd_ps(s3, s4);
+
+                p0 = MM256_LOAD(in1, x + 1);
+                p1 = MM256_LOAD(in0, x + 1);
+                p2 = MM256_LOAD(in_1, x + 1);
+                s1 = MM256_SUM3(p0, p1, p2, k00, k10, k20);
+                s2 = MM256_SUM3(p0, p1, p2, k01, k11, k21);
+                s1 = _mm256_hadd_ps(s1, s2);
+                p3 = MM256_LOAD(in2, x + 1);
+                s4 = MM256_SUM3(p3, p0, p1, k00, k10, k20);
+                s5 = MM256_SUM3(p3, p0, p1, k01, k11, k21);
+                s4 = _mm256_hadd_ps(s4, s5);
+
+                si = _mm256_cvtps_epi32(_mm256_add_ps(_mm256_hadd_ps(s0, s1), off8));
+                packed = _mm_packs_epi32(
+                    _mm256_castsi256_si128(si), _mm256_extracti128_si256(si, 1)
+                );
+                _mm_storel_epi64((__m128i *)&out0[x], _mm_packus_epi16(packed, packed));
+
+                si = _mm256_cvtps_epi32(_mm256_add_ps(_mm256_hadd_ps(s3, s4), off8));
+                packed = _mm_packs_epi32(
+                    _mm256_castsi256_si128(si), _mm256_extracti128_si256(si, 1)
+                );
+                _mm_storel_epi64((__m128i *)&out1[x], _mm_packus_epi16(packed, packed));
+            }
+#undef MM256_LOAD
+#undef MM256_SUM3
+        }
+#endif
         for (; x < im->xsize - 1 - 3; x += 4) {
             __m128 ss0, ss1, ss2, ss3, ss4, ss5;
             __m128 pix00, pix10, pix20, pix30;
