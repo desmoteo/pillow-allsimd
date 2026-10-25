@@ -948,3 +948,25 @@ class TestTruncatedPngPLeaks(PillowLeakTestCase):
                 im.load()
 
         self._test_leak(core)
+
+
+@pytest.mark.parametrize("mode", ("1", "L", "LA", "P", "RGB", "RGBA", "I;16"))
+@pytest.mark.parametrize("width", (1, 2, 5, 15, 16, 17, 33, 100))
+@pytest.mark.parametrize("optimize", (False, True))
+def test_filters_roundtrip(mode: str, width: int, optimize: bool) -> None:
+    # Rows are filtered several bytes at a time, then one at a time. Smooth
+    # rows with noise make every filter win somewhere.
+    data = bytes(
+        (x * 7 + y * 13 + (x * y) % 5) % 256 for y in range(9) for x in range(256)
+    )
+    base = Image.frombytes("L", (256, 9), data).resize((width, 9))
+    if mode in ("1", "L", "P"):
+        im = base.convert(mode)
+    elif mode == "I;16":
+        im = base.convert("I").point(lambda v: v * 257).convert("I;16")
+    else:
+        im = Image.merge(mode, [base] * len(mode))
+    out = BytesIO()
+    im.save(out, "PNG", optimize=optimize)
+    with Image.open(out) as reloaded:
+        assert_image_equal(reloaded, im)
