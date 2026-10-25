@@ -1737,3 +1737,20 @@ def test_incorrectly_ordered_coordinates(xy: tuple[int, int, int, int]) -> None:
         draw.rectangle(xy)
     with pytest.raises(ValueError):
         draw.rounded_rectangle(xy)
+
+
+@pytest.mark.parametrize("width", (1, 3, 4, 5, 7, 8, 9, 37))
+def test_rgba_ink_blend_exact(width: int) -> None:
+    # Spans of RGBA ink on RGB images are blended several pixels at a time,
+    # then one at a time, with the same rounding for every alpha.
+    for alpha in range(256):
+        background = (alpha, 255 - alpha, (alpha * 7) % 256)
+        ink = ((alpha * 3) % 256, (alpha * 5) % 256, 200)
+        im = Image.new("RGB", (width, 1), background)
+        ImageDraw.Draw(im, "RGBA").rectangle((0, 0, width - 1, 0), (*ink, alpha))
+        expected = tuple(
+            ((v + 128) + ((v + 128) >> 8)) >> 8
+            for v in (b * (255 - alpha) + c * alpha for b, c in zip(background, ink))
+        )
+        assert im.getpixel((width - 1, 0)) == expected
+        assert set(im.get_flattened_data()) == {expected}
