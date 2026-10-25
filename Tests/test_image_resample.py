@@ -754,7 +754,7 @@ def test_wide_modes_rows_and_columns_alike(
 ) -> None:
     # Rows are resized four at a time and columns in blocks, the rest one
     # at a time: identical rows or columns must stay identical either way.
-    values = [0, 1, 7, 255, 256, 1000, 65535, 3, 40000, 12, 9, 65534, 77]
+    values: list[float] = [0, 1, 7, 255, 256, 1000, 65535, 3, 40000, 12, 9, 65534, 77]
     if mode == "F":
         values += [float("inf"), float("nan"), -0.0, -1.5e38]
     elif mode == "I":
@@ -769,8 +769,8 @@ def test_wide_modes_rows_and_columns_alike(
     assert all(out[y * width : (y + 1) * width] == out[:width] for y in range(11))
 
     columns = rows.transpose(Image.Transpose.TRANSPOSE)
-    out = columns.resize((11, len(values) * 2 + 1), resample)
-    transposed = out.transpose(Image.Transpose.TRANSPOSE).tobytes()
+    resized = columns.resize((11, len(values) * 2 + 1), resample)
+    transposed = resized.transpose(Image.Transpose.TRANSPOSE).tobytes()
     assert all(
         transposed[y * width : (y + 1) * width] == transposed[:width] for y in range(11)
     )

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import json
 import os
 import platform
@@ -486,11 +487,11 @@ def api_operations(
         "merge RGBA": lambda: Image.merge("RGBA", rgba.split()),
         "tobytes RGBA BGRA": lambda: rgba.tobytes("raw", "BGRA"),
         "tobytes RGB BGR": lambda: rgb.tobytes("raw", "BGR"),
-        "frombytes RGB BGR": lambda b=rgb.tobytes(): Image.frombytes(
-            "RGB", (w, h), b, "raw", "BGR"
+        "frombytes RGB BGR": functools.partial(
+            Image.frombytes, "RGB", (w, h), rgb.tobytes(), "raw", "BGR"
         ),
-        "frombytes RGBA BGRA": lambda b=rgba.tobytes(): Image.frombytes(
-            "RGBA", (w, h), b, "raw", "BGRA"
+        "frombytes RGBA BGRA": functools.partial(
+            Image.frombytes, "RGBA", (w, h), rgba.tobytes(), "raw", "BGRA"
         ),
         "pixel access 20k": pixel_access,
         "get_flattened_data L": lambda: list(L.get_flattened_data())[:: w + 1],

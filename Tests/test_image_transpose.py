@@ -149,6 +149,16 @@ def test_roundtrip(mode: str) -> None:
     )
 
 
+def _pixels(im: Image.Image) -> memoryview:
+    # The image's pixels as items of its pixel size
+    data = memoryview(im.tobytes())
+    if im.mode == "L":
+        return data.cast("B")
+    if im.mode == "I;16":
+        return data.cast("H")
+    return data.cast("I")
+
+
 @pytest.mark.parametrize("mode", ("L", "RGBA", "I", "I;16"))
 @pytest.mark.parametrize(
     "size", ((1, 1), (3, 5), (8, 8), (37, 29), (530, 13), (11, 523), (520, 515))
@@ -160,7 +170,7 @@ def test_rotations_match_columns(mode: str, size: tuple[int, int]) -> None:
     im = Image.frombytes(
         mode, size, data[: xsize * ysize * {"L": 1, "I;16": 2}.get(mode, 4)]
     )
-    pixels = memoryview(im.tobytes()).cast({"L": "B", "I;16": "H"}.get(mode, "I"))
+    pixels = _pixels(im)
 
     def column(x: int, reverse: bool) -> bytes:
         values = pixels[x::xsize]
@@ -188,7 +198,7 @@ def test_flips_match_rows(mode: str, size: tuple[int, int]) -> None:
     im = Image.frombytes(
         mode, size, data[: xsize * ysize * {"L": 1, "I;16": 2}.get(mode, 4)]
     )
-    pixels = memoryview(im.tobytes()).cast({"L": "B", "I;16": "H"}.get(mode, "I"))
+    pixels = _pixels(im)
     rows = [pixels[y * xsize : (y + 1) * xsize][::-1].tobytes() for y in range(ysize)]
 
     assert im.transpose(Transpose.FLIP_LEFT_RIGHT).tobytes() == b"".join(rows)
