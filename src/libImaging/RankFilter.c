@@ -496,6 +496,25 @@ nomemory:
     return (Imaging)ImagingError_MemoryError();
 }
 
+/* Whether ImagingRankFilterSameSize filters all bands of im at once
+   faster than band by band. For 4-byte pixels it filters every byte,
+   padding included, so it only pays off where the work per byte is small
+   (minimum, maximum, the vector 3 x 3 median) or there is no padding. */
+int
+ImagingRankFilterAllBands(Imaging im, int size, int rank) {
+    if (!im || im->type != IMAGING_TYPE_UINT8 || !im->image32 || im->pixelsize != 4 ||
+        size < 3 || !(size & 1) || size > RANK_NETWORK_MAX || rank < 0 ||
+        rank >= size * size) {
+        return 0;
+    }
+#if defined(RANK_VEC)
+    if (size == 3 && rank == 4) {
+        return 1;
+    }
+#endif
+    return rank == 0 || rank == size * size - 1 || im->bands == 4;
+}
+
 /* As ImagingRankFilter on im expanded by (size - 1) / 2 pixels that repeat
    its edges, without making the expanded copy where the fast paths can
    read the edges themselves. Those also take images of several 8-bit

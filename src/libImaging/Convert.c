@@ -142,12 +142,23 @@ la2lA(UINT8 *out, const UINT8 *in, int xsize) {
 
 static void
 l2rgb(UINT8 *out, const UINT8 *in, int xsize) {
-    /* Whole pixels, which the compiler vectorizes; byte stores it doesn't. */
     int x;
+#if defined(IMAGING_SIMD_SSE4)
+    /* Whole pixels, which compilers vectorize for x86; byte stores they
+       don't. On arm64 they turn the byte stores into st4, which is faster. */
     for (x = 0; x < xsize; x++) {
         UINT32 v = MAKE_UINT32(in[x], in[x], in[x], 255);
         memcpy(out + x * 4, &v, sizeof(v));
     }
+#else
+    for (x = 0; x < xsize; x++) {
+        UINT8 v = *in++;
+        *out++ = v;
+        *out++ = v;
+        *out++ = v;
+        *out++ = 255;
+    }
+#endif
 }
 
 static void
@@ -743,15 +754,25 @@ hsv2rgb(UINT8 *out, const UINT8 *in, int xsize) {  // following colorsys.py
 
 static void
 rgb2rgba(UINT8 *out, const UINT8 *in, int xsize) {
-    /* Whole pixels, which the compiler vectorizes; byte stores it doesn't. */
-    const UINT32 alpha = MAKE_UINT32(0, 0, 0, 255);
     int x;
+#if defined(IMAGING_SIMD_SSE4)
+    /* As in l2rgb. */
+    const UINT32 alpha = MAKE_UINT32(0, 0, 0, 255);
     for (x = 0; x < xsize; x++) {
         UINT32 v;
         memcpy(&v, in + x * 4, sizeof(v));
         v |= alpha;
         memcpy(out + x * 4, &v, sizeof(v));
     }
+#else
+    for (x = 0; x < xsize; x++) {
+        *out++ = *in++;
+        *out++ = *in++;
+        *out++ = *in++;
+        *out++ = 255;
+        in++;
+    }
+#endif
 }
 
 static void
