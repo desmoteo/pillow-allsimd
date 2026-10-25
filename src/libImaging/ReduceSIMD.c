@@ -668,6 +668,50 @@ ImagingReduceNxN_4u8_neon(
     }
 }
 
+/* Any scale with xscale up to 512: one output pixel at a time. Each row
+   of its block is summed 4, 2 and 1 pixels at a time in 16-bit lanes; the
+   pixels alternate between the two halves, so a lane holds at most 256
+   bytes. The rows are summed in 32 bits. */
+static void
+ImagingReduceNxN_4u8_neon_wide(
+    Imaging imOut, Imaging imIn, int box[4], int xscale, int yscale
+) {
+    int x, y, yy, k;
+    UINT32 multiplier = division_UINT32(yscale * xscale, 8);
+    UINT32 amend = yscale * xscale / 2;
+    uint32x4_t mm_multiplier = vdupq_n_u32(multiplier);
+
+    for (y = 0; y < box[3] / yscale; y++) {
+        int yy_from = box[1] + y * yscale;
+        UINT32 *out = (UINT32 *)imOut->image[y];
+        for (x = 0; x < box[2] / xscale; x++) {
+            int xx = box[0] + x * xscale;
+            uint32x4_t ss = vdupq_n_u32(amend);
+            for (yy = yy_from; yy < yy_from + yscale; yy++) {
+                const UINT8 *p = (UINT8 *)imIn->image[yy] + xx * 4;
+                uint16x8_t row = vdupq_n_u16(0);
+                for (k = 0; k < xscale - 3; k += 4) {
+                    uint8x16_t v = vld1q_u8(p + k * 4);
+                    row = vaddw_high_u8(vaddw_u8(row, vget_low_u8(v)), v);
+                }
+                if (k < xscale - 1) {
+                    row = vaddw_u8(row, vld1_u8(p + k * 4));
+                    k += 2;
+                }
+                if (k < xscale) {
+                    UINT32 v;
+                    memcpy(&v, p + k * 4, sizeof(v));
+                    row = vaddw_u8(row, vcreate_u8(v));
+                }
+                ss = vaddq_u32(ss, vaddl_u16(vget_low_u16(row), vget_high_u16(row)));
+            }
+            ss = vshrq_n_u32(vmulq_u32(ss, mm_multiplier), 24);
+            uint8x8_t px = vmovn_u16(vcombine_u16(vmovn_u32(ss), vdup_n_u16(0)));
+            out[x] = vget_lane_u32(vreinterpret_u32_u8(px), 0);
+        }
+    }
+}
+
 static void
 ImagingReduce1x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
     int x, y;
@@ -729,6 +773,8 @@ ImagingReduce_4u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscal
         ImagingReduce2x2_4u8(imOut, imIn, box);
     } else if (xscale <= 4 && yscale <= 16) {
         ImagingReduceNxN_4u8_neon(imOut, imIn, box, xscale, yscale);
+    } else if (xscale <= 512) {
+        ImagingReduceNxN_4u8_neon_wide(imOut, imIn, box, xscale, yscale);
     } else {
         return 0;
     }

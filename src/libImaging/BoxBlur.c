@@ -198,13 +198,22 @@ void static inline ImagingLineBoxBlurZero8(
     }
 }
 
-#if defined(IMAGING_SIMD_SSE4)
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+#define BLUR_4_ROWS
 /* 1-byte images are blurred four rows at a time: byte x of rows 0..3 become
    the four channels of pixel x of a 4-byte row, which the 4-byte line blur
    processes with the same arithmetic per byte. */
 static void
 interleave4(UINT32 *out, UINT8 *in0, UINT8 *in1, UINT8 *in2, UINT8 *in3, int xsize) {
     int x = 0;
+#if defined(IMAGING_SIMD_NEON)
+    for (; x < xsize - 15; x += 16) {
+        uint8x16x4_t v = {
+            {vld1q_u8(&in0[x]), vld1q_u8(&in1[x]), vld1q_u8(&in2[x]), vld1q_u8(&in3[x])}
+        };
+        vst4q_u8((UINT8 *)&out[x], v);
+    }
+#else
     for (; x < xsize - 15; x += 16) {
         __m128i a = _mm_loadu_si128((__m128i *)&in0[x]);
         __m128i b = _mm_loadu_si128((__m128i *)&in1[x]);
@@ -217,6 +226,7 @@ interleave4(UINT32 *out, UINT8 *in0, UINT8 *in1, UINT8 *in2, UINT8 *in3, int xsi
         _mm_storeu_si128((__m128i *)&out[x + 8], _mm_unpacklo_epi16(ab_hi, cd_hi));
         _mm_storeu_si128((__m128i *)&out[x + 12], _mm_unpackhi_epi16(ab_hi, cd_hi));
     }
+#endif
     for (; x < xsize; x++) {
         out[x] = MAKE_UINT32(in0[x], in1[x], in2[x], in3[x]);
     }
@@ -227,6 +237,15 @@ deinterleave4(
     UINT8 *out0, UINT8 *out1, UINT8 *out2, UINT8 *out3, UINT32 *in, int xsize
 ) {
     int x = 0;
+#if defined(IMAGING_SIMD_NEON)
+    for (; x < xsize - 15; x += 16) {
+        uint8x16x4_t v = vld4q_u8((UINT8 *)&in[x]);
+        vst1q_u8(&out0[x], v.val[0]);
+        vst1q_u8(&out1[x], v.val[1]);
+        vst1q_u8(&out2[x], v.val[2]);
+        vst1q_u8(&out3[x], v.val[3]);
+    }
+#else
     __m128i by_row =
         _mm_setr_epi8(0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15);
     for (; x < xsize - 15; x += 16) {
@@ -242,6 +261,7 @@ deinterleave4(
         _mm_storeu_si128((__m128i *)&out2[x], _mm_unpacklo_epi64(t2, t3));
         _mm_storeu_si128((__m128i *)&out3[x], _mm_unpackhi_epi64(t2, t3));
     }
+#endif
     for (; x < xsize; x++) {
         UINT8 *p = (UINT8 *)&in[x];
         out0[x] = p[0];
@@ -277,7 +297,7 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius) {
 
     if (imIn->image8) {
         y = 0;
-#if defined(IMAGING_SIMD_SSE4)
+#if defined(BLUR_4_ROWS)
         UINT32 *lineIn4 = malloc(imIn->xsize * sizeof(UINT32));
         if (lineIn4 == NULL) {
             ImagingSectionLeave(&cookie);
