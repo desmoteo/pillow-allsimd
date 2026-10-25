@@ -364,7 +364,7 @@ def _(upd: Update) -> None:
     for mode in ("L", "LA", "RGB", "RGBA"):
         for size in ((1, 1), (5, 9), (67, 23), (203, 71)):
             im = noise(mode, size, size[1])
-            for r in (0.4, 1, 2.5, 3, 3.6, 7, 40):
+            for r in (0.4, 1, 2, 2.5, 3, 3.6, 4, 7, 40):
                 upd(im.filter(ImageFilter.BoxBlur(r)).tobytes())
                 upd(im.filter(ImageFilter.GaussianBlur(r)).tobytes())
                 upd(im.filter(ImageFilter.GaussianBlur((r, r / 3))).tobytes())
