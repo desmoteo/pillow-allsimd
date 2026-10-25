@@ -343,6 +343,17 @@ def test_rankfilter_3x3_all_ranks(mode: str, size: tuple[int, int]) -> None:
         assert list(out.get_flattened_data()) == _rank_reference(im, 3, rank)
 
 
+@pytest.mark.parametrize("filter_size", (5, 7, 9, 11))
+@pytest.mark.parametrize("size", ((1, 1), (6, 5), (259, 3)))
+def test_rankfilter_network_ranks(filter_size: int, size: tuple[int, int]) -> None:
+    # 1-byte images use a sorting network, pruned for the rank, up to 11x11.
+    im = hopper("L").resize(size)
+    n = filter_size * filter_size
+    for rank in sorted({0, 1, n // 3, n // 2, n - 2, n - 1} | set(range(0, n, 7))):
+        out = im.filter(ImageFilter.RankFilter(filter_size, rank))
+        assert list(out.get_flattened_data()) == _rank_reference(im, filter_size, rank)
+
+
 @pytest.mark.parametrize("filter_size", (3, 5, 7))
 @pytest.mark.parametrize("size", ((1, 1), (6, 9), (71, 5)))
 def test_min_max_filter_any_size(filter_size: int, size: tuple[int, int]) -> None:

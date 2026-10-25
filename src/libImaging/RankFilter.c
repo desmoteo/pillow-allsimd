@@ -77,34 +77,107 @@ MakeRankFunction(UINT8) MakeRankFunction(INT32) MakeRankFunction(FLOAT32)
     }
 }
 
-/* 3x3, any rank: the nine neighbours of RANK_CHUNK output pixels are
-   sorted by a 25-comparator sorting network, then v[rank] is the result. */
-static void
-RankFilter3x3_u8(Imaging imOut, Imaging im, int rank) {
-    static const UINT8 network[25][2] = {{0, 1}, {3, 4}, {6, 7}, {1, 2}, {4, 5},
-                                         {7, 8}, {0, 1}, {3, 4}, {6, 7}, {0, 3},
-                                         {3, 6}, {0, 3}, {1, 4}, {4, 7}, {1, 4},
-                                         {2, 5}, {5, 8}, {2, 5}, {1, 3}, {5, 7},
-                                         {2, 6}, {4, 6}, {2, 4}, {2, 3}, {5, 6}};
-    UINT8 v[9][RANK_CHUNK];
-    int x0, y, i, j, c;
+/* Largest window sorted by a network; larger ones use the selection above. */
+#define RANK_NETWORK_MAX 11
 
-    // Lanes past the end of the row are sorted too; keep them defined.
-    memset(v, 0, sizeof(v));
-    for (y = 0; y < imOut->ysize; y++) {
-        for (x0 = 0; x0 < imOut->xsize; x0 += RANK_CHUNK) {
-            int n = imOut->xsize - x0 < RANK_CHUNK ? imOut->xsize - x0 : RANK_CHUNK;
-            for (i = 0; i < 3; i++) {
-                for (j = 0; j < 3; j++) {
-                    memcpy(v[i * 3 + j], &im->image8[y + i][x0 + j], n);
+/* Builds a comparator network that sorts n values, n <= 128: Batcher's
+   odd-even merge sort for the next power of two, without the comparators
+   that touch the wires past n. Those wires can be taken as holding the
+   largest value, which no comparator moves, so the rest still sorts.
+   Returns the number of comparators. */
+static int
+RankNetworkBatcher(int n, UINT8 (*network)[2]) {
+    int count = 0, size = 1, p, k, j, i;
+    while (size < n) {
+        size <<= 1;
+    }
+    for (p = 1; p < size; p <<= 1) {
+        for (k = p; k >= 1; k >>= 1) {
+            for (j = k % p; j + k < size; j += 2 * k) {
+                for (i = 0; i < k && i + j + k < size; i++) {
+                    if ((i + j) / (2 * p) == (i + j + k) / (2 * p) && i + j + k < n) {
+                        network[count][0] = (UINT8)(i + j);
+                        network[count][1] = (UINT8)(i + j + k);
+                        count++;
+                    }
                 }
             }
-            for (c = 0; c < 25; c++) {
-                RankCompareExchange(v[network[c][0]], v[network[c][1]]);
-            }
-            memcpy(&imOut->image8[y][x0], v[rank], n);
         }
     }
+    return count;
+}
+
+/* Keeps only the comparators that the value ending on wire rank depends
+   on, in order. Returns the new count. */
+static int
+RankNetworkPrune(UINT8 (*network)[2], int count, int rank) {
+    UINT8 needed[RANK_NETWORK_MAX * RANK_NETWORK_MAX] = {0};
+    int c, kept = 0;
+    needed[rank] = 1;
+    for (c = count - 1; c >= 0; c--) {
+        if (needed[network[c][0]] || needed[network[c][1]]) {
+            needed[network[c][0]] = needed[network[c][1]] = 1;
+            network[c][0] |= 0x80;  // mark as kept
+        }
+    }
+    for (c = 0; c < count; c++) {
+        if (network[c][0] & 0x80) {
+            network[kept][0] = network[c][0] & 0x7f;
+            network[kept][1] = network[c][1];
+            kept++;
+        }
+    }
+    return kept;
+}
+
+/* Size 3 to RANK_NETWORK_MAX, any rank: the size * size neighbours of
+   RANK_CHUNK output pixels go through a sorting network, pruned to what
+   wire rank needs, and v[rank] is the result. Each compare-exchange is a
+   minimum and a maximum over a row of bytes, which compilers vectorise.
+   Returns 0 if out of memory. */
+static int
+RankFilterNetwork_u8(Imaging imOut, Imaging im, int size, int rank) {
+    /* An optimal network for 9 values. */
+    static const UINT8 network3[25][2] = {{0, 1}, {3, 4}, {6, 7}, {1, 2}, {4, 5},
+                                          {7, 8}, {0, 1}, {3, 4}, {6, 7}, {0, 3},
+                                          {3, 6}, {0, 3}, {1, 4}, {4, 7}, {1, 4},
+                                          {2, 5}, {5, 8}, {2, 5}, {1, 3}, {5, 7},
+                                          {2, 6}, {4, 6}, {2, 4}, {2, 3}, {5, 6}};
+    /* Batcher's network for 128 values has 1471 comparators. */
+    UINT8 network[1471][2];
+    int n = size * size, count, x0, y, i, j, c;
+    UINT8(*v)[RANK_CHUNK];
+
+    if (size == 3) {
+        memcpy(network, network3, sizeof(network3));
+        count = 25;
+    } else {
+        count = RankNetworkBatcher(n, network);
+    }
+    count = RankNetworkPrune(network, count, rank);
+
+    v = malloc((size_t)n * RANK_CHUNK);
+    if (!v) {
+        return 0;
+    }
+    // Lanes past the end of the row are sorted too; keep them defined.
+    memset(v, 0, (size_t)n * RANK_CHUNK);
+    for (y = 0; y < imOut->ysize; y++) {
+        for (x0 = 0; x0 < imOut->xsize; x0 += RANK_CHUNK) {
+            int w = imOut->xsize - x0 < RANK_CHUNK ? imOut->xsize - x0 : RANK_CHUNK;
+            for (i = 0; i < size; i++) {
+                for (j = 0; j < size; j++) {
+                    memcpy(v[i * size + j], &im->image8[y + i][x0 + j], w);
+                }
+            }
+            for (c = 0; c < count; c++) {
+                RankCompareExchange(v[network[c][0]], v[network[c][1]]);
+            }
+            memcpy(&imOut->image8[y][x0], v[rank], w);
+        }
+    }
+    free(v);
+    return 1;
 }
 
 /* Minimum (rank 0) or maximum (rank size * size - 1) of any size: of each
@@ -221,8 +294,11 @@ ImagingRankFilter(Imaging im, int size, int rank) {
             ImagingSectionLeave(&cookie);
             goto nomemory;
         }
-    } else if (im->image8 && size == 3) {
-        RankFilter3x3_u8(imOut, im, rank);
+    } else if (im->image8 && size >= 3 && size <= RANK_NETWORK_MAX) {
+        if (!RankFilterNetwork_u8(imOut, im, size, rank)) {
+            ImagingSectionLeave(&cookie);
+            goto nomemory;
+        }
     } else if (im->image8) {
         RANK_BODY(UINT8);
     } else if (im->type == IMAGING_TYPE_INT32) {
