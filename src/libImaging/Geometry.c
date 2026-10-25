@@ -1364,11 +1364,15 @@ ImagingGenericTransform(
     }
 
 #if defined(TRANSFORM_SIMD)
-    /* Direct calls, which the compiler inlines, for the common case. */
+    /* Direct calls, which the compiler inlines, for the common cases.
+       Perspective transforms gain nothing from it: their two divisions
+       per pixel dominate. */
     if (transform == affine_transform && filter == bilinear_filter32RGB_simd) {
         TRANSFORM_TILES(affine_transform, bilinear_filter32RGB_simd)
     } else if (transform == affine_transform && filter == bicubic_filter32RGB_simd) {
         TRANSFORM_TILES(affine_transform, bicubic_filter32RGB_simd)
+    } else if (transform == quad_transform && filter == bilinear_filter32RGB_simd) {
+        TRANSFORM_TILES(quad_transform, bilinear_filter32RGB_simd)
     } else
 #endif
     {
