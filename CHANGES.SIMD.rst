@@ -14,6 +14,11 @@ Based on Pillow 13.0.0
   unsharp mask row, which beat the compiler's code with GCC 12 and 14
   (gaussian RGB 1.27x, unsharp RGB 1.31x on Cortex-A78AE); 13.0's
   histogram loops on arm64 (1.1x)
+- Rank, median, minimum and maximum filters of 1-byte images up to 11x11
+  use a sorting network pruned for the rank, vectorised by the compiler:
+  median 5 65x, rank 7 50x faster than Pillow 13.0 (2560x1600)
+- x86: RGBa -> RGBA is exact (colour above alpha gave 0, alpha 0 gave
+  colour 0); slightly slower
 - ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a
   container, on a remote host or locally, so the host's Python version does
   not matter
