@@ -95,6 +95,7 @@ typedef struct {
     int index, load_flags, stroke_filled, used;
     FT_Fixed stroke; /* stroke radius in 26.6, 0 if not stroked */
     int left, top;   /* bitmap offsets from the pen position */
+    FT_Pos advance;  /* horizontal advance, in entries for it */
     int width, rows; /* in pixels; pitch is width * bytes per pixel */
     int pitch;
     int has_bitmap; /* FreeType gave a buffer */
@@ -399,6 +400,9 @@ failed:
 
 #endif
 
+static int
+glyph_advance(FontObject *self, int index, int load_flags, FT_Pos *advance);
+
 static size_t
 text_layout_fallback(
     PyObject *string,
@@ -410,11 +414,11 @@ text_layout_fallback(
     int mask,
     int color
 ) {
-    int error, load_flags, i;
+    int load_flags, i;
     char *buffer = NULL;
     FT_ULong ch;
     Py_ssize_t count;
-    FT_GlyphSlot glyph;
+    FT_Pos advance;
     FT_Bool kerning = FT_HAS_KERNING(self->face);
     FT_UInt last_index = 0;
 
@@ -459,12 +463,9 @@ text_layout_fallback(
             ch = PyUnicode_READ_CHAR(string, i);
         }
         (*glyph_info)[i].index = FT_Get_Char_Index(self->face, ch);
-        error = FT_Load_Glyph(self->face, (*glyph_info)[i].index, load_flags);
-        if (error) {
-            geterror(error);
+        if (!glyph_advance(self, (*glyph_info)[i].index, load_flags, &advance)) {
             return 0;
         }
-        glyph = self->face->glyph;
         (*glyph_info)[i].x_offset = 0;
         (*glyph_info)[i].y_offset = 0;
         if (kerning && last_index && (*glyph_info)[i].index) {
@@ -481,7 +482,7 @@ text_layout_fallback(
             }
         }
 
-        (*glyph_info)[i].x_advance = glyph->metrics.horiAdvance;
+        (*glyph_info)[i].x_advance = advance;
         // y_advance is only used in ttb, which is not supported by basic layout
         (*glyph_info)[i].y_advance = 0;
         last_index = (*glyph_info)[i].index;
@@ -627,6 +628,36 @@ glyph_bbox(FontObject *self, int index, int load_flags, FT_BBox *bbox) {
     }
     bbox->xMin = e->left, bbox->yMax = e->top;
     bbox->xMax = e->width, bbox->yMin = e->rows;
+    return 1;
+}
+
+/* The horizontal advance of a glyph as loaded with load_flags, for the
+   basic layout, from the cache: loading the glyph for it took most of the
+   time of measuring and drawing text. Entries for advances have
+   stroke_filled -2. Returns 0 on errors, with an exception set. */
+static int
+glyph_advance(FontObject *self, int index, int load_flags, FT_Pos *advance) {
+    GlyphCacheEntry *e;
+    int error;
+    if (!glyph_get_reserve(self)) {
+        PyErr_NoMemory();
+        return 0;
+    }
+    e = glyph_cache_slot(self, index, load_flags, 0, -2);
+    if (!e->used) {
+        error = FT_Load_Glyph(self->face, index, load_flags);
+        if (error) {
+            geterror(error);
+            return 0;
+        }
+        memset(e, 0, sizeof(*e));
+        e->index = index, e->load_flags = load_flags, e->stroke_filled = -2;
+        e->advance = self->face->glyph->metrics.horiAdvance;
+        e->used = 1;
+        self->glyph_cache_count++;
+        self->glyph_cache_bytes += sizeof(*e);
+    }
+    *advance = e->advance;
     return 1;
 }
 
