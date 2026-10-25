@@ -243,6 +243,9 @@ def worker(
                     for v in items
                 )
             result["ops"][name] = base64.b64encode(data).decode()
+            # Histogram counts and other numbers are compared as 4-byte values.
+            ints = not isinstance(out, bytes) and all(isinstance(v, int) for v in items)
+            result.setdefault("itemsize", {})[name] = 4 if ints else 1
     print(json.dumps(result))
 
 
@@ -387,12 +390,12 @@ def main() -> int:
         print(row)
 
     if args.check:
-        outputs = {
-            n: run_worker(variants[n], "check", (67, 23), args.only, None, args.set)[
-                "ops"
-            ]
+        checks = {
+            n: run_worker(variants[n], "check", (67, 23), args.only, None, args.set)
             for n in names
         }
+        outputs = {n: r["ops"] for n, r in checks.items()}
+        itemsize = checks[baseline].get("itemsize", {})
         report["check"] = {}
         print(f"\nOutput differences vs {baseline} (67x23 images):")
         for n in others:
@@ -400,8 +403,19 @@ def main() -> int:
             for op, b64 in outputs[baseline].items():
                 a, b = base64.b64decode(b64), base64.b64decode(outputs[n][op])
                 if a != b:
+                    size = itemsize.get(op, 1)
+                    av = [
+                        int.from_bytes(a[i : i + size], "little")
+                        for i in range(0, len(a), size)
+                    ]
+                    bv = [
+                        int.from_bytes(b[i : i + size], "little")
+                        for i in range(0, len(b), size)
+                    ]
                     dv = (
-                        [abs(x - y) for x, y in zip(a, b)] if len(a) == len(b) else [-1]
+                        [abs(x - y) for x, y in zip(av, bv)]
+                        if len(av) == len(bv)
+                        else [-1]
                     )
                     diffs[op] = {"max": max(dv), "count": sum(1 for v in dv if v)}
             report["check"][n] = diffs

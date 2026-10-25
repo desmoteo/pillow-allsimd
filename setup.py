@@ -1018,6 +1018,11 @@ class pil_build_ext(build_ext):
         target = sysconfig.get_platform().lower()
         if target.endswith("universal2"):
             return ["x86_64", "arm64"]
+        # The architecture isn't always last: mingw_x86_64_ucrt,
+        # ios-13.0-arm64-iphoneos, android-24-arm64_v8a.
+        match = re.search(r"x86_64|amd64|aarch64|arm64|i386|i686", target)
+        if match:
+            return [match.group(0)]
         return [target.rsplit("-", 1)[-1] if "-" in target else target]
 
     def _configure_simd(self) -> str:

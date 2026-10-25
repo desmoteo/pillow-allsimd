@@ -466,24 +466,37 @@ ImagingVerticalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius) {
         return ImagingError_MemoryError();
     }
 
-#define ROW(i) ((UINT8 *)imIn->image[(i) < 0 ? 0 : ((i) > lasty ? lasty : (i))])
+/* Row index i (64-bit, as y + radius can exceed INT_MAX) clamped to the image. */
+#define ROW(i) ((UINT8 *)imIn->image[(i) < 0 ? 0 : ((i) > lasty ? lasty : (int)(i))])
 
     ImagingSectionEnter(&cookie);
 
-    /* Window for row -1: rows -radius-1 .. radius-1. */
-    for (i = -radius - 1; i < radius; i++) {
-        UINT8 *row = ROW(i);
+    /* Window for row -1: rows -radius-1 .. radius-1. The radius + 1 rows
+       before the image repeat row 0 and those after it repeat the last row,
+       so they are added by multiplication, and the cost doesn't grow with
+       the radius. The sums are the same modulo 2^32. */
+    {
+        int inside = radius - 1 < lasty ? radius - 1 : lasty;
+        UINT32 after = radius - 1 > lasty ? (UINT32)(radius - 1 - lasty) : 0;
+        UINT8 *first = ROW(0), *last = ROW(lasty);
         for (b = 0; b < size; b++) {
-            acc[b] += row[b];
+            acc[b] = first[b] * (UINT32)(radius + 1) + last[b] * after;
+        }
+        for (i = 0; i <= inside; i++) {
+            UINT8 *row = ROW(i);
+            for (b = 0; b < size; b++) {
+                acc[b] += row[b];
+            }
         }
     }
     for (y = 0; y <= lasty; y++) {
+        long long yl = y;
         ImagingBoxBlurColumns(
             (UINT8 *)imOut->image[y],
             acc,
-            ROW(y + radius),
-            ROW(y - radius - 1),
-            ROW(y + radius + 1),
+            ROW(yl + radius),
+            ROW(yl - radius - 1),
+            ROW(yl + radius + 1),
             size,
             ww,
             fw

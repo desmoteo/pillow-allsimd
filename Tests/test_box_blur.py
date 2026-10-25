@@ -337,3 +337,15 @@ def test_l_matches_rgb_band(radius: float, size: tuple[int, int]) -> None:
     rgb = Image.merge("RGB", (im, im, im))
     for f in (ImageFilter.BoxBlur(radius), ImageFilter.GaussianBlur(radius)):
         assert_image_equal(im.filter(f), rgb.filter(f).getchannel(0))
+
+
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA"))
+@pytest.mark.parametrize("radius", (0.5, 3, 7.4, 30, 10**6))
+def test_vertical_matches_transposed_horizontal(mode: str, radius: float) -> None:
+    # The vertical pass works on rows of the image, the horizontal one on
+    # pixels of a row; the result must be the same as blurring the transposed
+    # image horizontally. Radii much larger than the image must also be fast.
+    im = hopper(mode).resize((13, 9))
+    t = Image.Transpose.TRANSPOSE
+    expected = box_blur_axes(im.transpose(t), (radius, 0), 2).transpose(t)
+    assert_image_equal(box_blur_axes(im, (0, radius), 2), expected)

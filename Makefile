@@ -59,7 +59,7 @@ help:
 # e.g. -O2: setting CFLAGS replaces Python's own, optimization level included.
 .PHONY: install
 install:
-	$(if $(OPTIMIZE),CFLAGS="$(OPTIMIZE)") python3 -m pip -v install . $(if $(SIMD),-C simd=$(SIMD))
+	$(if $(OPTIMIZE),CFLAGS="$(strip $(CFLAGS) $(OPTIMIZE))") python3 -m pip -v install . $(if $(SIMD),-C simd=$(SIMD))
 	python3 selftest.py
 
 .PHONY: install-coverage
