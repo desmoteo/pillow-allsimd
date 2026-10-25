@@ -767,8 +767,12 @@ nearest_filter32(void *out, Imaging im, double xin, double yin) {
 #define XCLIP(x) (((x) < 0) ? 0 : ((x) < xsize) ? (x) : xsize - 1)
 #define YCLIP(y) (((y) < 0) ? 0 : ((y) < ysize) ? (y) : ysize - 1)
 
-/* Vector filters for 3- and 4-band 8-bit images, below. */
-#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+/* Vector filters for 3- and 4-band 8-bit images, below. Not on arm64: a
+   NEON version (two float64x2_t, contracted to FMA like the scalar code)
+   was 4% faster for bilinear but 12% slower for bicubic and 9% slower for
+   perspective transforms than GCC's code for the scalar filters on a
+   Cortex-A78AE. */
+#if defined(IMAGING_SIMD_SSE4)
 #define TRANSFORM_SIMD
 #endif
 
@@ -1011,8 +1015,7 @@ bicubic_filter32RGB(void *out, Imaging im, double xin, double yin) {
    channels of a pixel side by side: one 256-bit vector of doubles with AVX2,
    two 128-bit vectors otherwise. Each channel goes through the same
    operations in the same order as the scalar filters above, in double, so
-   the results are identical: x86 builds don't contract them to FMA, and
-   on arm64 the vector expressions contract where the scalar ones do. */
+   the results are identical; x86 builds don't contract them to FMA. */
 /* Constant sizes, so that the copies are inlined. */
 static inline void
 tv_store_bands(UINT8 *out, INT32 pixel, int bands) {
@@ -1062,7 +1065,7 @@ tv_store(UINT8 *out, transform_vec v, int bands) {
     pixel = _mm_cvtsi128_si32(i);
     tv_store_bands(out, pixel, bands);
 }
-#elif defined(IMAGING_SIMD_SSE4)
+#else
 typedef struct {
     __m128d lo, hi;
 } transform_vec;
@@ -1109,61 +1112,6 @@ tv_store(UINT8 *out, transform_vec v, int bands) {
     i = _mm_packus_epi16(_mm_packus_epi32(i, i), i);
     pixel = _mm_cvtsi128_si32(i);
     tv_store_bands(out, pixel, bands);
-}
-#else
-typedef struct {
-    float64x2_t lo, hi;
-} transform_vec;
-
-static inline transform_vec
-tv_load(const UINT8 *p) {
-    UINT32 v;
-    uint32x4_t i;
-    memcpy(&v, p, sizeof(v));
-    i = vmovl_u16(vget_low_u16(vmovl_u8(vreinterpret_u8_u32(vdup_n_u32(v)))));
-    transform_vec r = {
-        vcvtq_f64_u64(vmovl_u32(vget_low_u32(i))), vcvtq_f64_u64(vmovl_high_u32(i))
-    };
-    return r;
-}
-
-static inline transform_vec
-tv_set1(double d) {
-    transform_vec v = {vdupq_n_f64(d), vdupq_n_f64(d)};
-    return v;
-}
-
-/* Operators rather than intrinsics: GCC then fuses multiplies and adds
-   into FMA exactly where it fuses those of the scalar filters, which it
-   does by default on arm64, and the results stay identical. */
-static inline transform_vec
-tv_add(transform_vec a, transform_vec b) {
-    transform_vec v = {a.lo + b.lo, a.hi + b.hi};
-    return v;
-}
-
-static inline transform_vec
-tv_sub(transform_vec a, transform_vec b) {
-    transform_vec v = {a.lo - b.lo, a.hi - b.hi};
-    return v;
-}
-
-static inline transform_vec
-tv_mul(transform_vec a, transform_vec b) {
-    transform_vec v = {a.lo * b.lo, a.hi * b.hi};
-    return v;
-}
-
-/* Truncates to integers in 0..255 and stores 3 or 4 bytes. */
-static inline void
-tv_store(UINT8 *out, transform_vec v, int bands) {
-    float64x2_t zero = vdupq_n_f64(0.0), max = vdupq_n_f64(255.0);
-    int64x2_t lo = vcvtq_s64_f64(vminq_f64(vmaxq_f64(v.lo, zero), max));
-    int64x2_t hi = vcvtq_s64_f64(vminq_f64(vmaxq_f64(v.hi, zero), max));
-    uint16x4_t w =
-        vmovn_u32(vreinterpretq_u32_s32(vcombine_s32(vmovn_s64(lo), vmovn_s64(hi))));
-    uint8x8_t b = vmovn_u16(vcombine_u16(w, w));
-    tv_store_bands(out, vget_lane_s32(vreinterpret_s32_u8(b), 0), bands);
 }
 #endif
 

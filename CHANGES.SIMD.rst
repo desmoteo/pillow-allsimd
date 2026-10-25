@@ -45,9 +45,6 @@ Based on Pillow 13.0.0
   compiler vectorizes (1.6x to 2.9x; the AVX2 build's CMYK was 15% slower
   than SSE4); ImageChops add and subtract with scale 1 in integers, other
   scales by table, lighter and darker without clipping (add 1.6x)
-- arm64: rotate and transform with bilinear and bicubic filters for 3-
-  and 4-band images in NEON vectors of doubles, written so that GCC fuses
-  the multiply-adds where it fuses the scalar ones (same output)
 - BoxBlur, GaussianBlur, UnsharpMask: the passes of each direction run
   together, every horizontal pass on a row while it is in cache, the
   vertical ones in one sweep with a ring of rows per pass; AVX2 blurs two
