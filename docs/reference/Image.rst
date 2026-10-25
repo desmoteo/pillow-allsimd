@@ -113,6 +113,15 @@ Registering plugins
 .. autofunction:: register_decoder
 .. autofunction:: register_encoder
 
+Fast mode
+^^^^^^^^^
+
+Pillow-SIMD only; see :ref:`fast-mode`.
+
+.. autofunction:: set_fast
+.. autofunction:: get_fast
+.. autoclass:: fast_mode
+
 The Image class
 ---------------
 

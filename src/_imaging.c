@@ -4818,6 +4818,21 @@ _get_use_block_allocator(PyObject *self, PyObject *args) {
 }
 
 static PyObject *
+_set_fast(PyObject *self, PyObject *args) {
+    int enabled;
+    if (!PyArg_ParseTuple(args, "i:set_fast", &enabled)) {
+        return NULL;
+    }
+    ImagingSetFast(enabled ? IMAGING_FAST_ALL : 0);
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+_get_fast(PyObject *self, PyObject *args) {
+    return PyBool_FromLong(ImagingGetFast() != 0);
+}
+
+static PyObject *
 _clear_cache(PyObject *self, PyObject *args) {
     int i = 0;
 
@@ -5028,6 +5043,8 @@ static PyMethodDef functions[] = {
     {"set_blocks_max", (PyCFunction)_set_blocks_max, METH_VARARGS},
     {"set_use_block_allocator", (PyCFunction)_set_use_block_allocator, METH_VARARGS},
     {"clear_cache", (PyCFunction)_clear_cache, METH_VARARGS},
+    {"get_fast", (PyCFunction)_get_fast, METH_NOARGS},
+    {"set_fast", (PyCFunction)_set_fast, METH_VARARGS},
 
     {NULL, NULL} /* sentinel */
 };
@@ -5207,6 +5224,11 @@ setup_module(PyObject *m) {
     have_xcb = Py_False;
 #endif
     if (PyModule_AddObjectRef(m, "HAVE_XCB", have_xcb) < 0) {
+        return -1;
+    }
+
+    /* Pillow-SIMD's fast mode (set_fast, get_fast) */
+    if (PyModule_AddObjectRef(m, "HAVE_FAST", Py_True) < 0) {
         return -1;
     }
 

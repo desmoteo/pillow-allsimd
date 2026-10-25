@@ -71,6 +71,11 @@ Based on Pillow 13.0.0
 - ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a
   container, on a remote host or locally, so the host's Python version does
   not matter
+- Fast mode switch: ``PILLOW_SIMD_FAST=1``, ``Image.set_fast()``,
+  ``Image.get_fast()``, ``Image.fast_mode()`` and the ``fast`` feature.
+  Off by default; it will let operations use kernels whose results may
+  differ from Pillow's by small, documented amounts. No operation has a fast
+  kernel yet (see ``APPROXIMATE_KERNELS_PLAN.md``)
 - Pixel conversions written so that they vectorize under Python's
   ``-fno-strict-overflow`` (RGBA -> RGB 1.9x, RGB -> RGBA 1.9x, L -> RGB
   2.1x with AVX2); NEON loops for L -> RGB, RGB <-> RGBA and CMYK
