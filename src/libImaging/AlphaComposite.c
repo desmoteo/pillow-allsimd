@@ -237,6 +237,71 @@ alpha_composite_8px(__m256i mm_dst, __m256i mm_src) {
     )
 #endif
 
+/* Composites one row of xsize pixels: out may be dst, for in place. */
+static void
+alpha_composite_row(
+    rgba8 *out, const rgba8 *dst, const rgba8 *restrict src, int xsize
+) {
+    int x = 0;
+
+#if defined(IMAGING_SIMD_AVX2)
+    for (; x < xsize - 7; x += 8) {
+        _mm256_storeu_si256(
+            (__m256i *)&out[x],
+            alpha_composite_8px(
+                _mm256_loadu_si256((__m256i *)&dst[x]),
+                _mm256_loadu_si256((__m256i *)&src[x])
+            )
+        );
+    }
+#endif
+
+#if defined(ALPHA_COMPOSITE_VECTOR)
+    for (; x < xsize - 3; x += 4) {
+        ALPHA_COMPOSITE_4PX(&out[x], &dst[x], &src[x]);
+    }
+    if (x < xsize) {
+        // Run the remaining pixels through the same vector code.
+        rgba8 tmp_dst[4] = {{0}}, tmp_src[4] = {{0}}, tmp_out[4];
+        int n = xsize - x;
+        memcpy(tmp_dst, &dst[x], n * sizeof(rgba8));
+        memcpy(tmp_src, &src[x], n * sizeof(rgba8));
+        ALPHA_COMPOSITE_4PX(tmp_out, tmp_dst, tmp_src);
+        memcpy(&out[x], tmp_out, n * sizeof(rgba8));
+    }
+#else
+    for (; x < xsize; x += 1) {
+        if (src[x].a == 0) {
+            // Copy 4 bytes at once.
+            out[x] = dst[x];
+        } else {
+            // Integer implementation with increased precision.
+            // Each variable has extra meaningful bits.
+            // Divisions are rounded.
+
+            UINT32 tmpr, tmpg, tmpb;
+            UINT32 blend = dst[x].a * (255 - src[x].a);
+            UINT32 outa255 = src[x].a * 255 + blend;
+            // There we use 7 bits for precision.
+            // We could use more, but we go beyond 32 bits.
+            UINT32 coef1 = src[x].a * 255 * 255 * (1 << PRECISION_BITS) / outa255;
+            UINT32 coef2 = 255 * (1 << PRECISION_BITS) - coef1;
+
+            tmpr = src[x].r * coef1 + dst[x].r * coef2;
+            tmpg = src[x].g * coef1 + dst[x].g * coef2;
+            tmpb = src[x].b * coef1 + dst[x].b * coef2;
+            out[x].r =
+                SHIFTFORDIV255(tmpr + (0x80 << PRECISION_BITS)) >> PRECISION_BITS;
+            out[x].g =
+                SHIFTFORDIV255(tmpg + (0x80 << PRECISION_BITS)) >> PRECISION_BITS;
+            out[x].b =
+                SHIFTFORDIV255(tmpb + (0x80 << PRECISION_BITS)) >> PRECISION_BITS;
+            out[x].a = SHIFTFORDIV255(outa255 + 0x80);
+        }
+    }
+#endif
+}
+
 /**
  * Alpha-composite imSrc over imDst, returning a newly allocated result.
  *
@@ -263,76 +328,92 @@ ImagingAlphaComposite(Imaging imDst, Imaging imSrc) {
         return NULL;
     }
 
-    // Invariant over the loop.
-    int xsize = imDst->xsize;
-    int ysize = imDst->ysize;
-
     ImagingSectionEnter(&cookie);
-    for (int y = 0; y < ysize; y++) {
-        // restrict safe: imDst/imSrc are read-only, imOut is a fresh allocation.
-        rgba8 *restrict dst = (rgba8 *)imDst->image[y];
-        rgba8 *restrict src = (rgba8 *)imSrc->image[y];
-        rgba8 *restrict out = (rgba8 *)imOut->image[y];
-        int x = 0;
-
-#if defined(IMAGING_SIMD_AVX2)
-        for (; x < xsize - 7; x += 8) {
-            _mm256_storeu_si256(
-                (__m256i *)&out[x],
-                alpha_composite_8px(
-                    _mm256_loadu_si256((__m256i *)&dst[x]),
-                    _mm256_loadu_si256((__m256i *)&src[x])
-                )
-            );
-        }
-#endif
-
-#if defined(ALPHA_COMPOSITE_VECTOR)
-        for (; x < xsize - 3; x += 4) {
-            ALPHA_COMPOSITE_4PX(&out[x], &dst[x], &src[x]);
-        }
-        if (x < xsize) {
-            // Run the remaining pixels through the same vector code.
-            rgba8 tmp_dst[4] = {{0}}, tmp_src[4] = {{0}}, tmp_out[4];
-            int n = xsize - x;
-            memcpy(tmp_dst, &dst[x], n * sizeof(rgba8));
-            memcpy(tmp_src, &src[x], n * sizeof(rgba8));
-            ALPHA_COMPOSITE_4PX(tmp_out, tmp_dst, tmp_src);
-            memcpy(&out[x], tmp_out, n * sizeof(rgba8));
-        }
-#else
-        for (; x < xsize; x += 1) {
-            if (src[x].a == 0) {
-                // Copy 4 bytes at once.
-                out[x] = dst[x];
-            } else {
-                // Integer implementation with increased precision.
-                // Each variable has extra meaningful bits.
-                // Divisions are rounded.
-
-                UINT32 tmpr, tmpg, tmpb;
-                UINT32 blend = dst[x].a * (255 - src[x].a);
-                UINT32 outa255 = src[x].a * 255 + blend;
-                // There we use 7 bits for precision.
-                // We could use more, but we go beyond 32 bits.
-                UINT32 coef1 = src[x].a * 255 * 255 * (1 << PRECISION_BITS) / outa255;
-                UINT32 coef2 = 255 * (1 << PRECISION_BITS) - coef1;
-
-                tmpr = src[x].r * coef1 + dst[x].r * coef2;
-                tmpg = src[x].g * coef1 + dst[x].g * coef2;
-                tmpb = src[x].b * coef1 + dst[x].b * coef2;
-                out[x].r =
-                    SHIFTFORDIV255(tmpr + (0x80 << PRECISION_BITS)) >> PRECISION_BITS;
-                out[x].g =
-                    SHIFTFORDIV255(tmpg + (0x80 << PRECISION_BITS)) >> PRECISION_BITS;
-                out[x].b =
-                    SHIFTFORDIV255(tmpb + (0x80 << PRECISION_BITS)) >> PRECISION_BITS;
-                out[x].a = SHIFTFORDIV255(outa255 + 0x80);
-            }
-        }
-#endif
+    for (int y = 0; y < imDst->ysize; y++) {
+        alpha_composite_row(
+            (rgba8 *)imOut->image[y],
+            (rgba8 *)imDst->image[y],
+            (rgba8 *)imSrc->image[y],
+            imDst->xsize
+        );
     }
     ImagingSectionLeave(&cookie);
 
     return imOut;
+}
+
+/* The lowest and the highest address of an image's rows. */
+static void
+image_span(Imaging im, const char **lo, const char **hi) {
+    int y;
+    *lo = *hi = NULL;
+    for (y = 0; y < im->ysize; y++) {
+        const char *row = im->image[y];
+        if (!*lo || row < *lo) {
+            *lo = row;
+        }
+        if (!*hi || row + im->linesize > *hi) {
+            *hi = row + im->linesize;
+        }
+    }
+}
+
+/**
+ * Alpha-composite the xsize x ysize pixels of imSrc at (sx, sy) over imDst
+ * at (dx, dy), in place, as compositing them onto a copy of that area and
+ * pasting it back would: each pixel's result depends only on the two
+ * pixels. The area is clipped to imDst, and must lie within imSrc.
+ *
+ * Returns 0 if the images share memory, for the caller to composite
+ * through copies; -1 on error.
+ */
+int
+ImagingAlphaCompositeOnto(
+    Imaging imDst, Imaging imSrc, int dx, int dy, int sx, int sy, int xsize, int ysize
+) {
+    ImagingSectionCookie cookie;
+    const char *dlo, *dhi, *slo, *shi;
+    int y;
+
+    if (!imDst || !imSrc ||
+        (imDst->mode != IMAGING_MODE_RGBA && imDst->mode != IMAGING_MODE_LA) ||
+        imDst->mode != imSrc->mode) {
+        (void)ImagingError_ModeError();
+        return -1;
+    }
+    if (sx < 0 || sy < 0 || xsize < 0 || ysize < 0 || xsize > imSrc->xsize - sx ||
+        ysize > imSrc->ysize - sy) {
+        (void)ImagingError_ValueError("source area outside the image");
+        return -1;
+    }
+    image_span(imDst, &dlo, &dhi);
+    image_span(imSrc, &slo, &shi);
+    if (dlo < shi && slo < dhi) {
+        return 0;
+    }
+
+    /* Clip to imDst. */
+    if (dx < 0) {
+        sx -= dx, xsize += dx, dx = 0;
+    }
+    if (dy < 0) {
+        sy -= dy, ysize += dy, dy = 0;
+    }
+    if (xsize > imDst->xsize - dx) {
+        xsize = imDst->xsize - dx;
+    }
+    if (ysize > imDst->ysize - dy) {
+        ysize = imDst->ysize - dy;
+    }
+    if (xsize <= 0 || ysize <= 0) {
+        return 1;
+    }
+
+    ImagingSectionEnter(&cookie);
+    for (y = 0; y < ysize; y++) {
+        rgba8 *dst = (rgba8 *)imDst->image[dy + y] + dx;
+        alpha_composite_row(dst, dst, (rgba8 *)imSrc->image[sy + y] + sx, xsize);
+    }
+    ImagingSectionLeave(&cookie);
+    return 1;
 }

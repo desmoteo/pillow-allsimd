@@ -1980,6 +1980,23 @@ class Image:
             msg = "Source must be non-negative"
             raise ValueError(msg)
 
+        left, top, right, bottom = overlay_crop_box
+        if (
+            self.mode == im.mode
+            and self.mode in ("RGBA", "LA")
+            and all(isinstance(v, int) for v in (*dest, *overlay_crop_box))
+            and left <= right <= im.width
+            and top <= bottom <= im.height
+        ):
+            # Within the overlay image: composite in place, without the
+            # copies below, unless the images share memory.
+            self._ensure_mutable()
+            im.load()
+            if self.im.alpha_composite_onto(
+                im.im, tuple(dest), (left, top, right - left, bottom - top)
+            ):
+                return
+
         # over image, crop if it's not the whole image.
         if overlay_crop_box == (0, 0, *im.size):
             overlay = im

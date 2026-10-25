@@ -1696,6 +1696,40 @@ _paste(ImagingObject *self, PyObject *args) {
     return result;
 }
 
+/* Composites an area of another image over this one in place, as
+   Image.alpha_composite() with a dest offset does through copies. False
+   if the images share memory, for the caller to do that instead. */
+static PyObject *
+_alpha_composite_onto(ImagingObject *self, PyObject *args) {
+    ImagingObject *src;
+    int dx, dy, sx, sy, xsize, ysize, status;
+
+    if (!PyArg_ParseTuple(
+            args,
+            "O!(ii)(iiii)",
+            &Imaging_Type,
+            &src,
+            &dx,
+            &dy,
+            &sx,
+            &sy,
+            &xsize,
+            &ysize
+        )) {
+        return NULL;
+    }
+
+    Py_BEGIN_CRITICAL_SECTION2(self, src);
+    status = ImagingAlphaCompositeOnto(
+        self->image, src->image, dx, dy, sx, sy, xsize, ysize
+    );
+    Py_END_CRITICAL_SECTION2();
+    if (status < 0) {
+        return NULL;
+    }
+    return PyBool_FromLong(status);
+}
+
 static PyObject *
 _point_impl(ImagingObject *self, PyObject *args) {
     static const char *wrong_length = "wrong number of lut entries";
@@ -4339,6 +4373,7 @@ static struct PyMethodDef methods[] = {
     {"modefilter", (PyCFunction)_modefilter, METH_VARARGS},
     {"offset", (PyCFunction)_offset, METH_VARARGS},
     {"paste", (PyCFunction)_paste, METH_VARARGS},
+    {"alpha_composite_onto", (PyCFunction)_alpha_composite_onto, METH_VARARGS},
     {"point", (PyCFunction)_point, METH_VARARGS},
     {"point_transform", (PyCFunction)_point_transform, METH_VARARGS},
     {"putdata", (PyCFunction)_putdata, METH_VARARGS},

@@ -437,6 +437,42 @@ class TestImage:
         with pytest.raises(ValueError):
             source.alpha_composite(over, (0, 0), (0, -1))
 
+    @pytest.mark.parametrize("mode", ("RGBA", "LA"))
+    def test_alpha_inplace_matches_copies(self, mode: str) -> None:
+        # The in-place path against crop, composite and paste, which it
+        # replaces where the source area is within the overlay image
+        def reference(
+            base: Image.Image,
+            over: Image.Image,
+            dest: tuple[int, int],
+            source: tuple[int, int, int, int],
+        ) -> Image.Image:
+            out = base.copy()
+            overlay = over.crop(source)
+            box = (*dest, dest[0] + overlay.width, dest[1] + overlay.height)
+            out.paste(Image.alpha_composite(out.crop(box), overlay), box)
+            return out
+
+        base = hopper("RGBA").resize((61, 47)).convert(mode)
+        base.putalpha(hopper("L").resize((61, 47)).point(lambda v: 255 - v))
+        over = hopper("RGBA").resize((37, 29)).convert(mode)
+        over.putalpha(hopper("L").resize((37, 29)))
+        for dest in ((0, 0), (5, 3), (-7, -2), (40, 30), (60, 46), (-40, 0), (61, 0)):
+            for source in (
+                (0, 0, 37, 29),
+                (3, 4, 20, 25),
+                (0, 0, 0, 0),
+                (36, 28, 37, 29),
+            ):
+                out = base.copy()
+                out.alpha_composite(over, dest, source)
+                assert_image_equal(out, reference(base, over, dest, source))
+
+        # Onto itself: the source must be read before it is overwritten
+        out = base.copy()
+        out.alpha_composite(out, (5, 3))
+        assert_image_equal(out, reference(base, base, (5, 3), (0, 0, *base.size)))
+
     def test_register_open_duplicates(self) -> None:
         # Arrange
         factory, accept = Image.OPEN["JPEG"]
