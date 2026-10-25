@@ -38,6 +38,7 @@
 
 #if defined(__linux__)
 #include <stdint.h>
+#include <stdio.h>
 #include <sys/mman.h>
 #endif
 #include <string.h>
@@ -352,15 +353,37 @@ ImagingMemoryClearCache(ImagingMemoryArena arena, int new_size) {
 /* Large blocks may use transparent huge pages, as numpy's arrays do: a
    pass over a 16 MB image then touches 8 pages instead of 4096, with fewer
    TLB misses and no prefetch stop every 4 KB. Linux only, and only where
-   the system allows it (THP "madvise" or "always"). */
+   THP is in "madvise" mode: with "always" the blocks get huge pages
+   anyway, and the advice would only add synchronous compaction where
+   defrag is "madvise" (10% slower passes on a Jetson Orin). */
 #define HUGEPAGE_SIZE (2 * 1024 * 1024)
+#if defined(__linux__) && defined(MADV_HUGEPAGE)
+static int
+memory_thp_madvise(void) {
+    /* -1: not read yet. Racing threads read the same answer. */
+    static int madvise_mode = -1;
+    if (madvise_mode < 0) {
+        char mode[64] = {0};
+        FILE *f = fopen("/sys/kernel/mm/transparent_hugepage/enabled", "r");
+        if (f) {
+            if (!fgets(mode, sizeof(mode), f)) {
+                mode[0] = 0;
+            }
+            fclose(f);
+        }
+        madvise_mode = strstr(mode, "[madvise]") != NULL;
+    }
+    return madvise_mode;
+}
+#endif
+
 static void
 memory_advise_hugepages(void *ptr, size_t size) {
 #if defined(__linux__) && defined(MADV_HUGEPAGE)
     uintptr_t start =
         ((uintptr_t)ptr + HUGEPAGE_SIZE - 1) & ~(uintptr_t)(HUGEPAGE_SIZE - 1);
     uintptr_t end = ((uintptr_t)ptr + size) & ~(uintptr_t)(HUGEPAGE_SIZE - 1);
-    if (ptr && end > start) {
+    if (ptr && end > start && memory_thp_madvise()) {
         madvise((void *)start, end - start, MADV_HUGEPAGE);
     }
 #else
