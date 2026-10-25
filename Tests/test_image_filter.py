@@ -314,7 +314,6 @@ def test_i16_uses_generic_kernel(mode: str) -> None:
         assert list(im.filter(kernel).get_flattened_data()) == list(reference)
 
 
-
 def _rank_reference(im: Image.Image, size: int, rank: int) -> list[int]:
     # Sorts each window in Python; edges are repeated as ImageFilter does.
     w, h = im.size

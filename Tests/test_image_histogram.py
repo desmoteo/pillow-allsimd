@@ -62,6 +62,8 @@ def test_histogram_counts(mode: str, size: tuple[int, int]) -> None:
             assert isinstance(v, int)
             expected[band * 256 + v] += 1
     assert im.histogram() == expected
+
+
 @pytest.mark.parametrize("mode", ("I", "F"))
 def test_histogram_masked_unsupported_mode(mode: str) -> None:
     mask = Image.new("1", (128, 128))
