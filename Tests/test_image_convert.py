@@ -389,3 +389,36 @@ def test_unpremultiply_exact(width: int) -> None:
         v = c if a in (0, 255) else min(255, 255 * c // a)
         expected += bytes((v, v, v, a))
     assert im.convert("RGBA").tobytes() == bytes(expected)
+
+
+def _ycc_term(v: int, k: float) -> int:
+    # The tables of ConvertYCbCr.c: (int)(v * K * 64 + 0.5), toward zero.
+    return int(v * k * 64 + 0.5)
+
+
+@pytest.mark.parametrize("width", (1, 3, 5, 61))
+def test_ycbcr_conversions_exact(width: int) -> None:
+    # Pixels are converted several at a time, then one at a time.
+    values = [(r * 37) % 256 for r in range(width * 64 * 3)]
+    data = bytes(values)
+    rgb = Image.frombytes("RGB", (width, 64), data)
+    expected = bytearray()
+    for i in range(0, len(data), 3):
+        r, g, b = data[i : i + 3]
+        y = _ycc_term(r, 0.299) + _ycc_term(g, 0.587) + _ycc_term(b, 0.114)
+        cb = _ycc_term(r, -0.16874) + _ycc_term(g, -0.33126) + _ycc_term(b, 0.5)
+        cr = _ycc_term(r, 0.5) + _ycc_term(g, -0.41869) + _ycc_term(b, -0.08131)
+        expected += bytes(
+            ((y >> 6) & 255, ((cb >> 6) + 128) & 255, ((cr >> 6) + 128) & 255)
+        )
+    assert rgb.convert("YCbCr").tobytes() == bytes(expected)
+
+    ycc = Image.frombytes("YCbCr", (width, 64), data)
+    expected = bytearray()
+    for i in range(0, len(data), 3):
+        y, cb, cr = data[i : i + 3]
+        r = y + (_ycc_term(cr - 128, 1.402) >> 6)
+        g = y + ((_ycc_term(cb - 128, -0.34414) + _ycc_term(cr - 128, -0.71414)) >> 6)
+        b = y + (_ycc_term(cb - 128, 1.772) >> 6)
+        expected += bytes(min(max(v, 0), 255) for v in (r, g, b))
+    assert ycc.convert("RGB").tobytes() == bytes(expected)
