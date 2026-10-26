@@ -24,12 +24,10 @@ ImagingReduceNxN_4u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int ys
                 UINT8 *line1 = (UINT8 *)imIn->image[yy + 1];
                 for (xx = xx_from; xx < xx_from + xscale - 1; xx += 2) {
                     __m128i pix0 = _mm_unpacklo_epi8(
-                        _mm_loadl_epi64((__m128i *)&line0[xx * 4]),
-                        _mm_setzero_si128()
+                        _mm_loadl_epi64((__m128i *)&line0[xx * 4]), _mm_setzero_si128()
                     );
                     __m128i pix1 = _mm_unpacklo_epi8(
-                        _mm_loadl_epi64((__m128i *)&line1[xx * 4]),
-                        _mm_setzero_si128()
+                        _mm_loadl_epi64((__m128i *)&line1[xx * 4]), _mm_setzero_si128()
                     );
                     pix0 = _mm_add_epi16(pix0, pix1);
                     pix0 = _mm_add_epi32(
@@ -49,8 +47,7 @@ ImagingReduceNxN_4u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int ys
                 UINT8 *line = (UINT8 *)imIn->image[yy];
                 for (xx = xx_from; xx < xx_from + xscale - 1; xx += 2) {
                     __m128i pix0 = _mm_unpacklo_epi8(
-                        _mm_loadl_epi64((__m128i *)&line[xx * 4]),
-                        _mm_setzero_si128()
+                        _mm_loadl_epi64((__m128i *)&line[xx * 4]), _mm_setzero_si128()
                     );
                     pix0 = _mm_add_epi32(
                         _mm_unpackhi_epi16(pix0, _mm_setzero_si128()),
@@ -260,7 +257,9 @@ ImagingReduce1x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
                 (__m128i *)&((UINT32 *)imOut->image[y])[x],
                 _mm_avg_epu8(
                     _mm_loadu_si128((__m128i *)&line0[xx * 4]),
-                    _mm_loadu_si128((__m128i *)&line1[xx * 4])));
+                    _mm_loadu_si128((__m128i *)&line1[xx * 4])
+                )
+            );
         }
         for (; x < box[2] / xscale; x++) {
             int xx = box[0] + x * xscale;
@@ -293,16 +292,24 @@ ImagingReduce2x1_4u8(Imaging imOut, Imaging imIn, int box[4]) {
         // Channels of neighbouring pixels side by side, then summed in pairs.
         for (x = 0; x < box[2] / xscale - 3; x += 4) {
             int xx = box[0] + x * xscale;
-            __m128i shuffle = _mm_set_epi8(15,11,14,10,13,9,12,8, 7,3,6,2,5,1,4,0);
+            __m128i shuffle =
+                _mm_set_epi8(15, 11, 14, 10, 13, 9, 12, 8, 7, 3, 6, 2, 5, 1, 4, 0);
             __m128i ones = _mm_set1_epi8(1);
-            __m128i ss0 = _mm_maddubs_epi16(_mm_shuffle_epi8(
-                _mm_loadu_si128((__m128i *)&line0[xx * 4]), shuffle), ones);
-            __m128i ss1 = _mm_maddubs_epi16(_mm_shuffle_epi8(
-                _mm_loadu_si128((__m128i *)&line0[xx * 4 + 16]), shuffle), ones);
+            __m128i ss0 = _mm_maddubs_epi16(
+                _mm_shuffle_epi8(_mm_loadu_si128((__m128i *)&line0[xx * 4]), shuffle),
+                ones
+            );
+            __m128i ss1 = _mm_maddubs_epi16(
+                _mm_shuffle_epi8(
+                    _mm_loadu_si128((__m128i *)&line0[xx * 4 + 16]), shuffle
+                ),
+                ones
+            );
             ss0 = _mm_srli_epi16(_mm_add_epi16(ss0, mm_amend), 1);
             ss1 = _mm_srli_epi16(_mm_add_epi16(ss1, mm_amend), 1);
             _mm_storeu_si128(
-                (__m128i *)&((UINT32 *)imOut->image[y])[x], _mm_packus_epi16(ss0, ss1));
+                (__m128i *)&((UINT32 *)imOut->image[y])[x], _mm_packus_epi16(ss0, ss1)
+            );
         }
         for (; x < box[2] / xscale; x++) {
             int xx = box[0] + x * xscale;
@@ -336,17 +343,22 @@ ImagingReduce2x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
         // Channels of neighbouring pixels side by side, then summed in pairs.
         for (x = 0; x < box[2] / xscale - 3; x += 4) {
             int xx = box[0] + x * xscale;
-            __m128i shuffle = _mm_set_epi8(15,11,14,10,13,9,12,8, 7,3,6,2,5,1,4,0);
+            __m128i shuffle =
+                _mm_set_epi8(15, 11, 14, 10, 13, 9, 12, 8, 7, 3, 6, 2, 5, 1, 4, 0);
             __m128i ones = _mm_set1_epi8(1);
-#define PAIRS(line, off) \
-    _mm_maddubs_epi16(_mm_shuffle_epi8(_mm_loadu_si128((__m128i *)&line[xx * 4 + off]), shuffle), ones)
+#define PAIRS(line, off)                                                            \
+    _mm_maddubs_epi16(                                                              \
+        _mm_shuffle_epi8(_mm_loadu_si128((__m128i *)&line[xx * 4 + off]), shuffle), \
+        ones                                                                        \
+    )
             __m128i ss0 = _mm_add_epi16(PAIRS(line0, 0), PAIRS(line1, 0));
             __m128i ss1 = _mm_add_epi16(PAIRS(line0, 16), PAIRS(line1, 16));
 #undef PAIRS
             ss0 = _mm_srli_epi16(_mm_add_epi16(ss0, mm_amend), 2);
             ss1 = _mm_srli_epi16(_mm_add_epi16(ss1, mm_amend), 2);
             _mm_storeu_si128(
-                (__m128i *)&((UINT32 *)imOut->image[y])[x], _mm_packus_epi16(ss0, ss1));
+                (__m128i *)&((UINT32 *)imOut->image[y])[x], _mm_packus_epi16(ss0, ss1)
+            );
         }
         for (; x < box[2] / xscale; x++) {
             int xx = box[0] + x * xscale;
@@ -388,8 +400,7 @@ ImagingReduce1x3_4u8(Imaging imOut, Imaging imIn, int box[4]) {
             int xx = box[0] + x * xscale;
             __m128i mm_ss0 = _mm_add_epi32(
                 _mm_add_epi32(
-                    mm_cvtepu8_epi32(&line0[xx * 4]),
-                    mm_cvtepu8_epi32(&line1[xx * 4])
+                    mm_cvtepu8_epi32(&line0[xx * 4]), mm_cvtepu8_epi32(&line1[xx * 4])
                 ),
                 _mm_add_epi32(mm_cvtepu8_epi32(&line2[xx * 4]), mm_amend)
             );
@@ -518,7 +529,8 @@ ImagingReduce2x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
             uint8x16x4_t p1 = vld4q_u8(&line1[xx * 4]);
             uint8x8x4_t o;
             for (c = 0; c < 4; c++) {
-                o.val[c] = vrshrn_n_u16(vpadalq_u8(vpaddlq_u8(p0.val[c]), p1.val[c]), 2);
+                o.val[c] =
+                    vrshrn_n_u16(vpadalq_u8(vpaddlq_u8(p0.val[c]), p1.val[c]), 2);
             }
             vst4_u8(&out[x * 4], o);
         }
@@ -602,9 +614,8 @@ neon_reduce_row_4u8(const UINT8 *p, int xscale, uint16x8_t *lo, uint16x8_t *hi) 
                 vaddq_u16(*lo, vaddl_u8(vget_low_u8(v0), vget_low_u8(v1))),
                 vaddl_u8(vget_low_u8(v2), vget_low_u8(v3))
             );
-            *hi = vaddq_u16(
-                vaddq_u16(*hi, vaddl_high_u8(v0, v1)), vaddl_high_u8(v2, v3)
-            );
+            *hi =
+                vaddq_u16(vaddq_u16(*hi, vaddl_high_u8(v0, v1)), vaddl_high_u8(v2, v3));
             break;
         }
     }

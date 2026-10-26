@@ -25,11 +25,15 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Callable
+from typing import Any
 
 SEED = 1234
 
 
-def operations(Image, ImageChops, ImageFilter, w: int, h: int) -> dict:
+def operations(
+    Image: Any, ImageChops: Any, ImageFilter: Any, w: int, h: int
+) -> dict[str, Callable[[], Any]]:
     """Name -> zero-argument callable returning an image (or list of images)."""
     import random
 
@@ -93,10 +97,11 @@ def operations(Image, ImageChops, ImageFilter, w: int, h: int) -> dict:
     }
 
 
-def import_pil(path: str):
+def import_pil(path: str) -> tuple[Any, Any, Any, str, str]:
     if path != "-":
         sys.path.insert(0, path)
-    from PIL import Image, ImageChops, ImageFilter, __file__ as pil_file, __version__
+    from PIL import Image, ImageChops, ImageFilter, __version__
+    from PIL import __file__ as pil_file
 
     return Image, ImageChops, ImageFilter, pil_file, __version__
 
@@ -107,7 +112,7 @@ def worker(path: str, mode: str, size: tuple[int, int], only: list[str]) -> None
     ops = operations(Image, ImageChops, ImageFilter, *size)
     if only:
         ops = {k: v for k, v in ops.items() if any(o in k for o in only)}
-    result: dict = {"pil": pil_file, "version": version, "ops": {}}
+    result: dict[str, Any] = {"pil": pil_file, "version": version, "ops": {}}
     for name, op in ops.items():
         if mode == "time":
             op()  # warm-up
@@ -135,9 +140,20 @@ def worker(path: str, mode: str, size: tuple[int, int], only: list[str]) -> None
     print(json.dumps(result))
 
 
-def run_worker(path: str, mode: str, size: tuple[int, int], only: list[str], cpu):
-    cmd = [sys.executable, "-I", os.path.abspath(__file__), "--worker", path,
-           "--mode", mode, "--size", f"{size[0]}x{size[1]}"]
+def run_worker(
+    path: str, mode: str, size: tuple[int, int], only: list[str], cpu: int | None
+) -> dict[str, Any]:
+    cmd = [
+        sys.executable,
+        "-I",
+        os.path.abspath(__file__),
+        "--worker",
+        path,
+        "--mode",
+        mode,
+        "--size",
+        f"{size[0]}x{size[1]}",
+    ]
     for o in only:
         cmd += ["--only", o]
     if cpu is not None and sys.platform.startswith("linux") and shutil.which("taskset"):
@@ -146,15 +162,23 @@ def run_worker(path: str, mode: str, size: tuple[int, int], only: list[str], cpu
     return json.loads(out.strip().splitlines()[-1])
 
 
-def machine_info() -> dict:
-    info = {"platform": platform.platform(), "machine": platform.machine(),
-            "python": sys.version.split()[0], "cpus": os.cpu_count()}
+def machine_info() -> dict[str, Any]:
+    info = {
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "python": sys.version.split()[0],
+        "cpus": os.cpu_count(),
+    }
     try:
         if sys.platform.startswith("linux"):
-            info["cpu"] = subprocess.run(["lscpu"], capture_output=True, text=True).stdout
+            info["cpu"] = subprocess.run(
+                ["lscpu"], capture_output=True, text=True
+            ).stdout
         elif sys.platform == "darwin":
             info["cpu"] = subprocess.run(
-                ["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True
+                ["sysctl", "-n", "machdep.cpu.brand_string"],
+                capture_output=True,
+                text=True,
             ).stdout.strip()
     except OSError:
         pass
@@ -162,21 +186,27 @@ def machine_info() -> dict:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--variant", action="append", default=[], metavar="NAME=PATH")
     ap.add_argument("--baseline", help="variant to compare against (default: first)")
     ap.add_argument("--rounds", type=int, default=5)
     ap.add_argument("--size", default="2560x1600", help="benchmark image size")
-    ap.add_argument("--only", action="append", default=[],
-                    help="run only operations whose name contains this (repeatable)")
+    ap.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        help="run only operations whose name contains this (repeatable)",
+    )
     ap.add_argument("--cpu", type=int, help="pin to this CPU (Linux, needs taskset)")
     ap.add_argument("--check", action="store_true", help="also compare outputs")
     ap.add_argument("--json", help="write all results to this file")
     ap.add_argument("--worker", help=argparse.SUPPRESS)
     ap.add_argument("--mode", default="time", help=argparse.SUPPRESS)
     args = ap.parse_args()
-    size = tuple(int(v) for v in args.size.lower().split("x"))
+    w, h = (int(v) for v in args.size.lower().split("x"))
+    size = (w, h)
 
     if args.worker:
         worker(args.worker, args.mode, size, args.only)
@@ -190,8 +220,12 @@ def main() -> int:
     if baseline not in variants:
         ap.error(f"unknown baseline {baseline}")
 
-    report: dict = {"machine": machine_info(), "size": args.size, "variants": {}}
-    timings: dict = {n: {} for n in names}
+    report: dict[str, Any] = {
+        "machine": machine_info(),
+        "size": args.size,
+        "variants": {},
+    }
+    timings: dict[str, dict[str, list[float]]] = {n: {} for n in names}
     for r in range(args.rounds):
         for n in names:
             res = run_worker(variants[n], "time", size, args.only, args.cpu)
@@ -204,39 +238,57 @@ def main() -> int:
     report["timings_ms"] = timings
     report["best_ms"] = best
 
-    print(f"\nMachine: {report['machine']['platform']}, image {args.size}, "
-          f"best of {args.rounds} rounds, times in ms")
+    print(
+        f"\nMachine: {report['machine']['platform']}, image {args.size}, "
+        f"best of {args.rounds} rounds, times in ms"
+    )
     for n in names:
-        print(f"  {n}: Pillow {report['variants'][n]['version']} from {report['variants'][n]['pil']}")
+        variant = report["variants"][n]
+        print(f"  {n}: Pillow {variant['version']} from {variant['pil']}")
     others = [n for n in names if n != baseline]
     width = max([11] + [len(n) + 2 for n in names])
     swidth = max([len(baseline) + 6] + [len(n) + 4 for n in others])
     print()
-    print(f"{'':28s}" + " " * (width * len(names))
-          + "".join(f"{'vs ' + baseline:>{swidth}s}" for _ in others))
-    print(f"{'operation':28s}" + "".join(f"{n:>{width}s}" for n in names)
-          + "".join(f"{n:>{swidth}s}" for n in others))
+    print(
+        f"{'':28s}"
+        + " " * (width * len(names))
+        + "".join(f"{'vs ' + baseline:>{swidth}s}" for _ in others)
+    )
+    print(
+        f"{'operation':28s}"
+        + "".join(f"{n:>{width}s}" for n in names)
+        + "".join(f"{n:>{swidth}s}" for n in others)
+    )
     for op in best[baseline]:
         row = f"{op:28s}" + "".join(f"{best[n][op]:{width}.2f}" for n in names)
-        row += "".join(f"{best[baseline][op] / best[n][op]:{swidth - 1}.2f}x" for n in others)
+        row += "".join(
+            f"{best[baseline][op] / best[n][op]:{swidth - 1}.2f}x" for n in others
+        )
         print(row)
 
     if args.check:
-        outputs = {n: run_worker(variants[n], "check", (67, 23), args.only, None)["ops"]
-                   for n in names}
+        outputs = {
+            n: run_worker(variants[n], "check", (67, 23), args.only, None)["ops"]
+            for n in names
+        }
         report["check"] = {}
         print(f"\nOutput differences vs {baseline} (67x23 images):")
         for n in others:
-            diffs = {}
+            diffs: dict[str, dict[str, int]] = {}
             for op, b64 in outputs[baseline].items():
                 a, b = base64.b64decode(b64), base64.b64decode(outputs[n][op])
                 if a != b:
-                    d = [abs(x - y) for x, y in zip(a, b)] if len(a) == len(b) else [-1]
-                    diffs[op] = {"max": max(d), "count": sum(1 for v in d if v)}
+                    dv = (
+                        [abs(x - y) for x, y in zip(a, b)] if len(a) == len(b) else [-1]
+                    )
+                    diffs[op] = {"max": max(dv), "count": sum(1 for v in dv if v)}
             report["check"][n] = diffs
-            print(f"  {n}: " + ("identical" if not diffs else f"{len(diffs)} operations differ"))
-            for op, d in diffs.items():
-                print(f"    {op:30s} max {d['max']:4d}  values {d['count']}")
+            print(
+                f"  {n}: "
+                + ("identical" if not diffs else f"{len(diffs)} operations differ")
+            )
+            for op, diff in diffs.items():
+                print(f"    {op:30s} max {diff['max']:4d}  values {diff['count']}")
 
     if args.json:
         with open(args.json, "w") as f:

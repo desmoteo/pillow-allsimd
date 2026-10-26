@@ -9,7 +9,6 @@ import pytest
 from PIL import Image, PpmImagePlugin
 
 from .helper import (
-    assert_image_equal,
     assert_image_equal_tofile,
     assert_image_similar,
     hopper,

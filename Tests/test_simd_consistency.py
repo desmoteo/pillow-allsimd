@@ -59,7 +59,7 @@ def test_alpha_composite(width: int, mode: str) -> None:
 @pytest.mark.parametrize("size", (3, 5))
 def test_filter(width: int, mode: str, size: int) -> None:
     rnd = random.Random(size)
-    kernels = [
+    kernels: list[list[float]] = [
         # Small coefficients take the integer kernels, large ones the float.
         [rnd.randint(-3, 5) for _ in range(size * size)],
         [rnd.uniform(-1000, 1000) for _ in range(size * size)],

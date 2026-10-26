@@ -29,10 +29,11 @@ void static inline ImagingLineBoxBlur32(
     // #define ADD_FAR(bulk, acc, left, right)
     //     bulk[0] = (acc[0] * ww) + (lineIn[left][0] + lineIn[right][0]) * fw;
 
-#define ADD_FAR(bulk, acc, left, right)                                      \
-    bulk = px4_add(                                                          \
+#define ADD_FAR(bulk, acc, left, right)                                           \
+    bulk = px4_add(                                                               \
         px4_mul(px4_add(px4_load(&lineIn[left]), px4_load(&lineIn[right])), fws), \
-        px4_mul(acc, wws));
+        px4_mul(acc, wws)                                                         \
+    );
 
     // #define SAVE(x, bulk)
     //    lineOut[x][0] = (UINT8)((bulk[0] + (1 << 23)) >> 24);
@@ -422,7 +423,8 @@ ImagingBoxBlurColumns(
         c = _mm_sub_epi32(_mm_add_epi32(c, a), s);                             \
         _mm_storeu_si128((__m128i *)&acc[b + k * 4], c);                       \
         c = _mm_add_epi32(                                                     \
-            _mm_mullo_epi32(c, wws), _mm_mullo_epi32(_mm_add_epi32(s, f), fws)); \
+            _mm_mullo_epi32(c, wws), _mm_mullo_epi32(_mm_add_epi32(s, f), fws) \
+        );                                                                     \
         r[k] = _mm_srli_epi32(_mm_add_epi32(c, b23), 24);                      \
     }
         COLUMNS_4(0);
@@ -432,7 +434,8 @@ ImagingBoxBlurColumns(
 #undef COLUMNS_4
         _mm_storeu_si128(
             (__m128i *)&out[b],
-            _mm_packus_epi16(_mm_packs_epi32(r[0], r[1]), _mm_packs_epi32(r[2], r[3])));
+            _mm_packus_epi16(_mm_packs_epi32(r[0], r[1]), _mm_packs_epi32(r[2], r[3]))
+        );
     }
 #endif
 

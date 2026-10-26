@@ -381,7 +381,8 @@ class pil_build_ext(build_ext):
             setattr(self, f"vendor_{x}", self.check_configuration(x, "vendor"))
         if self.check_configuration("debug", "true"):
             self.debug = True
-        self.parallel = configuration.get("parallel", [None])[-1]
+        parallel = configuration.get("parallel", [None])[-1]
+        self.parallel = int(parallel) if parallel else None
 
     def finalize_options(self) -> None:
         build_ext.finalize_options(self)
@@ -639,9 +640,7 @@ class pil_build_ext(build_ext):
                 _add_directory(include_dirs, os.path.join(sdk_path, "usr", "include"))
 
                 for extension in self.extensions:
-                    extension.extra_compile_args.append(
-                        "-Wno-nullability-completeness"
-                    )
+                    extension.extra_compile_args.append("-Wno-nullability-completeness")
 
         elif sys.platform == "ios":
             # Add the iOS SDK path.
@@ -1035,7 +1034,14 @@ class pil_build_ext(build_ext):
         """
         requested = configuration.get("simd", ["auto"])[-1]
         if requested not in (
-            "auto", "sse4", "avx2", "avxvnni", "native", "native512", "neon", "disable"
+            "auto",
+            "sse4",
+            "avx2",
+            "avxvnni",
+            "native",
+            "native512",
+            "neon",
+            "disable",
         ):
             msg = f"Unknown option '-C simd={requested}'"
             raise ValueError(msg)

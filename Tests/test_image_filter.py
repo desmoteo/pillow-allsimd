@@ -297,12 +297,13 @@ def _rank_reference(im: Image.Image, size: int, rank: int) -> list[int]:
     result = []
     for y in range(h):
         for x in range(w):
-            window = sorted(
-                px[min(max(x + i, 0), w - 1), min(max(y + j, 0), h - 1)]
-                for j in range(-m, m + 1)
-                for i in range(-m, m + 1)
-            )
-            result.append(window[rank])
+            window = []
+            for j in range(-m, m + 1):
+                for i in range(-m, m + 1):
+                    v = px[min(max(x + i, 0), w - 1), min(max(y + j, 0), h - 1)]
+                    assert isinstance(v, int)
+                    window.append(v)
+            result.append(sorted(window)[rank])
     return result
 
 

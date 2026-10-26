@@ -39,7 +39,8 @@ px4_shr(px4 a, int n) {
 static inline UINT32
 px4_pack(px4 v) {
     return _mm_cvtsi128_si32(_mm_shuffle_epi8(
-        v, _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 12, 8, 4, 0)));
+        v, _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 12, 8, 4, 0)
+    ));
 }
 
 #else

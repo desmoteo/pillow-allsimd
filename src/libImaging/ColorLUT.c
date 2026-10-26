@@ -649,7 +649,8 @@ neon_lut_pixel(
     );
     int32x4_t result = neon_lut_interpolate(left, right, shift3D);
     // clip8: (result + PRECISION_ROUNDING) >> PRECISION_BITS, then 0..255
-    result = vshrq_n_s32(vaddq_s32(result, vdupq_n_s32(PRECISION_ROUNDING)), PRECISION_BITS);
+    result =
+        vshrq_n_s32(vaddq_s32(result, vdupq_n_s32(PRECISION_ROUNDING)), PRECISION_BITS);
     return vqmovn_u16(vcombine_u16(vqmovun_s32(result), vdup_n_u16(0)));
 }
 #endif

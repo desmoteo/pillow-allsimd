@@ -23,27 +23,29 @@ typedef __m128i filter_acc;
 static inline __m128i
 filter_pack16(__m128i s0, __m128i s1, __m128i s2, __m128i s3) {
     __m128i lo = _mm_packs_epi32(
-        _mm_srai_epi32(s0, PRECISION_BITS), _mm_srai_epi32(s1, PRECISION_BITS));
+        _mm_srai_epi32(s0, PRECISION_BITS), _mm_srai_epi32(s1, PRECISION_BITS)
+    );
     __m128i hi = _mm_packs_epi32(
-        _mm_srai_epi32(s2, PRECISION_BITS), _mm_srai_epi32(s3, PRECISION_BITS));
+        _mm_srai_epi32(s2, PRECISION_BITS), _mm_srai_epi32(s3, PRECISION_BITS)
+    );
     return _mm_packus_epi16(lo, hi);
 }
 #define FILTER_STORE16(ptr, v) _mm_storeu_si128((__m128i *)(ptr), v)
 
 /* Adds a[i] * k0 + b[i] * k1 for 16 bytes a and b to four 32-bit sums. */
-#define FILTER_MLA16x2(s0, s1, s2, s3, pa, pb, k0, k1)                        \
-    {                                                                         \
-        __m128i a_ = _mm_loadu_si128((__m128i *)(pa));                        \
-        __m128i b_ = _mm_loadu_si128((__m128i *)(pb));                        \
+#define FILTER_MLA16x2(s0, s1, s2, s3, pa, pb, k0, k1)                             \
+    {                                                                              \
+        __m128i a_ = _mm_loadu_si128((__m128i *)(pa));                             \
+        __m128i b_ = _mm_loadu_si128((__m128i *)(pb));                             \
         __m128i kk_ = _mm_set1_epi32(((UINT32)(UINT16)(k1) << 16) | (UINT16)(k0)); \
-        __m128i alo_ = _mm_cvtepu8_epi16(a_);                                 \
-        __m128i ahi_ = _mm_cvtepu8_epi16(_mm_srli_si128(a_, 8));              \
-        __m128i blo_ = _mm_cvtepu8_epi16(b_);                                 \
-        __m128i bhi_ = _mm_cvtepu8_epi16(_mm_srli_si128(b_, 8));              \
-        s0 = mm_dpwssd(s0, _mm_unpacklo_epi16(alo_, blo_), kk_); \
-        s1 = mm_dpwssd(s1, _mm_unpackhi_epi16(alo_, blo_), kk_); \
-        s2 = mm_dpwssd(s2, _mm_unpacklo_epi16(ahi_, bhi_), kk_); \
-        s3 = mm_dpwssd(s3, _mm_unpackhi_epi16(ahi_, bhi_), kk_); \
+        __m128i alo_ = _mm_cvtepu8_epi16(a_);                                      \
+        __m128i ahi_ = _mm_cvtepu8_epi16(_mm_srli_si128(a_, 8));                   \
+        __m128i blo_ = _mm_cvtepu8_epi16(b_);                                      \
+        __m128i bhi_ = _mm_cvtepu8_epi16(_mm_srli_si128(b_, 8));                   \
+        s0 = mm_dpwssd(s0, _mm_unpacklo_epi16(alo_, blo_), kk_);                   \
+        s1 = mm_dpwssd(s1, _mm_unpackhi_epi16(alo_, blo_), kk_);                   \
+        s2 = mm_dpwssd(s2, _mm_unpacklo_epi16(ahi_, bhi_), kk_);                   \
+        s3 = mm_dpwssd(s3, _mm_unpackhi_epi16(ahi_, bhi_), kk_);                   \
     }
 #define FILTER_MLA16x1(s0, s1, s2, s3, p, k) FILTER_MLA16x2(s0, s1, s2, s3, p, p, k, 0)
 
@@ -56,30 +58,32 @@ static inline uint8x16_t
 filter_pack16(int32x4_t s0, int32x4_t s1, int32x4_t s2, int32x4_t s3) {
     int32x4_t shift = vdupq_n_s32(-PRECISION_BITS);
     int16x8_t lo = vcombine_s16(
-        vqmovn_s32(vshlq_s32(s0, shift)), vqmovn_s32(vshlq_s32(s1, shift)));
+        vqmovn_s32(vshlq_s32(s0, shift)), vqmovn_s32(vshlq_s32(s1, shift))
+    );
     int16x8_t hi = vcombine_s16(
-        vqmovn_s32(vshlq_s32(s2, shift)), vqmovn_s32(vshlq_s32(s3, shift)));
+        vqmovn_s32(vshlq_s32(s2, shift)), vqmovn_s32(vshlq_s32(s3, shift))
+    );
     return vcombine_u8(vqmovun_s16(lo), vqmovun_s16(hi));
 }
 #define FILTER_STORE16(ptr, v) vst1q_u8(ptr, v)
 
 /* Adds 16 bytes times k to four 32-bit sums. */
-#define FILTER_MLA16(s0, s1, s2, s3, ptr, k)                                  \
-    {                                                                         \
-        uint8x16_t src_ = vld1q_u8(ptr);                                      \
-        int16x8_t lo_ = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(src_)));   \
-        int16x8_t hi_ = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(src_)));  \
-        s0 = vmlal_n_s16(s0, vget_low_s16(lo_), k);                           \
-        s1 = vmlal_n_s16(s1, vget_high_s16(lo_), k);                          \
-        s2 = vmlal_n_s16(s2, vget_low_s16(hi_), k);                           \
-        s3 = vmlal_n_s16(s3, vget_high_s16(hi_), k);                          \
+#define FILTER_MLA16(s0, s1, s2, s3, ptr, k)                                 \
+    {                                                                        \
+        uint8x16_t src_ = vld1q_u8(ptr);                                     \
+        int16x8_t lo_ = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(src_)));  \
+        int16x8_t hi_ = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(src_))); \
+        s0 = vmlal_n_s16(s0, vget_low_s16(lo_), k);                          \
+        s1 = vmlal_n_s16(s1, vget_high_s16(lo_), k);                         \
+        s2 = vmlal_n_s16(s2, vget_low_s16(hi_), k);                          \
+        s3 = vmlal_n_s16(s3, vget_high_s16(hi_), k);                         \
     }
 
 /* Same interface as the SSE4 version, which pairs taps for pmaddwd. */
-#define FILTER_MLA16x2(s0, s1, s2, s3, pa, pb, k0, k1)                        \
-    {                                                                         \
-        FILTER_MLA16(s0, s1, s2, s3, pa, k0);                                 \
-        FILTER_MLA16(s0, s1, s2, s3, pb, k1);                                 \
+#define FILTER_MLA16x2(s0, s1, s2, s3, pa, pb, k0, k1) \
+    {                                                  \
+        FILTER_MLA16(s0, s1, s2, s3, pa, k0);          \
+        FILTER_MLA16(s0, s1, s2, s3, pb, k1);          \
     }
 #define FILTER_MLA16x1(s0, s1, s2, s3, p, k) FILTER_MLA16(s0, s1, s2, s3, p, k)
 #endif
@@ -149,24 +153,32 @@ ImagingFilterNxN_simd(
 
 /* Separate entry points so the compiler unrolls each size fully. */
 static void
-ImagingFilter3x3i_u8_simd(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset) {
+ImagingFilter3x3i_u8_simd(
+    Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset
+) {
     ImagingFilterNxN_simd(imOut, im, kernel, offset, 3, 1);
 }
 
 static void
-ImagingFilter5x5i_u8_simd(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset) {
+ImagingFilter5x5i_u8_simd(
+    Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset
+) {
     ImagingFilterNxN_simd(imOut, im, kernel, offset, 5, 1);
 }
 
 #if defined(IMAGING_SIMD_NEON)
 /* x86 has dedicated SSE4/AVX2 kernels for 4-byte images. */
 static void
-ImagingFilter3x3i_4u8_simd(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset) {
+ImagingFilter3x3i_4u8_simd(
+    Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset
+) {
     ImagingFilterNxN_simd(imOut, im, kernel, offset, 3, 4);
 }
 
 static void
-ImagingFilter5x5i_4u8_simd(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset) {
+ImagingFilter5x5i_4u8_simd(
+    Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset
+) {
     ImagingFilterNxN_simd(imOut, im, kernel, offset, 5, 4);
 }
 #endif

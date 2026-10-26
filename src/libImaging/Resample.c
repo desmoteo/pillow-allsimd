@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <math.h>
 
-
 #define ROUND_UP(f) ((int)((f) >= 0.0 ? (f) + 0.5F : (f) - 0.5F))
 
 struct filter {
@@ -280,7 +279,7 @@ normalize_coeffs_8bpc(int outSize, int ksize, double *prekk) {
     double maxkk;
 
     // use the same buffer for normalized coefficients
-    kk = (INT16 *) prekk;
+    kk = (INT16 *)prekk;
 
     maxkk = prekk[0];
     for (x = 0; x < outSize * ksize; x++) {
@@ -290,7 +289,7 @@ normalize_coeffs_8bpc(int outSize, int ksize, double *prekk) {
     }
 
     for (coefs_precision = 0; coefs_precision < PRECISION_BITS; coefs_precision += 1) {
-        int next_value = (int) (0.5 + maxkk * (1 << (coefs_precision + 1)));
+        int next_value = (int)(0.5 + maxkk * (1 << (coefs_precision + 1)));
         // The next value will be outside of the range, so just stop
         if (next_value >= (1 << MAX_COEFS_PRECISION))
             break;
@@ -298,9 +297,9 @@ normalize_coeffs_8bpc(int outSize, int ksize, double *prekk) {
 
     for (x = 0; x < outSize * ksize; x++) {
         if (prekk[x] < 0) {
-            kk[x] = (int) (-0.5 + prekk[x] * (1 << coefs_precision));
+            kk[x] = (int)(-0.5 + prekk[x] * (1 << coefs_precision));
         } else {
-            kk[x] = (int) (0.5 + prekk[x] * (1 << coefs_precision));
+            kk[x] = (int)(0.5 + prekk[x] * (1 << coefs_precision));
         }
     }
     return coefs_precision;
@@ -318,7 +317,7 @@ _ImagingResampleHorizontal_8bpc(
     int coefs_precision;
 
     // use the same buffer for normalized coefficients
-    kk = (INT16 *) prekk;
+    kk = (INT16 *)prekk;
     coefs_precision = normalize_coeffs_8bpc(imOut->xsize, ksize, prekk);
 
     // Sizes are invariant over the loop.
@@ -332,19 +331,32 @@ _ImagingResampleHorizontal_8bpc(
 #if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD)
         for (; yy < ysize - 3; yy += 4) {
             ImagingResampleHorizontalConvolution1u4x(
-                imOut->image8[yy], imOut->image8[yy + 1],
-                imOut->image8[yy + 2], imOut->image8[yy + 3],
-                imIn->image8[yy + offset], imIn->image8[yy + offset + 1],
-                imIn->image8[yy + offset + 2], imIn->image8[yy + offset + 3],
-                xsize, bounds, kk, ksize, coefs_precision
+                imOut->image8[yy],
+                imOut->image8[yy + 1],
+                imOut->image8[yy + 2],
+                imOut->image8[yy + 3],
+                imIn->image8[yy + offset],
+                imIn->image8[yy + offset + 1],
+                imIn->image8[yy + offset + 2],
+                imIn->image8[yy + offset + 3],
+                xsize,
+                bounds,
+                kk,
+                ksize,
+                coefs_precision
             );
         }
 #endif
 #if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD)
         for (; yy < ysize; yy++) {
             ImagingResampleHorizontalConvolution1u(
-                imOut->image8[yy], imIn->image8[yy + offset],
-                xsize, bounds, kk, ksize, coefs_precision
+                imOut->image8[yy],
+                imIn->image8[yy + offset],
+                xsize,
+                bounds,
+                kk,
+                ksize,
+                coefs_precision
             );
         }
 #endif
@@ -356,7 +368,7 @@ _ImagingResampleHorizontal_8bpc(
                 xmin = bounds[xx * 2 + 0];
                 xmax = bounds[xx * 2 + 1];
                 k = &kk[xx * ksize];
-                ss0 = 1 << (coefs_precision -1);
+                ss0 = 1 << (coefs_precision - 1);
                 for (x = 0; x < xmax; x++) {
                     ss0 += lineIn[x + xmin] * k[x];
                 }
@@ -369,23 +381,29 @@ _ImagingResampleHorizontal_8bpc(
         yy = 0;
         for (; yy < ysize - 3; yy += 4) {
             ImagingResampleHorizontalConvolution8u4x(
-                (UINT32 *) imOut->image32[yy],
-                (UINT32 *) imOut->image32[yy + 1],
-                (UINT32 *) imOut->image32[yy + 2],
-                (UINT32 *) imOut->image32[yy + 3],
-                (UINT32 *) imIn->image32[yy + offset],
-                (UINT32 *) imIn->image32[yy + offset + 1],
-                (UINT32 *) imIn->image32[yy + offset + 2],
-                (UINT32 *) imIn->image32[yy + offset + 3],
-                xsize, bounds, kk, ksize,
+                (UINT32 *)imOut->image32[yy],
+                (UINT32 *)imOut->image32[yy + 1],
+                (UINT32 *)imOut->image32[yy + 2],
+                (UINT32 *)imOut->image32[yy + 3],
+                (UINT32 *)imIn->image32[yy + offset],
+                (UINT32 *)imIn->image32[yy + offset + 1],
+                (UINT32 *)imIn->image32[yy + offset + 2],
+                (UINT32 *)imIn->image32[yy + offset + 3],
+                xsize,
+                bounds,
+                kk,
+                ksize,
                 coefs_precision
             );
         }
         for (; yy < ysize; yy++) {
             ImagingResampleHorizontalConvolution8u(
-                (UINT32 *) imOut->image32[yy],
-                (UINT32 *) imIn->image32[yy + offset],
-                xsize, bounds, kk, ksize,
+                (UINT32 *)imOut->image32[yy],
+                (UINT32 *)imIn->image32[yy + offset],
+                xsize,
+                bounds,
+                kk,
+                ksize,
                 coefs_precision
             );
         }
@@ -405,7 +423,7 @@ _ImagingResampleVertical_8bpc(
     int coefs_precision;
 
     // use the same buffer for normalized coefficients
-    kk = (INT16 *) prekk;
+    kk = (INT16 *)prekk;
     coefs_precision = normalize_coeffs_8bpc(imOut->ysize, ksize, prekk);
 
     // Sizes are invariant over the loop.
@@ -428,7 +446,7 @@ _ImagingResampleVertical_8bpc(
                 (UINT32 *)lineOut, imIn, ymin, ymax, k, coefs_precision, words
             );
             for (xx = words * 4; xx < xsize; xx++) {
-                ss0 = 1 << (coefs_precision -1);
+                ss0 = 1 << (coefs_precision - 1);
                 for (y = 0; y < ymax; y++) {
                     ss0 += ((UINT8)imIn->image8[y + ymin][xx]) * k[y];
                 }
@@ -443,8 +461,13 @@ _ImagingResampleVertical_8bpc(
             ymin = bounds[yy * 2 + 0];
             ymax = bounds[yy * 2 + 1];
             ImagingResampleVerticalConvolution8u(
-                (UINT32 *) imOut->image32[yy], imIn,
-                ymin, ymax, k, coefs_precision, xsize
+                (UINT32 *)imOut->image32[yy],
+                imIn,
+                ymin,
+                ymax,
+                k,
+                coefs_precision,
+                xsize
             );
         }
     }

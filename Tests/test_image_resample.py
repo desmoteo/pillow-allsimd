@@ -94,7 +94,10 @@ class TestImagingCoreResampleAccuracy:
         assert c_px is not None
         for y in range(case.size[1]):
             for x in range(case.size[0]):
-                diff = abs(c_px[x, y] - s_px[x, y])
+                c, s = c_px[x, y], s_px[x, y]
+                assert isinstance(c, int)
+                assert isinstance(s, int)
+                diff = abs(c - s)
                 if (strict and diff) or diff > 1:
                     message = (
                         f"\nHave: \n{self.serialize_image(case)}\n"

@@ -522,7 +522,11 @@ ImagingFilter5x5(Imaging imOut, Imaging im, const float *kernel, float offset) {
    go to the generic code. */
 static int
 ImagingFilterSIMD(
-    Imaging imOut, Imaging im, int xsize, int ysize, const FLOAT32 *kernel,
+    Imaging imOut,
+    Imaging im,
+    int xsize,
+    int ysize,
+    const FLOAT32 *kernel,
     FLOAT32 offset
 ) {
     int i;
