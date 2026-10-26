@@ -30,14 +30,21 @@
 #   --builds "N=OPT .."  builds to compare, each a name and a -C simd= value,
 #                     e.g. "avx2=avx2 avxvnni=avxvnni" (default: per host)
 #   --force           run even if the host is neither arm64 nor x86-64
+#   --docker          build and run in a container instead of on the host:
+#                     builds a small image (python:3.12-slim + gcc) on the
+#                     host on the fly, with docker or podman
+#   --docker-base IMG base image for --docker (default: python:3.12-slim)
 #
 # Requirements on the host: SSH access, Python 3.10+ with headers and venv,
 # a C compiler, and PyPI access to install setuptools/pybind11 into a venv
-# (and Pillow for the baseline). No image libraries are needed: the builds
-# disable the jpeg and zlib codecs.
+# (and Pillow for the baseline). With --docker, only docker or podman and
+# access to the base image, Debian packages and PyPI; HTTP(S)_PROXY and
+# NO_PROXY set on the host are passed on. No image libraries are needed:
+# the builds disable the jpeg and zlib codecs.
 #
-# Example:
+# Examples:
 #   checks/simd_bench_remote.sh -u ubuntu --cpu 2 --rounds 7 192.0.2.10
+#   checks/simd_bench_remote.sh -u root --cpu 2 --docker server.example.com
 
 set -euo pipefail
 
@@ -47,7 +54,7 @@ log() { echo "==> $*" >&2; }
 
 HOST="" USER_OPT="" PORT="" IDENTITY="" PY="python3" REF="HEAD"
 WORKDIR="pillow-simd-bench" ROUNDS=5 SIZE="2560x1600" CPU="" UPSTREAM=1
-OUT="bench-results" KEEP=0 FORCE=0 BUILDS=""
+OUT="bench-results" KEEP=0 FORCE=0 BUILDS="" DOCKER=0 DOCKER_BASE="python:3.12-slim"
 ONLY=()
 SSH_EXTRA=()
 
@@ -70,6 +77,8 @@ while [ $# -gt 0 ]; do
         --out) OUT=$2; shift 2 ;;
         --keep) KEEP=1; shift ;;
         --force) FORCE=1; shift ;;
+        --docker) DOCKER=1; shift ;;
+        --docker-base) DOCKER_BASE=$2; DOCKER=1; shift 2 ;;
         -*) echo "unknown option: $1" >&2; usage 2 ;;
         *) [ -z "$HOST" ] || die "more than one host given"; HOST=$1; shift ;;
     esac
@@ -115,8 +124,41 @@ esac
 BUILDS=${BUILDS:-$DEFAULT_BUILDS}
 log "host: $OS $ARCH"
 
-log "checking $PY, headers and compiler on the host"
-rbash "set -e
+# Build commands run in $WORKDIR, on the host or in a container.
+if [ "$DOCKER" = 1 ]; then
+    ENGINE=$(rsh 'command -v docker || command -v podman' | head -1) \
+        || die "--docker needs docker or podman on $HOST"
+    ENGINE=${ENGINE##*/}
+    IMAGE="pillow-simd-bench"
+    PROXY_ARGS="-e HTTP_PROXY -e HTTPS_PROXY -e NO_PROXY -e http_proxy -e https_proxy -e no_proxy"
+    log "building the $IMAGE image from $DOCKER_BASE with $ENGINE"
+    rbash "set -e
+        $ENGINE build -q -t $IMAGE \
+            --build-arg HTTP_PROXY --build-arg HTTPS_PROXY --build-arg NO_PROXY \
+            --build-arg http_proxy --build-arg https_proxy --build-arg no_proxy - <<'DOCKERFILE'
+FROM $DOCKER_BASE
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir setuptools wheel pybind11
+DOCKERFILE
+    " >/dev/null || die "could not build the image (no access to $DOCKER_BASE, Debian or PyPI?)"
+    BPY="python3" BUILD_PY="python3"
+    renv() {
+        ssh "${SSH_OPTS[@]}" "$HOST" "mkdir -p $WORKDIR && cd $WORKDIR && $ENGINE run --rm -i \
+            -v \"\$PWD:/work:Z\" -w /work $PROXY_ARGS $IMAGE bash -s" <<< "set -e; $1"
+    }
+else
+    BPY="venv/bin/python" BUILD_PY="../venv/bin/python"
+    renv() { rbash "set -e; mkdir -p $WORKDIR && cd $WORKDIR; $1"; }
+fi
+
+if [ "$DOCKER" = 1 ]; then
+    PY=python3
+    log "checking python3, headers and compiler in the container"
+else
+    log "checking $PY, headers and compiler on the host"
+fi
+renv "
     command -v $PY >/dev/null || { echo 'missing: $PY'; exit 1; }
     $PY -c 'import sys; assert sys.version_info >= (3, 10), sys.version' \
         || { echo 'Python 3.10 or newer required'; exit 1; }
@@ -137,18 +179,18 @@ rsh "cat > $WORKDIR/simd_bench.py" < "$REPO/checks/simd_bench.py"
 VERSION=$(git -C "$REPO" show "$COMMIT:src/PIL/_version.py" \
     | sed -n 's/^__version__ = "\([0-9.]*\).*"/\1/p' | sed 's/\.$//')
 
-log "setting up a venv with build tools"
-rbash "set -e; cd $WORKDIR
-    $PY -m venv venv
-    venv/bin/python -m pip install -q --upgrade pip setuptools wheel pybind11
-" || die "could not install build tools into the venv (no PyPI access?)"
+if [ "$DOCKER" = 0 ]; then
+    log "setting up a venv with build tools"
+    renv "$PY -m venv venv
+        venv/bin/python -m pip install -q --upgrade pip setuptools wheel pybind11
+    " || die "could not install build tools into the venv (no PyPI access?)"
+fi
 
 build() {  # name simd-option
     log "building $1 (-C simd=$2)"
-    rbash "set -e; cd $WORKDIR
-        rm -rf build-$1 && cp -r src build-$1
+    renv "rm -rf build-$1 && cp -r src build-$1
         cd build-$1
-        ../venv/bin/python -m pip install -v --no-deps --no-build-isolation --no-cache-dir \
+        $BUILD_PY -m pip install -v --no-deps --no-build-isolation --no-cache-dir \
             -C simd=$2 -C jpeg=disable -C zlib=disable --target ../$1 . > ../build-$1.log 2>&1 \
             || { tail -40 ../build-$1.log; exit 1; }
         grep 'SIMD kernels' ../build-$1.log | sed 's/^ *//'
@@ -161,9 +203,9 @@ done
 VARIANTS=()
 if [ "$UPSTREAM" = 1 ]; then
     log "installing upstream Pillow ${VERSION:-latest} as the baseline"
-    if rsh "cd $WORKDIR && venv/bin/python -m pip install -q --no-deps --only-binary :all: \
+    if renv "$BPY -m pip install -q --no-deps --only-binary :all: \
             --target upstream 'pillow==$VERSION'" 2>/dev/null \
-       || rsh "cd $WORKDIR && rm -rf upstream && venv/bin/python -m pip install -q --no-deps \
+       || renv "rm -rf upstream && $BPY -m pip install -q --no-deps \
             --only-binary :all: --target upstream pillow"; then
         VARIANTS+=(--variant "upstream=upstream")
     else
@@ -183,7 +225,7 @@ log "running the benchmark (${ROUNDS} rounds, $SIZE); this takes a few minutes"
 STAMP=$(date +%Y%m%d-%H%M%S)
 DEST="$OUT/${HOST#*@}-$COMMIT-$STAMP"
 mkdir -p "$DEST"
-rsh "cd $WORKDIR && venv/bin/python -I simd_bench.py$QARGS" | tee "$DEST/report.txt"
+renv "$BPY -I simd_bench.py$QARGS" | tee "$DEST/report.txt"
 
 log "copying results to $DEST"
 rsh "cd $WORKDIR && cat results.json" > "$DEST/results.json"
@@ -193,6 +235,10 @@ done
 echo "commit $COMMIT, host $HOST ($OS $ARCH)" > "$DEST/info.txt"
 
 if [ "$KEEP" = 0 ]; then
+    if [ "$DOCKER" = 1 ]; then
+        # Files written in the container may belong to its root user.
+        renv "rm -rf /work/* /work/.[!.]*" || true
+    fi
     rsh "rm -rf $WORKDIR"
 else
     log "kept $HOST:$WORKDIR"
