@@ -89,7 +89,7 @@ jobs:
       id: cache-libavif
       with:
         path: ~/cache-libavif
-        key: ${{ runner.os }}-libavif-${{ hashFiles('depends/install_libavif.sh') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-libavif-${{ hashFiles('depends/install_libavif.sh') }}
 
     - name: Cache libimagequant
       if: startsWith(matrix.os, 'ubuntu')
@@ -97,7 +97,7 @@ jobs:
       id: cache-libimagequant
       with:
         path: ~/cache-libimagequant
-        key: ${{ runner.os }}-libimagequant-${{ hashFiles('depends/install_imagequant.sh') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-libimagequant-${{ hashFiles('depends/install_imagequant.sh') }}
 
     - name: Cache libwebp
       if: startsWith(matrix.os, 'ubuntu')
@@ -105,7 +105,7 @@ jobs:
       id: cache-libwebp
       with:
         path: ~/cache-libwebp
-        key: ${{ runner.os }}-libwebp-${{ hashFiles('depends/install_webp.sh') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-libwebp-${{ hashFiles('depends/install_webp.sh') }}
 
     - name: Install Linux dependencies
       if: startsWith(matrix.os, 'ubuntu')
