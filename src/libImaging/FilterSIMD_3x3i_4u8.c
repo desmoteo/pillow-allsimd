@@ -31,12 +31,12 @@ ImagingFilter3x3i_4u8(Imaging imOut, Imaging im, const INT16* kernel,
         pix21 = _mm256_unpackhi_epi8(source, _mm256_setzero_si256());
 
     #define MM_KERNEL_SUM(ss, row, kctl) \
-        ss = _mm256_add_epi32(ss, _mm256_madd_epi16( \
-            pix0##row, _mm256_shuffle_epi32(kernel00, kctl))); \
-        ss = _mm256_add_epi32(ss, _mm256_madd_epi16( \
-            pix1##row, _mm256_shuffle_epi32(kernel10, kctl))); \
-        ss = _mm256_add_epi32(ss, _mm256_madd_epi16( \
-            pix2##row, _mm256_shuffle_epi32(kernel20, kctl)));
+        ss = mm256_dpwssd(ss,  \
+            pix0##row, _mm256_shuffle_epi32(kernel00, kctl)); \
+        ss = mm256_dpwssd(ss,  \
+            pix1##row, _mm256_shuffle_epi32(kernel10, kctl)); \
+        ss = mm256_dpwssd(ss,  \
+            pix2##row, _mm256_shuffle_epi32(kernel20, kctl));
 
         __m128i shuffle = _mm_set_epi8(15,11,14,10,13,9,12,8, 7,3,6,2,5,1,4,0);
         __m256i kernel00 = _mm256_set_epi16(
@@ -130,12 +130,12 @@ ImagingFilter3x3i_4u8(Imaging imOut, Imaging im, const INT16* kernel,
         pix21 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
 
     #define MM_KERNEL_SUM(ss, row, kctl) \
-        ss = _mm_add_epi32(ss, _mm_madd_epi16( \
-            pix0##row, _mm_shuffle_epi32(kernel00, kctl))); \
-        ss = _mm_add_epi32(ss, _mm_madd_epi16( \
-            pix1##row, _mm_shuffle_epi32(kernel10, kctl))); \
-        ss = _mm_add_epi32(ss, _mm_madd_epi16( \
-            pix2##row, _mm_shuffle_epi32(kernel20, kctl)));
+        ss = mm_dpwssd(ss,  \
+            pix0##row, _mm_shuffle_epi32(kernel00, kctl)); \
+        ss = mm_dpwssd(ss,  \
+            pix1##row, _mm_shuffle_epi32(kernel10, kctl)); \
+        ss = mm_dpwssd(ss,  \
+            pix2##row, _mm_shuffle_epi32(kernel20, kctl));
 
         __m128i shuffle = _mm_set_epi8(15,11,14,10,13,9,12,8, 7,3,6,2,5,1,4,0);
         __m128i kernel00 = _mm_set_epi16(

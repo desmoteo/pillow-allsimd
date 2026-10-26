@@ -37,11 +37,11 @@ ImagingResampleHorizontalConvolution8u4x(
             pix = _mm256_shuffle_epi8(source, _mm256_set_epi8(
                 -1,7, -1,3, -1,6, -1,2, -1,5, -1,1, -1,4, -1,0,
                 -1,7, -1,3, -1,6, -1,2, -1,5, -1,1, -1,4, -1,0));
-            sss0 = _mm256_add_epi32(sss0, _mm256_madd_epi16(pix, mmk0));
+            sss0 = mm256_dpwssd(sss0, pix, mmk0);
             pix = _mm256_shuffle_epi8(source, _mm256_set_epi8(
                 -1,15, -1,11, -1,14, -1,10, -1,13, -1,9, -1,12, -1,8,
                 -1,15, -1,11, -1,14, -1,10, -1,13, -1,9, -1,12, -1,8));
-            sss0 = _mm256_add_epi32(sss0, _mm256_madd_epi16(pix, mmk1));
+            sss0 = mm256_dpwssd(sss0, pix, mmk1);
 
             source = _mm256_inserti128_si256(_mm256_castsi128_si256(
                 _mm_loadu_si128((__m128i *) &lineIn2[x + xmin])),
@@ -49,11 +49,11 @@ ImagingResampleHorizontalConvolution8u4x(
             pix = _mm256_shuffle_epi8(source, _mm256_set_epi8(
                 -1,7, -1,3, -1,6, -1,2, -1,5, -1,1, -1,4, -1,0,
                 -1,7, -1,3, -1,6, -1,2, -1,5, -1,1, -1,4, -1,0));
-            sss1 = _mm256_add_epi32(sss1, _mm256_madd_epi16(pix, mmk0));
+            sss1 = mm256_dpwssd(sss1, pix, mmk0);
             pix = _mm256_shuffle_epi8(source, _mm256_set_epi8(
                 -1,15, -1,11, -1,14, -1,10, -1,13, -1,9, -1,12, -1,8,
                 -1,15, -1,11, -1,14, -1,10, -1,13, -1,9, -1,12, -1,8));
-            sss1 = _mm256_add_epi32(sss1, _mm256_madd_epi16(pix, mmk1));
+            sss1 = mm256_dpwssd(sss1, pix, mmk1);
         }
 
         for (; x < xmax - 1; x += 2) {
@@ -67,7 +67,7 @@ ImagingResampleHorizontalConvolution8u4x(
             pix = _mm256_shuffle_epi8(pix, _mm256_set_epi8(
                 -1,7, -1,3, -1,6, -1,2, -1,5, -1,1, -1,4, -1,0,
                 -1,7, -1,3, -1,6, -1,2, -1,5, -1,1, -1,4, -1,0));
-            sss0 = _mm256_add_epi32(sss0, _mm256_madd_epi16(pix, mmk));
+            sss0 = mm256_dpwssd(sss0, pix, mmk);
 
             pix = _mm256_inserti128_si256(_mm256_castsi128_si256(
                 _mm_loadl_epi64((__m128i *) &lineIn2[x + xmin])),
@@ -75,7 +75,7 @@ ImagingResampleHorizontalConvolution8u4x(
             pix = _mm256_shuffle_epi8(pix, _mm256_set_epi8(
                 -1,7, -1,3, -1,6, -1,2, -1,5, -1,1, -1,4, -1,0,
                 -1,7, -1,3, -1,6, -1,2, -1,5, -1,1, -1,4, -1,0));
-            sss1 = _mm256_add_epi32(sss1, _mm256_madd_epi16(pix, mmk));
+            sss1 = mm256_dpwssd(sss1, pix, mmk);
         }
 
         for (; x < xmax; x ++) {
@@ -88,12 +88,12 @@ ImagingResampleHorizontalConvolution8u4x(
             pix = _mm256_inserti128_si256(_mm256_castsi128_si256(
                 mm_cvtepu8_epi32(&lineIn0[x + xmin])),
                 mm_cvtepu8_epi32(&lineIn1[x + xmin]), 1);
-            sss0 = _mm256_add_epi32(sss0, _mm256_madd_epi16(pix, mmk));
+            sss0 = mm256_dpwssd(sss0, pix, mmk);
 
             pix = _mm256_inserti128_si256(_mm256_castsi128_si256(
                 mm_cvtepu8_epi32(&lineIn2[x + xmin])),
                 mm_cvtepu8_epi32(&lineIn3[x + xmin]), 1);
-            sss1 = _mm256_add_epi32(sss1, _mm256_madd_epi16(pix, mmk));
+            sss1 = mm256_dpwssd(sss1, pix, mmk);
         }
 
         sss0 = _mm256_srai_epi32(sss0, coefs_precision);
@@ -130,28 +130,28 @@ ImagingResampleHorizontalConvolution8u4x(
             source = _mm_loadu_si128((__m128i *) &lineIn0[x + xmin]);
             // [16] a1 a0 b1 b0 g1 g0 r1 r0
             pix = _mm_shuffle_epi8(source, mask_lo);
-            sss0 = _mm_add_epi32(sss0, _mm_madd_epi16(pix, mmk_lo));
+            sss0 = mm_dpwssd(sss0, pix, mmk_lo);
             // [16] a3 a2 b3 b2 g3 g2 r3 r2
             pix = _mm_shuffle_epi8(source, mask_hi);
-            sss0 = _mm_add_epi32(sss0, _mm_madd_epi16(pix, mmk_hi));
+            sss0 = mm_dpwssd(sss0, pix, mmk_hi);
 
             source = _mm_loadu_si128((__m128i *) &lineIn1[x + xmin]);
             pix = _mm_shuffle_epi8(source, mask_lo);
-            sss1 = _mm_add_epi32(sss1, _mm_madd_epi16(pix, mmk_lo));
+            sss1 = mm_dpwssd(sss1, pix, mmk_lo);
             pix = _mm_shuffle_epi8(source, mask_hi);
-            sss1 = _mm_add_epi32(sss1, _mm_madd_epi16(pix, mmk_hi));
+            sss1 = mm_dpwssd(sss1, pix, mmk_hi);
 
             source = _mm_loadu_si128((__m128i *) &lineIn2[x + xmin]);
             pix = _mm_shuffle_epi8(source, mask_lo);
-            sss2 = _mm_add_epi32(sss2, _mm_madd_epi16(pix, mmk_lo));
+            sss2 = mm_dpwssd(sss2, pix, mmk_lo);
             pix = _mm_shuffle_epi8(source, mask_hi);
-            sss2 = _mm_add_epi32(sss2, _mm_madd_epi16(pix, mmk_hi));
+            sss2 = mm_dpwssd(sss2, pix, mmk_hi);
 
             source = _mm_loadu_si128((__m128i *) &lineIn3[x + xmin]);
             pix = _mm_shuffle_epi8(source, mask_lo);
-            sss3 = _mm_add_epi32(sss3, _mm_madd_epi16(pix, mmk_lo));
+            sss3 = mm_dpwssd(sss3, pix, mmk_lo);
             pix = _mm_shuffle_epi8(source, mask_hi);
-            sss3 = _mm_add_epi32(sss3, _mm_madd_epi16(pix, mmk_hi));
+            sss3 = mm_dpwssd(sss3, pix, mmk_hi);
         }
 
         for (; x < xmax - 1; x += 2) {
@@ -166,19 +166,19 @@ ImagingResampleHorizontalConvolution8u4x(
             pix = _mm_loadl_epi64((__m128i *) &lineIn0[x + xmin]);
             // [16] a1 a0 b1 b0 g1 g0 r1 r0
             pix = _mm_shuffle_epi8(pix, mask);
-            sss0 = _mm_add_epi32(sss0, _mm_madd_epi16(pix, mmk));
+            sss0 = mm_dpwssd(sss0, pix, mmk);
 
             pix = _mm_loadl_epi64((__m128i *) &lineIn1[x + xmin]);
             pix = _mm_shuffle_epi8(pix, mask);
-            sss1 = _mm_add_epi32(sss1, _mm_madd_epi16(pix, mmk));
+            sss1 = mm_dpwssd(sss1, pix, mmk);
 
             pix = _mm_loadl_epi64((__m128i *) &lineIn2[x + xmin]);
             pix = _mm_shuffle_epi8(pix, mask);
-            sss2 = _mm_add_epi32(sss2, _mm_madd_epi16(pix, mmk));
+            sss2 = mm_dpwssd(sss2, pix, mmk);
 
             pix = _mm_loadl_epi64((__m128i *) &lineIn3[x + xmin]);
             pix = _mm_shuffle_epi8(pix, mask);
-            sss3 = _mm_add_epi32(sss3, _mm_madd_epi16(pix, mmk));
+            sss3 = mm_dpwssd(sss3, pix, mmk);
         }
 
         for (; x < xmax; x ++) {
@@ -187,16 +187,16 @@ ImagingResampleHorizontalConvolution8u4x(
             mmk = _mm_set1_epi32(k[x]);
             // [16] xx a0 xx b0 xx g0 xx r0
             pix = mm_cvtepu8_epi32(&lineIn0[x + xmin]);
-            sss0 = _mm_add_epi32(sss0, _mm_madd_epi16(pix, mmk));
+            sss0 = mm_dpwssd(sss0, pix, mmk);
 
             pix = mm_cvtepu8_epi32(&lineIn1[x + xmin]);
-            sss1 = _mm_add_epi32(sss1, _mm_madd_epi16(pix, mmk));
+            sss1 = mm_dpwssd(sss1, pix, mmk);
 
             pix = mm_cvtepu8_epi32(&lineIn2[x + xmin]);
-            sss2 = _mm_add_epi32(sss2, _mm_madd_epi16(pix, mmk));
+            sss2 = mm_dpwssd(sss2, pix, mmk);
 
             pix = mm_cvtepu8_epi32(&lineIn3[x + xmin]);
-            sss3 = _mm_add_epi32(sss3, _mm_madd_epi16(pix, mmk));
+            sss3 = mm_dpwssd(sss3, pix, mmk);
         }
 
         sss0 = _mm_srai_epi32(sss0, coefs_precision);
@@ -256,7 +256,7 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
             mmk = _mm256_shuffle_epi8(ksource, _mm256_set_epi8(
                 11,10, 9,8, 11,10, 9,8, 11,10, 9,8, 11,10, 9,8,
                 3,2, 1,0, 3,2, 1,0, 3,2, 1,0, 3,2, 1,0));
-            sss256 = _mm256_add_epi32(sss256, _mm256_madd_epi16(pix, mmk));
+            sss256 = mm256_dpwssd(sss256, pix, mmk);
 
             pix = _mm256_shuffle_epi8(source, _mm256_set_epi8(
                 -1,15, -1,11, -1,14, -1,10, -1,13, -1,9, -1,12, -1,8,
@@ -264,7 +264,7 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
             mmk = _mm256_shuffle_epi8(ksource, _mm256_set_epi8(
                 15,14, 13,12, 15,14, 13,12, 15,14, 13,12, 15,14, 13,12,
                 7,6, 5,4, 7,6, 5,4, 7,6, 5,4, 7,6, 5,4));
-            sss256 = _mm256_add_epi32(sss256, _mm256_madd_epi16(pix, mmk));
+            sss256 = mm256_dpwssd(sss256, pix, mmk);
         }
 
         for (; x < xmax - 3; x += 4) {
@@ -283,7 +283,7 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
             mmk = _mm256_shuffle_epi8(ksource, _mm256_set_epi8(
                 7,6, 5,4, 7,6, 5,4, 7,6, 5,4, 7,6, 5,4, 
                 3,2, 1,0, 3,2, 1,0, 3,2, 1,0, 3,2, 1,0));
-            sss256 = _mm256_add_epi32(sss256, _mm256_madd_epi16(pix, mmk));
+            sss256 = mm256_dpwssd(sss256, pix, mmk);
         }
 
         sss = _mm_add_epi32(
@@ -307,13 +307,13 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
                 -1,11, -1,3, -1,10, -1,2, -1,9, -1,1, -1,8, -1,0));
             mmk = _mm_shuffle_epi8(ksource, _mm_set_epi8(
                 5,4, 1,0, 5,4, 1,0, 5,4, 1,0, 5,4, 1,0));
-            sss = _mm_add_epi32(sss, _mm_madd_epi16(pix, mmk));
+            sss = mm_dpwssd(sss, pix, mmk);
 
             pix = _mm_shuffle_epi8(source, _mm_set_epi8(
                 -1,15, -1,7, -1,14, -1,6, -1,13, -1,5, -1,12, -1,4));
             mmk = _mm_shuffle_epi8(ksource, _mm_set_epi8(
                 7,6, 3,2, 7,6, 3,2, 7,6, 3,2, 7,6, 3,2));
-            sss = _mm_add_epi32(sss, _mm_madd_epi16(pix, mmk));
+            sss = mm_dpwssd(sss, pix, mmk);
 
             source = _mm_loadu_si128((__m128i *) &lineIn[x + 4 + xmin]);
 
@@ -321,13 +321,13 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
                 -1,11, -1,3, -1,10, -1,2, -1,9, -1,1, -1,8, -1,0));
             mmk = _mm_shuffle_epi8(ksource, _mm_set_epi8(
                 13,12, 9,8, 13,12, 9,8, 13,12, 9,8, 13,12, 9,8));
-            sss = _mm_add_epi32(sss, _mm_madd_epi16(pix, mmk));
+            sss = mm_dpwssd(sss, pix, mmk);
 
             pix = _mm_shuffle_epi8(source, _mm_set_epi8(
                 -1,15, -1,7, -1,14, -1,6, -1,13, -1,5, -1,12, -1,4));
             mmk = _mm_shuffle_epi8(ksource, _mm_set_epi8(
                 15,14, 11,10, 15,14, 11,10, 15,14, 11,10, 15,14, 11,10));
-            sss = _mm_add_epi32(sss, _mm_madd_epi16(pix, mmk));
+            sss = mm_dpwssd(sss, pix, mmk);
         }
 
         for (; x < xmax - 3; x += 4) {
@@ -339,13 +339,13 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
                 -1,11, -1,3, -1,10, -1,2, -1,9, -1,1, -1,8, -1,0));
             mmk = _mm_shuffle_epi8(ksource, _mm_set_epi8(
                 5,4, 1,0, 5,4, 1,0, 5,4, 1,0, 5,4, 1,0));
-            sss = _mm_add_epi32(sss, _mm_madd_epi16(pix, mmk));
+            sss = mm_dpwssd(sss, pix, mmk);
 
             pix = _mm_shuffle_epi8(source, _mm_set_epi8(
                 -1,15, -1,7, -1,14, -1,6, -1,13, -1,5, -1,12, -1,4));
             mmk = _mm_shuffle_epi8(ksource, _mm_set_epi8(
                 7,6, 3,2, 7,6, 3,2, 7,6, 3,2, 7,6, 3,2));
-            sss = _mm_add_epi32(sss, _mm_madd_epi16(pix, mmk));
+            sss = mm_dpwssd(sss, pix, mmk);
         }
 
 #endif
@@ -355,13 +355,13 @@ ImagingResampleHorizontalConvolution8u(UINT32 *restrict lineOut,
             __m128i source = _mm_loadl_epi64((__m128i *) &lineIn[x + xmin]);
             __m128i pix = _mm_shuffle_epi8(source, _mm_set_epi8(
                 -1,7, -1,3, -1,6, -1,2, -1,5, -1,1, -1,4, -1,0));
-            sss = _mm_add_epi32(sss, _mm_madd_epi16(pix, mmk));
+            sss = mm_dpwssd(sss, pix, mmk);
         }
 
         for (; x < xmax; x ++) {
             __m128i pix = mm_cvtepu8_epi32(&lineIn[x + xmin]);
             __m128i mmk = _mm_set1_epi32(k[x]);
-            sss = _mm_add_epi32(sss, _mm_madd_epi16(pix, mmk));
+            sss = mm_dpwssd(sss, pix, mmk);
         }
         sss = _mm_srai_epi32(sss, coefs_precision);
         sss = _mm_packs_epi32(sss, sss);
@@ -547,10 +547,10 @@ ImagingResampleHorizontalConvolution1u4x(
 #define MM_LOAD2(p) _mm_cvtsi32_si128((p)[0] | ((p)[1] << 16))
 #define MM_LOAD1(p) _mm_cvtsi32_si128((p)[0])
 #define MM_TAPS(load, n)                                               \
-    sss0 = _mm_add_epi32(sss0, _mm_madd_epi16(load(in0 + x), mmk));    \
-    sss1 = _mm_add_epi32(sss1, _mm_madd_epi16(load(in1 + x), mmk));    \
-    sss2 = _mm_add_epi32(sss2, _mm_madd_epi16(load(in2 + x), mmk));    \
-    sss3 = _mm_add_epi32(sss3, _mm_madd_epi16(load(in3 + x), mmk));    \
+    sss0 = mm_dpwssd(sss0, load(in0 + x), mmk);    \
+    sss1 = mm_dpwssd(sss1, load(in1 + x), mmk);    \
+    sss2 = mm_dpwssd(sss2, load(in2 + x), mmk);    \
+    sss3 = mm_dpwssd(sss3, load(in3 + x), mmk);    \
     x += n;
 
         while (x < xmax - 7) {

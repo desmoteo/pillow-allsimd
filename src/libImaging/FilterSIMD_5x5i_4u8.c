@@ -30,16 +30,16 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16* kernel,
         pix4##row = _mm256_inserti128_si256(pix4##row, _mm256_castsi256_si128(pix4##row), 1);
 
     #define MM_KERNEL_SUM(ss, row, unpack_epi8, krow, kctl) \
-        ss = _mm256_add_epi32(ss, _mm256_madd_epi16( \
-            unpack_epi8(pix0##row, zero), _mm256_shuffle_epi32(kernel0##krow, kctl))); \
-        ss = _mm256_add_epi32(ss, _mm256_madd_epi16( \
-            unpack_epi8(pix1##row, zero), _mm256_shuffle_epi32(kernel1##krow, kctl))); \
-        ss = _mm256_add_epi32(ss, _mm256_madd_epi16( \
-            unpack_epi8(pix2##row, zero), _mm256_shuffle_epi32(kernel2##krow, kctl))); \
-        ss = _mm256_add_epi32(ss, _mm256_madd_epi16( \
-            unpack_epi8(pix3##row, zero), _mm256_shuffle_epi32(kernel3##krow, kctl))); \
-        ss = _mm256_add_epi32(ss, _mm256_madd_epi16( \
-            unpack_epi8(pix4##row, zero), _mm256_shuffle_epi32(kernel4##krow, kctl)));
+        ss = mm256_dpwssd(ss,  \
+            unpack_epi8(pix0##row, zero), _mm256_shuffle_epi32(kernel0##krow, kctl)); \
+        ss = mm256_dpwssd(ss,  \
+            unpack_epi8(pix1##row, zero), _mm256_shuffle_epi32(kernel1##krow, kctl)); \
+        ss = mm256_dpwssd(ss,  \
+            unpack_epi8(pix2##row, zero), _mm256_shuffle_epi32(kernel2##krow, kctl)); \
+        ss = mm256_dpwssd(ss,  \
+            unpack_epi8(pix3##row, zero), _mm256_shuffle_epi32(kernel3##krow, kctl)); \
+        ss = mm256_dpwssd(ss,  \
+            unpack_epi8(pix4##row, zero), _mm256_shuffle_epi32(kernel4##krow, kctl));
 
         __m128i shuffle = _mm_set_epi8(15,11,14,10,13,9,12,8, 7,3,6,2,5,1,4,0);
         __m256i kernel00 = _mm256_set_epi16(
@@ -138,16 +138,16 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16* kernel,
         pix4##row = _mm_shuffle_epi8(_mm_loadu_si128((__m128i*) &in_2[x]), shuffle);
 
     #define MM_KERNEL_SUM(ss, row, unpack_epi8, krow, kctl) \
-        ss = _mm_add_epi32(ss, _mm_madd_epi16( \
-            unpack_epi8(pix0##row, zero), _mm_shuffle_epi32(kernel0##krow, kctl))); \
-        ss = _mm_add_epi32(ss, _mm_madd_epi16( \
-            unpack_epi8(pix1##row, zero), _mm_shuffle_epi32(kernel1##krow, kctl))); \
-        ss = _mm_add_epi32(ss, _mm_madd_epi16( \
-            unpack_epi8(pix2##row, zero), _mm_shuffle_epi32(kernel2##krow, kctl))); \
-        ss = _mm_add_epi32(ss, _mm_madd_epi16( \
-            unpack_epi8(pix3##row, zero), _mm_shuffle_epi32(kernel3##krow, kctl))); \
-        ss = _mm_add_epi32(ss, _mm_madd_epi16( \
-            unpack_epi8(pix4##row, zero), _mm_shuffle_epi32(kernel4##krow, kctl)));
+        ss = mm_dpwssd(ss,  \
+            unpack_epi8(pix0##row, zero), _mm_shuffle_epi32(kernel0##krow, kctl)); \
+        ss = mm_dpwssd(ss,  \
+            unpack_epi8(pix1##row, zero), _mm_shuffle_epi32(kernel1##krow, kctl)); \
+        ss = mm_dpwssd(ss,  \
+            unpack_epi8(pix2##row, zero), _mm_shuffle_epi32(kernel2##krow, kctl)); \
+        ss = mm_dpwssd(ss,  \
+            unpack_epi8(pix3##row, zero), _mm_shuffle_epi32(kernel3##krow, kctl)); \
+        ss = mm_dpwssd(ss,  \
+            unpack_epi8(pix4##row, zero), _mm_shuffle_epi32(kernel4##krow, kctl));
 
         __m128i shuffle = _mm_set_epi8(15,11,14,10,13,9,12,8, 7,3,6,2,5,1,4,0);
         __m128i kernel00 = _mm_set_epi16(

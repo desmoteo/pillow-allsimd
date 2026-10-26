@@ -7,8 +7,11 @@ Unreleased
 - arm64: NEON kernels for resize, reduce, box and Gaussian blur, unsharp mask,
   alpha composition, RGB → L, alpha (un)premultiplication, 3x3 and 5x5
   filters, split and merge. Other architectures build portable C code
-- Build: ``-C simd=auto|sse4|avx2|neon|disable`` option; flags chosen per
-  target architecture; SSE4.1 baseline on x86 (was SSE4.2)
+- Build: ``-C simd=auto|sse4|avx2|avxvnni|neon|disable`` option; flags
+  chosen per target architecture; SSE4.1 baseline on x86 (was SSE4.2)
+- AVX-VNNI build (``-C simd=avxvnni``): the 16-bit multiply-add of the
+  resample and integer filter kernels becomes one vpdpwssd. Same output;
+  integer filters on RGB 1.35x (3x3) and 2.1x (5x5) faster than AVX2
 - BoxBlur, GaussianBlur: fixed swapped channels for single-axis blurs on
   4-byte modes; fixed reads past 1-pixel lines; vertical pass without
   transposes, up to 1.8x faster

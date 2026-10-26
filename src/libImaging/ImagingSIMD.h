@@ -23,6 +23,9 @@
 #if defined(__AVX2__)
 #define IMAGING_SIMD_AVX2
 #include <immintrin.h>
+#if defined(__AVXVNNI__)
+#define IMAGING_SIMD_AVXVNNI
+#endif
 #endif
 
 #elif defined(__aarch64__) || defined(_M_ARM64)
@@ -47,6 +50,18 @@ mm_cvtepu8_epi32(const void *ptr) {
     memcpy(&v, ptr, sizeof(v));
     return _mm_cvtepu8_epi32(_mm_cvtsi32_si128(v));
 }
+#endif
+
+#if defined(IMAGING_SIMD_SSE4)
+/* acc + a[0] * b[0] + a[1] * b[1] for each pair of signed 16-bit lanes,
+   modulo 2^32: one vpdpwssd with AVX-VNNI, pmaddwd and paddd otherwise. */
+#if defined(IMAGING_SIMD_AVXVNNI)
+#define mm_dpwssd(acc, a, b) _mm_dpwssd_avx_epi32(acc, a, b)
+#define mm256_dpwssd(acc, a, b) _mm256_dpwssd_avx_epi32(acc, a, b)
+#else
+#define mm_dpwssd(acc, a, b) _mm_add_epi32(acc, _mm_madd_epi16(a, b))
+#define mm256_dpwssd(acc, a, b) _mm256_add_epi32(acc, _mm256_madd_epi16(a, b))
+#endif
 #endif
 
 #if defined(IMAGING_SIMD_AVX2)
