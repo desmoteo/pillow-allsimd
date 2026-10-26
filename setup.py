@@ -1027,11 +1027,16 @@ class pil_build_ext(build_ext):
         -C simd=auto (default) picks SSE4.1 on x86 and NEON on arm64,
         -C simd=avx2 adds AVX2 on x86, -C simd=avxvnni adds AVX2 and AVX-VNNI
         (Intel Alder Lake, Sapphire Rapids and newer, AMD Zen 5),
-        -C simd=disable builds scalar code.
+        -C simd=native builds for the CPU of the build machine (-march=native,
+        float contraction off so results don't change), -C simd=native512 also
+        lets the compiler use 512-bit vectors; such builds only run on CPUs
+        like the build machine's. -C simd=disable builds scalar code.
         Flags are appended, so the optimisation flags are kept.
         """
         requested = configuration.get("simd", ["auto"])[-1]
-        if requested not in ("auto", "sse4", "avx2", "avxvnni", "neon", "disable"):
+        if requested not in (
+            "auto", "sse4", "avx2", "avxvnni", "native", "native512", "neon", "disable"
+        ):
             msg = f"Unknown option '-C simd={requested}'"
             raise ValueError(msg)
 
@@ -1045,6 +1050,20 @@ class pil_build_ext(build_ext):
         if requested == "disable":
             macros.append(("IMAGING_SIMD_DISABLE", None))
             simd = "disabled"
+        elif requested in ("native", "native512"):
+            if msvc:
+                msg = f"'-C simd={requested}' is not supported with MSVC"
+                raise ValueError(msg)
+            if requested == "native512" and not x86:
+                msg = "'-C simd=native512' requires an x86 target"
+                raise ValueError(msg)
+            # -march=native enables FMA, and GCC would then fuse float
+            # multiplies and adds, which changes results.
+            args = ["-march=native", "-ffp-contract=off"]
+            simd = "native (-march=native)"
+            if requested == "native512":
+                args.append("-mprefer-vector-width=512")
+                simd = "native, 512-bit vectors (-march=native)"
         elif x86:
             if requested == "neon":
                 msg = "'-C simd=neon' requires an arm64 target"
