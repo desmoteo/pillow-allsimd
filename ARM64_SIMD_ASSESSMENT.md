@@ -152,7 +152,7 @@ Ordered by expected benefit and ease. Speed-up factors are the x86 gains reporte
 
 ## Caveats
 
-- No arm64 hardware was used. Instruction mappings and effort figures are from reading the code and from NEON documentation, not from measurement.
+- When this assessment was written, no arm64 hardware was used: instruction mappings and effort figures came from reading the code and NEON documentation. The kernels were later measured on a Jetson Orin (Cortex-A78AE, GCC 11); results are in [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md).
 - The line counts and intrinsic inventory were obtained with grep over `src/`, and are reliable. The effort and speed-up estimates are judgement calls.
 
 ## Implementation checklist
@@ -193,19 +193,22 @@ Each kernel has its own commit and a comparison against the x86 output on the di
   - RGB→L/LA/I and RGBA→LA: `vld4q_u8` with the SSE4 15-bit coefficients, **identical to x86**. Last pixels via padded buffers.
   - RGBA→RGBa premultiply: exact `MULDIV255` (`vraddhn_u16`).
   - RGBa→RGBA: **exact** float division (`vdivq_f32`), not `vrecpeq_f32`, so it matches upstream; x86 SSE4 still uses `rcp_ps` (±1).
-- [x] **2.4 Reduce:** NEON for 1×2, 2×1 and 2×2, the common thumbnail factors (`vpaddlq`/`vpadalq` + rounding narrow, `vrhaddq`). Other factors use the scalar code. **Identical to upstream.** (`bf56b0bfd`)
+- [x] **2.4 Reduce:** NEON for 1×2, 2×1 and 2×2, the common thumbnail factors (`vpaddlq`/`vpadalq` + rounding narrow, `vrhaddq`). **Identical to upstream.** (`bf56b0bfd`)
+  - Later: any horizontal factor up to 4 with `vld2/3/4q_u32` (`9fd5b665a`), larger factors up to 512 (`a85f87dfb`), and 2×2/4×4 for 1-byte images (`b913b10e8`). All identical to the scalar code.
 - [x] **2.5 Filter:** integer 3×3/5×5 for 4-byte and 1-byte images (`FilterSIMD_NxNi.c`, shared with x86 for 1-byte). Large coefficients use the generic code. **Identical to x86 SSE4.** (`30f0a1d50`, `b94b94ee2`)
 - [x] **2.6 BoxBlur:** horizontal pass via `px4`, vertical pass 16 bytes per step. **Identical to upstream.** (`e470d62b6`)
 - [x] **2.7 AlphaComposite:** eight pixels per step with upstream's **exact** integer arithmetic (division in `float64x2_t`), not `vrecpeq_f32`. Verified equal to the scalar code for all 65,536 alpha pairs. (`8e2a6db5c`)
-- [ ] **2.8 ColorLUT.** **Not done**; arm64 uses the upstream scalar code.
-- [x] **Also:** UnsharpMask post-pass (`47dad2b12`), merge (`4d508867b`).
+- [x] **2.8 ColorLUT:** NEON with the portable code's precision, so output is identical to upstream (`9fd5b665a`); 1.5x on the Jetson.
+- [x] **Also:** UnsharpMask post-pass (`47dad2b12`), merge (`4d508867b`), 1-byte horizontal resample (`4c45bd949`), `ImageChops.multiply`/`screen` (`e08321aae`), RGB pack/unpack (`bc77919ef`), float 3×3/5×5 filters for 4-byte images (`84639e8fd`).
+- [x] **Dropped after measuring on the Jetson:** the NEON kernels of 2.6 (blur), 2.7 (alpha composite) and the UnsharpMask post-pass. GCC 11's vectorised portable code was faster (`2e6edeec2`), and so was the 1-byte blur through the 4-byte line code. The NEON float filter is not used for 1-byte images.
 
 Remaining cross-architecture differences (arm64 vs x86 SSE4), all by design:
 - `rcp_ps`-based unpremultiply and alpha composite on x86 vs exact on arm64 (±1).
-- ColorLUT: SIMD on x86 vs upstream scalar on arm64 (±1).
-- Float filters (only when coefficients don't fit 16 bits): GCC fuses multiply-adds on AArch64 by default (`-ffp-contract=fast`), x86 without `-mfma` doesn't (±1). Upstream Pillow behaves the same.
+- ColorLUT: x86 SIMD uses its own lower precision; arm64 NEON matches upstream (±1 between them).
+- Float filters (only when coefficients don't fit 16 bits): GCC fuses multiply-adds on AArch64 by default (`-ffp-contract=fast`), x86 without `-mfma` doesn't (±1). Upstream Pillow behaves the same. The NEON float kernel follows GCC's fusion, matching the scalar arm64 build except for rare ±1 with inexact coefficients.
 
 ### Phase 3: CI and wheels
 - [x] CI jobs on `ubuntu-24.04-arm` (NEON and scalar) in `test.yml`. `macos-latest` (Apple Silicon) now also builds NEON. **Prepared, not run.**
-- [ ] Benchmarks on real arm64 hardware vs upstream Pillow. Drop any NEON kernel that is not faster than scalar. **Not done: no arm64 hardware here. qemu timings are meaningless.**
-  - Run with `checks/simd_bench_remote.sh HOST`: builds the NEON and scalar variants on the host, installs upstream Pillow as a baseline, benchmarks all three and compares outputs. Tested end to end against an emulated arm64 host.
+- [x] Benchmarks on real arm64 hardware vs upstream Pillow, on a Jetson Orin (Cortex-A78AE, GCC 11). NEON kernels that were not faster than the portable code were dropped (see Phase 2). Results: [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md).
+  - Run with `checks/simd_bench_remote.sh HOST`: builds the NEON and scalar variants on the host, installs upstream Pillow as a baseline, benchmarks all three and compares outputs.
+  - Not yet measured on a second arm64 core (Apple M-series, Graviton), where the NEON/portable balance may differ.

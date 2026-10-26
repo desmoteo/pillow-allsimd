@@ -32,7 +32,7 @@ in performing the same operation on multiple data points simultaneously
 by using multiple processing elements.
 Common CPU SIMD instruction sets are MMX, SSE-SSE4, AVX, AVX2, AVX512, NEON.
 
-Currently, Pillow-SIMD can be [compiled](#installation) with SSE4 (default on x86), AVX2 or NEON (default on arm64) support.
+Currently, Pillow-SIMD can be [compiled](#installation) with SSE4 (default on x86), AVX2, AVX-VNNI or NEON (default on arm64) support, or for the build machine's own CPU.
 
 
 ## Status
@@ -46,18 +46,24 @@ In fact, Uploadcare has been running Pillow-SIMD since 2015.
 
 The following image operations are currently SIMD-accelerated:
 
-- Resize (convolution-based resampling): SSE4, AVX2, NEON
-- Reduce: SSE4, NEON (2x1, 1x2, 2x2)
-- Gaussian and box blur: SSE4, NEON
-- Unsharp mask: SSE4, NEON
-- Alpha composition: SSE4, AVX2, NEON
+- Resize (convolution-based resampling), including L images: SSE4, AVX2, AVX-VNNI, NEON
+- Reduce: SSE4 (any factor), NEON (horizontal factors up to 512); 2x2 and 4x4 for L images on both
+- Gaussian and box blur: SSE4 (L images four rows at a time); portable C on arm64
+- Unsharp mask: SSE4; portable C on arm64
+- Alpha composition: SSE4, AVX2; portable C on arm64
 - RGBA → RGBa (alpha premultiplication): SSE4, AVX2, NEON
 - RGBa → RGBA (division by alpha): SSE4, AVX2, NEON
 - RGB → L (grayscale): SSE4, NEON
-- 3x3 and 5x5 kernel filters: SSE4, AVX2, NEON
-- 3D color lookup tables: SSE4, AVX2
+- 3x3 and 5x5 kernel filters: SSE4, AVX2, AVX-VNNI, NEON (integer kernels); float kernels for large coefficients on SSE4, AVX2 and NEON (4-byte images)
+- 3D color lookup tables: SSE4, AVX2, NEON
+- `ImageChops.multiply` and `screen`: SSE4, AVX2, NEON
+- RGB pack and unpack (`frombytes`, `tobytes`, codecs): SSE4, NEON
 - Split, get_channel and merge: SSE4 (split), NEON
 
+On arm64, blur, unsharp mask and alpha composition use the portable C code
+because on a Cortex-A78AE it was faster than hand-written NEON.
+Rank filters (min, max, median), histograms and `ImageChops.offset` have
+faster portable C code on every architecture.
 Other architectures build the portable C code.
 
 
@@ -119,6 +125,11 @@ The `simd` option accepts:
 - `auto` (default): SSE4.1 on x86, NEON on arm64, portable C elsewhere.
 - `sse4`: SSE4.1 (x86 only).
 - `avx2`: SSE4.1 and AVX2 (x86 only).
+- `avxvnni`: SSE4.1, AVX2 and AVX-VNNI (x86 only: Intel Alder Lake,
+  Sapphire Rapids and newer, AMD Zen 5). Faster integer filters and resize.
+- `native`: everything the build machine's CPU supports (`-march=native`),
+  including AVX-512 in compiler-generated code. Only runs on similar CPUs.
+- `native512`: like `native`, with 512-bit vectors preferred (x86 only).
 - `neon`: NEON (arm64 only).
 - `disable`: portable C code only, on any architecture.
 

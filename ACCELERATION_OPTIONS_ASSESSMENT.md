@@ -4,7 +4,12 @@ Companion to [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/
 
 Scope: wider x86 instruction sets, Intel/AMD integrated GPUs and NPUs, NVIDIA GPUs, and non-SIMD wins (threading, codecs, memory).
 
-Basis: code review of this repo plus general knowledge of the hardware and libraries. **Nothing here was benchmarked.** Speed-up figures are expectations, not measurements. The dev machine is an Intel Core Ultra 9 285H (16 threads, AVX2/VNNI/GFNI; no AVX-512), so AVX-512 could not be tested locally.
+Basis: code review of this repo plus general knowledge of the hardware and libraries. **Nothing here was benchmarked when it was written.** Speed-up figures are expectations, not measurements. The dev machine is an Intel Core Ultra 9 285H (16 threads, AVX2/VNNI/GFNI; no AVX-512), so AVX-512 could not be tested locally.
+
+Later measurements (details in [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md)):
+- AVX-VNNI is implemented as the compile-time option `-C simd=avxvnni`. It makes integer filters 1.3–2.1x and resize up to 1.13x faster than AVX2, with identical output.
+- AVX-512 was measured through the compiler (`-C simd=native` / `native512`) on a Xeon Gold 5512U. Only `blend` (1.5x) and the median filter (1.13x) gained noticeably, so hand-written AVX-512 kernels are not recommended.
+- Runtime dispatch is still not implemented.
 
 ## Summary and recommendation
 

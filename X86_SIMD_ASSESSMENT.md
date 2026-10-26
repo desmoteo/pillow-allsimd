@@ -182,7 +182,7 @@ L images (documents, scans, ML preprocessing) get almost no benefit today.
 ### 3.6 Resample (small refinements)
 - Vertical AVX2 handles 8 pixels per iteration. 16 pixels per iteration (two loads per row) amortises the `set1` of coefficients and loop overhead, matching what the SSE4 path does with 2×4.
 - Horizontal 1-row kernel: the AVX2 `xmax < 8` fallback sets up an SSE accumulator but skips the 4-tap SSE loop, so 4–7-tap filters (bilinear/bicubic upscales) go through the 2-tap loop. Add the 4-tap SSE step.
-- AVX-VNNI (`_mm256_dpwssd_avx_epi32`) fuses `madd` + `add` in every resample, filter-int and ColorLUT inner loop. It is present on this CPU; this needs the dispatch tier from the acceleration doc.
+- AVX-VNNI (`_mm256_dpwssd_avx_epi32`) fuses `madd` + `add` in every resample, filter-int and ColorLUT inner loop. Done as a compile-time option, `-C simd=avxvnni` (`39f7971c4`), without dispatch: integer filters 1.3–2.1x and resize up to 1.13x faster than AVX2, output identical. See [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md).
 
 ### 3.7 Convert
 - RGB→L/LA/I use `hadd_epi32` (3 uops on Intel) and have no AVX2.
@@ -228,14 +228,14 @@ Ranked by measured cost and likely usage.
 4. **Restore Reduce 4×4/5×5, then L-mode SIMD** for resize (reuse the vertical kernel), reduce and filter (3.1, 3.3): about 1 week.
 5. **BoxBlur restructure, UnsharpMask post-pass, real 256-bit filter path** (3.4, 3.5, 3.8): about 1 week.
 6. **New kernels**: median/rank filter, then affine/rotate (section 4). About 1–2 weeks each.
-7. **AVX-VNNI and AVX-512VL** tiers once dispatch exists (acceleration doc §1.2).
+7. **AVX-VNNI and AVX-512VL** tiers once dispatch exists (acceleration doc §1.2). AVX-VNNI now exists as `-C simd=avxvnni`; AVX-512 through the compiler (`-C simd=native512`) was measured on a Xeon and gains little except `blend` (1.5x).
 
 ## Caveats
 
 - Benchmarks are from one laptop CPU with a noisy power governor. Use them for direction and order of magnitude; confirm on target servers with `benchmark.yml`.
 - "Expected" speed-ups in sections 3 and 4 are estimates and were not prototyped.
 - The macOS `-msse4` loss (1.5) is from reading `setup.py`; it was not built on a Mac.
-- AVX-512 could not be tested on this CPU.
+- AVX-512 could not be tested on this CPU. It was later measured on a Xeon Gold 5512U through `-C simd=native`/`native512` (see [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md)).
 - Scripts used (output diff, exhaustive unpremultiply test, benchmarks) were kept outside the repo and are not part of this change.
 
 ## Implementation checklist
@@ -288,9 +288,9 @@ Every item is done when:
   - Output identical to the scalar loop for 40 percent/threshold combinations; 82 → 47 ms on a 2560×1600 RGB image.
 - [x] 4.5 Reduce 4-channel paths: four outputs per iteration for 1×2 (`pavgb`), 2×1 and 2×2 (`pshufb` + `pmaddubsw`), about 2x faster. Other factors keep one output per iteration.
 - [ ] 4.6 Filter AVX2 path: real 256-bit loads instead of duplicated lanes. **Not done.**
-- [x] 4.7 BoxBlur: the vertical pass works on rows (no transposes), 16 bytes per step with SSE4/NEON. GaussianBlur on L 1.8x faster, BoxBlur on RGB 1.5x, GaussianBlur on RGB 1.1x: the per-pixel horizontal passes now dominate. **Interleaving rows in the horizontal pass is not done.**
+- [x] 4.7 BoxBlur: the vertical pass works on rows (no transposes), 16 bytes per step with SSE4/NEON. GaussianBlur on L 1.8x faster, BoxBlur on RGB 1.5x, GaussianBlur on RGB 1.1x: the per-pixel horizontal passes now dominate. Later, 1-byte images were blurred four rows at a time through the 4-byte line code (2.4–3x, `b913b10e8`); two RGB rows per AVX2 vector was measured and dropped ([CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md)).
 - [x] 4.8 L-mode integer 3×3/5×5 filter kernel (`FilterSIMD_NxNi.c`, shared with NEON). 1.4x (3×3) and 2x (5×5) faster than the float kernels; x86 and arm64 L filter output is identical.
-- [ ] 4.9 New kernels: 3×3 median via a min/max network, then affine/rotate bilinear. **Not done.**
+- [x] 4.9 New kernels: 3×3 rank filters (median and any rank) via a sorting network, and min/max of any size by rows then columns, in portable C that compilers vectorise (`bc77919ef`), 30–130x faster. **Affine/rotate bilinear is not done.**
 
 ### Phase 5: verification
 - [x] Output diff harness (SSE4 vs AVX2 vs scalar vs upstream vs arm64) run after each change. Final state:
