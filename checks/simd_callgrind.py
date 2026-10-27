@@ -66,10 +66,10 @@ def slug(op: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "_", op)
 
 
-def worker(path: str, op: str, control: str, size: tuple[int, int]) -> None:
+def worker(path: str, op: str, control: str, size: tuple[int, int], which: str) -> None:
     sb = load_bench()
     Image, ImageChops, ImageFilter, _, _ = sb.import_pil(path)
-    fn = sb.operations(Image, ImageChops, ImageFilter, *size)[op]
+    fn = sb.all_operations(which, Image, ImageChops, ImageFilter, *size)[op]
     vg = ctypes.CDLL(control)
     fn()  # lazy imports and tables stay out of the count
     vg.vg_start()
@@ -89,6 +89,7 @@ def run(
         f"--callgrind-out-file={d}/{slug(op)}.%p",
         sys.executable, "-I", os.path.abspath(__file__),
         "--worker", path, "--op", op, "--control", control, "--size", args.size,
+        "--set", args.set,
     ]  # fmt: skip
     with open(os.path.join(d, slug(op) + ".log"), "w") as log:
         rc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT).returncode
@@ -117,6 +118,7 @@ def main() -> None:
     ap.add_argument("--variant", action="append", default=[], metavar="NAME=PATH")
     ap.add_argument("--only", action="append", default=[], help="operation name")
     ap.add_argument("--size", default="2560x1600")
+    ap.add_argument("--set", default="simd", help="operation set of simd_bench.py")
     ap.add_argument("--out", default="callgrind-out")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
     ap.add_argument("--worker", help=argparse.SUPPRESS)
@@ -127,7 +129,7 @@ def main() -> None:
     size = (w, h)
 
     if args.worker:
-        worker(args.worker, args.op, args.control, size)
+        worker(args.worker, args.op, args.control, size, args.set)
         return
 
     variants = [v.split("=", 1) for v in args.variant] or [["default", "-"]]
@@ -142,7 +144,7 @@ def main() -> None:
 
     sb = load_bench()
     Image, ImageChops, ImageFilter, _, _ = sb.import_pil(variants[0][1])
-    ops = [o for o in sb.operations(Image, ImageChops, ImageFilter, 8, 8)
+    ops = [o for o in sb.all_operations(args.set, Image, ImageChops, ImageFilter, 8, 8)
            if not args.only or o in args.only]  # fmt: skip
 
     jobs = [(n, p, o) for o in ops for n, p in variants]

@@ -97,6 +97,110 @@ def operations(
     }
 
 
+def extra_operations(
+    Image: Any, ImageChops: Any, ImageFilter: Any, w: int, h: int
+) -> dict[str, Callable[[], Any]]:
+    """Common operations with no SIMD kernel, to find where one would pay."""
+    import importlib
+    import random
+
+    # The PIL that import_pil() put first on the path.
+    ImageOps = importlib.import_module("PIL.ImageOps")
+    rnd = random.Random(SEED)
+    rgb = Image.frombytes("RGB", (w, h), rnd.randbytes(w * h * 3))
+    rgb2 = Image.frombytes("RGB", (w, h), rnd.randbytes(w * h * 3))
+    L = Image.frombytes("L", (w, h), rnd.randbytes(w * h))
+    rgba = rgb.convert("RGBA")
+    rgba.putalpha(Image.frombytes("L", (w, h), rnd.randbytes(w * h)))
+    ycc = rgb.convert("YCbCr")
+    # A palette image with large flat areas, as from a real quantised photo.
+    P = rgb.resize((max(1, w // 10), max(1, h // 10))).quantize(64).resize((w, h))
+    F = L.convert("F")
+    I16 = L.convert("I;16")
+    mask = L.point(lambda v: 255 if v > 128 else 0)
+    # 4 << 13 overflows the 16-bit integer kernels: these take the float ones.
+    float5 = ImageFilter.Kernel((5, 5), [-1] * 12 + [24] + [-1] * 12, 1)
+    small = (max(1, w // 4), max(1, h // 4))
+    R, T = Image.Resampling, Image.Transform
+
+    def paste(im: Any, src: Any, m: Any) -> Any:
+        out = im.copy()
+        out.paste(src, (0, 0), m)
+        return out
+
+    def thumbnail() -> Any:
+        out = rgb.copy()
+        out.thumbnail((max(1, w // 8), max(1, h // 8)))
+        return out
+
+    def putalpha() -> Any:
+        out = rgb.convert("RGBA")
+        out.putalpha(L)
+        return out
+
+    return {
+        "rotate RGB 30 nearest": lambda: rgb.rotate(30, R.NEAREST),
+        "rotate RGB 30 bilinear": lambda: rgb.rotate(30, R.BILINEAR),
+        "rotate RGB 30 bicubic": lambda: rgb.rotate(30, R.BICUBIC),
+        "perspective RGBA bilinear": lambda: rgba.transform(
+            (w, h), T.PERSPECTIVE, (1.1, 0.1, -5, 0.05, 0.9, 3, 1e-5, 2e-5), R.BILINEAR
+        ),
+        "transpose RGB ROTATE_90": lambda: rgb.transpose(Image.Transpose.ROTATE_90),
+        "transpose RGB FLIP_LR": lambda: rgb.transpose(Image.Transpose.FLIP_LEFT_RIGHT),
+        "transpose L TRANSPOSE": lambda: L.transpose(Image.Transpose.TRANSPOSE),
+        "resize RGB 1/4 nearest": lambda: rgb.resize(small, R.NEAREST),
+        "resize F 1/4 bicubic": lambda: F.resize(small, R.BICUBIC),
+        "resize I;16 1/4 bicubic": lambda: I16.resize(small, R.BICUBIC),
+        "convert RGB->RGBA": lambda: rgb.convert("RGBA"),
+        "convert RGBA->RGB": lambda: rgba.convert("RGB"),
+        "convert L->RGB": lambda: L.convert("RGB"),
+        "convert P->RGB": lambda: P.convert("RGB"),
+        "convert RGB->YCbCr": lambda: rgb.convert("YCbCr"),
+        "convert YCbCr->RGB": lambda: ycc.convert("RGB"),
+        "convert RGB->HSV": lambda: rgb.convert("HSV"),
+        "convert RGB->CMYK": lambda: rgb.convert("CMYK"),
+        "convert L->F": lambda: L.convert("F"),
+        "convert L->1 dither": lambda: L.convert("1"),
+        "convert RGB->P adaptive": lambda: rgb.convert(
+            "P", palette=Image.Palette.ADAPTIVE
+        ),
+        "quantize RGB fastoctree": lambda: rgb.quantize(256, Image.Quantize.FASTOCTREE),
+        "paste RGB mask 1-bit L": lambda: paste(rgb, rgb2, mask),
+        "composite RGB mask L": lambda: Image.composite(rgb, rgb2, L),
+        "paste RGBA over RGB": lambda: paste(rgb, rgba, rgba),
+        "putalpha RGBA": putalpha,
+        "point RGB lut": lambda: rgb.point([255 - i for i in range(256)] * 3),
+        "autocontrast RGB": lambda: ImageOps.autocontrast(rgb, cutoff=1),
+        "equalize RGB": lambda: ImageOps.equalize(rgb),
+        "getextrema RGB": lambda: [v for band in rgb.getextrema() for v in band],
+        "chops add": lambda: ImageChops.add(rgb, rgb2),
+        "chops difference": lambda: ImageChops.difference(rgb, rgb2),
+        "chops lighter": lambda: ImageChops.lighter(rgb, rgb2),
+        "filter RGB 5x5 float": lambda: rgb.filter(float5),
+        "filter L 5x5 float": lambda: L.filter(float5),
+        "filter RGB EDGE_ENHANCE": lambda: rgb.filter(ImageFilter.EDGE_ENHANCE),
+        "mode 3 L": lambda: L.filter(ImageFilter.ModeFilter(3)),
+        "expand RGB 20": lambda: ImageOps.expand(rgb, 20),
+        "thumbnail RGB 1/8": thumbnail,
+    }
+
+
+SETS = {
+    "simd": (operations,),
+    "extra": (extra_operations,),
+    "all": (operations, extra_operations),
+}
+
+
+def all_operations(
+    which: str, Image: Any, ImageChops: Any, ImageFilter: Any, w: int, h: int
+) -> dict[str, Callable[[], Any]]:
+    ops: dict[str, Callable[[], Any]] = {}
+    for fn in SETS[which]:
+        ops.update(fn(Image, ImageChops, ImageFilter, w, h))
+    return ops
+
+
 def import_pil(path: str) -> tuple[Any, Any, Any, str, str]:
     if path != "-":
         sys.path.insert(0, path)
@@ -106,10 +210,12 @@ def import_pil(path: str) -> tuple[Any, Any, Any, str, str]:
     return Image, ImageChops, ImageFilter, pil_file, __version__
 
 
-def worker(path: str, mode: str, size: tuple[int, int], only: list[str]) -> None:
+def worker(
+    path: str, mode: str, size: tuple[int, int], only: list[str], which: str
+) -> None:
     """Runs in a subprocess; prints one JSON object."""
     Image, ImageChops, ImageFilter, pil_file, version = import_pil(path)
-    ops = operations(Image, ImageChops, ImageFilter, *size)
+    ops = all_operations(which, Image, ImageChops, ImageFilter, *size)
     if only:
         ops = {k: v for k, v in ops.items() if any(o in k for o in only)}
     result: dict[str, Any] = {"pil": pil_file, "version": version, "ops": {}}
@@ -141,7 +247,12 @@ def worker(path: str, mode: str, size: tuple[int, int], only: list[str]) -> None
 
 
 def run_worker(
-    path: str, mode: str, size: tuple[int, int], only: list[str], cpu: int | None
+    path: str,
+    mode: str,
+    size: tuple[int, int],
+    only: list[str],
+    cpu: int | None,
+    which: str,
 ) -> dict[str, Any]:
     cmd = [
         sys.executable,
@@ -153,6 +264,8 @@ def run_worker(
         mode,
         "--size",
         f"{size[0]}x{size[1]}",
+        "--set",
+        which,
     ]
     for o in only:
         cmd += ["--only", o]
@@ -199,6 +312,13 @@ def main() -> int:
         default=[],
         help="run only operations whose name contains this (repeatable)",
     )
+    ap.add_argument(
+        "--set",
+        choices=sorted(SETS),
+        default="simd",
+        help="simd: operations with SIMD kernels (default); extra: common "
+        "operations without; all: both",
+    )
     ap.add_argument("--cpu", type=int, help="pin to this CPU (Linux, needs taskset)")
     ap.add_argument("--check", action="store_true", help="also compare outputs")
     ap.add_argument("--json", help="write all results to this file")
@@ -209,7 +329,7 @@ def main() -> int:
     size = (w, h)
 
     if args.worker:
-        worker(args.worker, args.mode, size, args.only)
+        worker(args.worker, args.mode, size, args.only, args.set)
         return 0
 
     if not args.variant:
@@ -228,7 +348,7 @@ def main() -> int:
     timings: dict[str, dict[str, list[float]]] = {n: {} for n in names}
     for r in range(args.rounds):
         for n in names:
-            res = run_worker(variants[n], "time", size, args.only, args.cpu)
+            res = run_worker(variants[n], "time", size, args.only, args.cpu, args.set)
             report["variants"][n] = {"pil": res["pil"], "version": res["version"]}
             for op, ms in res["ops"].items():
                 timings[n].setdefault(op, []).append(ms)
@@ -268,7 +388,9 @@ def main() -> int:
 
     if args.check:
         outputs = {
-            n: run_worker(variants[n], "check", (67, 23), args.only, None)["ops"]
+            n: run_worker(variants[n], "check", (67, 23), args.only, None, args.set)[
+                "ops"
+            ]
             for n in names
         }
         report["check"] = {}
