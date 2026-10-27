@@ -39,6 +39,10 @@ New and faster kernels
   and maximum for any size, 14x to 130x faster; the GIL is released
 - Filter with integer kernels on L images: AVX2 path, 32 pixels per step,
   2x faster than SSE4 (2.2x with AVX-VNNI); output unchanged
+- RGB to HSV: SSE4 kernel for 4 pixels with the float and double steps of
+  the scalar code, and fmod(h, 1.0) replaced by its exact equivalent for
+  the range h is in. 5.4x faster than upstream on SSE4, 1.4x in the scalar
+  build; output identical for all 16.7 million RGB values
 - Filter with 3x3 float kernels on L images (CONTOUR, FIND_EDGES): AVX2
   path, 8 pixels per step, 1.9x faster than SSE4; output unchanged
 - Rotate and transform (affine, perspective, quad, mesh): the output is
