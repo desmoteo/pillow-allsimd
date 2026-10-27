@@ -39,6 +39,10 @@ New and faster kernels
   and maximum for any size, 14x to 130x faster; the GIL is released
 - Filter with integer kernels on L images: AVX2 path, 32 pixels per step,
   2x faster than SSE4 (2.2x with AVX-VNNI); output unchanged
+- Quantize with median cut or maximum coverage, convert("P", ADAPTIVE):
+  the color hash table takes its nodes from blocks instead of one malloc
+  each; the same chains, so the same palette and pixels. 1.7x faster on a
+  2560x1600 image of random colors
 - RGB to HSV: SSE4 kernel for 4 pixels with the float and double steps of
   the scalar code, and fmod(h, 1.0) replaced by its exact equivalent for
   the range h is in. 5.4x faster than upstream on SSE4, 1.4x in the scalar

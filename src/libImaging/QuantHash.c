@@ -29,6 +29,15 @@ typedef struct _HashNode {
     HashVal_t value;
 } HashNode;
 
+/* Nodes come from blocks owned by the table instead of one malloc each;
+   freed nodes are reused. The chains are the same as before. */
+#define NODES_PER_BLOCK 4096
+
+typedef struct _HashNodeBlock {
+    struct _HashNodeBlock *next;
+    HashNode nodes[NODES_PER_BLOCK];
+} HashNodeBlock;
+
 struct _HashTable {
     HashNode **table;
     uint32_t length;
@@ -36,7 +45,35 @@ struct _HashTable {
     HashFunc hashFunc;
     HashCmpFunc cmpFunc;
     void *userData;
+    HashNodeBlock *blocks;
+    uint32_t blockUsed;
+    HashNode *freeNodes;
 };
+
+static HashNode *
+_hashtable_node_alloc(HashTable *h) {
+    HashNode *node = h->freeNodes;
+    if (node) {
+        h->freeNodes = node->next;
+        return node;
+    }
+    if (!h->blocks || h->blockUsed == NODES_PER_BLOCK) {
+        HashNodeBlock *block = malloc(sizeof(HashNodeBlock));
+        if (!block) {
+            return NULL;
+        }
+        block->next = h->blocks;
+        h->blocks = block;
+        h->blockUsed = 0;
+    }
+    return &h->blocks->nodes[h->blockUsed++];
+}
+
+static void
+_hashtable_node_free(HashTable *h, HashNode *node) {
+    node->next = h->freeNodes;
+    h->freeNodes = node;
+}
 
 #define MIN_LENGTH 11
 #define RESIZE_FACTOR 3
@@ -56,6 +93,9 @@ hashtable_new(HashFunc hf, HashCmpFunc cf) {
     h->length = MIN_LENGTH;
     h->count = 0;
     h->userData = NULL;
+    h->blocks = NULL;
+    h->blockUsed = 0;
+    h->freeNodes = NULL;
     h->table = malloc(sizeof(HashNode *) * h->length);
     if (!h->table) {
         free(h);
@@ -145,12 +185,12 @@ _hashtable_insert_node(
             if (cf) {
                 nv->key = node->key;
                 cf(h, &(nv->key), &(nv->value), node->key, node->value);
-                free(node);
+                _hashtable_node_free(h, node);
                 return 1;
             } else {
                 nv->key = node->key;
                 nv->value = node->value;
-                free(node);
+                _hashtable_node_free(h, node);
                 return 1;
             }
         } else if (i > 0) {
@@ -188,7 +228,7 @@ _hashtable_insert(HashTable *h, HashKey_t key, HashVal_t val, int resize, int up
         }
     }
     if (!update) {
-        t = malloc(sizeof(HashNode));
+        t = _hashtable_node_alloc(h);
         if (!t) {
             return 0;
         }
@@ -229,7 +269,7 @@ hashtable_insert_or_update_computed(
             break;
         }
     }
-    t = malloc(sizeof(HashNode));
+    t = _hashtable_node_alloc(h);
     if (!t) {
         return 0;
     }
@@ -239,7 +279,8 @@ hashtable_insert_or_update_computed(
     if (newFunc) {
         newFunc(h, t->key, &(t->value));
     } else {
-        free(t);
+        *n = t->next;
+        _hashtable_node_free(h, t);
         return 0;
     }
     h->count++;
@@ -282,18 +323,13 @@ hashtable_foreach(HashTable *h, IteratorFunc i, void *u) {
 
 void
 hashtable_free(HashTable *h) {
-    HashNode *n, *nn;
-    uint32_t i;
+    HashNodeBlock *block, *next;
 
-    if (h->table) {
-        for (i = 0; i < h->length; i++) {
-            for (n = h->table[i]; n; n = nn) {
-                nn = n->next;
-                free(n);
-            }
-        }
-        free(h->table);
+    for (block = h->blocks; block; block = next) {
+        next = block->next;
+        free(block);
     }
+    free(h->table);
     free(h);
 }
 
