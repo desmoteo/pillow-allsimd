@@ -550,6 +550,7 @@ bilinear_filter32LA(void *out, Imaging im, double xin, double yin) {
     return 1;
 }
 
+#if !defined(IMAGING_SIMD_SSE4)
 static int
 bilinear_filter32RGB(void *out, Imaging im, double xin, double yin) {
     int b;
@@ -560,6 +561,7 @@ bilinear_filter32RGB(void *out, Imaging im, double xin, double yin) {
     }
     return 1;
 }
+#endif
 
 #undef BILINEAR
 #undef BILINEAR_HEAD
@@ -684,6 +686,7 @@ bicubic_filter32LA(void *out, Imaging im, double xin, double yin) {
     return 1;
 }
 
+#if !defined(IMAGING_SIMD_SSE4)
 static int
 bicubic_filter32RGB(void *out, Imaging im, double xin, double yin) {
     int b;
@@ -700,10 +703,219 @@ bicubic_filter32RGB(void *out, Imaging im, double xin, double yin) {
     }
     return 1;
 }
+#endif
 
 #undef BICUBIC
 #undef BICUBIC_HEAD
 #undef BICUBIC_BODY
+
+#if defined(IMAGING_SIMD_SSE4)
+/* Bilinear and bicubic filters for 3- and 4-band 8-bit images with the
+   channels of a pixel side by side: one 256-bit vector of doubles with AVX2,
+   two 128-bit vectors otherwise. Each channel goes through the same
+   operations in the same order as the scalar filters above, in double, so
+   the results are identical; x86 builds don't contract them to FMA. */
+/* Constant sizes, so that the copies are inlined. */
+static inline void
+tv_store_bands(UINT8 *out, INT32 pixel, int bands) {
+    if (bands == 4) {
+        memcpy(out, &pixel, 4);
+    } else {
+        memcpy(out, &pixel, 3);
+    }
+}
+
+#if defined(IMAGING_SIMD_AVX2)
+typedef __m256d transform_vec;
+
+static inline transform_vec
+tv_load(const UINT8 *p) {
+    return _mm256_cvtepi32_pd(mm_cvtepu8_epi32(p));
+}
+
+static inline transform_vec
+tv_set1(double v) {
+    return _mm256_set1_pd(v);
+}
+
+static inline transform_vec
+tv_add(transform_vec a, transform_vec b) {
+    return _mm256_add_pd(a, b);
+}
+
+static inline transform_vec
+tv_sub(transform_vec a, transform_vec b) {
+    return _mm256_sub_pd(a, b);
+}
+
+static inline transform_vec
+tv_mul(transform_vec a, transform_vec b) {
+    return _mm256_mul_pd(a, b);
+}
+
+/* Truncates to integers in 0..255 and stores 3 or 4 bytes. */
+static inline void
+tv_store(UINT8 *out, transform_vec v, int bands) {
+    __m256d clamped =
+        _mm256_min_pd(_mm256_max_pd(v, _mm256_setzero_pd()), _mm256_set1_pd(255.0));
+    __m128i i = _mm256_cvttpd_epi32(clamped);
+    INT32 pixel;
+    i = _mm_packus_epi16(_mm_packus_epi32(i, i), i);
+    pixel = _mm_cvtsi128_si32(i);
+    tv_store_bands(out, pixel, bands);
+}
+#else
+typedef struct {
+    __m128d lo, hi;
+} transform_vec;
+
+static inline transform_vec
+tv_load(const UINT8 *p) {
+    __m128i i = mm_cvtepu8_epi32(p);
+    transform_vec v = {_mm_cvtepi32_pd(i), _mm_cvtepi32_pd(_mm_srli_si128(i, 8))};
+    return v;
+}
+
+static inline transform_vec
+tv_set1(double d) {
+    transform_vec v = {_mm_set1_pd(d), _mm_set1_pd(d)};
+    return v;
+}
+
+static inline transform_vec
+tv_add(transform_vec a, transform_vec b) {
+    transform_vec v = {_mm_add_pd(a.lo, b.lo), _mm_add_pd(a.hi, b.hi)};
+    return v;
+}
+
+static inline transform_vec
+tv_sub(transform_vec a, transform_vec b) {
+    transform_vec v = {_mm_sub_pd(a.lo, b.lo), _mm_sub_pd(a.hi, b.hi)};
+    return v;
+}
+
+static inline transform_vec
+tv_mul(transform_vec a, transform_vec b) {
+    transform_vec v = {_mm_mul_pd(a.lo, b.lo), _mm_mul_pd(a.hi, b.hi)};
+    return v;
+}
+
+/* Truncates to integers in 0..255 and stores 3 or 4 bytes. */
+static inline void
+tv_store(UINT8 *out, transform_vec v, int bands) {
+    __m128d zero = _mm_setzero_pd(), max = _mm_set1_pd(255.0);
+    __m128i lo = _mm_cvttpd_epi32(_mm_min_pd(_mm_max_pd(v.lo, zero), max));
+    __m128i hi = _mm_cvttpd_epi32(_mm_min_pd(_mm_max_pd(v.hi, zero), max));
+    __m128i i = _mm_unpacklo_epi64(lo, hi);
+    INT32 pixel;
+    i = _mm_packus_epi16(_mm_packus_epi32(i, i), i);
+    pixel = _mm_cvtsi128_si32(i);
+    tv_store_bands(out, pixel, bands);
+}
+#endif
+
+/* BILINEAR: a + (b - a) * d */
+static inline transform_vec
+tv_bilinear(transform_vec a, transform_vec b, transform_vec d) {
+    return tv_add(a, tv_mul(tv_sub(b, a), d));
+}
+
+/* BICUBIC, term by term: -a + b is b - a, which rounds the same. */
+static inline transform_vec
+tv_bicubic(
+    transform_vec v1,
+    transform_vec v2,
+    transform_vec v3,
+    transform_vec v4,
+    transform_vec d
+) {
+    transform_vec p2 = tv_sub(v3, v1);
+    transform_vec p3 = tv_sub(tv_add(tv_mul(tv_set1(2.0), tv_sub(v1, v2)), v3), v4);
+    transform_vec p4 = tv_add(tv_sub(tv_sub(v2, v1), v3), v4);
+    return tv_add(v2, tv_mul(d, tv_add(p2, tv_mul(d, tv_add(p3, tv_mul(d, p4))))));
+}
+
+static int
+bilinear_filter32RGB_simd(void *out, Imaging im, double xin, double yin) {
+    int x, y, x0, x1;
+    double dx, dy;
+    const UINT8 *in;
+    transform_vec d, v1, v2;
+    if (xin < 0.0 || xin >= im->xsize || yin < 0.0 || yin >= im->ysize) {
+        return 0;
+    }
+    xin -= 0.5;
+    yin -= 0.5;
+    x = FLOOR(xin);
+    y = FLOOR(yin);
+    dx = xin - x;
+    dy = yin - y;
+    x0 = XCLIP(im, x + 0) * 4;
+    x1 = XCLIP(im, x + 1) * 4;
+    d = tv_set1(dx);
+    in = (UINT8 *)im->image[YCLIP(im, y)];
+    v1 = tv_bilinear(tv_load(in + x0), tv_load(in + x1), d);
+    if (y + 1 >= 0 && y + 1 < im->ysize) {
+        in = (UINT8 *)im->image[y + 1];
+        v2 = tv_bilinear(tv_load(in + x0), tv_load(in + x1), d);
+    } else {
+        v2 = v1;
+    }
+    tv_store(out, tv_bilinear(v1, v2, tv_set1(dy)), im->bands);
+    return 1;
+}
+
+static int
+bicubic_filter32RGB_simd(void *out, Imaging im, double xin, double yin) {
+    int x, y, x0, x1, x2, x3;
+    double dx, dy;
+    const UINT8 *in;
+    transform_vec d, v1, v2, v3, v4;
+    if (xin < 0.0 || xin >= im->xsize || yin < 0.0 || yin >= im->ysize) {
+        return 0;
+    }
+    xin -= 0.5;
+    yin -= 0.5;
+    x = FLOOR(xin);
+    y = FLOOR(yin);
+    dx = xin - x;
+    dy = yin - y;
+    x--;
+    y--;
+    x0 = XCLIP(im, x + 0) * 4;
+    x1 = XCLIP(im, x + 1) * 4;
+    x2 = XCLIP(im, x + 2) * 4;
+    x3 = XCLIP(im, x + 3) * 4;
+    d = tv_set1(dx);
+#define TV_ROW(in)                                                                \
+    tv_bicubic(                                                                   \
+        tv_load(in + x0), tv_load(in + x1), tv_load(in + x2), tv_load(in + x3), d \
+    )
+    in = (UINT8 *)im->image[YCLIP(im, y)];
+    v1 = TV_ROW(in);
+    if (y + 1 >= 0 && y + 1 < im->ysize) {
+        in = (UINT8 *)im->image[y + 1];
+        v2 = TV_ROW(in);
+    } else {
+        v2 = v1;
+    }
+    if (y + 2 >= 0 && y + 2 < im->ysize) {
+        in = (UINT8 *)im->image[y + 2];
+        v3 = TV_ROW(in);
+    } else {
+        v3 = v2;
+    }
+    if (y + 3 >= 0 && y + 3 < im->ysize) {
+        in = (UINT8 *)im->image[y + 3];
+        v4 = TV_ROW(in);
+    } else {
+        v4 = v3;
+    }
+#undef TV_ROW
+    tv_store(out, tv_bicubic(v1, v2, v3, v4, tv_set1(dy)), im->bands);
+    return 1;
+}
+#endif
 
 static ImagingTransformFilter
 getfilter(Imaging im, int filterid) {
@@ -729,7 +941,11 @@ getfilter(Imaging im, int filterid) {
                         if (im->bands == 2) {
                             return bilinear_filter32LA;
                         } else {
+#if defined(IMAGING_SIMD_SSE4)
+                            return bilinear_filter32RGB_simd;
+#else
                             return bilinear_filter32RGB;
+#endif
                         }
                     case IMAGING_TYPE_INT32:
                         return bilinear_filter32I;
@@ -747,7 +963,11 @@ getfilter(Imaging im, int filterid) {
                         if (im->bands == 2) {
                             return bicubic_filter32LA;
                         } else {
+#if defined(IMAGING_SIMD_SSE4)
+                            return bicubic_filter32RGB_simd;
+#else
                             return bicubic_filter32RGB;
+#endif
                         }
                     case IMAGING_TYPE_INT32:
                         return bicubic_filter32I;
@@ -762,6 +982,10 @@ getfilter(Imaging im, int filterid) {
 }
 
 /* transformation engines */
+
+#ifndef TRANSFORM_TILE
+#define TRANSFORM_TILE 64
+#endif
 
 Imaging
 ImagingGenericTransform(
@@ -780,7 +1004,7 @@ ImagingGenericTransform(
        ImagingScaleAffine where possible. */
 
     ImagingSectionCookie cookie;
-    int x, y;
+    int x, y, tx, ty;
     char *out;
     double xx, yy;
 
@@ -810,18 +1034,41 @@ ImagingGenericTransform(
         y1 = imOut->ysize;
     }
 
-    for (y = y0; y < y1; y++) {
-        out = imOut->image[y] + x0 * imOut->pixelsize;
-        for (x = x0; x < x1; x++) {
-            if (!transform(&xx, &yy, x - x0, y - y0, transform_data) ||
-                !filter(out, imIn, xx, yy)) {
-                if (fill) {
-                    memset(out, 0, imOut->pixelsize);
-                }
-            }
-            out += imOut->pixelsize;
-        }
+    /* Tiles of the output: a rotation crosses a new source row every few
+       pixels of an output row, and a tile keeps those rows in cache. Each
+       pixel is computed as before, so the order doesn't change results. */
+#define TRANSFORM_TILES(transform, filter)                                      \
+    for (ty = y0; ty < y1; ty += TRANSFORM_TILE) {                              \
+        int ty1 = ty + TRANSFORM_TILE < y1 ? ty + TRANSFORM_TILE : y1;          \
+        for (tx = x0; tx < x1; tx += TRANSFORM_TILE) {                          \
+            int tx1 = tx + TRANSFORM_TILE < x1 ? tx + TRANSFORM_TILE : x1;      \
+            for (y = ty; y < ty1; y++) {                                        \
+                out = imOut->image[y] + tx * imOut->pixelsize;                  \
+                for (x = tx; x < tx1; x++) {                                    \
+                    if (!transform(&xx, &yy, x - x0, y - y0, transform_data) || \
+                        !filter(out, imIn, xx, yy)) {                           \
+                        if (fill) {                                             \
+                            memset(out, 0, imOut->pixelsize);                   \
+                        }                                                       \
+                    }                                                           \
+                    out += imOut->pixelsize;                                    \
+                }                                                               \
+            }                                                                   \
+        }                                                                       \
     }
+
+#if defined(IMAGING_SIMD_SSE4)
+    /* Direct calls, which the compiler inlines, for the common case. */
+    if (transform == affine_transform && filter == bilinear_filter32RGB_simd) {
+        TRANSFORM_TILES(affine_transform, bilinear_filter32RGB_simd)
+    } else if (transform == affine_transform && filter == bicubic_filter32RGB_simd) {
+        TRANSFORM_TILES(affine_transform, bicubic_filter32RGB_simd)
+    } else
+#endif
+    {
+        TRANSFORM_TILES(transform, filter)
+    }
+#undef TRANSFORM_TILES
 
     ImagingSectionLeave(&cookie);
 
@@ -944,7 +1191,7 @@ affine_fixed(
        arithmetics */
 
     ImagingSectionCookie cookie;
-    int x, y;
+    int x, y, tx, ty;
     int xin, yin;
     int xsize, ysize;
     int xx, yy;
@@ -967,28 +1214,34 @@ affine_fixed(
 
 #undef FIX
 
-#define AFFINE_TRANSFORM_FIXED(pixel, image)                \
-    for (y = y0; y < y1; y++) {                             \
-        pixel *out;                                         \
-        xx = a2;                                            \
-        yy = a5;                                            \
-        out = imOut->image[y];                              \
-        if (fill && x1 > x0) {                              \
-            memset(out + x0, 0, (x1 - x0) * sizeof(pixel)); \
-        }                                                   \
-        for (x = x0; x < x1; x++, out++) {                  \
-            xin = xx >> 16;                                 \
-            if (xin >= 0 && xin < xsize) {                  \
-                yin = yy >> 16;                             \
-                if (yin >= 0 && yin < ysize) {              \
-                    *out = imIn->image[yin][xin];           \
-                }                                           \
-            }                                               \
-            xx += a0;                                       \
-            yy += a3;                                       \
-        }                                                   \
-        a2 += a1;                                           \
-        a5 += a4;                                           \
+/* In tiles of the output, as ImagingGenericTransform. The coordinates of a
+   tile's first pixel are what the per-pixel additions reach there: they fit
+   an int, since the corners were checked, but the products may not. */
+#define AFFINE_TRANSFORM_FIXED(pixel, image)                                       \
+    for (ty = y0; ty < y1; ty += TRANSFORM_TILE) {                                 \
+        int ty1 = ty + TRANSFORM_TILE < y1 ? ty + TRANSFORM_TILE : y1;             \
+        for (tx = x0; tx < x1; tx += TRANSFORM_TILE) {                             \
+            int tx1 = tx + TRANSFORM_TILE < x1 ? tx + TRANSFORM_TILE : x1;         \
+            for (y = ty; y < ty1; y++) {                                           \
+                pixel *out = (pixel *)imOut->image[y] + tx;                        \
+                xx = (int)(a2 + (int64_t)(y - y0) * a1 + (int64_t)(tx - x0) * a0); \
+                yy = (int)(a5 + (int64_t)(y - y0) * a4 + (int64_t)(tx - x0) * a3); \
+                if (fill) {                                                        \
+                    memset(out, 0, (tx1 - tx) * sizeof(pixel));                    \
+                }                                                                  \
+                for (x = tx; x < tx1; x++, out++) {                                \
+                    xin = xx >> 16;                                                \
+                    if (xin >= 0 && xin < xsize) {                                 \
+                        yin = yy >> 16;                                            \
+                        if (yin >= 0 && yin < ysize) {                             \
+                            *out = imIn->image[yin][xin];                          \
+                        }                                                          \
+                    }                                                              \
+                    xx += a0;                                                      \
+                    yy += a3;                                                      \
+                }                                                                  \
+            }                                                                      \
+        }                                                                          \
     }
 
     ImagingSectionEnter(&cookie);

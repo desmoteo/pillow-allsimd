@@ -37,6 +37,13 @@ New and faster kernels
 - RankFilter, MinFilter, MaxFilter, MedianFilter on 1-byte images: a
   sorting network for 3x3 windows (any rank) and row-then-column minimum
   and maximum for any size, 14x to 130x faster; the GIL is released
+- Rotate and transform (affine, perspective, quad, mesh): the output is
+  computed in 64x64 tiles, which keeps the source rows in cache; bilinear
+  and bicubic filters for 3- and 4-band images take all channels in one
+  AVX2 vector of doubles (two with SSE4). Output identical. On x86, rotate
+  30 degrees 2560x1600 RGB: nearest 3x to 4.6x, bilinear 1.6x (SSE4) to 2x
+  (AVX2), bicubic 1.4x to 2.2x; perspective 2x to 2.5x. The tiles alone
+  make the scalar build 1.2x (bilinear, bicubic) to 4x (nearest) faster
 - ModeFilter: the window histogram is updated by columns, and windows
   of fewer than 16 values check only their own values; 13x faster for
   size 3, 3.4x to 4.8x for sizes 5 to 17; output unchanged; the GIL is
