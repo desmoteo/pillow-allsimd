@@ -1101,7 +1101,15 @@ class pil_build_ext(build_ext):
             if requested != "auto":
                 msg = f"'-C simd={requested}' is not supported for {arches}"
                 raise ValueError(msg)
-            simd = "none (scalar)"
+            if len(arches) > 1:
+                # One set of flags for several slices (macOS universal2): NEON
+                # needs none; the x86_64 slice gets no -msse4.1.
+                simd = ", ".join(
+                    f"{a}: {'NEON' if a in ('arm64', 'aarch64') else 'scalar'}"
+                    for a in arches
+                )
+            else:
+                simd = "none (scalar)"
 
         # GCC only vectorizes loops at -O2 since version 12; the scalar code
         # paths need it to match upstream wheels built with newer compilers.
