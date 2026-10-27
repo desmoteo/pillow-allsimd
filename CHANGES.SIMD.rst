@@ -37,6 +37,8 @@ New and faster kernels
 - RankFilter, MinFilter, MaxFilter, MedianFilter on 1-byte images: a
   sorting network for 3x3 windows (any rank) and row-then-column minimum
   and maximum for any size, 14x to 130x faster; the GIL is released
+- Filter with integer kernels on L images: AVX2 path, 32 pixels per step,
+  2x faster than SSE4 (2.2x with AVX-VNNI); output unchanged
 - Rotate and transform (affine, perspective, quad, mesh): the output is
   computed in 64x64 tiles, which keeps the source rows in cache; bilinear
   and bicubic filters for 3- and 4-band images take all channels in one

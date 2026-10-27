@@ -55,8 +55,7 @@ The following image operations are currently SIMD-accelerated:
 - RGBa → RGBA (division by alpha): SSE4, AVX2, NEON
 - RGB → L, LA and I, RGBA → LA (grayscale): SSE4, NEON
 - 3x3 and 5x5 kernel filters with integer kernels (coefficients that fit 16 bits):
-  SSE4, AVX2, AVX-VNNI, NEON on 4-byte images; SSE4 (AVX-VNNI when built
-  with it), NEON on L images
+  SSE4, AVX2, AVX-VNNI, NEON
 - 3x3 and 5x5 kernel filters with float kernels (large coefficients): SSE4,
   AVX2 (3x3 only), NEON on 4-byte images; SSE4 on L images
 - Rotate and transforms with bilinear and bicubic filters, 3- and 4-band
