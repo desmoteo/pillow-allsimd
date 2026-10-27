@@ -71,6 +71,10 @@ jobs:
         SIMD: ${{ matrix.simd }}
         KERNELS: ${{ matrix.kernels }}
 
+    - name: Install extra test images
+      run: |
+        cd depends && ./install_extra_test_images.sh
+
     - name: Test
       # -I keeps src/ out of the path, so the installed package is tested.
       run: |
