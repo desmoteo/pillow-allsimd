@@ -66,8 +66,8 @@ The following image operations are currently SIMD-accelerated:
 
 On arm64, blur, unsharp mask and alpha composition use the portable C code
 because on a Cortex-A78AE it was faster than hand-written NEON.
-Rank filters (min, max, median), histograms and `ImageChops.offset` have
-faster portable C code on every architecture.
+Rank filters (min, max, median), the mode filter, histograms and
+`ImageChops.offset` have faster portable C code on every architecture.
 Other architectures build the portable C code.
 
 
