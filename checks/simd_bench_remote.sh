@@ -88,6 +88,12 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$HOST" ] || usage 2
 [ -n "$USER_OPT" ] && HOST="$USER_OPT@${HOST#*@}"
+# WORKDIR goes unquoted into remote commands, rm -rf included: only allow a
+# plain relative path.
+case "$WORKDIR" in
+    "" | /* | *..* | *[!A-Za-z0-9._/-]*)
+        die "--workdir must be a relative path of letters, digits, '.', '_', '-' and '/'" ;;
+esac
 
 REPO=$(git -C "$(dirname "$0")" rev-parse --show-toplevel)
 COMMIT=$(git -C "$REPO" rev-parse --short "$REF^{commit}") || die "unknown ref $REF"

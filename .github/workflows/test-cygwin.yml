@@ -54,6 +54,8 @@ jobs:
       - name: Install Cygwin
         uses: cygwin/cygwin-install-action@5a1b0cd107181fa6bb6bf3f90d500f4fb3132f18 # v7.0.0
         with:
+          # The steps below use C:\cygwin; the action's default is D:\cygwin.
+          install-dir: 'C:\cygwin'
           packages: >
             gcc-g++
             ghostscript

@@ -3,9 +3,10 @@
 with callgrind, for several Pillow builds.
 
 Uses the operations of ``simd_bench.py``. Only the operation itself is
-measured: each run starts callgrind with instrumentation off, does one
-warm-up call, then switches instrumentation on for exactly one more call
-through a small helper library built from ``valgrind/callgrind.h``.
+measured: each run starts callgrind with instrumentation off, switches it
+on for a warm-up call, which fills the simulated caches but isn't counted,
+then collects for exactly one more call, through a small helper library
+built from ``valgrind/callgrind.h``.
 
     python3 checks/simd_callgrind.py --variant scalar=/tmp/scalar \\
         --variant sse4=/tmp/sse4 --out /tmp/cg --jobs 12
@@ -40,9 +41,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.join(HERE, "simd_bench.py")
 CONTROL_C = """
 #include <valgrind/callgrind.h>
+void vg_instrument(void) { CALLGRIND_START_INSTRUMENTATION; }
 void vg_start(void) {
     CALLGRIND_ZERO_STATS;
-    CALLGRIND_START_INSTRUMENTATION;
     CALLGRIND_TOGGLE_COLLECT;
 }
 void vg_stop(void) {
@@ -72,6 +73,8 @@ def worker(path: str, op: str, control: str, size: tuple[int, int], which: str) 
     fn = sb.all_operations(which, Image, ImageChops, ImageFilter, *size)[op]
     vg = ctypes.CDLL(control)
     fn()  # lazy imports and tables stay out of the count
+    vg.vg_instrument()
+    fn()  # warms the simulated caches; collection is still off
     vg.vg_start()
     fn()
     vg.vg_stop()
@@ -83,6 +86,10 @@ def run(
 ) -> tuple[str, str, int]:
     d = os.path.join(args.out, name)
     os.makedirs(d, exist_ok=True)
+    # Dumps of an earlier run would be read as this run's results.
+    for old in glob.glob(os.path.join(d, slug(op) + ".*")):
+        if not old.endswith(".log"):
+            os.remove(old)
     cmd = [
         "valgrind", "--tool=callgrind", "--instr-atstart=no", "--collect-atstart=no",
         "--cache-sim=yes", "--branch-sim=yes",

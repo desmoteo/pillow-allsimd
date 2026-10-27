@@ -170,7 +170,7 @@ jobs:
     - name: Upload coverage
       uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
       with:
-        flags: ${{ matrix.os == 'ubuntu-latest' && 'GHA_Ubuntu' || 'GHA_macOS' }}
+        flags: ${{ startsWith(matrix.os, 'ubuntu') && 'GHA_Ubuntu' || 'GHA_macOS' }}
         name: ${{ matrix.os }} Python ${{ matrix.python-version }} SIMD ${{ matrix.simd }}
 
   success:
