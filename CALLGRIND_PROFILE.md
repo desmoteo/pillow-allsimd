@@ -212,6 +212,8 @@ Each change was checked for byte-identical output against the previous build of 
 ### Measured and dropped
 
 - **Integer filters on 4-byte images, 8 pixels per AVX2 step** (checklist item 4.6). The existing AVX2 kernel duplicates each 128-bit load into both lanes but gives each lane a different kernel alignment, so every 256-bit multiply-add already makes two output pixels. Running the SSE4 scheme in each lane on 8 consecutive pixels saves shuffles but not multiply-adds: 0.93x (3×3) and 1.02x (5×5) with AVX2, 0.89x and 0.46x with AVX-VNNI. The AVX2 kernel is bound by its multiply-add and add pairs, which AVX-VNNI fuses; that is the 2.1x gap, not idle lanes.
+- **Tiling only when an output row reads many source rows** (the rows spanned by the middle output row, below 32 untiled), to give back the 4% the tiles cost a perspective transform on arm64. That transform's rows span about 128 source rows, so it stayed tiled; at that span tiles gain 1.15x on x86 and lose 4% on the Jetson, a cache difference between the two, not wasted tiling. No measurable change elsewhere.
+- **5×5 float kernels on AVX2.** 4-byte images: two pixels per 256-bit vector in the SSE4 order of operations, four independent sums per step, every loaded pair converted once: 37.2 ms against 35.9 ms, as the conversions cost what the wider arithmetic saves. L images: each lane repeating the SSE4 step for its own pair of pixels was 0.57x, as the edge columns are built from scalars, which costs more in 256 bits. The 3×3 float kernel for L images kept the same scheme: 5.8 → 3.1 ms (`CONTOUR`), output identical.
 - **Searching the counts of ModeFilter in blocks of 16** to find the first maximum: slower than the plain loop (410 against 330 ms).
 
 ### Lessons
