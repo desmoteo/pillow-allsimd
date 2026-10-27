@@ -4,14 +4,15 @@ name: Test Valgrind Memory Leaks
 
 # this is very expensive. Only run on the pull request.
 on:
-  # push:
-  #   branches:
-  #     - "**"
-  #   paths:
-  #     - ".github/workflows/test-valgrind-memory.yml"
-  #     - "**.c"
-  #     - "**.h"
-  #     - "depends/docker-test-valgrind-memory.sh"
+  # Pushes run this only when the workflow or its script changes (it takes
+  # about two hours); pull requests also run it for C changes. A push also
+  # registers it with GitHub, which "gh workflow run" needs on a fork.
+  push:
+    branches:
+      - "**"
+    paths:
+      - ".github/workflows/test-valgrind-memory.yml"
+      - "depends/docker-test-valgrind-memory.sh"
   pull_request:
     paths:
       - ".github/workflows/test-valgrind-memory.yml"
@@ -60,5 +61,7 @@ jobs:
       run: |
         # The Pillow user in the docker container is UID 1001
         sudo chown -R 1001 $GITHUB_WORKSPACE
-        docker run --name pillow_container -e "PILLOW_VALGRIND_TEST=true" -v $GITHUB_WORKSPACE:/Pillow pythonpillow/${{ matrix.docker }}:${{ matrix.dockerTag }} /Pillow/depends/docker-test-valgrind-memory.sh
+        docker run --name pillow_container -e "PILLOW_VALGRIND_TEST=true" \
+            -e OPTIMIZE=-O2 \
+            -v $GITHUB_WORKSPACE:/Pillow pythonpillow/${{ matrix.docker }}:${{ matrix.dockerTag }} /Pillow/depends/docker-test-valgrind-memory.sh
         sudo chown -R runner $GITHUB_WORKSPACE
