@@ -1072,6 +1072,13 @@ class pil_build_ext(build_ext):
             # multiplies and adds, which changes results.
             args = ["-march=native", "-ffp-contract=off"]
             simd = "native (-march=native)"
+            if sys.platform == "darwin" and all(
+                a in ("arm64", "aarch64") for a in arches
+            ):
+                # Apple clang has rejected -march=native for arm64, and it
+                # already targets Apple's own CPUs there.
+                args = ["-ffp-contract=off"]
+                simd = "native (Apple clang default for arm64)"
             if requested == "native512":
                 args.append("-mprefer-vector-width=512")
                 simd = "native, 512-bit vectors (-march=native)"
