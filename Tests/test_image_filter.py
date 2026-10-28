@@ -288,6 +288,47 @@ def test_consistency_i16_high_byte(mode: str) -> None:
         assert im.getpixel((4, 4)) == 1000
 
 
+def _rank_reference(im: Image.Image, size: int, rank: int) -> list[int]:
+    # Sorts each window in Python; edges are repeated as ImageFilter does.
+    w, h = im.size
+    m = size // 2
+    px = im.load()
+    assert px is not None
+    result = []
+    for y in range(h):
+        for x in range(w):
+            window = []
+            for j in range(-m, m + 1):
+                for i in range(-m, m + 1):
+                    v = px[min(max(x + i, 0), w - 1), min(max(y + j, 0), h - 1)]
+                    assert isinstance(v, int)
+                    window.append(v)
+            result.append(sorted(window)[rank])
+    return result
+
+
+@pytest.mark.parametrize("mode", ("L", "1"))
+@pytest.mark.parametrize("size", ((1, 1), (5, 3), (70, 4), (259, 3)))
+def test_rankfilter_3x3_all_ranks(mode: str, size: tuple[int, int]) -> None:
+    # 1-byte images use a sorting network for 3x3 windows.
+    im = hopper("L").resize(size).convert(mode)
+    for rank in range(9):
+        out = im.filter(ImageFilter.RankFilter(3, rank))
+        assert list(out.get_flattened_data()) == _rank_reference(im, 3, rank)
+
+
+@pytest.mark.parametrize("filter_size", (3, 5, 7))
+@pytest.mark.parametrize("size", ((1, 1), (6, 9), (71, 5)))
+def test_min_max_filter_any_size(filter_size: int, size: tuple[int, int]) -> None:
+    # 1-byte images do minimum and maximum filters by rows, then columns.
+    im = hopper("L").resize(size)
+    last = filter_size * filter_size - 1
+    out = im.filter(ImageFilter.MinFilter(filter_size))
+    assert list(out.get_flattened_data()) == _rank_reference(im, filter_size, 0)
+    out = im.filter(ImageFilter.MaxFilter(filter_size))
+    assert list(out.get_flattened_data()) == _rank_reference(im, filter_size, last)
+
+
 @pytest.mark.parametrize(
     "kernel",
     (
@@ -307,3 +348,36 @@ def test_float_kernel_l_matches_rgb_band(
     im = hopper("L").resize(size)
     rgb = Image.merge("RGB", (im, im, im))
     assert_image_equal(im.filter(kernel), rgb.filter(kernel).getchannel(0))
+
+
+def _mode_reference(im: Image.Image, size: int) -> list[int]:
+    # The most frequent value of each window clipped to the image, the
+    # lowest one on a tie; the pixel itself unless it occurs more than twice.
+    w, h = im.size
+    m = size // 2
+    px = im.load()
+    assert px is not None
+    result = []
+    for y in range(h):
+        for x in range(w):
+            counts = [0] * 256
+            for yy in range(max(y - m, 0), min(y + m, h - 1) + 1):
+                for xx in range(max(x - m, 0), min(x + m, w - 1) + 1):
+                    value = px[xx, yy]
+                    assert isinstance(value, int)
+                    counts[value] += 1
+            best = max(counts)
+            value = px[x, y]
+            assert isinstance(value, int)
+            result.append(counts.index(best) if best > 2 else value)
+    return result
+
+
+@pytest.mark.parametrize("filter_size", (1, 3, 5, 6, 9))
+@pytest.mark.parametrize("size", ((1, 1), (7, 1), (1, 6), (5, 3), (23, 11)))
+def test_modefilter_matches_reference(filter_size: int, size: tuple[int, int]) -> None:
+    # Few distinct values give many ties; windows below 16 values check their
+    # own values, larger ones scan all counts.
+    im = hopper("L").resize(size).point(lambda v: v // 64 * 60)
+    out = im.filter(ImageFilter.ModeFilter(filter_size))
+    assert list(out.get_flattened_data()) == _mode_reference(im, filter_size)

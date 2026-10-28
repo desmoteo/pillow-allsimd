@@ -54,10 +54,13 @@ The following image operations are currently SIMD-accelerated:
 - RGBA → RGBa (alpha premultiplication): SSE4, AVX2, NEON
 - RGBa → RGBA (division by alpha): SSE4, AVX2, NEON
 - RGB → L, LA and I, RGBA → LA (grayscale): SSE4, NEON
+- RGB → HSV: SSE4
 - 3x3 and 5x5 kernel filters with integer kernels (coefficients that fit 16 bits):
   SSE4, AVX2, AVX-VNNI, NEON
 - 3x3 and 5x5 kernel filters with float kernels (large coefficients): SSE4,
   AVX2 (3x3 only), NEON on 4-byte images; SSE4, AVX2 (3x3 only) on L images
+- Rotate and transforms with bilinear and bicubic filters, 3- and 4-band
+  images: SSE4, AVX2; every architecture transforms in cache-friendly tiles
 - 3D color lookup tables: SSE4, AVX2, NEON
 - `ImageChops.multiply` and `screen`: SSE4, AVX2, NEON
 - RGB pack and unpack (`frombytes`, `tobytes`, codecs): SSE4, NEON
@@ -65,6 +68,8 @@ The following image operations are currently SIMD-accelerated:
 
 On arm64, blur, unsharp mask and alpha composition use the portable C code
 because on a Cortex-A78AE it was faster than hand-written NEON.
+Rank filters (min, max, median), the mode filter, histograms and
+`ImageChops.offset` have faster portable C code on every architecture.
 Other architectures build the portable C code.
 
 
