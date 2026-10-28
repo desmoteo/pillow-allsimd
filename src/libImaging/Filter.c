@@ -67,7 +67,11 @@ clip32(float in) {
 #include "FilterSIMD_5x5f_4u8.c"
 #include "FilterSIMD_5x5i_4u8.c"
 #endif
-#if defined(IMAGING_SIMD_SSE4)
+#if defined(IMAGING_SIMD_NEON)
+#include <math.h>
+#include "FilterSIMD_NxNf.c"
+#endif
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
 #include "FilterSIMD_NxNi.c"
 #define FILTER_SIMD
 #endif
@@ -550,6 +554,7 @@ ImagingFilterSIMD(
         norm_offset = tmp;
     }
 
+#if defined(IMAGING_SIMD_SSE4)
     if (xsize == 3) {
         if (im->image8 && fast_path) {
             ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset);
@@ -571,6 +576,31 @@ ImagingFilterSIMD(
             ImagingFilter5x5f_4u8(imOut, im, kernel, offset);
         }
     }
+#else
+    if (!fast_path) {
+        /* 1-byte images keep the generic code, which GCC vectorises well:
+           on the Jetson Orin it was 1.5x faster than the NEON float kernel
+           (CONTOUR on L: 15.5 vs 22.9 ms). 4-byte images gain 1.7x. */
+        if (im->image8) {
+            return 0;
+        }
+        ImagingFilterNxNf_neon(imOut, im, kernel, offset, xsize, 4);
+        return 1;
+    }
+    if (xsize == 3) {
+        if (im->image8) {
+            ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset);
+        } else {
+            ImagingFilter3x3i_4u8_simd(imOut, im, norm_kernel, norm_offset);
+        }
+    } else {
+        if (im->image8) {
+            ImagingFilter5x5i_u8_simd(imOut, im, norm_kernel, norm_offset);
+        } else {
+            ImagingFilter5x5i_4u8_simd(imOut, im, norm_kernel, norm_offset);
+        }
+    }
+#endif
     return 1;
 }
 #endif

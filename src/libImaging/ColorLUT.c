@@ -603,6 +603,58 @@ table_index3D(int index1D, int index2D, int index3D, int size1D, int size1D_2D) 
     return index1D + index2D * size1D + index3D * size1D_2D;
 }
 
+#if defined(IMAGING_SIMD_NEON)
+/* interpolate3/4 for the channels in the lanes:
+   (a * (2^15 - s) + b * s) >> 15 == a + (((b - a) * s) >> 15). */
+static inline int32x4_t
+neon_lut_interpolate(int32x4_t a, int32x4_t b, INT32 shift) {
+    return vaddq_s32(a, vshrq_n_s32(vmulq_n_s32(vsubq_s32(b, a), shift), SHIFT_BITS));
+}
+
+/* Four table values from p. For a 3-channel table the fourth is the next
+   entry's first value, or at the end the table's padding; it is unused. */
+static inline int32x4_t
+neon_lut_load(const INT16 *p) {
+    return vmovl_s16(vld1_s16(p));
+}
+
+/* One pixel's lookup with the same arithmetic as the scalar code below,
+   rounded and clipped to 0..255 in each lane. */
+static inline uint8x8_t
+neon_lut_pixel(
+    const INT16 *table,
+    int idx,
+    int step1D,
+    int step2D,
+    int step3D,
+    INT32 shift1D,
+    INT32 shift2D,
+    INT32 shift3D
+) {
+    const INT16 *t = &table[idx];
+    int32x4_t left = neon_lut_interpolate(
+        neon_lut_interpolate(neon_lut_load(t), neon_lut_load(t + step1D), shift1D),
+        neon_lut_interpolate(
+            neon_lut_load(t + step2D), neon_lut_load(t + step2D + step1D), shift1D
+        ),
+        shift2D
+    );
+    t += step3D;
+    int32x4_t right = neon_lut_interpolate(
+        neon_lut_interpolate(neon_lut_load(t), neon_lut_load(t + step1D), shift1D),
+        neon_lut_interpolate(
+            neon_lut_load(t + step2D), neon_lut_load(t + step2D + step1D), shift1D
+        ),
+        shift2D
+    );
+    int32x4_t result = neon_lut_interpolate(left, right, shift3D);
+    // clip8: (result + PRECISION_ROUNDING) >> PRECISION_BITS, then 0..255
+    result =
+        vshrq_n_s32(vaddq_s32(result, vdupq_n_s32(PRECISION_ROUNDING)), PRECISION_BITS);
+    return vqmovn_u16(vcombine_u16(vqmovun_s32(result), vdup_n_u16(0)));
+}
+#endif
+
 /*
  Transforms colors of imIn using provided 3D lookup table
  and puts the result in imOut. Returns imOut on success or 0 on error.
@@ -678,6 +730,26 @@ ImagingColorLUT3D_linear(
                                            size1D,
                                            size1D_2D
                                        );
+#if defined(IMAGING_SIMD_NEON)
+            {
+                uint8x8_t px = neon_lut_pixel(
+                    table,
+                    idx,
+                    table_channels,
+                    size1D * table_channels,
+                    size1D_2D * table_channels,
+                    shift1D,
+                    shift2D,
+                    shift3D
+                );
+                if (table_channels == 3) {
+                    px = vset_lane_u8(rowIn[x * 4 + 3], px, 3);
+                }
+                vst1_lane_u32(
+                    (uint32_t *)(void *)(rowOut + x * 4), vreinterpret_u32_u8(px), 0
+                );
+            }
+#else
             INT16 result[4], left[4], right[4];
             INT16 leftleft[4], leftright[4], rightleft[4], rightright[4];
 
@@ -752,6 +824,7 @@ ImagingColorLUT3D_linear(
                 );
                 memcpy(rowOut + x * sizeof(v), &v, sizeof(v));
             }
+#endif
         }
     }
     ImagingSectionLeave(&cookie);

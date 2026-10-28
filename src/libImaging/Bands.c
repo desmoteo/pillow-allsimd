@@ -84,6 +84,12 @@ ImagingGetBand(Imaging imIn, int band) {
             memcpy(out + x, &v, sizeof(v));
             in += 16;
         }
+#elif defined(IMAGING_SIMD_NEON)
+        for (; x < xsize - 15; x += 16) {
+            uint8x16x4_t source = vld4q_u8(in);
+            vst1q_u8(out + x, source.val[band]);
+            in += 64;
+        }
 #else
         for (; x < xsize - 3; x += 4) {
             UINT32 v = MAKE_UINT32(in[band], in[4 + band], in[8 + band], in[12 + band]);
@@ -114,6 +120,10 @@ ImagingGetBand(Imaging imIn, int band) {
         UINT32 v = _mm_cvtsi128_si32(_mm_srli_si128(source, 4 * band)); \
         memcpy(out, &v, sizeof(v));                                     \
     }
+#elif defined(IMAGING_SIMD_NEON)
+#define SPLIT_STEP 16
+#define SPLIT_LOAD(in) uint8x16x4_t source = vld4q_u8(in);
+#define SPLIT_STORE(out, band) vst1q_u8(out, source.val[band]);
 #else
 #define SPLIT_STEP 4
 #define SPLIT_LOAD(in)
@@ -368,6 +378,14 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             UINT8 *restrict in1 = bands[1]->image8[y];
             UINT32 *restrict out = (UINT32 *)imOut->image32[y];
             x = 0;
+#if defined(IMAGING_SIMD_NEON)
+            for (; x < xsize - 15; x += 16) {
+                uint8x16x4_t px = {
+                    {vld1q_u8(in0 + x), vdupq_n_u8(0), vdupq_n_u8(0), vld1q_u8(in1 + x)}
+                };
+                vst4q_u8((UINT8 *)&out[x], px);
+            }
+#endif
             for (; x < xsize; x++) {
                 out[x] = MAKE_UINT32(in0[x], 0, 0, in1[x]);
             }
@@ -379,6 +397,17 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             UINT8 *restrict in2 = bands[2]->image8[y];
             UINT32 *restrict out = (UINT32 *)imOut->image32[y];
             x = 0;
+#if defined(IMAGING_SIMD_NEON)
+            for (; x < xsize - 15; x += 16) {
+                uint8x16x4_t px = {
+                    {vld1q_u8(in0 + x),
+                     vld1q_u8(in1 + x),
+                     vld1q_u8(in2 + x),
+                     vdupq_n_u8(0)}
+                };
+                vst4q_u8((UINT8 *)&out[x], px);
+            }
+#endif
             for (; x < xsize; x++) {
                 out[x] = MAKE_UINT32(in0[x], in1[x], in2[x], 0);
             }
@@ -391,6 +420,17 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             UINT8 *restrict in3 = bands[3]->image8[y];
             UINT32 *restrict out = (UINT32 *)imOut->image32[y];
             x = 0;
+#if defined(IMAGING_SIMD_NEON)
+            for (; x < xsize - 15; x += 16) {
+                uint8x16x4_t px = {
+                    {vld1q_u8(in0 + x),
+                     vld1q_u8(in1 + x),
+                     vld1q_u8(in2 + x),
+                     vld1q_u8(in3 + x)}
+                };
+                vst4q_u8((UINT8 *)&out[x], px);
+            }
+#endif
             for (; x < xsize; x++) {
                 out[x] = MAKE_UINT32(in0[x], in1[x], in2[x], in3[x]);
             }

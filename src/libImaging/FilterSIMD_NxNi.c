@@ -15,6 +15,7 @@ filter_clip(INT32 ss) {
     return ss < 0 ? 0 : (ss > 255 ? 255 : ss);
 }
 
+#if defined(IMAGING_SIMD_SSE4)
 typedef __m128i filter_acc;
 #define FILTER_ACC_INIT(v) _mm_set1_epi32(v)
 
@@ -76,6 +77,45 @@ filter_pack32(__m256i s0, __m256i s1, __m256i s2, __m256i s3) {
     );
     return _mm256_permute4x64_epi64(_mm256_packus_epi16(lo, hi), 0xd8);
 }
+#endif
+
+#else
+typedef int32x4_t filter_acc;
+#define FILTER_ACC_INIT(v) vdupq_n_s32(v)
+
+/* Shifts and saturates 16 sums to bytes. */
+static inline uint8x16_t
+filter_pack16(int32x4_t s0, int32x4_t s1, int32x4_t s2, int32x4_t s3) {
+    int32x4_t shift = vdupq_n_s32(-PRECISION_BITS);
+    int16x8_t lo = vcombine_s16(
+        vqmovn_s32(vshlq_s32(s0, shift)), vqmovn_s32(vshlq_s32(s1, shift))
+    );
+    int16x8_t hi = vcombine_s16(
+        vqmovn_s32(vshlq_s32(s2, shift)), vqmovn_s32(vshlq_s32(s3, shift))
+    );
+    return vcombine_u8(vqmovun_s16(lo), vqmovun_s16(hi));
+}
+#define FILTER_STORE16(ptr, v) vst1q_u8(ptr, v)
+
+/* Adds 16 bytes times k to four 32-bit sums. */
+#define FILTER_MLA16(s0, s1, s2, s3, ptr, k)                                 \
+    {                                                                        \
+        uint8x16_t src_ = vld1q_u8(ptr);                                     \
+        int16x8_t lo_ = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(src_)));  \
+        int16x8_t hi_ = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(src_))); \
+        s0 = vmlal_n_s16(s0, vget_low_s16(lo_), k);                          \
+        s1 = vmlal_n_s16(s1, vget_high_s16(lo_), k);                         \
+        s2 = vmlal_n_s16(s2, vget_low_s16(hi_), k);                          \
+        s3 = vmlal_n_s16(s3, vget_high_s16(hi_), k);                         \
+    }
+
+/* Same interface as the SSE4 version, which pairs taps for pmaddwd. */
+#define FILTER_MLA16x2(s0, s1, s2, s3, pa, pb, k0, k1) \
+    {                                                  \
+        FILTER_MLA16(s0, s1, s2, s3, pa, k0);          \
+        FILTER_MLA16(s0, s1, s2, s3, pb, k1);          \
+    }
+#define FILTER_MLA16x1(s0, s1, s2, s3, p, k) FILTER_MLA16(s0, s1, s2, s3, p, k)
 #endif
 
 /* size is 3 or 5; bpp is 1 or 4 bytes per pixel. */
@@ -176,3 +216,20 @@ ImagingFilter5x5i_u8_simd(
 ) {
     ImagingFilterNxN_simd(imOut, im, kernel, offset, 5, 1);
 }
+
+#if defined(IMAGING_SIMD_NEON)
+/* x86 has dedicated SSE4/AVX2 kernels for 4-byte images. */
+static void
+ImagingFilter3x3i_4u8_simd(
+    Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset
+) {
+    ImagingFilterNxN_simd(imOut, im, kernel, offset, 3, 4);
+}
+
+static void
+ImagingFilter5x5i_4u8_simd(
+    Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset
+) {
+    ImagingFilterNxN_simd(imOut, im, kernel, offset, 5, 4);
+}
+#endif

@@ -1028,7 +1028,7 @@ class pil_build_ext(build_ext):
     def _configure_simd(self) -> str:
         """Add the compile flags for the SIMD kernels in PIL._imaging.
 
-        -C simd=auto (default) picks SSE4.1 on x86 and scalar code elsewhere,
+        -C simd=auto (default) picks SSE4.1 on x86 and NEON on arm64,
         -C simd=avx2 adds AVX2 on x86, -C simd=avxvnni adds AVX2 and AVX-VNNI
         (Intel Alder Lake, Sapphire Rapids and newer, AMD Zen 5),
         -C simd=native builds for the CPU of the build machine (-march=native,
@@ -1045,6 +1045,7 @@ class pil_build_ext(build_ext):
             "avxvnni",
             "native",
             "native512",
+            "neon",
             "disable",
         ):
             msg = f"Unknown option '-C simd={requested}'"
@@ -1052,6 +1053,7 @@ class pil_build_ext(build_ext):
 
         arches = self._simd_target_arches()
         x86 = all(a in ("x86_64", "amd64", "i386", "i686", "x86") for a in arches)
+        arm64 = all(a in ("arm64", "aarch64") for a in arches)
         msvc = self.compiler.compiler_type == "msvc"
 
         args: list[str] = []
@@ -1081,6 +1083,9 @@ class pil_build_ext(build_ext):
                 args.append("-mprefer-vector-width=512")
                 simd = "native, 512-bit vectors (-march=native)"
         elif x86:
+            if requested == "neon":
+                msg = "'-C simd=neon' requires an arm64 target"
+                raise ValueError(msg)
             if requested == "avxvnni":
                 if msvc:
                     msg = "'-C simd=avxvnni' is not supported with MSVC"
@@ -1093,11 +1098,25 @@ class pil_build_ext(build_ext):
             else:
                 args = [] if msvc else ["-msse4.1"]
                 simd = "SSE4.1"
+        elif arm64:
+            if requested in ("sse4", "avx2", "avxvnni"):
+                msg = f"'-C simd={requested}' requires an x86 target"
+                raise ValueError(msg)
+            # NEON is part of the AArch64 baseline, no flag needed.
+            simd = "NEON"
         else:
             if requested != "auto":
                 msg = f"'-C simd={requested}' is not supported for {arches}"
                 raise ValueError(msg)
-            simd = "none (scalar)"
+            if len(arches) > 1:
+                # One set of flags for several slices (macOS universal2): NEON
+                # needs none; the x86_64 slice gets no -msse4.1.
+                simd = ", ".join(
+                    f"{a}: {'NEON' if a in ('arm64', 'aarch64') else 'scalar'}"
+                    for a in arches
+                )
+            else:
+                simd = "none (scalar)"
 
         # GCC only vectorizes loops at -O2 since version 12; the scalar code
         # paths need it to match upstream wheels built with newer compilers.

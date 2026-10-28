@@ -36,6 +36,7 @@ jobs:
       matrix:
         include:
         - { os: "ubuntu-latest", simd: "avx2", kernels: "SSE4.1 + AVX2" }
+        - { os: "ubuntu-24.04-arm", simd: "auto", kernels: "NEON" }
 
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os }} sdist SIMD ${{ matrix.simd }}
@@ -53,8 +54,10 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get -qq update
+        # imagemagick provides the viewer test_imageshow expects on CIs;
+        # the arm64 runner image has none.
         sudo apt-get -qq install libfreetype-dev libjpeg-turbo8-dev liblcms2-dev \
-          libopenjp2-7-dev libtiff-dev libwebp-dev zlib1g-dev
+          libopenjp2-7-dev libtiff-dev libwebp-dev zlib1g-dev imagemagick
         python3 -m pip install pytest pytest-timeout
 
     - name: Build sdist

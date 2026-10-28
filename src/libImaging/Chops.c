@@ -186,6 +186,21 @@ chop_multiply_row(
             );
         }
     }
+#elif defined(IMAGING_SIMD_NEON)
+    {
+        uint8x16_t inv = vdupq_n_u8(invert);
+        uint16x8_t one = vdupq_n_u16(1);
+        for (; x < n - 15; x += 16) {
+            uint8x16_t a = veorq_u8(vld1q_u8(in1 + x), inv);
+            uint8x16_t b = veorq_u8(vld1q_u8(in2 + x), inv);
+            uint16x8_t lo = vmull_u8(vget_low_u8(a), vget_low_u8(b));
+            uint16x8_t hi = vmull_high_u8(a, b);
+            // (x + (1 + (x >> 8))) >> 8, narrowed to 8 bits
+            uint8x8_t out_lo = vaddhn_u16(lo, vsraq_n_u16(one, lo, 8));
+            uint8x8_t out_hi = vaddhn_u16(hi, vsraq_n_u16(one, hi, 8));
+            vst1q_u8(out + x, veorq_u8(vcombine_u8(out_lo, out_hi), inv));
+        }
+    }
 #endif
 
     for (; x < n; x++) {

@@ -299,6 +299,108 @@ rgba2rgbA_4(UINT8 *out, const UINT8 *in) {
 }
 #endif
 
+#if defined(IMAGING_SIMD_NEON)
+#define CONVERT_VECTOR
+
+/* ITU-R Recommendation 601-2 luma of 8 pixels with the same 15-bit
+   coefficients as the SSE4 code, so results are identical. Each
+   coefficient is split into bytes (9798 = 38 * 256 + 70, 19235 = 75 * 256
+   + 35, 3735 = 14 * 256 + 151) so all products fit 16-bit lanes:
+   (hi * 256 + lo + 0x4000) >> 15 == (hi + (lo >> 8) + 64) >> 7. */
+static inline uint8x8_t
+rgb2l_8px(uint8x8_t r, uint8x8_t g, uint8x8_t b) {
+    uint16x8_t hi = vmull_u8(r, vdup_n_u8(38));
+    hi = vmlal_u8(hi, g, vdup_n_u8(75));
+    hi = vmlal_u8(hi, b, vdup_n_u8(14));
+    uint16x8_t lo = vmull_u8(r, vdup_n_u8(70));
+    lo = vmlal_u8(lo, g, vdup_n_u8(35));
+    lo = vmlal_u8(lo, b, vdup_n_u8(151));
+    return vrshrn_n_u16(vsraq_n_u16(hi, lo, 8), 7);
+}
+
+static inline uint8x16_t
+rgb2l_16px(uint8x16x4_t px) {
+    return vcombine_u8(
+        rgb2l_8px(
+            vget_low_u8(px.val[0]), vget_low_u8(px.val[1]), vget_low_u8(px.val[2])
+        ),
+        rgb2l_8px(
+            vget_high_u8(px.val[0]), vget_high_u8(px.val[1]), vget_high_u8(px.val[2])
+        )
+    );
+}
+
+static inline void
+rgb2l_16(UINT8 *out, const UINT8 *in) {
+    vst1q_u8(out, rgb2l_16px(vld4q_u8(in)));
+}
+
+static inline void
+rgb2la_16(UINT8 *out, const UINT8 *in) {
+    uint8x16_t l = rgb2l_16px(vld4q_u8(in));
+    uint8x16x4_t res = {{l, l, l, vdupq_n_u8(255)}};
+    vst4q_u8(out, res);
+}
+
+static inline void
+rgb2i_16(UINT8 *out, const UINT8 *in) {
+    uint8x16_t l = rgb2l_16px(vld4q_u8(in));
+    uint16x8_t lo = vmovl_u8(vget_low_u8(l));
+    uint16x8_t hi = vmovl_u8(vget_high_u8(l));
+    vst1q_u8(out, vreinterpretq_u8_u32(vmovl_u16(vget_low_u16(lo))));
+    vst1q_u8(out + 16, vreinterpretq_u8_u32(vmovl_u16(vget_high_u16(lo))));
+    vst1q_u8(out + 32, vreinterpretq_u8_u32(vmovl_u16(vget_low_u16(hi))));
+    vst1q_u8(out + 48, vreinterpretq_u8_u32(vmovl_u16(vget_high_u16(hi))));
+}
+
+static inline void
+rgba2la_16(UINT8 *out, const UINT8 *in) {
+    uint8x16x4_t px = vld4q_u8(in);
+    uint8x16_t l = rgb2l_16px(px);
+    uint8x16x4_t res = {{l, l, l, px.val[3]}};
+    vst4q_u8(out, res);
+}
+
+/* MULDIV255(v, a) for 16 pixels, exact. */
+static inline uint8x16_t
+neon_muldiv255(uint8x16_t v, uint8x16_t a) {
+    uint16x8_t lo = vmull_u8(vget_low_u8(v), vget_low_u8(a));
+    uint16x8_t hi = vmull_u8(vget_high_u8(v), vget_high_u8(a));
+    return vcombine_u8(
+        vraddhn_u16(lo, vrshrq_n_u16(lo, 8)), vraddhn_u16(hi, vrshrq_n_u16(hi, 8))
+    );
+}
+
+/* CLIP8(255 * v / a), truncated, for four lanes. The float quotient is
+   exact enough that truncating it equals the integer division. */
+static inline uint16x4_t
+neon_div_alpha(uint16x4_t v, float32x4_t a) {
+    float32x4_t q = vdivq_f32(vmulq_n_f32(vcvtq_f32_u32(vmovl_u16(v)), 255.0f), a);
+    return vqmovn_u32(vcvtq_u32_f32(q));
+}
+
+static inline uint8x16_t
+neon_unpremultiply(uint8x16_t v, uint8x16_t a) {
+    uint16x8_t a_lo = vmovl_u8(vget_low_u8(a));
+    uint16x8_t a_hi = vmovl_u8(vget_high_u8(a));
+    uint16x8_t v_lo = vmovl_u8(vget_low_u8(v));
+    uint16x8_t v_hi = vmovl_u8(vget_high_u8(v));
+    float32x4_t a0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo)));
+    float32x4_t a1 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(a_lo)));
+    float32x4_t a2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_hi)));
+    float32x4_t a3 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(a_hi)));
+    uint16x8_t r_lo = vcombine_u16(
+        neon_div_alpha(vget_low_u16(v_lo), a0), neon_div_alpha(vget_high_u16(v_lo), a1)
+    );
+    uint16x8_t r_hi = vcombine_u16(
+        neon_div_alpha(vget_low_u16(v_hi), a2), neon_div_alpha(vget_high_u16(v_hi), a3)
+    );
+    uint8x16_t r = vcombine_u8(vqmovn_u16(r_lo), vqmovn_u16(r_hi));
+    // Alpha 0 keeps the colour.
+    return vbslq_u8(vceqzq_u8(a), v, r);
+}
+#endif
+
 #if defined(CONVERT_VECTOR)
 /* Runs a kernel for `step` pixels over a row. The last xsize % step
    pixels go through the same kernel via zero-padded buffers, so the
@@ -324,6 +426,9 @@ rgba2rgbA_4(UINT8 *out, const UINT8 *in) {
 #if defined(IMAGING_SIMD_SSE4)
 #define CONVERT_STEP 4
 #define CONVERT_KERNEL(name) name##_4
+#elif defined(IMAGING_SIMD_NEON)
+#define CONVERT_STEP 16
+#define CONVERT_KERNEL(name) name##_16
 #endif
 
 static void
@@ -658,6 +763,16 @@ rgbA2rgba(UINT8 *out, const UINT8 *in, int xsize) {
         _mm_storeu_si128((__m128i *)&out[x * 4], source);
     }
 
+#elif defined(IMAGING_SIMD_NEON)
+
+    for (; x < xsize - 15; x += 16) {
+        uint8x16x4_t px = vld4q_u8(&in[x * 4]);
+        px.val[0] = neon_muldiv255(px.val[0], px.val[3]);
+        px.val[1] = neon_muldiv255(px.val[1], px.val[3]);
+        px.val[2] = neon_muldiv255(px.val[2], px.val[3]);
+        vst4q_u8(&out[x * 4], px);
+    }
+
 #endif
 
     for (; x < xsize; x++) {
@@ -851,7 +966,33 @@ rgba2rgbA(UINT8 *out, const UINT8 *in, int xsize) {
 
 #endif
 
+#if defined(IMAGING_SIMD_SSE4)
     CONVERT_ROW(rgba2rgbA_4, 4, out + x * 4, in + x * 4, xsize - x, 4, 4);
+#else
+    // The NEON kernel is exact, so the scalar code below can finish the row.
+    for (; x < xsize - 15; x += 16) {
+        uint8x16x4_t px = vld4q_u8(in + x * 4);
+        px.val[0] = neon_unpremultiply(px.val[0], px.val[3]);
+        px.val[1] = neon_unpremultiply(px.val[1], px.val[3]);
+        px.val[2] = neon_unpremultiply(px.val[2], px.val[3]);
+        vst4q_u8(out + x * 4, px);
+    }
+    in += x * 4;
+    out += x * 4;
+    for (; x < xsize; x++, in += 4) {
+        unsigned int alpha = in[3];
+        if (alpha == 255 || alpha == 0) {
+            *out++ = in[0];
+            *out++ = in[1];
+            *out++ = in[2];
+        } else {
+            *out++ = CLIP8((255 * in[0]) / alpha);
+            *out++ = CLIP8((255 * in[1]) / alpha);
+            *out++ = CLIP8((255 * in[2]) / alpha);
+        }
+        *out++ = in[3];
+    }
+#endif
 #else
     int x;
     unsigned int alpha;

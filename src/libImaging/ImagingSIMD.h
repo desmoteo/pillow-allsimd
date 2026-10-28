@@ -3,7 +3,8 @@
 
 #include <string.h>
 
-/* Instruction set the SIMD kernels are compiled for. IMAGING_SIMD_AVX2
+/* Instruction set the SIMD kernels are compiled for. At most one of
+   IMAGING_SIMD_SSE4 and IMAGING_SIMD_NEON is defined; IMAGING_SIMD_AVX2
    implies IMAGING_SIMD_SSE4. With none defined, the portable scalar code
    is used. Define IMAGING_SIMD_DISABLE to force the scalar code. */
 
@@ -26,6 +27,10 @@
 #define IMAGING_SIMD_AVXVNNI
 #endif
 #endif
+
+#elif defined(__aarch64__) || defined(_M_ARM64)
+#define IMAGING_SIMD_NEON
+#include <arm_neon.h>
 #endif
 
 #endif /* IMAGING_SIMD_DISABLE */

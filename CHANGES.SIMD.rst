@@ -6,7 +6,7 @@ Unreleased
 
 Build
 
-- ``-C simd=auto|sse4|avx2|avxvnni|native|native512|disable``
+- ``-C simd=auto|sse4|avx2|avxvnni|native|native512|neon|disable``
   option; flags chosen per target architecture; SSE4.1 baseline on x86
   (was SSE4.2). ``native`` builds for the build machine's CPU
   (``-march=native``, float contraction off), ``native512`` also prefers
@@ -14,26 +14,34 @@ Build
 - AVX-VNNI build (``-C simd=avxvnni``): the 16-bit multiply-add of the
   resample and integer filter kernels becomes one vpdpwssd. Same output;
   integer filters on RGB 1.3x to 2.1x faster than AVX2
-- Every SIMD site has a portable C fallback; other architectures build it
+- arm64: NEON kernels; other architectures build portable C code
 
 New and faster kernels
 
-- Resize of 1-byte images (L): SIMD horizontal pass (SSE4), 2.4x to 8x
-  faster
-- Reduce: 1x2, 2x1, 2x2 about 2x faster; 2x2 and 4x4 for 1-byte images on
-  SSE4, 6x to 10x faster; restored 4x4 and 5x5 for 1-byte images
-- Filter: integer kernel for L images, up to 2x faster
+- Resize of 1-byte images (L): SIMD horizontal pass (SSE4, NEON), 2.4x to
+  8x faster on x86, 2.5x to 3.3x on arm64
+- Reduce: 1x2, 2x1, 2x2 about 2x faster on x86; 2x2 and 4x4 for 1-byte
+  images on SSE4 and NEON, 6x to 10x faster; NEON for 4-byte images with
+  horizontal factors up to 512 (1.6x to 4.5x on arm64); restored 4x4 and 5x5
+  for 1-byte images
+- Filter: integer kernel for L images, up to 2x faster; on arm64 NEON
+  integer kernels and NEON float kernels for 4-byte images (FIND_EDGES on
+  RGB 1.7x). Like the x86 float kernels, the float ones can differ by 1
+  from the scalar code for inexact coefficients
 - BoxBlur, GaussianBlur: vertical pass without transposes, up to 1.8x
   faster; on x86 1-byte images are blurred four rows at a time, 1.9x to 3x
 - UnsharpMask: SIMD post-pass on x86, about 1.7x faster
+- ColorLUT: NEON kernel (1.5x), output identical to the scalar code
 - ImageChops.multiply, screen: exact division by 255 without a divide;
-  SSE4 and AVX2. 6.4x to 12x faster
+  SSE4, AVX2 and NEON. 6.4x to 12x faster on x86, 3.4x on arm64
 - Filter with integer kernels on L images: AVX2 path, 32 pixels per step,
   2x faster than SSE4 (2.2x with AVX-VNNI); output unchanged
 - Filter with 3x3 float kernels on L images (CONTOUR, FIND_EDGES): AVX2
   path, 8 pixels per step, 1.9x faster than SSE4; output unchanged
-- RGB pack and unpack (frombytes, tobytes, codecs): SSE4, 1.1x to 1.7x
-  faster
+- RGB pack and unpack (frombytes, tobytes, codecs): SSE4 and NEON,
+  1.1x to 1.7x faster
+- arm64: blur, unsharp mask and alpha composition use the portable C
+  code, which GCC vectorises better than the previous NEON kernels did
 - Released the GIL in AlphaComposite, Bands, Blend and Chops
 
 Fixes

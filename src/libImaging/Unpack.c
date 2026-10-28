@@ -596,6 +596,14 @@ ImagingUnpackRGB(UINT8 *_out, const UINT8 *in, int pixels) {
         in += 12;
         _out += 16;
     }
+#elif defined(IMAGING_SIMD_NEON)
+    for (; i < pixels - 15; i += 16) {
+        uint8x16x3_t rgb = vld3q_u8(in);
+        uint8x16x4_t rgbx = {{rgb.val[0], rgb.val[1], rgb.val[2], vdupq_n_u8(255)}};
+        vst4q_u8(_out, rgbx);
+        in += 48;
+        _out += 64;
+    }
 #endif
     /* RGB triplets */
     for (; i < pixels - 1; i++) {

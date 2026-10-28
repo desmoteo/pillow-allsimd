@@ -267,6 +267,13 @@ ImagingPackRGB(UINT8 *out, const UINT8 *in, int pixels) {
         _mm_storeu_si128((__m128i *)out, _mm_shuffle_epi8(v, to_rgb));
         out += 12;
     }
+#elif defined(IMAGING_SIMD_NEON)
+    for (; i < pixels - 15; i += 16) {
+        uint8x16x4_t rgbx = vld4q_u8(in + i * 4);
+        uint8x16x3_t rgb = {{rgbx.val[0], rgbx.val[1], rgbx.val[2]}};
+        vst3q_u8(out, rgb);
+        out += 48;
+    }
 #endif
     /* RGB triplets */
     for (; i < pixels - 1; i++) {

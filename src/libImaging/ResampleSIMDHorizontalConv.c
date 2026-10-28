@@ -831,6 +831,116 @@ ImagingResampleHorizontalConvolution8u(
     }
 }
 
+#elif defined(IMAGING_SIMD_NEON)
+
+/* Shifts and saturates four 32-bit sums to bytes, as the SSE4 code does
+   with srai, packs_epi32 and packus_epi16. */
+static inline UINT32
+neon_resample_pack(int32x4_t sss, int coefs_precision) {
+    int16x4_t s16 = vqmovn_s32(vshlq_s32(sss, vdupq_n_s32(-coefs_precision)));
+    uint8x8_t u8 = vqmovun_s16(vcombine_s16(s16, s16));
+    return vget_lane_u32(vreinterpret_u32_u8(u8), 0);
+}
+
+/* Adds sum(pixel[x] * k[x]) for one output pixel of a 4-byte row to sss. */
+static inline int32x4_t
+neon_resample_horiz_px(const UINT8 *in, const INT16 *k, int xmax, int32x4_t sss) {
+    int x = 0;
+    int32x4_t sss1 = vdupq_n_s32(0);
+
+    for (; x < xmax - 3; x += 4) {
+        uint8x16_t source = vld1q_u8(in + x * 4);
+        int16x8_t lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(source)));
+        int16x8_t hi = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(source)));
+        sss = vmlal_n_s16(sss, vget_low_s16(lo), k[x]);
+        sss1 = vmlal_n_s16(sss1, vget_high_s16(lo), k[x + 1]);
+        sss = vmlal_n_s16(sss, vget_low_s16(hi), k[x + 2]);
+        sss1 = vmlal_n_s16(sss1, vget_high_s16(hi), k[x + 3]);
+    }
+    for (; x < xmax - 1; x += 2) {
+        int16x8_t pix = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(in + x * 4)));
+        sss = vmlal_n_s16(sss, vget_low_s16(pix), k[x]);
+        sss1 = vmlal_n_s16(sss1, vget_high_s16(pix), k[x + 1]);
+    }
+    for (; x < xmax; x++) {
+        UINT32 v;
+        memcpy(&v, in + x * 4, sizeof(v));
+        int16x4_t pix = vreinterpret_s16_u16(
+            vget_low_u16(vmovl_u8(vreinterpret_u8_u32(vdup_n_u32(v))))
+        );
+        sss = vmlal_n_s16(sss, pix, k[x]);
+    }
+    return vaddq_s32(sss, sss1);
+}
+
+void
+ImagingResampleHorizontalConvolution8u4x(
+    UINT32 *restrict lineOut0,
+    UINT32 *restrict lineOut1,
+    UINT32 *restrict lineOut2,
+    UINT32 *restrict lineOut3,
+    UINT32 *restrict lineIn0,
+    UINT32 *restrict lineIn1,
+    UINT32 *restrict lineIn2,
+    UINT32 *restrict lineIn3,
+    int xsize,
+    int *xbounds,
+    INT16 *kk,
+    int kmax,
+    int coefs_precision
+) {
+    int xmin, xmax, xx;
+    INT16 *k;
+    int32x4_t initial = vdupq_n_s32(1 << (coefs_precision - 1));
+
+    for (xx = 0; xx < xsize; xx++) {
+        xmin = xbounds[xx * 2 + 0];
+        xmax = xbounds[xx * 2 + 1];
+        k = &kk[xx * kmax];
+        lineOut0[xx] = neon_resample_pack(
+            neon_resample_horiz_px((UINT8 *)&lineIn0[xmin], k, xmax, initial),
+            coefs_precision
+        );
+        lineOut1[xx] = neon_resample_pack(
+            neon_resample_horiz_px((UINT8 *)&lineIn1[xmin], k, xmax, initial),
+            coefs_precision
+        );
+        lineOut2[xx] = neon_resample_pack(
+            neon_resample_horiz_px((UINT8 *)&lineIn2[xmin], k, xmax, initial),
+            coefs_precision
+        );
+        lineOut3[xx] = neon_resample_pack(
+            neon_resample_horiz_px((UINT8 *)&lineIn3[xmin], k, xmax, initial),
+            coefs_precision
+        );
+    }
+}
+
+void
+ImagingResampleHorizontalConvolution8u(
+    UINT32 *restrict lineOut,
+    UINT32 *restrict lineIn,
+    int xsize,
+    int *xbounds,
+    INT16 *kk,
+    int kmax,
+    int coefs_precision
+) {
+    int xmin, xmax, xx;
+    int32x4_t initial = vdupq_n_s32(1 << (coefs_precision - 1));
+
+    for (xx = 0; xx < xsize; xx++) {
+        xmin = xbounds[xx * 2 + 0];
+        xmax = xbounds[xx * 2 + 1];
+        lineOut[xx] = neon_resample_pack(
+            neon_resample_horiz_px(
+                (UINT8 *)&lineIn[xmin], &kk[xx * kmax], xmax, initial
+            ),
+            coefs_precision
+        );
+    }
+}
+
 #else
 
 /* Portable version of the kernels above, with the same arithmetic:
@@ -987,6 +1097,101 @@ ImagingResampleHorizontalConvolution1u4x(
         lineOut1[xx] = (UINT8)_mm_extract_epi8(sss, 1);
         lineOut2[xx] = (UINT8)_mm_extract_epi8(sss, 2);
         lineOut3[xx] = (UINT8)_mm_extract_epi8(sss, 3);
+    }
+}
+
+#elif defined(IMAGING_SIMD_NEON)
+#define RESAMPLE_HORIZONTAL_1BAND_SIMD
+
+/* Four bytes, widened to 16 bits. */
+static inline int16x4_t
+neon_load4_s16(const UINT8 *p) {
+    UINT32 v;
+    memcpy(&v, p, sizeof(v));
+    return vreinterpret_s16_u16(
+        vget_low_u16(vmovl_u8(vreinterpret_u8_u32(vdup_n_u32(v))))
+    );
+}
+
+/* Four rows at once, as on SSE4: one coefficient load per step for all
+   rows, one pairwise reduction per output pixel, and the last taps done
+   across the four rows in one vector. The output rows may be the same row,
+   with the same input row for each. */
+static void
+ImagingResampleHorizontalConvolution1u4x(
+    UINT8 *lineOut0,
+    UINT8 *lineOut1,
+    UINT8 *lineOut2,
+    UINT8 *lineOut3,
+    const UINT8 *lineIn0,
+    const UINT8 *lineIn1,
+    const UINT8 *lineIn2,
+    const UINT8 *lineIn3,
+    int xsize,
+    int *xbounds,
+    INT16 *kk,
+    int kmax,
+    int coefs_precision
+) {
+    int xmin, xmax, xx, x;
+    int32x4_t initial = vdupq_n_s32(1 << (coefs_precision - 1));
+    int32x4_t shift = vdupq_n_s32(-coefs_precision);
+
+    for (xx = 0; xx < xsize; xx++) {
+        const INT16 *k;
+        const UINT8 *in0, *in1, *in2, *in3;
+        int32x4_t sss0 = vdupq_n_s32(0), sss1 = sss0, sss2 = sss0, sss3 = sss0;
+        int32x4_t sss;
+        uint8x8_t out;
+
+        xmin = xbounds[xx * 2 + 0];
+        xmax = xbounds[xx * 2 + 1];
+        k = &kk[xx * kmax];
+        in0 = lineIn0 + xmin;
+        in1 = lineIn1 + xmin;
+        in2 = lineIn2 + xmin;
+        in3 = lineIn3 + xmin;
+        x = 0;
+
+#define NEON_LOAD8(p) vreinterpretq_s16_u16(vmovl_u8(vld1_u8(p)))
+#define NEON_TAPS8(sss, p)                                          \
+    {                                                               \
+        int16x8_t pix = NEON_LOAD8(p);                              \
+        sss = vmlal_s16(sss, vget_low_s16(pix), vget_low_s16(mmk)); \
+        sss = vmlal_high_s16(sss, pix, mmk);                        \
+    }
+        for (; x < xmax - 7; x += 8) {
+            int16x8_t mmk = vld1q_s16(&k[x]);
+            NEON_TAPS8(sss0, in0 + x)
+            NEON_TAPS8(sss1, in1 + x)
+            NEON_TAPS8(sss2, in2 + x)
+            NEON_TAPS8(sss3, in3 + x)
+        }
+#undef NEON_TAPS8
+#undef NEON_LOAD8
+
+        if (x < xmax - 3) {
+            int16x4_t mmk = vld1_s16(&k[x]);
+            sss0 = vmlal_s16(sss0, neon_load4_s16(in0 + x), mmk);
+            sss1 = vmlal_s16(sss1, neon_load4_s16(in1 + x), mmk);
+            sss2 = vmlal_s16(sss2, neon_load4_s16(in2 + x), mmk);
+            sss3 = vmlal_s16(sss3, neon_load4_s16(in3 + x), mmk);
+            x += 4;
+        }
+
+        // [32] sum3 sum2 sum1 sum0
+        sss = vpaddq_s32(vpaddq_s32(sss0, sss1), vpaddq_s32(sss2, sss3));
+        // Up to three taps left: one tap of the four rows per step.
+        for (; x < xmax; x++) {
+            int32x4_t pix = {in0[x], in1[x], in2[x], in3[x]};
+            sss = vmlaq_n_s32(sss, pix, k[x]);
+        }
+        sss = vshlq_s32(vaddq_s32(sss, initial), shift);
+        out = vqmovn_u16(vcombine_u16(vqmovun_s32(sss), vdup_n_u16(0)));
+        lineOut0[xx] = vget_lane_u8(out, 0);
+        lineOut1[xx] = vget_lane_u8(out, 1);
+        lineOut2[xx] = vget_lane_u8(out, 2);
+        lineOut3[xx] = vget_lane_u8(out, 3);
     }
 }
 
