@@ -32,7 +32,7 @@ in performing the same operation on multiple data points simultaneously
 by using multiple processing elements.
 Common CPU SIMD instruction sets are MMX, SSE-SSE4, AVX, AVX2, AVX512, NEON.
 
-Currently, Pillow-SIMD can be [compiled](#installation) with SSE4 (default) or AVX2 support.
+Currently, Pillow-SIMD can be [compiled](#installation) with SSE4 (default on x86), AVX2 or AVX-VNNI support, or for the build machine's own CPU.
 
 
 ## Status
@@ -46,14 +46,24 @@ In fact, Uploadcare has been running Pillow-SIMD since 2015.
 
 The following image operations are currently SIMD-accelerated:
 
-- Resize (convolution-based resampling): SSE4, AVX2
-- Gaussian and box blur: SSE4
+- Resize (convolution-based resampling), including L images: SSE4, AVX2, AVX-VNNI
+- Reduce: SSE4 (any factor); 2x2 and 4x4 for L images
+- Gaussian and box blur: SSE4 (L images four rows at a time)
+- Unsharp mask: SSE4
 - Alpha composition: SSE4, AVX2
 - RGBA → RGBa (alpha premultiplication): SSE4, AVX2
 - RGBa → RGBA (division by alpha): SSE4, AVX2
-- RGB → L (grayscale): SSE4
-- 3x3 and 5x5 kernel filters: SSE4, AVX2
+- RGB → L, LA and I, RGBA → LA (grayscale): SSE4
+- 3x3 and 5x5 kernel filters with integer kernels (coefficients that fit 16 bits):
+  SSE4, AVX2, AVX-VNNI
+- 3x3 and 5x5 kernel filters with float kernels (large coefficients): SSE4,
+  AVX2 (3x3 only)
+- 3D color lookup tables: SSE4, AVX2
+- `ImageChops.multiply` and `screen`: SSE4, AVX2
+- RGB pack and unpack (`frombytes`, `tobytes`, codecs): SSE4
 - Split and get_channel: SSE4
+
+Other architectures build the portable C code.
 
 
 ## Benchmarks
@@ -102,13 +112,28 @@ Please install [prerequisites](https://pillow.readthedocs.io/en/stable/installat
 The installation itself is simple just as running `$ pip install pillow-simd`,
 and if you're using SSE4-capable CPU everything should run smoothly.
 If you'd like to install the AVX2-enabled version,
-you need to pass the additional flag to a C compiler.
-The easiest way to do so is to define the `CC` variable during the compilation.
+pass the `simd` build option:
 
 ```bash
 $ pip uninstall pillow
-$ CC="cc -mavx2" pip install -U --force-reinstall pillow-simd
+$ pip install -U --force-reinstall --no-binary pillow-simd -C simd=avx2 pillow-simd
 ```
+
+The `simd` option accepts:
+
+- `auto` (default): SSE4.1 on x86, portable C elsewhere.
+- `sse4`: SSE4.1 (x86 only).
+- `avx2`: SSE4.1 and AVX2 (x86 only).
+- `avxvnni`: SSE4.1, AVX2 and AVX-VNNI (x86 only: Intel Alder Lake,
+  Sapphire Rapids and newer, AMD Zen 5). Faster integer filters and resize.
+- `native`: everything the build machine's CPU supports (`-march=native`),
+  including AVX-512 in compiler-generated code. Only runs on similar CPUs.
+- `native512`: like `native`, with 512-bit vectors preferred (x86 only).
+- `disable`: portable C code only, on any architecture.
+
+Defining the `CC` variable (`CC="cc -mavx2"`) also works.
+Don't use `CFLAGS` for this: setting it replaces Python's default
+compiler flags, including the optimization level.
 
 
 ## Contributing to Pillow-SIMD

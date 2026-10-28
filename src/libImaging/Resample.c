@@ -3,9 +3,6 @@
 #include <assert.h>
 #include <math.h>
 
-#include "ResampleSIMDHorizontalConv.c"
-#include "ResampleSIMDVerticalConv.c"
-
 #define ROUND_UP(f) ((int)((f) >= 0.0 ? (f) + 0.5F : (f) - 0.5F))
 
 struct filter {
@@ -184,6 +181,9 @@ clip8(int in, int precision) {
     return clip8_lookups[in >> precision];
 }
 
+#include "ResampleSIMDHorizontalConv.c"
+#include "ResampleSIMDVerticalConv.c"
+
 static int
 precompute_coeffs(
     int inSize,
@@ -327,7 +327,40 @@ _ImagingResampleHorizontal_8bpc(
     if (imIn->image8) {
         // Verify caller allocated distinct buffers.
         assert(imIn->image8 != imOut->image8);
-        for (yy = 0; yy < ysize; yy++) {
+        yy = 0;
+#if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD)
+        for (; yy < ysize - 3; yy += 4) {
+            ImagingResampleHorizontalConvolution1u4x(
+                imOut->image8[yy],
+                imOut->image8[yy + 1],
+                imOut->image8[yy + 2],
+                imOut->image8[yy + 3],
+                imIn->image8[yy + offset],
+                imIn->image8[yy + offset + 1],
+                imIn->image8[yy + offset + 2],
+                imIn->image8[yy + offset + 3],
+                xsize,
+                bounds,
+                kk,
+                ksize,
+                coefs_precision
+            );
+        }
+#endif
+#if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD)
+        for (; yy < ysize; yy++) {
+            ImagingResampleHorizontalConvolution1u(
+                imOut->image8[yy],
+                imIn->image8[yy + offset],
+                xsize,
+                bounds,
+                kk,
+                ksize,
+                coefs_precision
+            );
+        }
+#endif
+        for (; yy < ysize; yy++) {
             // Restrict safe: imIn and imOut are distinct.
             UINT8 *restrict lineIn = imIn->image8[yy + offset];
             UINT8 *restrict lineOut = imOut->image8[yy];
@@ -400,13 +433,19 @@ _ImagingResampleVertical_8bpc(
     if (imIn->image8) {
         // Verify caller allocated distinct buffers.
         assert(imIn->image8 != imOut->image8);
+        // The vertical kernel works on bytes, so it handles 1-byte pixels
+        // four at a time; the last xsize % 4 use the same arithmetic.
+        int words = xsize / 4;
         for (yy = 0; yy < ysize; yy++) {
             // Restrict safe: imOut is a fresh allocation.
             UINT8 *restrict lineOut = imOut->image8[yy];
             k = &kk[yy * ksize];
             ymin = bounds[yy * 2 + 0];
             ymax = bounds[yy * 2 + 1];
-            for (xx = 0; xx < xsize; xx++) {
+            ImagingResampleVerticalConvolution8u(
+                (UINT32 *)lineOut, imIn, ymin, ymax, k, coefs_precision, words
+            );
+            for (xx = words * 4; xx < xsize; xx++) {
                 ss0 = 1 << (coefs_precision - 1);
                 for (y = 0; y < ymax; y++) {
                     ss0 += ((UINT8)imIn->image8[y + ymin][xx]) * k[y];
@@ -422,7 +461,13 @@ _ImagingResampleVertical_8bpc(
             ymin = bounds[yy * 2 + 0];
             ymax = bounds[yy * 2 + 1];
             ImagingResampleVerticalConvolution8u(
-                (UINT32 *)imOut->image32[yy], imIn, ymin, ymax, k, coefs_precision
+                (UINT32 *)imOut->image32[yy],
+                imIn,
+                ymin,
+                ymax,
+                k,
+                coefs_precision,
+                xsize
             );
         }
     }

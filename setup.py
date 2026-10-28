@@ -14,6 +14,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import sysconfig
 import warnings
 from collections.abc import Iterator
 
@@ -639,7 +640,7 @@ class pil_build_ext(build_ext):
                 _add_directory(include_dirs, os.path.join(sdk_path, "usr", "include"))
 
                 for extension in self.extensions:
-                    extension.extra_compile_args = ["-Wno-nullability-completeness"]
+                    extension.extra_compile_args.append("-Wno-nullability-completeness")
 
         elif sys.platform == "ios":
             # Add the iOS SDK path.
@@ -650,7 +651,7 @@ class pil_build_ext(build_ext):
             _add_directory(include_dirs, os.path.join(sdk_path, "usr", "include"))
 
             for extension in self.extensions:
-                extension.extra_compile_args = ["-Wno-nullability-completeness"]
+                extension.extra_compile_args.append("-Wno-nullability-completeness")
 
         elif sys.platform.startswith(("linux", "gnu", "freebsd")):
             for dirname in _find_library_dirs_ldconfig():
@@ -998,12 +999,117 @@ class pil_build_ext(build_ext):
         tk_libs = ["psapi"] if sys.platform in ("win32", "cygwin") else []
         self._update_extension("PIL._imagingtk", tk_libs)
 
+        self.simd = self._configure_simd()
+
         build_ext.build_extensions(self)
 
         #
         # sanity checks
 
         self.summary_report(feature)
+
+    @staticmethod
+    def _simd_target_arches() -> list[str]:
+        # On macOS, ARCHFLAGS selects the slices being built.
+        if sys.platform == "darwin":
+            arches = re.findall(r"-arch\s+(\S+)", os.environ.get("ARCHFLAGS", ""))
+            if arches:
+                return arches
+        target = sysconfig.get_platform().lower()
+        if target.endswith("universal2"):
+            return ["x86_64", "arm64"]
+        # The architecture isn't always last: mingw_x86_64_ucrt,
+        # ios-13.0-arm64-iphoneos, android-24-arm64_v8a.
+        match = re.search(r"x86_64|amd64|aarch64|arm64|i386|i686", target)
+        if match:
+            return [match.group(0)]
+        return [target.rsplit("-", 1)[-1] if "-" in target else target]
+
+    def _configure_simd(self) -> str:
+        """Add the compile flags for the SIMD kernels in PIL._imaging.
+
+        -C simd=auto (default) picks SSE4.1 on x86 and scalar code elsewhere,
+        -C simd=avx2 adds AVX2 on x86, -C simd=avxvnni adds AVX2 and AVX-VNNI
+        (Intel Alder Lake, Sapphire Rapids and newer, AMD Zen 5),
+        -C simd=native builds for the CPU of the build machine (-march=native,
+        float contraction off so results don't change), -C simd=native512 also
+        lets the compiler use 512-bit vectors; such builds only run on CPUs
+        like the build machine's. -C simd=disable builds scalar code.
+        Flags are appended, so the optimisation flags are kept.
+        """
+        requested = configuration.get("simd", ["auto"])[-1]
+        if requested not in (
+            "auto",
+            "sse4",
+            "avx2",
+            "avxvnni",
+            "native",
+            "native512",
+            "disable",
+        ):
+            msg = f"Unknown option '-C simd={requested}'"
+            raise ValueError(msg)
+
+        arches = self._simd_target_arches()
+        x86 = all(a in ("x86_64", "amd64", "i386", "i686", "x86") for a in arches)
+        msvc = self.compiler.compiler_type == "msvc"
+
+        args: list[str] = []
+        macros: list[tuple[str, str | None]] = []
+        if requested == "disable":
+            macros.append(("IMAGING_SIMD_DISABLE", None))
+            simd = "disabled"
+        elif requested in ("native", "native512"):
+            if msvc:
+                msg = f"'-C simd={requested}' is not supported with MSVC"
+                raise ValueError(msg)
+            if requested == "native512" and not x86:
+                msg = "'-C simd=native512' requires an x86 target"
+                raise ValueError(msg)
+            # -march=native enables FMA, and GCC would then fuse float
+            # multiplies and adds, which changes results.
+            args = ["-march=native", "-ffp-contract=off"]
+            simd = "native (-march=native)"
+            if sys.platform == "darwin" and all(
+                a in ("arm64", "aarch64") for a in arches
+            ):
+                # Apple clang has rejected -march=native for arm64, and it
+                # already targets Apple's own CPUs there.
+                args = ["-ffp-contract=off"]
+                simd = "native (Apple clang default for arm64)"
+            if requested == "native512":
+                args.append("-mprefer-vector-width=512")
+                simd = "native, 512-bit vectors (-march=native)"
+        elif x86:
+            if requested == "avxvnni":
+                if msvc:
+                    msg = "'-C simd=avxvnni' is not supported with MSVC"
+                    raise ValueError(msg)
+                args = ["-msse4.1", "-mavx2", "-mavxvnni"]
+                simd = "SSE4.1 + AVX2 + AVX-VNNI"
+            elif requested == "avx2":
+                args = ["/arch:AVX2"] if msvc else ["-msse4.1", "-mavx2"]
+                simd = "SSE4.1 + AVX2"
+            else:
+                args = [] if msvc else ["-msse4.1"]
+                simd = "SSE4.1"
+        else:
+            if requested != "auto":
+                msg = f"'-C simd={requested}' is not supported for {arches}"
+                raise ValueError(msg)
+            simd = "none (scalar)"
+
+        # GCC only vectorizes loops at -O2 since version 12; the scalar code
+        # paths need it to match upstream wheels built with newer compilers.
+        if not msvc:
+            args = args + ["-ftree-vectorize"]
+
+        for extension in self.extensions:
+            if extension.name == "PIL._imaging":
+                extension.extra_compile_args += args
+                extension.define_macros += macros
+        _dbg(f"SIMD for {arches}: {simd} {args}")
+        return simd
 
     def summary_report(self, feature: ext_feature) -> None:
         print("-" * 68)
@@ -1021,6 +1127,8 @@ class pil_build_ext(build_ext):
             raqm_extra_info += "bundled"
             if feature.want_vendor("fribidi"):
                 raqm_extra_info += ", FriBiDi shim"
+
+        print(f"--- SIMD kernels: {self.simd}")
 
         options = [
             (feature.get("jpeg"), "JPEG"),
@@ -1080,7 +1188,7 @@ files.extend(
     os.path.join("src/libImaging", src_file + ".c") for src_file in _LIB_IMAGING
 )
 ext_modules = [
-    Extension("PIL._imaging", files, extra_compile_args=["-msse4"]),
+    Extension("PIL._imaging", files),
     Extension("PIL._imagingft", ["src/_imagingft.c"]),
     Extension("PIL._imagingcms", ["src/_imagingcms.c"]),
     Extension("PIL._webp", ["src/_webp.c"]),

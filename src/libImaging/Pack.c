@@ -257,6 +257,17 @@ packLAL(UINT8 *out, const UINT8 *in, int pixels) {
 void
 ImagingPackRGB(UINT8 *out, const UINT8 *in, int pixels) {
     int i = 0;
+#if defined(IMAGING_SIMD_SSE4)
+    /* 4 pixels per step; the 16-byte store writes 4 bytes past them, so
+       stop while at least 6 pixels (18 bytes) are left. */
+    __m128i to_rgb =
+        _mm_setr_epi8(0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14, -1, -1, -1, -1);
+    for (; i < pixels - 5; i += 4) {
+        __m128i v = _mm_loadu_si128((const __m128i *)(in + i * 4));
+        _mm_storeu_si128((__m128i *)out, _mm_shuffle_epi8(v, to_rgb));
+        out += 12;
+    }
+#endif
     /* RGB triplets */
     for (; i < pixels - 1; i++) {
         memcpy(out, in + i * 4, 4);

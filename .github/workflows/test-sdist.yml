@@ -1,0 +1,81 @@
+name: Test sdist
+
+# Pillow-SIMD is published as an sdist only, compiled on the machine it is
+# installed on. Build the sdist and install from it as users do.
+
+on:
+  push:
+    branches:
+      - "**"
+    paths-ignore: &paths-ignore
+      - ".github/workflows/docs.yml"
+      - ".github/workflows/wheels*"
+      - ".gitmodules"
+      - "docs/**"
+      - "wheels/**"
+  pull_request:
+    paths-ignore: *paths-ignore
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 1
+  PIP_DISABLE_PIP_VERSION_CHECK: 1
+
+jobs:
+  build:
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - { os: "ubuntu-latest", simd: "avx2", kernels: "SSE4.1 + AVX2" }
+
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} sdist SIMD ${{ matrix.simd }}
+
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
+
+    - name: Set up Python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      with:
+        python-version: "3.14"
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get -qq install libfreetype-dev libjpeg-turbo8-dev liblcms2-dev \
+          libopenjp2-7-dev libtiff-dev libwebp-dev zlib1g-dev
+        python3 -m pip install pytest pytest-timeout
+
+    - name: Build sdist
+      run: make sdist
+
+    - name: Install from sdist
+      run: |
+        set -o pipefail
+        # pip prints the build output to stderr.
+        python3 -m pip -v install dist/*.tar.gz -C simd="$SIMD" 2>&1 | tee install.log
+        grep -F -- "--- SIMD kernels: $KERNELS" install.log
+      env:
+        SIMD: ${{ matrix.simd }}
+        KERNELS: ${{ matrix.kernels }}
+
+    - name: Install extra test images
+      run: |
+        cd depends && ./install_extra_test_images.sh
+
+    - name: Test
+      # -I keeps src/ out of the path, so the installed package is tested.
+      run: |
+        python3 -I selftest.py
+        python3 -I -m pytest -p no:cacheprovider Tests

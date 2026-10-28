@@ -12,7 +12,7 @@ ImagingFilter3x3i_4u8(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offs
         INT32 *in1 = im->image32[y + 1];
         INT32 *out = imOut->image32[y];
 
-#if defined(__AVX2__)
+#if defined(IMAGING_SIMD_AVX2)
 
 #define MM_KERNEL_LOAD(x)                                                        \
     source = _mm256_castsi128_si256(                                             \
@@ -34,16 +34,10 @@ ImagingFilter3x3i_4u8(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offs
     pix20 = _mm256_unpacklo_epi8(source, _mm256_setzero_si256());                \
     pix21 = _mm256_unpackhi_epi8(source, _mm256_setzero_si256());
 
-#define MM_KERNEL_SUM(ss, row, kctl)                                           \
-    ss = _mm256_add_epi32(                                                     \
-        ss, _mm256_madd_epi16(pix0##row, _mm256_shuffle_epi32(kernel00, kctl)) \
-    );                                                                         \
-    ss = _mm256_add_epi32(                                                     \
-        ss, _mm256_madd_epi16(pix1##row, _mm256_shuffle_epi32(kernel10, kctl)) \
-    );                                                                         \
-    ss = _mm256_add_epi32(                                                     \
-        ss, _mm256_madd_epi16(pix2##row, _mm256_shuffle_epi32(kernel20, kctl)) \
-    );
+#define MM_KERNEL_SUM(ss, row, kctl)                                        \
+    ss = mm256_dpwssd(ss, pix0##row, _mm256_shuffle_epi32(kernel00, kctl)); \
+    ss = mm256_dpwssd(ss, pix1##row, _mm256_shuffle_epi32(kernel10, kctl)); \
+    ss = mm256_dpwssd(ss, pix2##row, _mm256_shuffle_epi32(kernel20, kctl));
 
         __m128i shuffle =
             _mm_set_epi8(15, 11, 14, 10, 13, 9, 12, 8, 7, 3, 6, 2, 5, 1, 4, 0);
@@ -194,16 +188,10 @@ ImagingFilter3x3i_4u8(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offs
     pix20 = _mm_unpacklo_epi8(source, _mm_setzero_si128());                   \
     pix21 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
 
-#define MM_KERNEL_SUM(ss, row, kctl)                                     \
-    ss = _mm_add_epi32(                                                  \
-        ss, _mm_madd_epi16(pix0##row, _mm_shuffle_epi32(kernel00, kctl)) \
-    );                                                                   \
-    ss = _mm_add_epi32(                                                  \
-        ss, _mm_madd_epi16(pix1##row, _mm_shuffle_epi32(kernel10, kctl)) \
-    );                                                                   \
-    ss = _mm_add_epi32(                                                  \
-        ss, _mm_madd_epi16(pix2##row, _mm_shuffle_epi32(kernel20, kctl)) \
-    );
+#define MM_KERNEL_SUM(ss, row, kctl)                                  \
+    ss = mm_dpwssd(ss, pix0##row, _mm_shuffle_epi32(kernel00, kctl)); \
+    ss = mm_dpwssd(ss, pix1##row, _mm_shuffle_epi32(kernel10, kctl)); \
+    ss = mm_dpwssd(ss, pix2##row, _mm_shuffle_epi32(kernel20, kctl));
 
         __m128i shuffle =
             _mm_set_epi8(15, 11, 14, 10, 13, 9, 12, 8, 7, 3, 6, 2, 5, 1, 4, 0);

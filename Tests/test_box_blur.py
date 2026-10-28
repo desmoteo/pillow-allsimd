@@ -4,6 +4,8 @@ import pytest
 
 from PIL import Image, ImageFilter
 
+from .helper import assert_image_equal, hopper
+
 sample = Image.new("L", (7, 5))
 # fmt: off
 sample.putdata(sum([
@@ -279,3 +281,71 @@ def test_three_passes() -> None:
         passes=3,
         delta=1,
     )
+
+
+@pytest.mark.parametrize("mode", ("RGB", "RGBA", "CMYK", "LA"))
+@pytest.mark.parametrize("radius", ((2, 0), (0, 2), (2, 2)))
+@pytest.mark.parametrize("n", (1, 2, 3))
+def test_channel_order(mode: str, radius: tuple[int, int], n: int) -> None:
+    # A flat image must come back unchanged, whatever the axes and passes.
+    color = (200, 50, 10, 255)[: len(Image.new(mode, (1, 1)).getbands())]
+    im = Image.new(mode, (16, 9), color)
+    out = im._new(im.im.box_blur(radius, n))
+    assert out.getpixel((8, 4)) == color
+
+
+@pytest.mark.parametrize("radius", ((3, 0), (0, 3)))
+def test_gaussian_one_axis_channel_order(radius: tuple[int, int]) -> None:
+    im = Image.new("RGBA", (16, 9), (200, 50, 10, 255))
+    out = im.filter(ImageFilter.GaussianBlur(radius))
+    assert out.getpixel((8, 4)) == (200, 50, 10, 255)
+
+
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA"))
+@pytest.mark.parametrize(
+    "size, radius",
+    (
+        ((1, 9), (0.3, 0)),
+        ((9, 1), (0, 0.3)),
+        ((1, 9), (0.5, 0)),
+        ((1, 9), (2.5, 0)),
+        ((9, 1), (0, 2.5)),
+    ),
+)
+@pytest.mark.parametrize("n", (1, 3))
+def test_one_pixel_line(
+    mode: str, size: tuple[int, int], radius: tuple[float, float], n: int
+) -> None:
+    # Blurring along a 1-pixel dimension only sees the pixel itself.
+    bands = len(Image.new(mode, (1, 1)).getbands())
+    im = Image.frombytes(mode, size, bytes((i * 29) % 256 for i in range(9 * bands)))
+    assert box_blur_axes(im, radius, n).tobytes() == im.tobytes()
+
+
+def box_blur_axes(
+    image: Image.Image, radius: tuple[float, float], n: int
+) -> Image.Image:
+    return image._new(image.im.box_blur(radius, n))
+
+
+@pytest.mark.parametrize("radius", (0.5, 1, 2.6, 5, 40))
+@pytest.mark.parametrize("size", ((1, 1), (3, 9), (17, 6), (67, 23)))
+def test_l_matches_rgb_band(radius: float, size: tuple[int, int]) -> None:
+    # 1-byte images are blurred several rows at a time with the 4-byte
+    # code; rows left over use the 1-byte code. Both must agree.
+    im = hopper("L").resize(size)
+    rgb = Image.merge("RGB", (im, im, im))
+    for f in (ImageFilter.BoxBlur(radius), ImageFilter.GaussianBlur(radius)):
+        assert_image_equal(im.filter(f), rgb.filter(f).getchannel(0))
+
+
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA"))
+@pytest.mark.parametrize("radius", (0.5, 3, 7.4, 30, 10**6))
+def test_vertical_matches_transposed_horizontal(mode: str, radius: float) -> None:
+    # The vertical pass works on rows of the image, the horizontal one on
+    # pixels of a row; the result must be the same as blurring the transposed
+    # image horizontally. Radii much larger than the image must also be fast.
+    im = hopper(mode).resize((13, 9))
+    t = Image.Transpose.TRANSPOSE
+    expected = box_blur_axes(im.transpose(t), (radius, 0), 2).transpose(t)
+    assert_image_equal(box_blur_axes(im, (0, radius), 2), expected)

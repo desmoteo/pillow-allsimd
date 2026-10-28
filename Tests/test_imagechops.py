@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from PIL import Image, ImageChops
 
 from .helper import assert_image_equal, hopper
@@ -292,6 +294,26 @@ def test_screen() -> None:
     # Assert
     assert new.getbbox() == (25, 25, 76, 76)
     assert new.getpixel((50, 50)) == ORANGE
+
+
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA"))
+@pytest.mark.parametrize("width", (1, 15, 17, 33, 256))
+def test_multiply_screen_exact(mode: str, width: int) -> None:
+    # Every pair of byte values, in rows long enough for the SIMD code
+    # and short enough for the scalar tail.
+    bands = len(mode)
+    a = bytes(i // 256 for i in range(65536))
+    b = bytes(i % 256 for i in range(65536))
+    size = (width, 65536 // (width * bands))
+    n = size[0] * size[1] * bands
+    im1 = Image.frombytes(mode, size, a[:n])
+    im2 = Image.frombytes(mode, size, b[:n])
+
+    expected = bytes(x * y // 255 for x, y in zip(a[:n], b[:n]))
+    assert ImageChops.multiply(im1, im2).tobytes() == expected
+
+    expected = bytes(255 - (255 - x) * (255 - y) // 255 for x, y in zip(a[:n], b[:n]))
+    assert ImageChops.screen(im1, im2).tobytes() == expected
 
 
 def test_subtract() -> None:

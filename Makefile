@@ -55,16 +55,16 @@ help:
 	@echo "  release-test       run code and package tests before release"
 	@echo "  test               run tests on installed Pillow"
 
-# OPTIMIZE=<flags> adds compiler flags, e.g. -O2: setting CFLAGS replaces
-# Python's own, optimization level included.
+# SIMD=<option> passes -C simd=<option>. OPTIMIZE=<flags> adds compiler flags,
+# e.g. -O2: setting CFLAGS replaces Python's own, optimization level included.
 .PHONY: install
 install:
-	$(if $(OPTIMIZE),CFLAGS="$(strip $(CFLAGS) $(OPTIMIZE))") python3 -m pip -v install .
+	$(if $(OPTIMIZE),CFLAGS="$(strip $(CFLAGS) $(OPTIMIZE))") python3 -m pip -v install . $(if $(SIMD),-C simd=$(SIMD))
 	python3 selftest.py
 
 .PHONY: install-coverage
 install-coverage:
-	CFLAGS="-coverage -Werror=implicit-function-declaration $(OPTIMIZE)" python3 -m pip -v install .
+	CFLAGS="-coverage -Werror=implicit-function-declaration $(OPTIMIZE)" python3 -m pip -v install . $(if $(SIMD),-C simd=$(SIMD))
 	python3 selftest.py
 
 .PHONY: debug

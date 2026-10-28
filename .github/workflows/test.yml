@@ -47,16 +47,21 @@ jobs:
           "3.11",
           "3.10",
         ]
+        # SIMD kernels: auto is SSE4.1 on x86.
+        simd: ["auto"]
         include:
         - { python-version: "3.12", PYTHONOPTIMIZE: 1, REVERSE: "--reverse" }
         - { python-version: "3.11", PYTHONOPTIMIZE: 2 }
         # Intel
         - { os: "macos-26-intel", python-version: "3.10" }
+        # SIMD variants
+        - { os: "ubuntu-latest", python-version: "3.14", simd: "avx2" }
+        - { os: "ubuntu-latest", python-version: "3.14", simd: "disable" }
         exclude:
         - { os: "macos-latest", python-version: "3.10" }
 
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os }} Python ${{ matrix.python-version }}
+    name: ${{ matrix.os }} Python ${{ matrix.python-version }} SIMD ${{ matrix.simd }}
 
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -124,6 +129,8 @@ jobs:
     - name: Build
       run: |
         .ci/build.sh
+      env:
+        SIMD: ${{ matrix.simd }}
 
     - name: Test
       run: |
@@ -161,7 +168,7 @@ jobs:
       uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
       with:
         flags: ${{ matrix.os == 'ubuntu-latest' && 'GHA_Ubuntu' || 'GHA_macOS' }}
-        name: ${{ matrix.os }} Python ${{ matrix.python-version }}
+        name: ${{ matrix.os }} Python ${{ matrix.python-version }} SIMD ${{ matrix.simd }}
 
   success:
     permissions:

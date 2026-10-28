@@ -42,8 +42,11 @@ jobs:
           ubuntu-22.04-jammy-amd64-valgrind,
         ]
         dockerTag: [main]
+        # Optimized SIMD builds. Valgrind 3.18 in the image runs SSE4 and
+        # AVX2 but not AVX-VNNI or AVX-512, so no avxvnni or native builds.
+        simd: [sse4, avx2]
 
-    name: ${{ matrix.docker }}
+    name: ${{ matrix.docker }} SIMD ${{ matrix.simd }}
 
     steps:
     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -62,6 +65,6 @@ jobs:
         # The Pillow user in the docker container is UID 1001
         sudo chown -R 1001 $GITHUB_WORKSPACE
         docker run --name pillow_container -e "PILLOW_VALGRIND_TEST=true" \
-            -e OPTIMIZE=-O2 \
+            -e SIMD=${{ matrix.simd }} -e OPTIMIZE=-O2 \
             -v $GITHUB_WORKSPACE:/Pillow pythonpillow/${{ matrix.docker }}:${{ matrix.dockerTag }} /Pillow/depends/docker-test-valgrind-memory.sh
         sudo chown -R runner $GITHUB_WORKSPACE

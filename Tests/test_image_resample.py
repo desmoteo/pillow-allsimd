@@ -667,3 +667,33 @@ class TestCoreResample16bpc:
                 assert (
                     value == expected
                 ), f"Pixel ({x}, {y}): expected {expected}, got {value}"
+
+
+@pytest.mark.parametrize(
+    "resample",
+    (
+        Image.Resampling.BOX,
+        Image.Resampling.BILINEAR,
+        Image.Resampling.HAMMING,
+        Image.Resampling.BICUBIC,
+        Image.Resampling.LANCZOS,
+    ),
+)
+@pytest.mark.parametrize(
+    "size, new_size",
+    (
+        ((1, 7), (3, 2)),
+        ((67, 23), (17, 11)),
+        ((67, 23), (201, 47)),
+        ((333, 71), (37, 300)),
+        ((1031, 9), (1543, 5)),
+    ),
+)
+def test_l_matches_rgb_band(
+    resample: Image.Resampling, size: tuple[int, int], new_size: tuple[int, int]
+) -> None:
+    # 1-byte and 4-byte images have separate kernels with the same
+    # arithmetic per channel. Covers row strips and partial vectors.
+    im = hopper("L").resize(size)
+    expected = Image.merge("RGB", (im, im, im)).resize(new_size, resample)
+    assert_image_equal(im.resize(new_size, resample), expected.getchannel(0))
