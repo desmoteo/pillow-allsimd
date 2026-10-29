@@ -246,4 +246,3 @@ Columns: native ms (13.0 wheel, scalar, SIMD); instructions per pixel (scalar, S
 | encode JPEG L | 2.03 | 2.50 | 2.50 | 19.7 | 19.7 | 1.00 | 1.5 | 0.03 | 1.7 | 1.0 | 0.00 | 0/0/95/4 | - | 12 |
 | encode GIF P | 17.97 | 17.37 | 17.47 | 137.7 | 137.7 | 1.00 | 1.5 | 1.02 | 4.6 | 1.3 | 0.62 | 92/0/0/8 | glzwe 92% | 44 |
 | decode GIF P | 8.39 | 9.89 | 9.73 | 96.6 | 96.6 | 1.00 | 1.9 | 0.69 | 3.6 | 1.4 | 0.39 | 97/0/0/3 | ImagingGifDecode 97% | 35 |
-
