@@ -1754,3 +1754,40 @@ def test_rgba_ink_blend_exact(width: int) -> None:
         )
         assert im.getpixel((width - 1, 0)) == expected
         assert set(im.get_flattened_data()) == {expected}
+
+
+@pytest.mark.parametrize(
+    "mode, background, ink",
+    (
+        ("L", 40, 230),
+        ("RGB", (20, 40, 60), (250, 120, 5)),
+        ("RGBA", (20, 40, 60, 255), (250, 120, 5, 180)),
+        ("RGBA", (0, 0, 0, 0), (250, 120, 5, 180)),
+        ("RGBA", (90, 10, 200, 120), (250, 120, 5, 180)),
+        ("LA", (30, 0), (240, 77)),
+    ),
+)
+@pytest.mark.parametrize("width", (1, 3, 4, 5, 17, 37))
+def test_bitmap_mask_blend_exact(
+    mode: str, background: tuple[int, ...] | int, ink: tuple[int, ...] | int, width: int
+) -> None:
+    # Masks are blended several pixels at a time, then one at a time, with
+    # the same rounding; colour channels of transparent pixels take the ink.
+    mask = Image.frombytes(
+        "L", (width, 256), bytes(y for y in range(256) for _ in range(width))
+    )
+    im = Image.new(mode, (width, 256), background)
+    ImageDraw.Draw(im).bitmap((0, 0), mask, fill=ink)
+    bg = background if isinstance(background, tuple) else (background,)
+    fg = ink if isinstance(ink, tuple) else (ink,)
+    for y in range(256):
+        expected = []
+        for i, (b, c) in enumerate(zip(bg, fg)):
+            m = y
+            if mode in ("RGBA", "LA") and i != len(bg) - 1 and m and bg[-1] == 0:
+                m = 255
+            t = b * (255 - m) + c * m + 128
+            expected.append((t + (t >> 8)) >> 8)
+        value = im.getpixel((width - 1, y))
+        assert (value if isinstance(value, tuple) else (value,)) == tuple(expected)
+        assert im.getpixel((0, y)) == value
