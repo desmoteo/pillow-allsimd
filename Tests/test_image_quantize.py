@@ -118,6 +118,30 @@ def test_quantize_kmeans(method: Image.Quantize) -> None:
         im.quantize(kmeans=-1, method=method)
 
 
+@pytest.mark.parametrize(
+    "method", (Image.Quantize.MEDIANCUT, Image.Quantize.MAXCOVERAGE)
+)
+def test_quantize_maps_to_nearest(method: Image.Quantize) -> None:
+    # 4096 colours, each seen twice, so that both looking up and caching
+    # their entries are used
+    data = bytes(
+        v
+        for i in (*range(4096), *range(4095, -1, -1))
+        for v in ((i * 37) & 255, (i * 11 + i // 64 * 5) & 255, (i * 101) & 255)
+    )
+    im = Image.frombytes("RGB", (128, 64), data)
+    converted = im.quantize(256, method, kmeans=0)
+
+    palette = converted.getpalette()
+    assert palette is not None
+    entries = [tuple(palette[i : i + 3]) for i in range(0, len(palette), 3)]
+    for pixel, index in zip(
+        zip(data[0::3], data[1::3], data[2::3]), converted.tobytes()
+    ):
+        distances = [sum((p - e) ** 2 for p, e in zip(pixel, c)) for c in entries]
+        assert distances[index] == min(distances)
+
+
 @skip_unless_feature("libimagequant")
 def test_resize() -> None:
     im = hopper().resize((100, 100))

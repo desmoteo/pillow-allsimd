@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "QuantTypes.h"
 #include "QuantOctree.h"
@@ -599,6 +600,130 @@ build_distance_tables(
     return 1;
 }
 
+/* The palette entry nearest to each pixel. The search below starts from
+   entry 0 and scans entries in the order of their distance from it, as far
+   as one can be nearer; it keeps the first strictly nearer one. So the
+   result is the nearest entry, ties going to entry 0, then to the entry
+   first in that order. The vector search finds the same entry directly:
+   the smallest of dist * 512 + rank over all entries, rank being 0 for
+   entry 0 and 1 + the position in the order for the others. Distances are
+   at most 3 * 255^2, so these keys fit 27 bits. */
+#if defined(IMAGING_SIMD_AVX2)
+#define NEAREST_LANES 8
+#elif defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+#define NEAREST_LANES 4
+#endif
+
+#if defined(NEAREST_LANES)
+typedef struct {
+    int32_t r[256 + NEAREST_LANES], g[256 + NEAREST_LANES], b[256 + NEAREST_LANES];
+    uint32_t rank[256 + NEAREST_LANES]; /* or all ones for padding */
+    uint32_t entry[257];                /* palette entry of each rank */
+    uint32_t n;                         /* entries, padded */
+} NearestPalette;
+
+static uint32_t
+nearest_entry(const NearestPalette *np, Pixel p) {
+    uint32_t j, key;
+#if defined(IMAGING_SIMD_AVX2)
+    __m256i r = _mm256_set1_epi32(p.c.r), g = _mm256_set1_epi32(p.c.g);
+    __m256i b = _mm256_set1_epi32(p.c.b), best = _mm256_set1_epi32(-1);
+    for (j = 0; j < np->n; j += 8) {
+        __m256i dr =
+            _mm256_sub_epi32(_mm256_loadu_si256((const __m256i *)&np->r[j]), r);
+        __m256i dg =
+            _mm256_sub_epi32(_mm256_loadu_si256((const __m256i *)&np->g[j]), g);
+        __m256i db =
+            _mm256_sub_epi32(_mm256_loadu_si256((const __m256i *)&np->b[j]), b);
+        __m256i d = _mm256_add_epi32(
+            _mm256_add_epi32(_mm256_mullo_epi32(dr, dr), _mm256_mullo_epi32(dg, dg)),
+            _mm256_mullo_epi32(db, db)
+        );
+        __m256i k = _mm256_or_si256(
+            _mm256_slli_epi32(d, 9), _mm256_loadu_si256((const __m256i *)&np->rank[j])
+        );
+        best = _mm256_min_epu32(best, k);
+    }
+    __m128i m =
+        _mm_min_epu32(_mm256_castsi256_si128(best), _mm256_extracti128_si256(best, 1));
+#elif defined(IMAGING_SIMD_SSE4)
+    __m128i r = _mm_set1_epi32(p.c.r), g = _mm_set1_epi32(p.c.g);
+    __m128i b = _mm_set1_epi32(p.c.b), m = _mm_set1_epi32(-1);
+    for (j = 0; j < np->n; j += 4) {
+        __m128i dr = _mm_sub_epi32(_mm_loadu_si128((const __m128i *)&np->r[j]), r);
+        __m128i dg = _mm_sub_epi32(_mm_loadu_si128((const __m128i *)&np->g[j]), g);
+        __m128i db = _mm_sub_epi32(_mm_loadu_si128((const __m128i *)&np->b[j]), b);
+        __m128i d = _mm_add_epi32(
+            _mm_add_epi32(_mm_mullo_epi32(dr, dr), _mm_mullo_epi32(dg, dg)),
+            _mm_mullo_epi32(db, db)
+        );
+        m = _mm_min_epu32(
+            m,
+            _mm_or_si128(
+                _mm_slli_epi32(d, 9), _mm_loadu_si128((const __m128i *)&np->rank[j])
+            )
+        );
+    }
+#endif
+#if defined(IMAGING_SIMD_SSE4)
+    m = _mm_min_epu32(m, _mm_shuffle_epi32(m, _MM_SHUFFLE(1, 0, 3, 2)));
+    m = _mm_min_epu32(m, _mm_shuffle_epi32(m, _MM_SHUFFLE(2, 3, 0, 1)));
+    key = (uint32_t)_mm_cvtsi128_si32(m);
+#elif defined(IMAGING_SIMD_NEON)
+    int32x4_t r = vdupq_n_s32(p.c.r), g = vdupq_n_s32(p.c.g), b = vdupq_n_s32(p.c.b);
+    uint32x4_t m = vdupq_n_u32(0xffffffff);
+    for (j = 0; j < np->n; j += 4) {
+        int32x4_t dr = vsubq_s32(vld1q_s32(&np->r[j]), r);
+        int32x4_t dg = vsubq_s32(vld1q_s32(&np->g[j]), g);
+        int32x4_t db = vsubq_s32(vld1q_s32(&np->b[j]), b);
+        int32x4_t d = vmlaq_s32(vmlaq_s32(vmulq_s32(dr, dr), dg, dg), db, db);
+        m = vminq_u32(
+            m,
+            vorrq_u32(vshlq_n_u32(vreinterpretq_u32_s32(d), 9), vld1q_u32(&np->rank[j]))
+        );
+    }
+    key = vminvq_u32(m);
+#endif
+    return np->entry[key & 511];
+}
+
+/* The palette for nearest_entry. NULL if out of memory. */
+static NearestPalette *
+nearest_palette_new(
+    Pixel *paletteData,
+    uint32_t nPaletteEntries,
+    uint32_t *avgDist,
+    uint32_t **avgDistSortKey
+) {
+    uint32_t j, idx;
+    uint32_t **aDSK = avgDistSortKey;
+    NearestPalette *np = malloc(sizeof(NearestPalette));
+    if (!np) {
+        return NULL;
+    }
+    np->n = (nPaletteEntries + NEAREST_LANES - 1) / NEAREST_LANES * NEAREST_LANES;
+    for (j = 0; j < np->n; j++) {
+        Pixel e = paletteData[j < nPaletteEntries ? j : 0];
+        np->r[j] = e.c.r, np->g[j] = e.c.g, np->b[j] = e.c.b;
+        np->rank[j] = 0xffffffff;
+    }
+    np->rank[0] = 0;
+    np->entry[0] = 0;
+    for (j = 0, idx = 1; j < nPaletteEntries; j++) {
+        uint32_t e = aDSK[j] - avgDist;
+        if (e != 0) {
+            np->entry[idx] = e;
+            np->rank[e] = idx++;
+        }
+    }
+    return np;
+}
+#endif
+
+/* Palette entries of recently seen colours, by a hash of the colour: each
+   word is the colour's 24 bits, then the entry; all ones when empty. */
+#define NEAREST_CACHE_BITS 18
+
 static int
 map_image_pixels(
     Pixel *pixelData,
@@ -614,11 +739,39 @@ map_image_pixels(
     uint32_t i, j;
     uint32_t bestdist, bestmatch, dist;
     uint32_t initialdist;
-    HashTable *h2;
+    uint32_t *cache;
+#if defined(NEAREST_LANES)
+    NearestPalette *np = NULL;
+    if (nPaletteEntries > 0 && nPaletteEntries <= 256) {
+        np = nearest_palette_new(paletteData, nPaletteEntries, avgDist, avgDistSortKey);
+        if (!np) {
+            return 0;
+        }
+    }
+#endif
 
-    h2 = hashtable_new(unshifted_pixel_hash, unshifted_pixel_cmp);
+    cache = malloc(sizeof(uint32_t) << NEAREST_CACHE_BITS);
+    if (!cache) {
+#if defined(NEAREST_LANES)
+        free(np);
+#endif
+        return 0;
+    }
+    memset(cache, 0xff, sizeof(uint32_t) << NEAREST_CACHE_BITS);
     for (i = 0; i < nPixels; i++) {
-        if (!hashtable_lookup(h2, pixelData[i], &bestmatch)) {
+        uint32_t rgb =
+            pixelData[i].c.r << 16 | pixelData[i].c.g << 8 | pixelData[i].c.b;
+        uint32_t slot = (rgb * 2654435761u) >> (32 - NEAREST_CACHE_BITS);
+        if (cache[slot] >> 8 == rgb && cache[slot] != 0xffffffff) {
+            pixelArray[i] = cache[slot] & 0xff;
+            continue;
+        }
+#if defined(NEAREST_LANES)
+        if (np) {
+            bestmatch = nearest_entry(np, pixelData[i]);
+        } else
+#endif
+        {
             bestmatch = 0;
             initialdist = _DISTSQR(paletteData + bestmatch, pixelData + i);
             bestdist = initialdist;
@@ -637,11 +790,16 @@ map_image_pixels(
                     break;
                 }
             }
-            hashtable_insert(h2, pixelData[i], bestmatch);
+        }
+        if (nPaletteEntries <= 256) {
+            cache[slot] = rgb << 8 | bestmatch;
         }
         pixelArray[i] = bestmatch;
     }
-    hashtable_free(h2);
+    free(cache);
+#if defined(NEAREST_LANES)
+    free(np);
+#endif
     return 1;
 }
 
@@ -721,16 +879,25 @@ map_image_pixels_from_median_box(
     uint32_t i, j;
     uint32_t bestdist, bestmatch, dist;
     uint32_t initialdist;
-    HashTable *h2;
     uint32_t pixelVal;
+    uint32_t *cache;
+    int small = nPaletteEntries <= 256;
 
-    h2 = hashtable_new(unshifted_pixel_hash, unshifted_pixel_cmp);
+    cache = malloc(sizeof(uint32_t) << NEAREST_CACHE_BITS);
+    if (!cache) {
+        return 0;
+    }
+    memset(cache, 0xff, sizeof(uint32_t) << NEAREST_CACHE_BITS);
     for (i = 0; i < nPixels; i++) {
-        if (hashtable_lookup(h2, pixelData[i], &pixelVal)) {
-            pixelArray[i] = pixelVal;
+        uint32_t rgb =
+            pixelData[i].c.r << 16 | pixelData[i].c.g << 8 | pixelData[i].c.b;
+        uint32_t slot = (rgb * 2654435761u) >> (32 - NEAREST_CACHE_BITS);
+        if (small && cache[slot] >> 8 == rgb && cache[slot] != 0xffffffff) {
+            pixelArray[i] = cache[slot] & 0xff;
             continue;
         }
         if (!hashtable_lookup(medianBoxHash, pixelData[i], &pixelVal)) {
+            free(cache);
             return 0;
         }
         initialdist = _DISTSQR(paletteData + pixelVal, pixelData + i);
@@ -752,9 +919,12 @@ map_image_pixels_from_median_box(
             }
         }
         pixelArray[i] = bestmatch;
-        hashtable_insert(h2, pixelData[i], bestmatch);
+        /* Ties depend on the median box, which the colour determines. */
+        if (small) {
+            cache[slot] = rgb << 8 | bestmatch;
+        }
     }
-    hashtable_free(h2);
+    free(cache);
     return 1;
 }
 
