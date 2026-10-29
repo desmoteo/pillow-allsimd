@@ -503,7 +503,7 @@ def api_operations(
         ops["quantize libimagequant"] = lambda: photo.quantize(
             256, Image.Quantize.LIBIMAGEQUANT
         )
-    codecs = {
+    codecs: dict[str, tuple[str | None, dict[str, Any]]] = {
         "PNG": ("zlib", {}),
         "PNG level 1": ("zlib", {"compress_level": 1}),
         "JPEG q85": ("jpg", {"quality": 85}),
