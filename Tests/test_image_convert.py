@@ -373,3 +373,19 @@ def test_matrix_identity() -> None:
     # Test list
     converted_im = im.convert("RGB", list(identity_matrix))
     assert_image_equal(converted_im, im)
+
+
+@pytest.mark.parametrize("width", (256, 1, 3, 5, 7, 9, 17))
+def test_unpremultiply_exact(width: int) -> None:
+    # Every (colour, alpha) pair, colour above alpha included, as resampling
+    # overshoot gives: 255 * c // a clipped to 255, c itself for alpha 0 and
+    # 255. The vector code must give the same bytes for any row length.
+    data = bytes(v for a in range(256) for c in range(256) for v in (c, c, c, a))
+    pixels = 256 * 256 // width * width
+    im = Image.frombytes("RGBa", (width, pixels // width), data[: pixels * 4])
+    expected = bytearray()
+    for i in range(pixels):
+        c, a = data[i * 4], data[i * 4 + 3]
+        v = c if a in (0, 255) else min(255, 255 * c // a)
+        expected += bytes((v, v, v, a))
+    assert im.convert("RGBA").tobytes() == bytes(expected)
