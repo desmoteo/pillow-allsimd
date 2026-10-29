@@ -59,3 +59,22 @@ def test_alpha(op: str) -> None:
             op,
             amount,
         )
+
+
+@pytest.mark.parametrize("mode", ("L", "LA", "RGB", "RGBA"))
+@pytest.mark.parametrize("factor", (0.0, 0.37, 1.0, 1.4, 2.5, -0.6))
+def test_lookup_table_matches_blend(mode: str, factor: float) -> None:
+    # Contrast and Brightness use a lookup table built with Image.blend,
+    # which must give what blending the whole image gives.
+    im = hopper(mode)
+    for enhancer in (ImageEnhance.Contrast(im), ImageEnhance.Brightness(im)):
+        expected = Image.blend(enhancer.degenerate, im, factor)
+        assert_image_equal(enhancer.enhance(factor), expected)
+
+
+def test_custom_degenerate() -> None:
+    im = hopper("RGB")
+    enhancer = ImageEnhance.Contrast(im)
+    enhancer.degenerate = Image.new("RGB", im.size, (10, 200, 30))
+    expected = Image.blend(enhancer.degenerate, im, 0.5)
+    assert_image_equal(enhancer.enhance(0.5), expected)
