@@ -25,8 +25,11 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Callable
 from typing import Any
+
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 SEED = 1234
 

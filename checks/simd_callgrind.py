@@ -35,7 +35,10 @@ import re
 import subprocess
 import sys
 import tempfile
-from types import ModuleType
+
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from types import ModuleType
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.join(HERE, "simd_bench.py")
