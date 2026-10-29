@@ -402,7 +402,8 @@ def api_operations(
         "draw points 100k": draw("", point_cloud),
         "draw text 100 lines": draw("", text),
         "draw text stroke 30 lines": draw("", text_stroke),
-        "draw ellipses RGBA blend": draw("RGBA", blend_ellipses, "RGBA"),
+        # ImageDraw blends RGBA ink only onto RGB images.
+        "draw ellipses RGBA ink on RGB": draw("RGBA", blend_ellipses, "RGB"),
         "draw floodfill 1/16 area": floodfill,
         "font textbbox 100": textbbox,
         "ImageOps grayscale": lambda: ImageOps.grayscale(rgb),
