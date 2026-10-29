@@ -10,6 +10,10 @@ Based on Pillow 13.0.0
   paths run inside them), vertical-first resampling and the MKS2013 and
   MKS2021 filters, which use the SIMD resample kernels (MKS2021 RGB 1/4:
   about 10x the 13.0 wheel on AVX2)
+- arm64: NEON again for the horizontal box blur of 4-byte images and the
+  unsharp mask row, which beat the compiler's code with GCC 12 and 14
+  (gaussian RGB 1.27x, unsharp RGB 1.31x on Cortex-A78AE); 13.0's
+  histogram loops on arm64 (1.1x)
 - ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a
   container, on a remote host or locally, so the host's Python version does
   not matter
