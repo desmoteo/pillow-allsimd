@@ -86,10 +86,30 @@ struct {
 static PyMutex ft_library_mutex;
 #endif
 
+/* A rendered glyph: what FreeType gives for a glyph index and load flags
+   (and stroke), which depends on nothing else, since the face's size and
+   variation are fixed between clears of the cache and no transform is
+   set. Non-8-bit bitmaps are stored converted to gray, with the scale to
+   apply; rows are stored in the order they are drawn. */
+typedef struct {
+    int index, load_flags, stroke_filled, used;
+    FT_Fixed stroke; /* stroke radius in 26.6, 0 if not stroked */
+    int left, top;   /* bitmap offsets from the pen position */
+    int width, rows; /* in pixels; pitch is width * bytes per pixel */
+    int pitch;
+    int has_bitmap; /* FreeType gave a buffer */
+    int supported;  /* gray, or BGRA when asked for color */
+    unsigned char pixel_mode, scale;
+    unsigned char *buffer;
+} GlyphCacheEntry;
+
 typedef struct {
     PyObject_HEAD FT_Face face;
     unsigned char *font_bytes;
     int layout_engine;
+    GlyphCacheEntry *glyph_cache; /* open addressing, glyph_cache_size slots */
+    int glyph_cache_size, glyph_cache_count;
+    size_t glyph_cache_bytes;
 } FontObject;
 
 static PyTypeObject Font_Type;
@@ -163,6 +183,9 @@ getfont(PyObject *self_, PyObject *args, PyObject *kw) {
 
     self->face = NULL;
     self->layout_engine = layout_engine;
+    self->glyph_cache = NULL;
+    self->glyph_cache_size = self->glyph_cache_count = 0;
+    self->glyph_cache_bytes = 0;
 
     if (filename && font_bytes_size <= 0) {
         self->font_bytes = NULL;
@@ -551,9 +574,65 @@ font_getlength(FontObject *self, PyObject *args) {
     return result;
 }
 
+static GlyphCacheEntry *
+glyph_get(
+    FontObject *self,
+    int index,
+    int load_flags,
+    FT_Stroker stroker,
+    FT_Fixed stroke,
+    int stroke_filled,
+    int color
+);
+static int
+glyph_get_reserve(FontObject *self);
+static GlyphCacheEntry *
+glyph_cache_slot(
+    FontObject *self, int index, int load_flags, FT_Fixed stroke, int stroke_filled
+);
+
+/* The pixel bounding box of a glyph as loaded with load_flags, from the
+   cache; entries for boxes have stroke_filled -1. Returns 0 on errors,
+   with an exception set. */
+static int
+glyph_bbox(FontObject *self, int index, int load_flags, FT_BBox *bbox) {
+    GlyphCacheEntry *e;
+    FT_Glyph glyph;
+    int error;
+    if (!glyph_get_reserve(self)) {
+        PyErr_NoMemory();
+        return 0;
+    }
+    e = glyph_cache_slot(self, index, load_flags, 0, -1);
+    if (!e->used) {
+        error = FT_Load_Glyph(self->face, index, load_flags);
+        if (error) {
+            geterror(error);
+            return 0;
+        }
+        error = FT_Get_Glyph(self->face->glyph, &glyph);
+        if (error) {
+            geterror(error);
+            return 0;
+        }
+        FT_Glyph_Get_CBox(glyph, FT_GLYPH_BBOX_PIXELS, bbox);
+        FT_Done_Glyph(glyph);
+        memset(e, 0, sizeof(*e));
+        e->index = index, e->load_flags = load_flags, e->stroke_filled = -1;
+        e->left = bbox->xMin, e->top = bbox->yMax;
+        e->width = bbox->xMax, e->rows = bbox->yMin;
+        e->used = 1;
+        self->glyph_cache_count++;
+        self->glyph_cache_bytes += sizeof(*e);
+    }
+    bbox->xMin = e->left, bbox->yMax = e->top;
+    bbox->xMax = e->width, bbox->yMin = e->rows;
+    return 1;
+}
+
 static int
 bounding_box_and_anchors(
-    FT_Face face,
+    FontObject *self,
     const char *anchor,
     int horizontal_dir,
     GlyphInfo *glyph_info,
@@ -569,10 +648,9 @@ bounding_box_and_anchors(
     int px, py;    /* position of current glyph, in pixels */
     int x_min, x_max, y_min, y_max; /* text bounding box, in pixels */
     int x_anchor, y_anchor;         /* offset of point drawn at (0, 0), in pixels */
-    int error;
-    FT_Glyph glyph;
-    FT_BBox bbox; /* glyph bounding box */
-    size_t i;     /* glyph_info index */
+    FT_BBox bbox;                   /* glyph bounding box */
+    FT_Face face = self->face;
+    size_t i; /* glyph_info index */
     /*
      * text bounds are given by:
      *   - bounding boxes of individual glyphs
@@ -601,19 +679,9 @@ bounding_box_and_anchors(
             }
         }
 
-        error = FT_Load_Glyph(face, glyph_info[i].index, load_flags);
-        if (error) {
-            geterror(error);
+        if (!glyph_bbox(self, glyph_info[i].index, load_flags, &bbox)) {
             return 1;
         }
-
-        error = FT_Get_Glyph(face->glyph, &glyph);
-        if (error) {
-            geterror(error);
-            return 1;
-        }
-
-        FT_Glyph_Get_CBox(glyph, FT_GLYPH_BBOX_PIXELS, &bbox);
         bbox.xMax += px;
         if (bbox.xMax > x_max) {
             x_max = bbox.xMax;
@@ -630,8 +698,6 @@ bounding_box_and_anchors(
         if (bbox.yMin < y_min) {
             y_min = bbox.yMin;
         }
-
-        FT_Done_Glyph(glyph);
     }
 
     if (anchor == NULL) {
@@ -782,7 +848,7 @@ font_getsize_impl(FontObject *self, PyObject *args) {
     }
 
     error = bounding_box_and_anchors(
-        self->face,
+        self,
         anchor,
         horizontal_dir,
         glyph_info,
@@ -813,6 +879,227 @@ font_getsize(FontObject *self, PyObject *args) {
     return result;
 }
 
+/* The cache is cleared when the face's variation changes and when it
+   holds more than this many bitmap bytes. */
+#define GLYPH_CACHE_MAX_BYTES (8 * 1024 * 1024)
+
+static void
+glyph_cache_clear(FontObject *self) {
+    int i;
+    for (i = 0; i < self->glyph_cache_size; i++) {
+        free(self->glyph_cache[i].buffer);
+    }
+    free(self->glyph_cache);
+    self->glyph_cache = NULL;
+    self->glyph_cache_size = self->glyph_cache_count = 0;
+    self->glyph_cache_bytes = 0;
+}
+
+static unsigned int
+glyph_cache_hash(int index, int load_flags, FT_Fixed stroke, int stroke_filled) {
+    unsigned int h = (unsigned int)index * 2654435761u;
+    h ^= (unsigned int)load_flags * 40503u + (unsigned int)stroke * 97u + stroke_filled;
+    return h ^ (h >> 15);
+}
+
+static GlyphCacheEntry *
+glyph_cache_slot(
+    FontObject *self, int index, int load_flags, FT_Fixed stroke, int stroke_filled
+) {
+    unsigned int mask = self->glyph_cache_size - 1;
+    unsigned int i = glyph_cache_hash(index, load_flags, stroke, stroke_filled) & mask;
+    for (;; i = (i + 1) & mask) {
+        GlyphCacheEntry *e = &self->glyph_cache[i];
+        if (!e->used || (e->index == index && e->load_flags == load_flags &&
+                         e->stroke == stroke && e->stroke_filled == stroke_filled)) {
+            return e;
+        }
+    }
+}
+
+/* Makes room for one more entry, keeping the entries. Returns 0 if out of
+   memory. */
+static int
+glyph_get_reserve(FontObject *self) {
+    int size, i, old_size = self->glyph_cache_size;
+    GlyphCacheEntry *old = self->glyph_cache;
+    if (old_size && 2 * (self->glyph_cache_count + 1) <= old_size) {
+        return 1;
+    }
+    size = old_size ? 2 * old_size : 256;
+    self->glyph_cache = calloc(size, sizeof(GlyphCacheEntry));
+    if (!self->glyph_cache) {
+        self->glyph_cache = old;
+        return 0;
+    }
+    self->glyph_cache_size = size;
+    for (i = 0; i < old_size; i++) {
+        if (old[i].used) {
+            *glyph_cache_slot(
+                self,
+                old[i].index,
+                old[i].load_flags,
+                old[i].stroke,
+                old[i].stroke_filled
+            ) = old[i];
+        }
+    }
+    free(old);
+    return 1;
+}
+
+/* The rendered glyph for index and load_flags (which must include
+   FT_LOAD_RENDER unless stroker is given), from the cache or rendered and
+   stored. Returns NULL with an exception set on errors from FreeType or
+   out of memory. */
+static GlyphCacheEntry *
+glyph_get(
+    FontObject *self,
+    int index,
+    int load_flags,
+    FT_Stroker stroker,
+    FT_Fixed stroke,
+    int stroke_filled,
+    int color
+) {
+    GlyphCacheEntry *e, entry;
+    FT_Glyph glyph = NULL;
+    FT_Bitmap bitmap, converted;
+    int error, converted_ready = 0, bytes_per_pixel, r;
+    const unsigned char *src;
+
+    if (!stroker) {
+        stroke = 0, stroke_filled = 0;
+    }
+    if (!glyph_get_reserve(self)) {
+        PyErr_NoMemory();
+        return NULL;
+    }
+    e = glyph_cache_slot(self, index, load_flags, stroke, stroke_filled);
+    if (e->used) {
+        return e;
+    }
+
+    memset(&entry, 0, sizeof(entry));
+    entry.index = index, entry.load_flags = load_flags;
+    entry.stroke = stroke, entry.stroke_filled = stroke_filled;
+    error = FT_Load_Glyph(self->face, index, load_flags);
+    if (error) {
+        geterror(error);
+        return NULL;
+    }
+    if (stroker) {
+        error = FT_Get_Glyph(self->face->glyph, &glyph);
+        if (!error) {
+            error = stroke_filled ? FT_Glyph_StrokeBorder(&glyph, stroker, 0, 1)
+                                  : FT_Glyph_Stroke(&glyph, stroker, 1);
+        }
+        if (!error) {
+            FT_Vector origin = {0, 0};
+            error = FT_Glyph_To_Bitmap(&glyph, FT_RENDER_MODE_NORMAL, &origin, 1);
+        }
+        if (error) {
+            if (glyph) {
+                FT_Done_Glyph(glyph);
+            }
+            geterror(error);
+            return NULL;
+        }
+        bitmap = ((FT_BitmapGlyph)glyph)->bitmap;
+        entry.left = ((FT_BitmapGlyph)glyph)->left;
+        entry.top = ((FT_BitmapGlyph)glyph)->top;
+    } else {
+        bitmap = self->face->glyph->bitmap;
+        entry.left = self->face->glyph->bitmap_left;
+        entry.top = self->face->glyph->bitmap_top;
+    }
+
+    entry.has_bitmap = bitmap.buffer != NULL;
+    entry.scale = 1;
+    if (entry.has_bitmap) {
+        // as font_render converted them before drawing
+        switch (bitmap.pixel_mode) {
+            case FT_PIXEL_MODE_MONO:
+                entry.scale = 255;
+                break;
+            case FT_PIXEL_MODE_GRAY2:
+                entry.scale = 255 / 3;
+                break;
+            case FT_PIXEL_MODE_GRAY4:
+                entry.scale = 255 / 15;
+                break;
+        }
+        switch (bitmap.pixel_mode) {
+            case FT_PIXEL_MODE_MONO:
+            case FT_PIXEL_MODE_GRAY2:
+            case FT_PIXEL_MODE_GRAY4:
+                FT_Bitmap_Init(&converted);
+                converted_ready = 1;
+                error = FT_Bitmap_Convert(library, &bitmap, &converted, 1);
+                if (error) {
+                    FT_Bitmap_Done(library, &converted);
+                    if (glyph) {
+                        FT_Done_Glyph(glyph);
+                    }
+                    geterror(error);
+                    return NULL;
+                }
+                bitmap = converted;
+                /* fall through */
+            case FT_PIXEL_MODE_GRAY:
+                entry.supported = 1;
+                break;
+            case FT_PIXEL_MODE_BGRA:
+                entry.supported = color;
+                break;
+            default:
+                entry.supported = 0;
+        }
+        entry.pixel_mode = bitmap.pixel_mode;
+        entry.width = bitmap.width;
+        entry.rows = bitmap.rows;
+        bytes_per_pixel = bitmap.pixel_mode == FT_PIXEL_MODE_BGRA ? 4 : 1;
+        entry.pitch = entry.width * bytes_per_pixel;
+        if (entry.supported && entry.rows > 0 && entry.pitch > 0) {
+            entry.buffer = malloc((size_t)entry.rows * entry.pitch);
+            if (!entry.buffer) {
+                if (converted_ready) {
+                    FT_Bitmap_Done(library, &converted);
+                }
+                if (glyph) {
+                    FT_Done_Glyph(glyph);
+                }
+                PyErr_NoMemory();
+                return NULL;
+            }
+            for (r = 0, src = bitmap.buffer; r < entry.rows; r++, src += bitmap.pitch) {
+                memcpy(entry.buffer + (size_t)r * entry.pitch, src, entry.pitch);
+            }
+        }
+    }
+    if (converted_ready) {
+        FT_Bitmap_Done(library, &converted);
+    }
+    if (glyph) {
+        FT_Done_Glyph(glyph);
+    }
+
+    if (self->glyph_cache_bytes > GLYPH_CACHE_MAX_BYTES) {
+        glyph_cache_clear(self);
+        if (!glyph_get_reserve(self)) {
+            free(entry.buffer);
+            PyErr_NoMemory();
+            return NULL;
+        }
+        e = glyph_cache_slot(self, index, load_flags, stroke, stroke_filled);
+    }
+    entry.used = 1;
+    *e = entry;
+    self->glyph_cache_count++;
+    self->glyph_cache_bytes += (size_t)entry.rows * entry.pitch + sizeof(entry);
+    return e;
+}
+
 static PyObject *
 font_render_impl(FontObject *self, PyObject *args) {
     int x, y;         /* pen position, in 26.6 precision */
@@ -821,10 +1108,8 @@ font_render_impl(FontObject *self, PyObject *args) {
     int load_flags;   /* FreeType load_flags parameter */
     int error;
     FT_Glyph glyph = NULL;
-    FT_GlyphSlot glyph_slot;
     FT_Bitmap bitmap;
     FT_Bitmap bitmap_converted; /* initialized lazily, for non-8bpp fonts */
-    FT_BitmapGlyph bitmap_glyph;
     FT_Stroker stroker = NULL;
     int bitmap_converted_ready = 0; /* has bitmap_converted been initialized */
     GlyphInfo *glyph_info = NULL;   /* computed text layout */
@@ -853,7 +1138,9 @@ font_render_impl(FontObject *self, PyObject *args) {
     float y_start = 0;
     int64_t width, height, y_offset;
     int x_offset;
-    int horizontal_dir; /* is primary axis horizontal? */
+    int horizontal_dir;      /* is primary axis horizontal? */
+    GlyphCacheEntry *cached; /* rendered glyph */
+    FT_Fixed stroke_radius = 0;
 
     /* render string into given buffer (the buffer *must* have
        the right size, or this will crash) */
@@ -912,7 +1199,7 @@ font_render_impl(FontObject *self, PyObject *args) {
     horizontal_dir = dir && strcmp(dir, "ttb") == 0 ? 0 : 1;
 
     error = bounding_box_and_anchors(
-        self->face,
+        self,
         anchor,
         horizontal_dir,
         glyph_info,
@@ -963,9 +1250,10 @@ font_render_impl(FontObject *self, PyObject *args) {
             goto glyph_error;
         }
 
+        stroke_radius = (FT_Fixed)round(stroke_width * 64);
         FT_Stroker_Set(
             stroker,
-            (FT_Fixed)round(stroke_width * 64),
+            stroke_radius,
             FT_STROKER_LINECAP_ROUND,
             FT_STROKER_LINEJOIN_ROUND,
             0
@@ -981,21 +1269,18 @@ font_render_impl(FontObject *self, PyObject *args) {
         px = PIXEL(x + glyph_info[i].x_offset);
         py = PIXEL(y + glyph_info[i].y_offset);
 
-        error =
-            FT_Load_Glyph(self->face, glyph_info[i].index, load_flags | FT_LOAD_RENDER);
-        if (error) {
-            geterror(error);
+        cached = glyph_get(
+            self, glyph_info[i].index, load_flags | FT_LOAD_RENDER, NULL, 0, 0, color
+        );
+        if (!cached) {
             goto glyph_error;
         }
 
-        glyph_slot = self->face->glyph;
-        bitmap = glyph_slot->bitmap;
-
-        if (glyph_slot->bitmap_top + py > y_max) {
-            y_max = glyph_slot->bitmap_top + py;
+        if (cached->top + py > y_max) {
+            y_max = cached->top + py;
         }
-        if (glyph_slot->bitmap_left + px < x_min) {
-            x_min = glyph_slot->bitmap_left + px;
+        if (cached->left + px < x_min) {
+            x_min = cached->left + px;
         }
 
         x += glyph_info[i].x_advance;
@@ -1014,79 +1299,32 @@ font_render_impl(FontObject *self, PyObject *args) {
         px = PIXEL(x + glyph_info[i].x_offset);
         py = PIXEL(y + glyph_info[i].y_offset);
 
-        error = FT_Load_Glyph(self->face, glyph_info[i].index, load_flags);
-        if (error) {
-            geterror(error);
+        cached = glyph_get(
+            self,
+            glyph_info[i].index,
+            load_flags,
+            stroker,
+            stroke_radius,
+            stroke_filled,
+            color
+        );
+        if (!cached) {
             goto glyph_error;
         }
+        xx = px + cached->left;
+        yy = -(py + cached->top);
+        bitmap.buffer = cached->buffer;
+        bitmap.width = cached->width;
+        bitmap.rows = cached->rows;
+        bitmap.pitch = cached->pitch;
+        bitmap.pixel_mode = cached->pixel_mode;
 
-        glyph_slot = self->face->glyph;
-        if (stroker != NULL) {
-            error = FT_Get_Glyph(glyph_slot, &glyph);
-            if (!error) {
-                error = stroke_filled ? FT_Glyph_StrokeBorder(&glyph, stroker, 0, 1)
-                                      : FT_Glyph_Stroke(&glyph, stroker, 1);
-            }
-            if (!error) {
-                FT_Vector origin = {0, 0};
-                error = FT_Glyph_To_Bitmap(&glyph, FT_RENDER_MODE_NORMAL, &origin, 1);
-            }
-            if (error) {
-                geterror(error);
+        if (cached->has_bitmap) {
+            /* the cache holds 8-bit gray, or BGRA when color was asked for */
+            convert_scale = cached->scale;
+            if (!cached->supported) {
+                PyErr_SetString(PyExc_OSError, "unsupported bitmap pixel mode");
                 goto glyph_error;
-            }
-
-            bitmap_glyph = (FT_BitmapGlyph)glyph;
-
-            bitmap = bitmap_glyph->bitmap;
-            xx = px + bitmap_glyph->left;
-            yy = -(py + bitmap_glyph->top);
-        } else {
-            bitmap = glyph_slot->bitmap;
-            xx = px + glyph_slot->bitmap_left;
-            yy = -(py + glyph_slot->bitmap_top);
-        }
-
-        if (bitmap.buffer) {
-            /* convert non-8bpp bitmaps */
-            switch (bitmap.pixel_mode) {
-                case FT_PIXEL_MODE_MONO:
-                    convert_scale = 255;
-                    break;
-                case FT_PIXEL_MODE_GRAY2:
-                    convert_scale = 255 / 3;
-                    break;
-                case FT_PIXEL_MODE_GRAY4:
-                    convert_scale = 255 / 15;
-                    break;
-                default:
-                    convert_scale = 1;
-            }
-            switch (bitmap.pixel_mode) {
-                case FT_PIXEL_MODE_MONO:
-                case FT_PIXEL_MODE_GRAY2:
-                case FT_PIXEL_MODE_GRAY4:
-                    if (!bitmap_converted_ready) {
-                        FT_Bitmap_Init(&bitmap_converted);
-                        bitmap_converted_ready = 1;
-                    }
-                    error = FT_Bitmap_Convert(library, &bitmap, &bitmap_converted, 1);
-                    if (error) {
-                        geterror(error);
-                        goto glyph_error;
-                    }
-                    bitmap = bitmap_converted;
-                    /* bitmap is now FT_PIXEL_MODE_GRAY, fall through */
-                case FT_PIXEL_MODE_GRAY:
-                    break;
-                case FT_PIXEL_MODE_BGRA:
-                    if (color) {
-                        break;
-                    }
-                    /* we didn't ask for color, fall through to default */
-                default:
-                    PyErr_SetString(PyExc_OSError, "unsupported bitmap pixel mode");
-                    goto glyph_error;
             }
 
             /* clip glyph bitmap width to target image bounds */
@@ -1213,10 +1451,6 @@ font_render_impl(FontObject *self, PyObject *args) {
         }
         x += glyph_info[i].x_advance;
         y += glyph_info[i].y_advance;
-        if (stroker != NULL) {
-            FT_Done_Glyph(glyph);
-            glyph = NULL;
-        }
     }
 
     if (bitmap_converted_ready) {
@@ -1396,6 +1630,7 @@ font_setvarname_impl(FontObject *self, PyObject *args) {
     }
 
     error = FT_Set_Named_Instance(self->face, instance_index);
+    glyph_cache_clear(self);
     if (error) {
         return geterror(error);
     }
@@ -1459,6 +1694,7 @@ font_setvaraxes_impl(FontObject *self, PyObject *args) {
 
     error = FT_Set_Var_Design_Coordinates(self->face, num_coords, coords);
     free(coords);
+    glyph_cache_clear(self);
     if (error) {
         return geterror(error);
     }
@@ -1477,6 +1713,7 @@ font_setvaraxes(FontObject *self, PyObject *args) {
 
 static void
 font_dealloc(FontObject *self) {
+    glyph_cache_clear(self);
     if (self->face) {
         MUTEX_LOCK(&ft_library_mutex);
         FT_Done_Face(self->face);
