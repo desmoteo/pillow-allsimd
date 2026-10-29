@@ -124,6 +124,10 @@ Ranked by expected gain for typical use. Times are ms at 1280×800 (SIMD build /
 - Fix for 5×5: a sorting network evaluated on 16 or 32 pixels at a time with `pminub`/`pmaxub` (NEON `vmin`/`vmax`), as the 3×3 network already is. Since every pixel's window is sorted with the same network, there are no branches.
 - Fix for larger sizes: a sliding-window histogram (Huang), O(size) per pixel.
 - Exact. Expected 10–30x for 5×5.
+- **Done in `00df40576`.** Sizes 3 to 11 now use the network: a Batcher odd-even merge network for 5×5 and up, pruned to what the requested rank needs. Each compare-exchange is a min/max loop over 256 pixels, which the compiler vectorises in every build, with no intrinsics. Results are unchanged.
+  - 2560×1600, ms (wheel / before / AVX2): median 5 1947 / 1926 / 29.6 (65x); rank 7 3600 / 3560 / 70.9 (50x); median 3 544 / 9.67 / 7.55.
+  - 1280×800: 9×9 1381 → 22.6 ms; 11×11 1987 → 60.0 ms.
+  - A sliding histogram was not needed.
 
 #### 2. PNG encoding
 `encode PNG RGB` 437 / 481 ms, RGBA 975 / 1011 ms, L 291 / 304 ms; level 1: 89 / 138 ms. Kind: build, SIMD.
