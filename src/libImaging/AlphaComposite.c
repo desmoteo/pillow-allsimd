@@ -237,6 +237,11 @@ alpha_composite_8px(__m256i mm_dst, __m256i mm_src) {
     )
 #endif
 
+/**
+ * Alpha-composite imSrc over imDst, returning a newly allocated result.
+ *
+ * Contract: imDst and imSrc are read-only and may alias each other.
+ */
 Imaging
 ImagingAlphaComposite(Imaging imDst, Imaging imSrc) {
     Imaging imOut;

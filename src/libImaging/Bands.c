@@ -17,6 +17,11 @@
 
 #include "Imaging.h"
 
+/**
+ * Extract a single band from imIn into a newly allocated single-band image.
+ *
+ * Contract: imIn is read-only and the returned image is a newly allocated result.
+ */
 Imaging
 ImagingGetBand(Imaging imIn, int band) {
     Imaging imOut;
@@ -134,6 +139,17 @@ ImagingGetBand(Imaging imIn, int band) {
     }
 #endif
 
+/**
+ * Splits imIn into its component bands.
+ * The provided null Imaging pointers will be allocated
+ * and filled with the individual bands, up to the number of bands in imIn.
+ *
+ * Contract: imIn is read-only.
+ *
+ * @param imIn  The input image.
+ * @param bands An array of null pointers to the output band images.
+ * @return      -1 in case of an error, 0 otherwise.
+ */
 int
 ImagingSplit(Imaging imIn, Imaging bands[4]) {
     int i, j, x, y;
@@ -141,13 +157,13 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
     /* Check arguments */
     if (!imIn || imIn->type != IMAGING_TYPE_UINT8) {
         (void)ImagingError_ModeError();
-        return 0;
+        return -1;
     }
 
     /* Shortcuts */
     if (imIn->bands == 1) {
         bands[0] = ImagingCopy(imIn);
-        return imIn->bands;
+        return 0;
     }
 
     for (i = 0; i < imIn->bands; i++) {
@@ -156,7 +172,7 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             for (j = 0; j < i; ++j) {
                 ImagingDelete(bands[j]);
             }
-            return 0;
+            return -1;
         }
     }
 
@@ -233,13 +249,18 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
     }
     ImagingSectionLeave(&cookie);
 
-    return imIn->bands;
+    return 0;
 }
 
 #undef SPLIT_STEP
 #undef SPLIT_LOAD
 #undef SPLIT_STORE
 
+/**
+ * Insert single-band imIn into `band` of imOut, in place.
+ *
+ * Contract: imIn and imOut MUST be distinct images and not alias each other.
+ */
 Imaging
 ImagingPutBand(Imaging imOut, Imaging imIn, int band) {
     int x, y;
@@ -289,6 +310,9 @@ ImagingPutBand(Imaging imOut, Imaging imIn, int band) {
     return imOut;
 }
 
+/**
+ * Fill a single band of imOut with a constant colour, in place.
+ */
 Imaging
 ImagingFillBand(Imaging imOut, int band, int color) {
     int x, y;
@@ -326,10 +350,15 @@ ImagingFillBand(Imaging imOut, int band, int color) {
     return imOut;
 }
 
+/**
+ * Merge the caller-supplied bands[] into a newly allocated multi-band image.
+ *
+ * Contract: the bands[] inputs are read-only, and the output is newly allocated.
+ */
 Imaging
 ImagingMerge(const ModeID mode, Imaging bands[4]) {
     int i, x, y;
-    int bandsCount = 0;
+    int bandsCount;
     Imaging imOut;
     Imaging firstBand;
 
@@ -338,11 +367,13 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
         return (Imaging)ImagingError_ValueError("wrong number of bands");
     }
 
-    for (i = 0; i < 4; ++i) {
-        if (!bands[i]) {
+    for (bandsCount = 0; bandsCount < 4; ++bandsCount) {
+        if (!bands[bandsCount]) {
             break;
         }
-        if (bands[i]->bands != 1) {
+    }
+    for (i = 0; i < bandsCount; ++i) {
+        if (bands[i]->bands != 1 || (bandsCount != 1 && bands[i]->pixelsize == 4)) {
             return (Imaging)ImagingError_ModeError();
         }
         if (bands[i]->xsize != firstBand->xsize ||
@@ -350,7 +381,6 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             return (Imaging)ImagingError_Mismatch();
         }
     }
-    bandsCount = i;
 
     imOut = ImagingNewDirty(mode, firstBand->xsize, firstBand->ysize);
     if (!imOut) {
@@ -362,7 +392,7 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
         return (Imaging)ImagingError_ValueError("wrong number of bands");
     }
 
-    if (imOut->bands == 1) {
+    if (bandsCount == 1) {
         return ImagingCopy2(imOut, firstBand);
     }
 

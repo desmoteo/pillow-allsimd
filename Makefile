@@ -64,7 +64,12 @@ install:
 
 .PHONY: install-coverage
 install-coverage:
-	CFLAGS="-coverage -Werror=implicit-function-declaration $(OPTIMIZE)" python3 -m pip -v install . $(if $(SIMD),-C simd=$(SIMD))
+	CFLAGS="-coverage -Werror=implicit-function-declaration $(OPTIMIZE)" python3 -m pip -v install .[tests] $(if $(SIMD),-C simd=$(SIMD))
+	python3 selftest.py
+
+.PHONY: install-tsan
+install-tsan:
+	CFLAGS="-g -O2 -fsanitize=thread" python3 -m pip -v install .[tests] $(if $(SIMD),-C simd=$(SIMD))
 	python3 selftest.py
 
 .PHONY: debug
@@ -100,8 +105,7 @@ test:
 .PHONY: test-p
 test-p:
 	python3 -c "import xdist" > /dev/null 2>&1 || python3 -m pip install pytest-xdist
-	python3 -m pytest -qq -n auto
-
+	python3 -m pytest -qq --numprocesses=logical --dist=worksteal
 
 .PHONY: valgrind
 valgrind:
@@ -116,7 +120,7 @@ valgrind-leak:
 	PILLOW_VALGRIND_TEST=true PYTHONMALLOC=malloc valgrind --suppressions=Tests/oss-fuzz/python.supp \
 	    --leak-check=full --show-leak-kinds=definite --errors-for-leak-kinds=definite \
             --log-file=/tmp/valgrind-output \
-            python3 -m pytest -vv --valgrind --valgrind-log=/tmp/valgrind-output
+            python3 -m pytest -vv --valgrind --valgrind-log=/tmp/valgrind-output $(PYTEST_ARGS)
 
 .PHONY: readme
 readme:

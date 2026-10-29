@@ -3,9 +3,7 @@ from __future__ import annotations
 import os
 import re
 import struct
-from collections.abc import Generator
 from io import BytesIO
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -27,13 +25,18 @@ from .helper import (
     skip_unless_feature_version,
 )
 
+TYPE_CHECKING = False
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
+
 EXTRA_DIR = "Tests/images/jpeg2000"
 
 pytestmark = skip_unless_feature("jpg_2000")
 
 
 @pytest.fixture
-def card() -> Generator[ImageFile.ImageFile, None, None]:
+def card() -> Generator[ImageFile.ImageFile]:
     with Image.open("Tests/images/test-card.png") as im:
         im.load()
     try:
@@ -229,6 +232,19 @@ def test_header_errors() -> None:
             pass
 
 
+@pytest.mark.parametrize("tbox", (b"", b"jp2h"))
+def test_oversized_box_length(tbox: bytes) -> None:
+    # Do not raise an OverflowError() when seeking to the end of a box,
+    # or when reading the contents of a box
+    data = (
+        b"\x00\x00\x00\x0cjP  \x0d\x0a\x87\x0a"  # JP2 signature box
+        + struct.pack(">I4s", 1, tbox)  # box with 64-bit length
+        + struct.pack(">Q", 2**63 - 12)  # oversized length
+    )
+    with pytest.raises(SyntaxError, match="Box length too large"):
+        Jpeg2KImagePlugin.Jpeg2KImageFile(BytesIO(data))
+
+
 def test_layers_type(card: ImageFile.ImageFile, tmp_path: Path) -> None:
     outfile = tmp_path / "temp_layers.jp2"
     for quality_layers in [[100, 50, 10], (100, 50, 10), None]:
@@ -342,6 +358,16 @@ def test_grayscale_four_channels() -> None:
     with Image.open(BytesIO(data)) as im:
         im.load()
         assert im.mode == "RGBA"
+
+
+def test_five_channels() -> None:
+    with open("Tests/images/rgb_trns_ycbc.jp2", "rb") as fp:
+        data = fp.read()
+
+    data = data[:126] + b"\x05" + data[127:]
+
+    with pytest.raises(SyntaxError, match="unable to determine J2K image mode"):
+        Jpeg2KImagePlugin.Jpeg2KImageFile(BytesIO(data))
 
 
 @pytest.mark.skipif(

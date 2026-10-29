@@ -136,11 +136,14 @@ ImagingExpand(Imaging imIn, int margin) {
     }
 
     ImagingSectionEnter(&cookie);
+    MUTEX_LOCK(&imIn->mutex);
+
     if (imIn->image8) {
         EXPAND(UINT8, image8);
     } else {
         EXPAND(INT32, image32);
     }
+    MUTEX_UNLOCK(&imIn->mutex);
     ImagingSectionLeave(&cookie);
 
     ImagingCopyPalette(imOut, imIn);
@@ -162,6 +165,11 @@ kernel_i16(int size, UINT8 *in0, int x, const float *kernel, int bigendian) {
     return result;
 }
 
+/**
+ * Convolve `im` with a 3x3 kernel, writing the result to imOut.
+ *
+ * Contract: imOut and im *MUST* be distinct images.
+ */
 static void
 ImagingFilter3x3(Imaging imOut, Imaging im, const float *kernel, float offset) {
 #define KERNEL1x3(in0, x, kernel, d)                                     \
@@ -196,7 +204,7 @@ ImagingFilter3x3(Imaging imOut, Imaging im, const float *kernel, float offset) {
                 }
                 out[x] = in0[x];
             }
-        } else if (im->type == IMAGING_TYPE_SPECIAL) {
+        } else if (im->type == IMAGING_TYPE_I16) {
             int bigendian = 0;
             if (
                 im->mode == IMAGING_MODE_I_16B
@@ -316,6 +324,11 @@ ImagingFilter3x3(Imaging imOut, Imaging im, const float *kernel, float offset) {
     memcpy(imOut->image[y], im->image[y], im->linesize);
 }
 
+/**
+ * Convolve `im` with a 5x5 kernel, writing the result to imOut.
+ *
+ * Contract: imOut and im *MUST* be distinct images.
+ */
 static void
 ImagingFilter5x5(Imaging imOut, Imaging im, const float *kernel, float offset) {
 #define KERNEL1x5(in0, x, kernel, d)                                             \
@@ -359,7 +372,7 @@ ImagingFilter5x5(Imaging imOut, Imaging im, const float *kernel, float offset) {
                 out[x + 0] = in0[x + 0];
                 out[x + 1] = in0[x + 1];
             }
-        } else if (im->type == IMAGING_TYPE_SPECIAL) {
+        } else if (im->type == IMAGING_TYPE_I16) {
             int bigendian = 0;
             if (
                 im->mode == IMAGING_MODE_I_16B
@@ -610,8 +623,7 @@ ImagingFilter(Imaging im, int xsize, int ysize, const FLOAT32 *kernel, FLOAT32 o
     Imaging imOut;
     ImagingSectionCookie cookie;
 
-    if (im->type == IMAGING_TYPE_FLOAT32 ||
-        (im->type == IMAGING_TYPE_SPECIAL && im->bands != 1)) {
+    if (im->type == IMAGING_TYPE_FLOAT32) {
         return (Imaging)ImagingError_ModeError();
     }
 
@@ -629,6 +641,8 @@ ImagingFilter(Imaging im, int xsize, int ysize, const FLOAT32 *kernel, FLOAT32 o
     }
 
     ImagingSectionEnter(&cookie);
+    MUTEX_LOCK(&im->mutex);
+
     int done = 0;
 #if defined(FILTER_SIMD)
     if (im->type == IMAGING_TYPE_UINT8) {
@@ -642,6 +656,7 @@ ImagingFilter(Imaging im, int xsize, int ysize, const FLOAT32 *kernel, FLOAT32 o
             ImagingFilter5x5(imOut, im, kernel, offset);
         }
     }
+    MUTEX_UNLOCK(&im->mutex);
     ImagingSectionLeave(&cookie);
     return imOut;
 }
