@@ -102,7 +102,7 @@ The x86 SIMD unpremultiply (RGBa → RGBA), inherited from upstream pillow-simd,
 **Cost.** AVX2 1.75 → 2.84 ms and SSE4 2.0 → 5.2 ms at 2560×1600; Pillow takes 33 ms. RGBA resize, rotate and perspective change by 1–2%.
 
 
-## Progress (2026-10-29)
+## Progress (2026-10-30)
 
 Done since this profile, with output unchanged (1280×800 unless noted, ms before / AVX2):
 
@@ -117,13 +117,29 @@ Done since this profile, with output unchanged (1280×800 unless noted, ms befor
 | 5. Masked fills (text, `bitmap()`) | `b63f28373` | `ImagingFill2` 154M → 15M instructions; text 93.9 → 88.1 |
 | 4. `floodfill` in C | `b8d1e31d3` | 86.3 → 1.39 |
 | 12. RGB ↔ YCbCr without tables | `ed826e396` | at 2560×1600: to YCbCr 11.65 → 7.45, to RGB 14.06 → 4.50 |
+| 5. Glyph cache per font | `6b5f11c54` | text 87.8 → 14.9, stroked text 85.6 → 5.0, `textbbox` 20.1 → 9.7 |
+| 3. Palette mapping: vector nearest-entry search and a colour cache | `47bf12020` | adaptive 448 → 257, median cut 165 → 132, max coverage 156 → 113 |
+| 14. Transposes and 90° rotations in register blocks, whole output lines | `fffd060cb` | L 0.86 → 0.27, RGB 1.0 → 0.68–0.73 |
+| 14. Flips and rotate 180 by vector row reversal | `4f427ace9` | RGB 0.55 → 0.39 (as fast as a row `memcpy`), L 0.53 → 0.05 |
+| 13. F, I and I;16 resampling in vectors of doubles | `661d7066e` | F 1/4 bicubic 3.12 → 1.17, I;16 1/4 bicubic 7.12 → 1.29, I;16 ×1.5 lanczos 39.8 → 7.3 |
+| 7. Arc clipping in fixed arrays, no allocations | `71cf7eccb` | pie slices 5.25 → 4.28, arcs 5.82 → 4.52, rounded rectangles 5.87 → 4.67 |
+| 16. `tobytes()` in one chunk; byte-order shuffles | `fce8b2be9` | `tobytes` RGB 0.63 → 0.33, BMP decode 1.24 → 1.06 |
+| 9. `alpha_composite` with an offset, in place | `17162edb3` | 1.94 → 0.86 |
 
 On x86, a vector 256-entry byte table (`pshufb`) was measured slower than the scalar lookup, which runs at 0.56 cycles per byte. So item 8 recognises the tables instead of vectorising the lookup.
 
+On the Jetson (NEON, GCC 14) the same changes give: adaptive palette 2.4x, L transposes 6x and RGB 1.4x, flips 1.4x (L 5.5x), F/I;16 resampling 1.4–2.1x, arcs 1.4–1.6x, `alpha_composite` with an offset 2.4x, `tobytes` 2.2x.
+
+Notes:
+- Item 3: in median cut the scalar search from the pixel's box entry stays: it starts next to the answer, and a full vector scan was slower with many colours. The vector scan is used from entry 0 (max coverage).
+- Item 7: allocations were not the main cost. With them gone, the clipping arithmetic and the list merges remain.
+- Item 16: the BGR and 4-byte reordering (un)packers were already vectorised by GCC in the x86 SIMD builds, and by GCC 14 on arm64; the explicit shuffles add little there.
+- Item 17 not done: a dirty allocation is only safe where every byte of every pixel is written. With a truncated file and `LOAD_TRUNCATED_IMAGES`, the rest of a decoder's image would be uninitialised memory rather than black, and band-only raw modes (such as `"R"` into RGB) leave the other bytes as they were.
+- Upstream bug found, not changed here: resizing `I;16B` and `I;16N` reads their bytes in the wrong order on little-endian machines (the `bigendian` test in `Resample.c`), so neighbouring values that differ in the high byte are blended wrongly. The 13.0 and 12.3 wheels do the same.
+
 Open:
 - zlib-ng (item 2): not installed here, and building it from source was not done.
-- The glyph cache (item 5).
-- Items 3, 7, 9 (fused `alpha_composite`), 11, 13–19.
+- Items 11, 15, 17–19.
 
 ## Recommendations
 

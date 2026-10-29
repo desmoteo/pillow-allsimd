@@ -247,7 +247,7 @@ done
 
 if [ "$COMPARE" = 1 ] && [ "${#BUILT[@]}" -gt 1 ]; then
     log "comparing the outputs of ${BUILT[*]} (baseline ${BUILT[0]})"
-    ARGS=(--baseline "${BUILT[0]}" --set all --rounds 1 --size 67x23 --check)
+    ARGS=(--baseline "${BUILT[0]}" --set full --rounds 1 --size 67x23 --check)
     for name in "${BUILT[@]}"; do ARGS+=(--variant "$name=$name"); done
     renv "python3 -I simd_bench.py$(printf ' %q' "${ARGS[@]}")" > "$DEST/compare.txt" 2>&1 \
         || log "warning: the comparison did not run (see $DEST/compare.txt)"
