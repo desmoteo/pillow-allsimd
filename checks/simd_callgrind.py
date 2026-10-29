@@ -35,6 +35,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from typing import Any
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
@@ -89,13 +90,15 @@ def run(
 ) -> tuple[str, str, int]:
     d = os.path.join(args.out, name)
     os.makedirs(d, exist_ok=True)
+    if args.resume and totals(args.out, name, op):
+        return name, op, 0
     # Dumps of an earlier run would be read as this run's results.
     for old in glob.glob(os.path.join(d, slug(op) + ".*")):
         if not old.endswith(".log"):
             os.remove(old)
     cmd = [
         "valgrind", "--tool=callgrind", "--instr-atstart=no", "--collect-atstart=no",
-        "--cache-sim=yes", "--branch-sim=yes",
+        "--cache-sim=yes", "--branch-sim=yes", *args.vg_arg,
         f"--callgrind-out-file={d}/{slug(op)}.%p",
         sys.executable, "-I", os.path.abspath(__file__),
         "--worker", path, "--op", op, "--control", control, "--size", args.size,
@@ -121,6 +124,61 @@ def totals(out: str, name: str, op: str) -> dict[str, int] | None:
     return None
 
 
+def functions(out: str, name: str, op: str, top: int) -> list[dict[str, Any]]:
+    """The most expensive functions of a dump by their own (exclusive) cost."""
+    files = glob.glob(os.path.join(out, name, slug(op) + ".*.1"))
+    if not files:
+        return []
+    cmd = ["callgrind_annotate", "--inclusive=no", "--threshold=100",
+           "--show-percs=no", "--auto=no", files[0]]  # fmt: skip
+    text = subprocess.run(cmd, capture_output=True, text=True).stdout
+    events: list[str] = []
+    rows: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        if line.startswith("Events shown:"):
+            events = line.split()[2:]
+            continue
+        parts = line.split()
+        if not events or len(parts) <= len(events) or "PROGRAM" in line:
+            continue
+        values = parts[: len(events)]
+        if not all(re.fullmatch(r"[\d,]+|\.", v) for v in values):
+            continue
+        costs = {e: int(v.replace(",", "")) if v != "." else 0
+                 for e, v in zip(events, values)}  # fmt: skip
+        fn = " ".join(parts[len(events) :])
+        obj = re.search(r" \[(.*)\]$", fn)
+        rows.append(
+            {
+                "function": re.sub(r" \[.*\]$", "", fn),
+                "object": os.path.basename(obj.group(1)) if obj else "",
+                **costs,
+            }
+        )
+        if len(rows) == top:
+            break
+    return rows
+
+
+def derived(t: dict[str, int], pixels: int) -> dict[str, float]:
+    """Per-pixel and per-1000-instruction rates of one dump's totals."""
+    ir = max(t["Ir"], 1)
+    d1 = t["D1mr"] + t["D1mw"]
+    ll = t["DLmr"] + t["DLmw"] + t["ILmr"]
+    bm = t["Bcm"] + t["Bim"]
+    return {
+        "Ir/px": t["Ir"] / pixels,
+        "mem/Ir": (t["Dr"] + t["Dw"]) / ir,
+        "Bc/kIr": 1000 * t["Bc"] / ir,
+        "Bcm%": 100 * t["Bcm"] / max(t["Bc"], 1),
+        "Bim%": 100 * t["Bim"] / max(t["Bi"], 1),
+        "D1m/kIr": 1000 * d1 / ir,
+        "LLm/kIr": 1000 * ll / ir,
+        # KCachegrind's cycle estimate: Ir + 10 Bm + 10 L1m + 100 LLm.
+        "CEst/px": (t["Ir"] + 10 * (bm + d1 + t["I1mr"]) + 100 * ll) / pixels,
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -131,6 +189,18 @@ def main() -> None:
     ap.add_argument("--set", default="simd", help="operation set of simd_bench.py")
     ap.add_argument("--out", default="callgrind-out")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
+    ap.add_argument(
+        "--vg-arg",
+        action="append",
+        default=[],
+        help="extra valgrind argument, e.g. --vg-arg=--D1=49152,12,64",
+    )
+    ap.add_argument(
+        "--top", type=int, default=8, help="functions to keep per dump (default 8)"
+    )
+    ap.add_argument(
+        "--resume", action="store_true", help="keep the dumps of an earlier run"
+    )
     ap.add_argument("--worker", help=argparse.SUPPRESS)
     ap.add_argument("--op", help=argparse.SUPPRESS)
     ap.add_argument("--control", help=argparse.SUPPRESS)
@@ -167,7 +237,16 @@ def main() -> None:
             )
 
     names = [n for n, _ in variants]
-    results = {o: {n: totals(args.out, n, o) for n in names} for o in ops}
+    results: dict[str, dict[str, Any]] = {}
+    for o in ops:
+        results[o] = {}
+        for n in names:
+            t = totals(args.out, n, o)
+            results[o][n] = t and {
+                **t,
+                "derived": derived(t, w * h),
+                "functions": functions(args.out, n, o, args.top),
+            }
     with open(os.path.join(args.out, "totals.json"), "w") as fh:
         json.dump(results, fh, indent=1)
 
@@ -180,17 +259,25 @@ def main() -> None:
             row.append(t["Ir"] / 1e6 if t else float("nan"))
         print(f"{o:30s}" + "".join(f"{v:12.1f}" for v in row))
 
-    print("\nMisses and mispredicts (millions)")
-    header = ("variant", "D1 miss", "LL miss", "branch mp")
-    print(f"{'operation':30s}" + "".join(f"{h:>11s}" for h in header))
+    print("\nRates (see derived() for the definitions)")
+    keys = ("Ir/px", "Bc/kIr", "Bcm%", "D1m/kIr", "LLm/kIr", "CEst/px")
+    print(f"{'operation':30s}{'variant':>10s}" + "".join(f"{k:>9s}" for k in keys))
     for o in ops:
         for n in names:
             t = results[o][n]
             if t:
-                d1 = (t["D1mr"] + t["D1mw"]) / 1e6
-                ll = (t["DLmr"] + t["DLmw"]) / 1e6
-                mp = (t["Bcm"] + t["Bim"]) / 1e6
-                print(f"{o:30s}{n:>11s}{d1:11.2f}{ll:11.2f}{mp:11.2f}")
+                d = t["derived"]
+                print(f"{o:30s}{n:>10s}" + "".join(f"{d[k]:9.1f}" for k in keys))
+
+    print("\nMost expensive function (share of instructions, of mispredicts)")
+    for o in ops:
+        for n in names:
+            t = results[o][n]
+            if t and t["functions"]:
+                f = t["functions"][0]
+                ir = 100 * f["Ir"] / max(t["Ir"], 1)
+                bm = 100 * (f["Bcm"] + f["Bim"]) / max(t["Bcm"] + t["Bim"], 1)
+                print(f"{o:30s}{n:>10s}  {ir:5.1f}% {bm:5.1f}%  {f['function']}")
 
 
 if __name__ == "__main__":

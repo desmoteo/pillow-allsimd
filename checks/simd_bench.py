@@ -201,10 +201,345 @@ def extra_operations(
     return ops
 
 
+def api_operations(
+    Image: Any, ImageChops: Any, ImageFilter: Any, w: int, h: int
+) -> dict[str, Callable[[], Any]]:
+    """The rest of the public API: drawing, text, ImageOps, ImageEnhance,
+    ImageMath, ImageMorph, ImageStat, other Image methods and the codecs.
+    Shapes and text use fixed counts with coordinates scaled to the image,
+    so their cost doesn't grow with the pixel count."""
+    import importlib
+    import io
+    import random
+
+    def mod(name: str) -> Any:
+        # The PIL that import_pil() put first on the path.
+        return importlib.import_module("PIL." + name)
+
+    ImageDraw, ImageFont, ImageOps = mod("ImageDraw"), mod("ImageFont"), mod("ImageOps")
+    ImageEnhance, ImageMath, ImageMorph = (
+        mod("ImageEnhance"),
+        mod("ImageMath"),
+        mod("ImageMorph"),
+    )
+    ImageStat, features = mod("ImageStat"), mod("features")
+    rnd = random.Random(SEED)
+    rgb = Image.frombytes("RGB", (w, h), rnd.randbytes(w * h * 3))
+    rgb2 = Image.frombytes("RGB", (w, h), rnd.randbytes(w * h * 3))
+    L = Image.frombytes("L", (w, h), rnd.randbytes(w * h))
+    L2 = Image.frombytes("L", (w, h), rnd.randbytes(w * h))
+    rgba = rgb.convert("RGBA")
+    rgba.putalpha(L)
+    R, T = Image.Resampling, Image.Transform
+    # Smooth areas with a little noise, closer to a photo than noise is:
+    # the codecs and palette code behave very differently on noise.
+    small = (max(1, w // 16), max(1, h // 16))
+    photo = rgb.resize(small, R.BOX).resize((w, h), R.BICUBIC)
+    photo = ImageChops.add(photo, rgb.point(lambda v: v // 32), offset=-4)
+    photo_L = photo.convert("L")
+    photo_P = photo.quantize(256)
+    binary = L.point(lambda v: 255 if v > 200 else 0)
+    font = ImageFont.load_default(max(8, h // 30))
+    sx, sy = w / 1000, h / 1000
+
+    def pts(n: int, k: int) -> list[list[tuple[float, float]]]:
+        return [
+            [(rnd.uniform(0, w), rnd.uniform(0, h)) for _ in range(k)] for _ in range(n)
+        ]
+
+    def boxes(n: int, size: float) -> list[tuple[float, float, float, float]]:
+        out = []
+        for _ in range(n):
+            x, y = rnd.uniform(0, w), rnd.uniform(0, h)
+            bw, bh = rnd.uniform(4, size * sx), rnd.uniform(4, size * sy)
+            out.append((x, y, x + bw, y + bh))
+        return out
+
+    lines2, lines_w, polys = pts(2000, 2), pts(500, 2), pts(300, 8)
+    rects, ellipses, arcs = boxes(1000, 200), boxes(500, 200), boxes(300, 200)
+    points = [(rnd.randrange(w), rnd.randrange(h)) for _ in range(100000)]
+    text_pos = [(rnd.uniform(0, w * 0.6), rnd.uniform(0, h)) for _ in range(100)]
+    words = "The quick brown fox jumps over the lazy dog 0123456789"
+
+    def draw(mode: str, fn: Callable[[Any], None], im_mode: str = "RGB") -> Any:
+        def run() -> Any:
+            im = Image.new(im_mode, (w, h), (20, 40, 60, 255)[: len(im_mode)])
+            fn(ImageDraw.Draw(im, mode or None))
+            return im
+
+        return run
+
+    def lines(d: Any) -> None:
+        for p in lines2:
+            d.line(p, fill=(255, 128, 0))
+
+    def wide_lines(d: Any) -> None:
+        for p in lines_w:
+            d.line(p, fill=(255, 128, 0), width=5)
+
+    def rectangles(d: Any) -> None:
+        for b in rects:
+            d.rectangle(b, fill=(0, 200, 100))
+
+    def rect_outlines(d: Any) -> None:
+        for b in rects:
+            d.rectangle(b, outline=(0, 200, 100), width=3)
+
+    def ellipses_fill(d: Any) -> None:
+        for b in ellipses:
+            d.ellipse(b, fill=(200, 0, 100))
+
+    def ellipse_outlines(d: Any) -> None:
+        for b in ellipses:
+            d.ellipse(b, outline=(200, 0, 100), width=4)
+
+    def polygons(d: Any) -> None:
+        for p in polys:
+            d.polygon(p, fill=(90, 90, 250))
+
+    def pieslices(d: Any) -> None:
+        for i, b in enumerate(arcs):
+            d.pieslice(b, i % 360, (i * 7) % 360 + 30, fill=(250, 250, 0))
+
+    def arcs_w(d: Any) -> None:
+        for i, b in enumerate(arcs):
+            d.arc(b, i % 360, (i * 7) % 360 + 30, fill=(250, 250, 0), width=3)
+
+    def rounded(d: Any) -> None:
+        for b in arcs:
+            d.rounded_rectangle(b, radius=12, fill=(10, 220, 220))
+
+    def point_cloud(d: Any) -> None:
+        d.point(points, fill=(255, 255, 255))
+
+    def text(d: Any) -> None:
+        for p in text_pos:
+            d.text(p, words, fill=(255, 255, 255), font=font)
+
+    def text_stroke(d: Any) -> None:
+        for p in text_pos[:30]:
+            d.text(p, words, fill=(255, 255, 255), font=font, stroke_width=2)
+
+    def blend_ellipses(d: Any) -> None:
+        for b in ellipses:
+            d.ellipse(b, fill=(200, 0, 100, 128))
+
+    def floodfill() -> Any:
+        im = Image.new("RGB", (w, h), (0, 0, 0))
+        d = ImageDraw.Draw(im)
+        d.rectangle((0, 0, w // 4, h // 4), outline=(255, 255, 255))
+        ImageDraw.floodfill(im, (w // 8, h // 8), (255, 0, 0))
+        return im
+
+    def textbbox() -> list[int]:
+        d = ImageDraw.Draw(Image.new("L", (1, 1)))
+        return [int(v) for p in text_pos for v in d.textbbox(p, words, font=font)]
+
+    def pixel_access() -> list[int]:
+        px = rgb.load()
+        return [px[x, y][0] for x, y in points[:20000]]
+
+    def stat() -> list[int]:
+        s = ImageStat.Stat(rgb)
+        return [int(v * 1000) for v in s.mean + s.stddev + s.median]
+
+    def encode(im: Any, fmt: str, **kw: Any) -> Callable[[], bytes]:
+        def run() -> bytes:
+            buf = io.BytesIO()
+            im.save(buf, fmt, **kw)
+            return buf.getvalue()
+
+        return run
+
+    def decode(make: Callable[[], bytes], **kw: Any) -> Callable[[], Any]:
+        # Encoded on the first call, which every harness makes untimed.
+        data: list[bytes] = []
+
+        def run() -> Any:
+            if not data:
+                data.append(make())
+            with Image.open(io.BytesIO(data[0])) as im:
+                if kw:
+                    im.draft(*kw["draft"])
+                im.load()
+                return im.copy()
+
+        return run
+
+    morph = ImageMorph.MorphOp(op_name="dilation8")
+    matrix = (0.3, 0.5, 0.2, 0)
+    tone = ImageOps.colorize
+    quad = (0, 0, 0, h, w, h * 0.9, w * 0.95, 0)
+    qw, qh = w // 4, h // 4
+    mesh = [
+        ((x, y, x + qw, y + qh), (x + 3, y, x, y + qh, x + qw, y + qh - 3, x + qw, y))
+        for x in range(0, w - qw + 1, qw)
+        for y in range(0, h - qh + 1, qh)
+    ]
+    chops_rgb = {
+        n: getattr(ImageChops, n)
+        for n in (
+            "subtract",
+            "add_modulo",
+            "subtract_modulo",
+            "darker",
+            "soft_light",
+            "hard_light",
+            "overlay",
+        )
+    }
+    ops: dict[str, Callable[[], Any]] = {
+        "draw lines 1px": draw("", lines),
+        "draw lines width 5": draw("", wide_lines),
+        "draw rectangles filled": draw("", rectangles),
+        "draw rectangles outline 3": draw("", rect_outlines),
+        "draw ellipses filled": draw("", ellipses_fill),
+        "draw ellipses outline 4": draw("", ellipse_outlines),
+        "draw polygons filled": draw("", polygons),
+        "draw pieslices": draw("", pieslices),
+        "draw arcs width 3": draw("", arcs_w),
+        "draw rounded rectangles": draw("", rounded),
+        "draw points 100k": draw("", point_cloud),
+        "draw text 100 lines": draw("", text),
+        "draw text stroke 30 lines": draw("", text_stroke),
+        "draw ellipses RGBA blend": draw("RGBA", blend_ellipses, "RGBA"),
+        "draw floodfill 1/16 area": floodfill,
+        "font textbbox 100": textbbox,
+        "ImageOps grayscale": lambda: ImageOps.grayscale(rgb),
+        "ImageOps invert": lambda: ImageOps.invert(rgb),
+        "ImageOps mirror": lambda: ImageOps.mirror(rgb),
+        "ImageOps posterize 3": lambda: ImageOps.posterize(rgb, 3),
+        "ImageOps solarize": lambda: ImageOps.solarize(rgb, 128),
+        "ImageOps colorize L": lambda: tone(L, (0, 0, 80), (255, 240, 200)),
+        "ImageOps fit 1/2": lambda: ImageOps.fit(rgb, (w // 2, h // 3)),
+        "ImageOps pad": lambda: ImageOps.pad(rgb, (w, w)),
+        "ImageOps contain 1/3": lambda: ImageOps.contain(rgb, (w // 3, h // 3)),
+        "ImageOps scale 0.6": lambda: ImageOps.scale(rgb, 0.6),
+        "ImageEnhance color": lambda: ImageEnhance.Color(rgb).enhance(1.4),
+        "ImageEnhance contrast": lambda: ImageEnhance.Contrast(rgb).enhance(1.4),
+        "ImageEnhance brightness": lambda: ImageEnhance.Brightness(rgb).enhance(1.4),
+        "ImageEnhance sharpness": lambda: ImageEnhance.Sharpness(rgb).enhance(2.0),
+        "ImageMath lambda_eval L": lambda: ImageMath.lambda_eval(
+            lambda a: a["convert"](a["a"] * 2 + a["b"] - 100, "L"), a=L, b=L2
+        ),
+        "ImageMorph dilation8": lambda: morph.apply(binary)[1],
+        "ImageStat mean stddev median": stat,
+        "crop + copy": lambda: rgb.crop((w // 8, h // 8, w * 7 // 8, h * 7 // 8)),
+        "paste RGB no mask": lambda: (lambda o: (o.paste(rgb2, (5, 5)), o)[1])(
+            rgb.copy()
+        ),
+        "point L function": lambda: L.point(lambda v: v * 0.7 + 20),
+        "point I scale offset": lambda: L.convert("I").point(lambda v: v * 3 + 7),
+        "convert RGB->L matrix": lambda: rgb.convert("L", matrix),
+        "convert RGB->P web dither": lambda: photo.convert("P"),
+        "convert RGB->1 dither": lambda: photo.convert("1"),
+        "convert L->I": lambda: L.convert("I"),
+        "convert I->L": lambda: L.convert("I").convert("L"),
+        "convert L->I;16": lambda: L.convert("I;16"),
+        "convert P->RGBA": lambda: photo_P.convert("RGBA"),
+        "quantize mediancut": lambda: photo.quantize(256, Image.Quantize.MEDIANCUT),
+        "quantize maxcoverage": lambda: photo.quantize(256, Image.Quantize.MAXCOVERAGE),
+        "getcolors palette image": lambda: [
+            c for n, c in photo_P.getcolors(256) or [] for c in (n, c)
+        ],
+        "getbbox RGBA": lambda: list(rgba.getbbox() or ()),
+        "entropy RGB": lambda: [int(rgb.entropy() * 1e6)],
+        "histogram L masked": lambda: L.histogram(binary),
+        "effect_spread 5": lambda: L.effect_spread(5),
+        "linear_gradient": lambda: Image.linear_gradient("L"),
+        "radial_gradient": lambda: Image.radial_gradient("L"),
+        "rotate RGBA 45 expand bicubic": lambda: rgba.rotate(
+            45, R.BICUBIC, expand=True
+        ),
+        "transform RGB quad bilinear": lambda: rgb.transform(
+            (w, h), T.QUAD, quad, R.BILINEAR
+        ),
+        "transform RGB mesh bilinear": lambda: rgb.transform(
+            (w, h), T.MESH, mesh, R.BILINEAR
+        ),
+        "transform RGB extent bicubic": lambda: rgb.transform(
+            (w // 2, h // 2), T.EXTENT, (10, 10, w - 10, h - 10), R.BICUBIC
+        ),
+        "resize RGB x1.5 nearest": lambda: rgb.resize((w * 3 // 2, h * 3 // 2), 0),
+        "resize RGB 1/3 box": lambda: rgb.resize((w // 3, h // 3), R.BOX),
+        "resize RGB 1/2 hamming": lambda: rgb.resize((w // 2, h // 2), R.HAMMING),
+        "resize RGB 1/2 bilinear": lambda: rgb.resize((w // 2, h // 2), R.BILINEAR),
+        "transpose RGB TRANSVERSE": lambda: rgb.transpose(Image.Transpose.TRANSVERSE),
+        "transpose L ROTATE_90": lambda: L.transpose(Image.Transpose.ROTATE_90),
+        "transpose RGB FLIP_TB": lambda: rgb.transpose(Image.Transpose.FLIP_TOP_BOTTOM),
+        "alpha_composite dest offset": lambda: (
+            lambda o: (o.alpha_composite(rgba, (w // 4, h // 4)), o)[1]
+        )(rgba.copy()),
+        "blend RGBA": lambda: Image.blend(rgba, rgba.transpose(0), 0.3),
+        "composite RGBA mask": lambda: Image.composite(rgba, rgb2.convert("RGBA"), L),
+        "getchannel": lambda: rgb.getchannel(1),
+        "merge RGBA": lambda: Image.merge("RGBA", rgba.split()),
+        "tobytes RGBA BGRA": lambda: rgba.tobytes("raw", "BGRA"),
+        "frombytes RGB BGR": lambda: Image.frombytes(
+            "RGB", (w, h), rgb.tobytes(), "raw", "BGR"
+        ),
+        "pixel access 20k": pixel_access,
+        "get_flattened_data L": lambda: list(L.get_flattened_data())[:: w + 1],
+        "chops invert": lambda: ImageChops.invert(rgb),
+        "chops logical_and 1": lambda: ImageChops.logical_and(
+            binary.convert("1"), L2.convert("1")
+        ),
+        "filter RGB BLUR": lambda: rgb.filter(ImageFilter.BLUR),
+        "filter RGB DETAIL": lambda: rgb.filter(ImageFilter.DETAIL),
+        "filter RGB EMBOSS": lambda: rgb.filter(ImageFilter.EMBOSS),
+        "filter RGB SMOOTH": lambda: rgb.filter(ImageFilter.SMOOTH),
+        "median 5 L": lambda: L.filter(ImageFilter.MedianFilter(5)),
+        "median 3 RGB": lambda: rgb.filter(ImageFilter.MedianFilter(3)),
+        "min 5 L": lambda: L.filter(ImageFilter.MinFilter(5)),
+        "rank 7 L": lambda: L.filter(ImageFilter.RankFilter(7, 20)),
+        "gaussian RGB r=20": lambda: rgb.filter(ImageFilter.GaussianBlur(20)),
+        "gaussian RGB r=0.6": lambda: rgb.filter(ImageFilter.GaussianBlur(0.6)),
+        "box RGB r=(10, 1)": lambda: rgb.filter(ImageFilter.BoxBlur((10, 1))),
+        "unsharp L": lambda: L.filter(ImageFilter.UnsharpMask(2, 150, 3)),
+    }
+    for n, f in chops_rgb.items():
+        ops[f"chops {n}"] = (lambda f: lambda: f(rgb, rgb2))(f)
+    if features.check("libimagequant"):
+        ops["quantize libimagequant"] = lambda: photo.quantize(
+            256, Image.Quantize.LIBIMAGEQUANT
+        )
+    codecs = {
+        "PNG": ("zlib", {}),
+        "PNG level 1": ("zlib", {"compress_level": 1}),
+        "JPEG q85": ("jpg", {"quality": 85}),
+        "WEBP q80": ("webp", {"quality": 80}),
+        "TIFF raw": ("libtiff", {}),
+        "TIFF LZW": ("libtiff", {"compression": "tiff_lzw"}),
+        "TIFF deflate": ("libtiff", {"compression": "tiff_adobe_deflate"}),
+        "BMP": (None, {}),
+        "PPM": (None, {}),
+    }
+    for name, (feature, kw) in codecs.items():
+        if feature and not features.check(feature):
+            continue
+        fmt = name.split()[0]
+        ops[f"encode {name} RGB"] = encode(photo, fmt, **kw)
+        ops[f"decode {name} RGB"] = decode(encode(photo, fmt, **kw))
+    if features.check("zlib"):
+        ops["encode PNG RGBA"] = encode(photo.convert("RGBA"), "PNG")
+        ops["decode PNG RGBA"] = decode(encode(photo.convert("RGBA"), "PNG"))
+        ops["encode PNG P"] = encode(photo_P, "PNG")
+        ops["encode PNG L"] = encode(photo_L, "PNG")
+    if features.check("jpg"):
+        jpeg = encode(photo, "JPEG", quality=85)
+        ops["decode JPEG RGB draft 1/4"] = decode(jpeg, draft=("RGB", small))
+        ops["encode JPEG L"] = encode(photo_L, "JPEG", quality=85)
+    ops["encode GIF P"] = encode(photo_P, "GIF")
+    ops["decode GIF P"] = decode(encode(photo_P, "GIF"))
+    return ops
+
+
 SETS = {
     "simd": (operations,),
     "extra": (extra_operations,),
+    "api": (api_operations,),
     "all": (operations, extra_operations),
+    "full": (operations, extra_operations, api_operations),
 }
 
 
