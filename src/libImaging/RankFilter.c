@@ -134,9 +134,12 @@ RankNetworkPrune(UINT8 (*network)[2], int count, int rank) {
    RANK_CHUNK output pixels go through a sorting network, pruned to what
    wire rank needs, and v[rank] is the result. Each compare-exchange is a
    minimum and a maximum over a row of bytes, which compilers vectorise.
-   Returns 0 if out of memory. */
+   Returns 0 if out of memory.
+   With margin 0, im is the image expanded by (size - 1) / 2 on each side;
+   otherwise im has imOut's size and pixels outside it repeat its edges, as
+   the expanded image would. */
 static int
-RankFilterNetwork_u8(Imaging imOut, Imaging im, int size, int rank) {
+RankFilterNetwork_u8(Imaging imOut, Imaging im, int size, int rank, int margin) {
     /* An optimal network for 9 values. */
     static const UINT8 network3[25][2] = {{0, 1}, {3, 4}, {6, 7}, {1, 2}, {4, 5},
                                           {7, 8}, {0, 1}, {3, 4}, {6, 7}, {0, 3},
@@ -166,8 +169,27 @@ RankFilterNetwork_u8(Imaging imOut, Imaging im, int size, int rank) {
         for (x0 = 0; x0 < imOut->xsize; x0 += RANK_CHUNK) {
             int w = imOut->xsize - x0 < RANK_CHUNK ? imOut->xsize - x0 : RANK_CHUNK;
             for (i = 0; i < size; i++) {
+                int yy = y + i - margin;
+                const UINT8 *row = im->image8
+                                       [yy < 0           ? 0
+                                        : yy < im->ysize ? yy
+                                                         : im->ysize - 1];
                 for (j = 0; j < size; j++) {
-                    memcpy(v[i * size + j], &im->image8[y + i][x0 + j], w);
+                    int x = x0 + j - margin;
+                    UINT8 *dst = v[i * size + j];
+                    if (x >= 0 && x + w <= im->xsize) {
+                        memcpy(dst, &row[x], w);
+                    } else {
+                        // the edge pixels repeated before and after the row
+                        int lead = x < 0 ? (-x < w ? -x : w) : 0;
+                        int tail = x + w > im->xsize ? x + w - im->xsize : 0;
+                        if (tail > w - lead) {
+                            tail = w - lead;
+                        }
+                        memset(dst, row[0], lead);
+                        memcpy(dst + lead, &row[x + lead], w - lead - tail);
+                        memset(dst + w - tail, row[im->xsize - 1], tail);
+                    }
                 }
             }
             for (c = 0; c < count; c++) {
@@ -182,40 +204,53 @@ RankFilterNetwork_u8(Imaging imOut, Imaging im, int size, int rank) {
 
 /* Minimum (rank 0) or maximum (rank size * size - 1) of any size: of each
    row's size neighbours, then of size of those row results. Returns 0 if
-   out of memory. */
+   out of memory. margin is as for RankFilterNetwork_u8. */
 static int
-RankFilterMinMax_u8(Imaging imOut, Imaging im, int size, int is_max) {
+RankFilterMinMax_u8(Imaging imOut, Imaging im, int size, int is_max, int margin) {
     int xsize = imOut->xsize, ysize = imOut->ysize;
     int x, y, k;
-    UINT8 *rows;
+    UINT8 *rows, *padded = NULL;
     if (xsize == 0 || ysize == 0) {
         return 1;
     }
-    rows = malloc((size_t)xsize * (ysize + size - 1));
-    if (!rows) {
+    rows = malloc((size_t)xsize * im->ysize);
+    if (margin) {
+        padded = malloc((size_t)xsize + 2 * margin);
+    }
+    if (!rows || (margin && !padded)) {
+        free(rows);
         return 0;
     }
 
-#define RANK_MINMAX(op)                                                 \
-    for (y = 0; y < ysize + size - 1; y++) {                            \
-        const UINT8 *in = im->image8[y];                                \
-        UINT8 *restrict row = rows + (size_t)y * xsize;                 \
-        memcpy(row, in, xsize);                                         \
-        for (k = 1; k < size; k++) {                                    \
-            for (x = 0; x < xsize; x++) {                               \
-                row[x] = op(row[x], in[x + k]);                         \
-            }                                                           \
-        }                                                               \
-    }                                                                   \
-    for (y = 0; y < ysize; y++) {                                       \
-        UINT8 *restrict out = imOut->image8[y];                         \
-        memcpy(out, rows + (size_t)y * xsize, xsize);                   \
-        for (k = 1; k < size; k++) {                                    \
-            const UINT8 *restrict row = rows + (size_t)(y + k) * xsize; \
-            for (x = 0; x < xsize; x++) {                               \
-                out[x] = op(out[x], row[x]);                            \
-            }                                                           \
-        }                                                               \
+#define RANK_ROW(r) \
+    (rows + (size_t)((r) < 0 ? 0 : (r) < im->ysize ? (r) : im->ysize - 1) * xsize)
+#define RANK_MINMAX(op)                                             \
+    for (y = 0; y < im->ysize; y++) {                               \
+        const UINT8 *in = im->image8[y];                            \
+        UINT8 *restrict row = rows + (size_t)y * xsize;             \
+        if (margin) {                                               \
+            /* the row with its edges repeated, as expanded */      \
+            memset(padded, in[0], margin);                          \
+            memcpy(padded + margin, in, xsize);                     \
+            memset(padded + margin + xsize, in[xsize - 1], margin); \
+            in = padded;                                            \
+        }                                                           \
+        memcpy(row, in, xsize);                                     \
+        for (k = 1; k < size; k++) {                                \
+            for (x = 0; x < xsize; x++) {                           \
+                row[x] = op(row[x], in[x + k]);                     \
+            }                                                       \
+        }                                                           \
+    }                                                               \
+    for (y = 0; y < ysize; y++) {                                   \
+        UINT8 *restrict out = imOut->image8[y];                     \
+        memcpy(out, RANK_ROW(y - margin), xsize);                   \
+        for (k = 1; k < size; k++) {                                \
+            const UINT8 *restrict row = RANK_ROW(y + k - margin);   \
+            for (x = 0; x < xsize; x++) {                           \
+                out[x] = op(out[x], row[x]);                        \
+            }                                                       \
+        }                                                           \
     }
 #define RANK_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define RANK_MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -227,8 +262,10 @@ RankFilterMinMax_u8(Imaging imOut, Imaging im, int size, int is_max) {
 #undef RANK_MIN
 #undef RANK_MAX
 #undef RANK_MINMAX
+#undef RANK_ROW
 
     free(rows);
+    free(padded);
     return 1;
 }
 
@@ -290,12 +327,12 @@ ImagingRankFilter(Imaging im, int size, int rank) {
     ImagingSectionCookie cookie;
     ImagingSectionEnter(&cookie);
     if (im->image8 && (rank == 0 || rank == size2 - 1) && size > 1) {
-        if (!RankFilterMinMax_u8(imOut, im, size, rank != 0)) {
+        if (!RankFilterMinMax_u8(imOut, im, size, rank != 0, 0)) {
             ImagingSectionLeave(&cookie);
             goto nomemory;
         }
     } else if (im->image8 && size >= 3 && size <= RANK_NETWORK_MAX) {
-        if (!RankFilterNetwork_u8(imOut, im, size, rank)) {
+        if (!RankFilterNetwork_u8(imOut, im, size, rank, 0)) {
             ImagingSectionLeave(&cookie);
             goto nomemory;
         }
@@ -320,4 +357,45 @@ ImagingRankFilter(Imaging im, int size, int rank) {
 nomemory:
     ImagingDelete(imOut);
     return (Imaging)ImagingError_MemoryError();
+}
+
+/* As ImagingRankFilter on im expanded by (size - 1) / 2 pixels that repeat
+   its edges, without making the expanded copy where the fast paths for
+   1-byte images can read the edges themselves. */
+Imaging
+ImagingRankFilterSameSize(Imaging im, int size, int rank) {
+    Imaging imOut, imExpanded;
+    int ok;
+    if (im && im->image8 && im->type == IMAGING_TYPE_UINT8 && im->bands == 1 &&
+        im->xsize > 0 && im->ysize > 0 && size >= 3 && (size & 1) &&
+        size <= RANK_NETWORK_MAX && rank >= 0 && rank < size * size) {
+        ImagingSectionCookie cookie;
+        imOut = ImagingNewDirty(im->mode, im->xsize, im->ysize);
+        if (!imOut) {
+            return NULL;
+        }
+        ImagingSectionEnter(&cookie);
+        if (rank == 0 || rank == size * size - 1) {
+            ok = RankFilterMinMax_u8(imOut, im, size, rank != 0, (size - 1) / 2);
+        } else {
+            ok = RankFilterNetwork_u8(imOut, im, size, rank, (size - 1) / 2);
+        }
+        ImagingSectionLeave(&cookie);
+        if (!ok) {
+            ImagingDelete(imOut);
+            return (Imaging)ImagingError_MemoryError();
+        }
+        ImagingCopyPalette(imOut, im);
+        return imOut;
+    }
+    if (!im) {
+        return (Imaging)ImagingError_ModeError();
+    }
+    imExpanded = ImagingExpand(im, size > 0 ? size / 2 : 0);
+    if (!imExpanded) {
+        return NULL;
+    }
+    imOut = ImagingRankFilter(imExpanded, size, rank);
+    ImagingDelete(imExpanded);
+    return imOut;
 }

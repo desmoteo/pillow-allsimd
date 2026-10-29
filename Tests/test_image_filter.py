@@ -418,3 +418,19 @@ def test_modefilter_matches_reference(filter_size: int, size: tuple[int, int]) -
     im = hopper("L").resize(size).point(lambda v: v // 64 * 60)
     out = im.filter(ImageFilter.ModeFilter(filter_size))
     assert list(out.get_flattened_data()) == _mode_reference(im, filter_size)
+
+
+@pytest.mark.parametrize("mode", ("L", "1"))
+@pytest.mark.parametrize("size", ((1, 1), (2, 7), (7, 2), (13, 11), (300, 4)))
+@pytest.mark.parametrize("filter_size", (3, 5, 7, 11))
+def test_rankfilter_same_size(
+    mode: str, size: tuple[int, int], filter_size: int
+) -> None:
+    # 1-byte images are filtered without an expanded copy, reading repeated
+    # edges directly; that must match filtering the expanded copy.
+    im = hopper("L").resize(size).convert(mode)
+    n = filter_size * filter_size
+    for rank in sorted({0, 1, n // 2, n - 2, n - 1}):
+        expected = im.im.expand(filter_size // 2).rankfilter(filter_size, rank)
+        out = im.im.rankfilter(filter_size, rank, True)
+        assert_image_equal(im._new(out), im._new(expected))

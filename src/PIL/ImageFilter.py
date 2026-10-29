@@ -112,8 +112,13 @@ class RankFilter(Filter):
         if image.mode == "P":
             msg = "cannot filter palette images"
             raise ValueError(msg)
-        image = image.expand(self.size // 2)
-        return image.rankfilter(self.size, self.rank)
+        if self.size * self.size * 4 > (2**31 - 1):
+            # A size set after __init__: expand() raises as for any filter.
+            image = image.expand(self.size // 2)
+            return image.rankfilter(self.size, self.rank)
+        # The same as image.expand(self.size // 2).rankfilter(...), which
+        # the fast paths do without the expanded copy.
+        return image.rankfilter(self.size, self.rank, True)
 
 
 class MedianFilter(RankFilter):

@@ -2203,12 +2203,17 @@ _putpixel(ImagingObject *self, PyObject *args) {
 
 static PyObject *
 _rankfilter_impl(ImagingObject *self, PyObject *args) {
-    int size, rank;
-    if (!PyArg_ParseTuple(args, "ii", &size, &rank)) {
+    int size, rank, same_size = 0;
+    if (!PyArg_ParseTuple(args, "ii|p", &size, &rank, &same_size)) {
         return NULL;
     }
 
-    return PyImagingNew(ImagingRankFilter(self->image, size, rank));
+    /* same_size: filter the image as if expanded by size // 2 pixels that
+       repeat its edges, giving an image of the same size. */
+    return PyImagingNew(
+        same_size ? ImagingRankFilterSameSize(self->image, size, rank)
+                  : ImagingRankFilter(self->image, size, rank)
+    );
 }
 static PyObject *
 _rankfilter(ImagingObject *self, PyObject *args) {
