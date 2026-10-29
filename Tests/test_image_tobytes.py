@@ -24,6 +24,8 @@ def test_rgb_roundtrip(width: int) -> None:
     assert [im.getpixel((x, 1)) for x in range(width)] == [
         tuple(data[(width + x) * 3 : (width + x) * 3 + 3]) for x in range(width)
     ]
+
+
 @pytest.mark.parametrize("failure", (None, "setimage", "encode", "status"))
 def test_encoder_cleanup(failure: str | None, monkeypatch: pytest.MonkeyPatch) -> None:
     cleanup_called = False
