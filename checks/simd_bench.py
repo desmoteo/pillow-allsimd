@@ -141,7 +141,7 @@ def extra_operations(
         out.putalpha(L)
         return out
 
-    return {
+    ops = {
         "rotate RGB 30 nearest": lambda: rgb.rotate(30, R.NEAREST),
         "rotate RGB 30 bilinear": lambda: rgb.rotate(30, R.BILINEAR),
         "rotate RGB 30 bicubic": lambda: rgb.rotate(30, R.BICUBIC),
@@ -186,6 +186,19 @@ def extra_operations(
         "expand RGB 20": lambda: ImageOps.expand(rgb, 20),
         "thumbnail RGB 1/8": thumbnail,
     }
+    if hasattr(R, "MKS2021"):  # Pillow 13.0 and newer
+        # Vertical pass first: the height shrinks most.
+        ops.update(
+            {
+                "resize RGB 1/4 MKS2013": lambda: rgb.resize(small, R.MKS2013),
+                "resize RGB 1/4 MKS2021": lambda: rgb.resize(small, R.MKS2021),
+                "resize L 1/4 MKS2021": lambda: L.resize(small, R.MKS2021),
+                "resize RGB 1/8 height lanczos": lambda: rgb.resize(
+                    (w, max(1, h // 8)), R.LANCZOS
+                ),
+            }
+        )
+    return ops
 
 
 SETS = {
@@ -385,12 +398,20 @@ def main() -> int:
         + "".join(f"{n:>{width}s}" for n in names)
         + "".join(f"{n:>{swidth}s}" for n in others)
     )
+    # Operations some builds lack, such as filters added in a later Pillow.
+    all_ops = list(dict.fromkeys(op for n in names for op in best[n]))
+    skipped = [op for op in all_ops if any(op not in best[n] for n in names)]
     for op in best[baseline]:
+        if op in skipped:
+            continue
         row = f"{op:28s}" + "".join(f"{best[n][op]:{width}.2f}" for n in names)
         row += "".join(
             f"{best[baseline][op] / best[n][op]:{swidth - 1}.2f}x" for n in others
         )
         print(row)
+
+    if skipped:
+        print(f"\nNot in every build, skipped: {', '.join(skipped)}")
 
     if args.check:
         checks = {
@@ -404,6 +425,8 @@ def main() -> int:
         for n in others:
             diffs: dict[str, dict[str, int]] = {}
             for op, b64 in outputs[baseline].items():
+                if op not in outputs[n]:
+                    continue
                 a, b = base64.b64decode(b64), base64.b64decode(outputs[n][op])
                 if a != b:
                     size = itemsize.get(op, 1)
