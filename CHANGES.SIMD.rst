@@ -17,6 +17,14 @@ Based on Pillow 13.0.0
 - Rank, median, minimum and maximum filters of 1-byte images up to 11x11
   use a sorting network pruned for the rank, vectorised by the compiler:
   median 5 65x, rank 7 50x faster than Pillow 13.0 (2560x1600)
+- Rank filters read the image's edges instead of an expanded copy (median 3
+  2.5x); ImageDraw: vector span fill and RGBA ink blend (filled shapes
+  1.6x to 2.3x), masked fills for text and bitmap(); floodfill in C (60x)
+- point(): XOR, AND and solarize tables as byte operations (ImageOps
+  invert, posterize, solarize 3.3x), output not zero-filled; ImageEnhance
+  contrast and brightness as lookup tables (1.5x)
+- PNG encoding: vector row filters (level 1 1.7x); RGB <-> YCbCr without
+  table lookups (1.6x, 3.1x)
 - x86: RGBa -> RGBA is exact (colour above alpha gave 0, alpha 0 gave
   colour 0); slightly slower
 - ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a
