@@ -239,7 +239,9 @@ def api_operations(
     photo_L = photo.convert("L")
     photo_P = photo.quantize(256)
     binary = L.point(lambda v: 255 if v > 200 else 0)
-    font = ImageFont.load_default(max(8, h // 30))
+    # Sized fonts need FreeType; the text operations are skipped without it.
+    freetype = features.check("freetype2")
+    font = ImageFont.load_default(max(8, h // 30)) if freetype else None
     sx, sy = w / 1000, h / 1000
 
     def pts(n: int, k: int) -> list[list[tuple[float, float]]]:
@@ -400,12 +402,9 @@ def api_operations(
         "draw arcs width 3": draw("", arcs_w),
         "draw rounded rectangles": draw("", rounded),
         "draw points 100k": draw("", point_cloud),
-        "draw text 100 lines": draw("", text),
-        "draw text stroke 30 lines": draw("", text_stroke),
         # ImageDraw blends RGBA ink only onto RGB images.
         "draw ellipses RGBA ink on RGB": draw("RGBA", blend_ellipses, "RGB"),
         "draw floodfill 1/16 area": floodfill,
-        "font textbbox 100": textbbox,
         "ImageOps grayscale": lambda: ImageOps.grayscale(rgb),
         "ImageOps invert": lambda: ImageOps.invert(rgb),
         "ImageOps mirror": lambda: ImageOps.mirror(rgb),
@@ -498,6 +497,10 @@ def api_operations(
         "box RGB r=(10, 1)": lambda: rgb.filter(ImageFilter.BoxBlur((10, 1))),
         "unsharp L": lambda: L.filter(ImageFilter.UnsharpMask(2, 150, 3)),
     }
+    if freetype:
+        ops["draw text 100 lines"] = draw("", text)
+        ops["draw text stroke 30 lines"] = draw("", text_stroke)
+        ops["font textbbox 100"] = textbbox
     for n, f in chops_rgb.items():
         ops[f"chops {n}"] = (lambda f: lambda: f(rgb, rgb2))(f)
     if features.check("libimagequant"):
