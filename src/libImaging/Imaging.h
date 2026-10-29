@@ -300,6 +300,10 @@ typedef int (*ImagingTransformFilter)(void *out, Imaging im, double x, double y)
 
 extern Imaging
 ImagingAlphaComposite(Imaging imIn1, Imaging imIn2);
+extern int
+ImagingAlphaCompositeOnto(
+    Imaging imDst, Imaging imSrc, int dx, int dy, int sx, int sy, int xsize, int ysize
+);
 extern Imaging
 ImagingBlend(Imaging imIn1, Imaging imIn2, float alpha);
 extern Imaging
