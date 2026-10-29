@@ -156,9 +156,11 @@ ImagingGetHistogram(Imaging im, Imaging imMask, void *minmax) {
 
     // restrict safe: im and imMask are both read-only here
     //                (they may even be the same image).
-    //                histogram is a fresh allocation from ImagingHistogramNew
+    // histogram is not restrict: with it, MSVC 14.51 (/O2 /GL) miscompiled
+    // this function once it also calls histogram_u8, and the F histogram
+    // returned NULL without an exception.
 
-    long *restrict histogram = h->histogram;
+    long *histogram = h->histogram;
 
     if (imMask) {
         /* mask */
