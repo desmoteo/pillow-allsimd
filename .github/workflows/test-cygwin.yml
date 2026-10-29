@@ -132,9 +132,10 @@ jobs:
           name: errors
           path: Tests/errors
 
-      - name: After success
+      - name: Prepare to upload coverage
         run: |
-          bash.exe .ci/after_success.sh
+          # .ci/test.sh wrote coverage.xml. Codecov's scripts must not run
+          # in Cygwin's bash.
           rm C:\cygwin\bin\bash.EXE
 
       - name: Upload coverage
