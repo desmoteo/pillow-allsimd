@@ -179,6 +179,59 @@ transpose_blocks(Imaging imOut, Imaging imIn, int flipx, int flipy) {
         transpose_blocks32(imOut, imIn, flipx, flipy);
     }
 }
+
+/* Each row of an 8-bit or 32-bit image reversed, into the same row of
+   imOut or, with flipy, the mirrored one (flip left right, rotate 180). */
+static void
+flip_rows(Imaging imOut, Imaging imIn, int flipy) {
+    int xsize = imIn->xsize, ysize = imIn->ysize;
+    int x, y;
+
+    for (y = 0; y < ysize; y++) {
+        int yo = flipy ? ysize - 1 - y : y;
+        x = 0;
+        if (imIn->pixelsize == 1) {
+            UINT8 *in = imIn->image8[y], *out = imOut->image8[yo] + xsize;
+#if defined(IMAGING_SIMD_SSE4)
+            __m128i reverse =
+                _mm_setr_epi8(15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0);
+            for (; x + 16 <= xsize; x += 16) {
+                __m128i v = _mm_loadu_si128((const __m128i *)(in + x));
+                _mm_storeu_si128(
+                    (__m128i *)(out - x - 16), _mm_shuffle_epi8(v, reverse)
+                );
+            }
+#else
+            for (; x + 16 <= xsize; x += 16) {
+                uint8x16_t v = vrev64q_u8(vld1q_u8(in + x));
+                vst1q_u8(out - x - 16, vextq_u8(v, v, 8));
+            }
+#endif
+            for (; x < xsize; x++) {
+                out[-1 - x] = in[x];
+            }
+        } else {
+            INT32 *in = imIn->image32[y], *out = imOut->image32[yo] + xsize;
+#if defined(IMAGING_SIMD_SSE4)
+            for (; x + 4 <= xsize; x += 4) {
+                __m128i v = _mm_loadu_si128((const __m128i *)(in + x));
+                _mm_storeu_si128(
+                    (__m128i *)(out - x - 4),
+                    _mm_shuffle_epi32(v, _MM_SHUFFLE(0, 1, 2, 3))
+                );
+            }
+#else
+            for (; x + 4 <= xsize; x += 4) {
+                uint32x4_t v = vrev64q_u32(vld1q_u32((const uint32_t *)(in + x)));
+                vst1q_u32((uint32_t *)(out - x - 4), vextq_u32(v, v, 2));
+            }
+#endif
+            for (; x < xsize; x++) {
+                out[-1 - x] = in[x];
+            }
+        }
+    }
+}
 #endif
 
 Imaging
@@ -210,14 +263,21 @@ ImagingFlipLeftRight(Imaging imOut, Imaging imIn) {
     ImagingSectionEnter(&cookie);
     MUTEX_LOCK(&imIn->mutex);
 
-    if (imIn->image8) {
-        if (isModeI16(imIn->mode)) {
-            FLIP_LEFT_RIGHT(UINT16, image8)
+#if defined(TRANSPOSE_SIMD)
+    if (imIn->pixelsize == 1 || imIn->pixelsize == 4) {
+        flip_rows(imOut, imIn, 0);
+    } else
+#endif
+    {
+        if (imIn->image8) {
+            if (isModeI16(imIn->mode)) {
+                FLIP_LEFT_RIGHT(UINT16, image8)
+            } else {
+                FLIP_LEFT_RIGHT(UINT8, image8)
+            }
         } else {
-            FLIP_LEFT_RIGHT(UINT8, image8)
+            FLIP_LEFT_RIGHT(INT32, image32)
         }
-    } else {
-        FLIP_LEFT_RIGHT(INT32, image32)
     }
 
     MUTEX_UNLOCK(&imIn->mutex);
@@ -500,15 +560,22 @@ ImagingRotate180(Imaging imOut, Imaging imIn) {
     ImagingSectionEnter(&cookie);
     MUTEX_LOCK(&imIn->mutex);
 
-    yr = ysize - 1;
-    if (imIn->image8) {
-        if (isModeI16(imIn->mode)) {
-            ROTATE_180(UINT16, image8)
+#if defined(TRANSPOSE_SIMD)
+    if (imIn->pixelsize == 1 || imIn->pixelsize == 4) {
+        flip_rows(imOut, imIn, 1);
+    } else
+#endif
+    {
+        yr = ysize - 1;
+        if (imIn->image8) {
+            if (isModeI16(imIn->mode)) {
+                ROTATE_180(UINT16, image8)
+            } else {
+                ROTATE_180(UINT8, image8)
+            }
         } else {
-            ROTATE_180(UINT8, image8)
+            ROTATE_180(INT32, image32)
         }
-    } else {
-        ROTATE_180(INT32, image32)
     }
 
     MUTEX_UNLOCK(&imIn->mutex);
