@@ -68,7 +68,7 @@ The full per-operation tables are in [PROFILE_TABLES.md](PROFILE_TABLES.md).
 
 The SIMD build against the 13.0 wheel at 1280×800 (206 operations with a wheel time):
 
-| Category | Operations | Geometric mean | Within 10% of the wheel | SIMD ms (sum) | Wheel ms (sum) |
+| Category | Operations | Geometric mean | No real speedup (≤ 1.1x, slower ones included) | SIMD ms (sum) | Wheel ms (sum) |
 |---|---:|---:|---:|---:|---:|
 | Filters | 35 | 6.39x | 6 | 1747 | 3663 |
 | Resampling and geometry | 47 | 3.03x | 14 | 185 | 543 |
