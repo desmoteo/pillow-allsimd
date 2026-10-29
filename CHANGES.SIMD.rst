@@ -4,6 +4,16 @@ Changelog (Pillow-SIMD)
 Unreleased
 ----------
 
+Based on Pillow 13.0.0
+
+- Merged Pillow 13.0.0: security fixes, free-threading locks (the SIMD
+  paths run inside them), vertical-first resampling and the MKS2013 and
+  MKS2021 filters, which use the SIMD resample kernels (MKS2021 RGB 1/4:
+  about 10x the 13.0 wheel on AVX2)
+- ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a
+  container, on a remote host or locally, so the host's Python version does
+  not matter
+
 Build
 
 - ``-C simd=auto|sse4|avx2|avxvnni|native|native512|neon|disable``

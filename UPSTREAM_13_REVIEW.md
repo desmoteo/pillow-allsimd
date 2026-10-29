@@ -2,10 +2,11 @@
 
 Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/x86-fixes-arm64-neon`; review written at `2e6edeec2`, step 1 of section 5 done in `311d9e4e5`.
 
-## Where things stand (2026-10-26)
+## Where things stand (2026-10-29)
 
 - Done: the 13.0 bug fixes (step 1), every SIMD target of section 4 except the RGB horizontal box-blur pass, the callgrind items, x86 work ported to arm64, and the new x86 build options (sections at the end).
-- Open: **the rebase onto Pillow 13.0** (steps 3 and 4 of section 5), a second arm64 machine for the NEON/portable split, and runtime dispatch (not planned on this branch).
+- Done on branch `simd/pillow-13`: **the merge of Pillow 13.0.0** (steps 3 and 4 of section 5). See "Status of steps 3 and 4" below.
+- Open: timing on arm64 hardware after the merge, a second arm64 machine for the NEON/portable split, and runtime dispatch (not planned on this branch).
 
 ## Sources and method
 
@@ -173,6 +174,46 @@ x86 (this machine, 2560×1600, best of 7, ms):
 | multiply L | 4.64 | 4.65 | 0.64 | 2.71 | 0.58 | 0.38 |
 
 Most of the gain comes from the formula itself: without the division, GCC vectorises the scalar loop. The intrinsics add 8–70% on top, and matter more for compilers that vectorise less, such as the Jetson's GCC 11. The NEON kernel has not been timed on real arm64 hardware yet. `checks/simd_bench.py` now also times `chops screen` and `chops multiply L`.
+
+## Status of steps 3 and 4 (branch `simd/pillow-13`)
+
+The branch merges the `13.0.0` tag of python-pillow/Pillow into `simd/x86-fixes-arm64-neon` instead of rebasing, so the commits of PRs #160–#164 stay unchanged underneath. The version is `13.0.0.post0`.
+
+- **Conflicts:** 24 files, as expected in CI, `setup.py`, `Makefile`, the tests and the C files Bands, BoxBlur, Chops, ColorLUT, Filter, Geometry, Histo, Offset and AlphaComposite. Resample, Reduce and Convert merged without conflicts.
+- **Two semantic conflicts** that only the compiler found:
+  - 13.0's `XCLIP`/`YCLIP` take one argument (the image sizes come from locals), so the SIMD bilinear and bicubic transform filters were adapted.
+  - `MIN`/`MAX` now come from `ImagingUtils.h`.
+- **Every 13.0 security fix is in place:**
+  - the `ImagingMerge` band check;
+  - the affine-transform double free;
+  - the rank filter margin overflow;
+  - the reduce size overflow.
+- **Every `MUTEX_LOCK` of 13.0 is kept.** The SIMD filter dispatch and the SIMD transform tiles run inside 13.0's locks, and so does the four-table histogram. Reduce, BoxBlur, Bands and UnsharpMask have no locks in 13.0 either.
+- **3.1 vertical-first resampling** comes with the merge. Each pass keeps its SIMD kernel, so either order uses them.
+- **`IMAGING_TYPE_I16`** replaces `IMAGING_TYPE_SPECIAL` everywhere; the SIMD dispatch only takes `IMAGING_TYPE_UINT8`.
+- **MKS2013 and MKS2021** run through the same SIMD kernels.
+  - Against the scalar build (`-C simd=disable`), resized L, LA, RGB, I;16, I and F images are identical for MKS2013, MKS2021, Lanczos and Bicubic, at 15 sizes up and down.
+  - RGBA differs for all four filters. It did already before the merge for Lanczos and Bicubic, so this is not new.
+  - Against stock 13.0, I;16, I and F are identical. The 8-bit modes differ, as they always have in pillow-simd, which uses 16-bit fixed-point coefficients.
+- **One 13.0 test needed a change.**
+  - `test_consistency_i16` compares `hopper("I")` with `hopper("I;16")` after filtering. In pillow-simd the SIMD RGB→L/I conversion has 15-bit coefficients (from upstream pillow-simd), which round one hopper pixel differently from RGB→I;16.
+  - The test now makes its `I` reference from the `I;16` image. That became possible with 13.0, which fixed the `I;16N → I` clipping noted in step 1.
+
+Measured on this machine (2560×1600, ms, best of 25, pinned to one CPU):
+
+| Operation | upstream 13.0 wheel | scalar | AVX2 |
+|---|---:|---:|---:|
+| resize RGB 1/4 MKS2021 | 70.5 | 76.6 | 6.5 |
+| resize RGB to 1/8 height, Lanczos (vertical first) | 49.8 | 15.3 | 5.7 |
+| P→RGB / P→RGBA | 2.1 / 1.8 | 1.6 / 1.5 | 1.6 / 1.5 |
+| getbbox, flip, rotate 180, difference, offset | within ±10% of each other | | |
+
+The 13.0 scalar speedups (palette copies, getbbox, flips, difference, offset) are memory-bound at this size: 16 MB in and out in about 2.5 ms. Hand-written SIMD has nothing to add there, so none was written.
+
+Tests: 6095 passed with `-C simd=avx2`, `sse4` and `disable` on the host (Python 3.14). 6129 passed for scalar, SSE4, AVX2 and AVX-VNNI in a Python 3.13 container via `checks/simd_test_remote.sh local`, which has more optional test dependencies.
+On arm64 under qemu (`--platform linux/arm64`), the filter, resample, resize, reduce, convert, chops, ColorLUT, box blur, transform, split, histogram and point tests (1375 tests) passed for the NEON and scalar builds. The output comparison shows only the known ±1 differences: the 5×5 float filter and the 15-bit RGB→L conversion.
+
+Python 3.10, which the Jetson runs, is no longer supported. `checks/simd_test_remote.sh` runs the test suite there in a container with a newer Python. `checks/simd_bench_remote.sh --docker` does the same for benchmarks.
 
 ## Caveats
 
