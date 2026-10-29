@@ -2201,6 +2201,74 @@ _putpixel(ImagingObject *self, PyObject *args) {
     return result;
 }
 
+/* Reads up to 4 band values from an int or a tuple of ints. */
+static int
+floodfill_bands(PyObject *obj, int bands, int *out) {
+    int b;
+    if (PyLong_Check(obj) && bands == 1) {
+        long v = PyLong_AsLong(obj);
+        if (v == -1 && PyErr_Occurred()) {
+            return -1;
+        }
+        // A value no 8-bit band can hold never compares equal.
+        out[0] = v < INT_MIN / 2 ? INT_MIN / 2 : v > INT_MAX / 2 ? INT_MAX / 2 : (int)v;
+        return 0;
+    }
+    if (!PyTuple_Check(obj) || PyTuple_GET_SIZE(obj) != bands) {
+        PyErr_SetString(PyExc_ValueError, "bad band values");
+        return -1;
+    }
+    for (b = 0; b < bands; b++) {
+        long v = PyLong_AsLong(PyTuple_GET_ITEM(obj, b));
+        if (v == -1 && PyErr_Occurred()) {
+            return -1;
+        }
+        out[b] = v < INT_MIN / 2 ? INT_MIN / 2 : v > INT_MAX / 2 ? INT_MAX / 2 : (int)v;
+    }
+    return 0;
+}
+
+static PyObject *
+_floodfill_impl(ImagingObject *self, PyObject *args) {
+    int x, y, background[4], border[4];
+    PyObject *background_obj, *border_obj;
+    double thresh;
+    Imaging im = self->image;
+    if (!PyArg_ParseTuple(
+            args, "iiOOd", &x, &y, &background_obj, &border_obj, &thresh
+        )) {
+        return NULL;
+    }
+    if (im->type != IMAGING_TYPE_UINT8 || im->bands > 4 ||
+        (!im->image8 && im->pixelsize != 4)) {
+        PyErr_SetString(PyExc_ValueError, "image has wrong mode");
+        return NULL;
+    }
+    if (floodfill_bands(background_obj, im->bands, background) < 0 ||
+        (border_obj != Py_None && floodfill_bands(border_obj, im->bands, border) < 0)) {
+        return NULL;
+    }
+    ImagingSectionCookie cookie;
+    ImagingSectionEnter(&cookie);
+    int err = ImagingFloodFill(
+        im, x, y, background, border_obj != Py_None ? border : NULL, thresh
+    );
+    ImagingSectionLeave(&cookie);
+    if (err < 0) {
+        return ImagingError_MemoryError();
+    }
+    Py_RETURN_NONE;
+}
+
+static PyObject *
+_floodfill(ImagingObject *self, PyObject *args) {
+    PyObject *result;
+    Py_BEGIN_CRITICAL_SECTION(self);
+    result = _floodfill_impl(self, args);
+    Py_END_CRITICAL_SECTION();
+    return result;
+}
+
 static PyObject *
 _rankfilter_impl(ImagingObject *self, PyObject *args) {
     int size, rank, same_size = 0;
@@ -4276,6 +4344,7 @@ static struct PyMethodDef methods[] = {
     {"putdata", (PyCFunction)_putdata, METH_VARARGS},
     {"quantize", (PyCFunction)_quantize, METH_VARARGS},
     {"rankfilter", (PyCFunction)_rankfilter, METH_VARARGS},
+    {"floodfill", (PyCFunction)_floodfill, METH_VARARGS},
     {"resize", (PyCFunction)_resize, METH_VARARGS},
     {"reduce", (PyCFunction)_reduce, METH_VARARGS},
     {"transpose", (PyCFunction)_transpose, METH_VARARGS},

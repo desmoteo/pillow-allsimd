@@ -1791,3 +1791,25 @@ def test_bitmap_mask_blend_exact(
         value = im.getpixel((width - 1, y))
         assert (value if isinstance(value, tuple) else (value,)) == tuple(expected)
         assert im.getpixel((0, y)) == value
+
+
+@pytest.mark.parametrize("mode", ("1", "L", "P", "LA", "RGB", "RGBA", "CMYK"))
+@pytest.mark.parametrize("border", (False, True))
+@pytest.mark.parametrize("thresh", (0, 30))
+def test_floodfill_c_matches_search(
+    mode: str, border: bool, thresh: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # 8-bit images are filled in C, which must fill the pixels the search in
+    # Python fills.
+    im = hopper("RGB").resize((61, 47)).quantize(4).convert(mode)
+    bands = len(im.getbands())
+    value = 77 if bands == 1 else (77,) * bands
+    if mode == "1":
+        value = 255
+    edge = im.getpixel((30, 0)) if border else None
+    expected = im.copy()
+    with monkeypatch.context() as m:
+        m.setattr(ImageDraw, "_floodfill_in_c", lambda *args: False)
+        ImageDraw.floodfill(expected, (30, 23), value, edge, thresh)
+    ImageDraw.floodfill(im, (30, 23), value, edge, thresh)
+    assert_image_equal(im, expected)
