@@ -120,6 +120,7 @@ def extra_operations(
     P = rgb.resize((max(1, w // 10), max(1, h // 10))).quantize(64).resize((w, h))
     F = L.convert("F")
     I16 = L.convert("I;16")
+    I32 = L.convert("I")
     mask = L.point(lambda v: 255 if v > 128 else 0)
     # 4 << 13 overflows the 16-bit integer kernels: these take the float ones.
     float5 = ImageFilter.Kernel((5, 5), [-1] * 12 + [24] + [-1] * 12, 1)
@@ -154,6 +155,11 @@ def extra_operations(
         "resize RGB 1/4 nearest": lambda: rgb.resize(small, R.NEAREST),
         "resize F 1/4 bicubic": lambda: F.resize(small, R.BICUBIC),
         "resize I;16 1/4 bicubic": lambda: I16.resize(small, R.BICUBIC),
+        "resize F x1.5 lanczos": lambda: F.resize((w * 3 // 2, h * 3 // 2), R.LANCZOS),
+        "resize I;16 x1.5 lanczos": lambda: I16.resize(
+            (w * 3 // 2, h * 3 // 2), R.LANCZOS
+        ),
+        "resize I 1/4 bicubic": lambda: I32.resize(small, R.BICUBIC),
         "convert RGB->RGBA": lambda: rgb.convert("RGBA"),
         "convert RGBA->RGB": lambda: rgba.convert("RGB"),
         "convert L->RGB": lambda: L.convert("RGB"),

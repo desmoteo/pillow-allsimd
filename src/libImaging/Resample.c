@@ -227,6 +227,7 @@ clip8(int in, int precision) {
 
 #include "ResampleSIMDHorizontalConv.c"
 #include "ResampleSIMDVerticalConv.c"
+#include "ResampleSIMD32bpc.c"
 
 static int
 precompute_coeffs(
@@ -554,6 +555,15 @@ _ImagingResampleHorizontal_16bpc(
     assert(imIn->image8 != imOut->image8);
 
     ImagingSectionEnter(&cookie);
+#if defined(RESAMPLE_WIDE)
+    if ((bigendian ? resample_horizontal_u16be : resample_horizontal_u16le)(
+            imOut, imIn, offset, ksize, bounds, kk
+        )) {
+        MUTEX_UNLOCK(&imIn->mutex);
+        ImagingSectionLeave(&cookie);
+        return;
+    }
+#endif
     for (yy = 0; yy < ysize; yy++) {
         // Restrict safe: imIn and imOut are distinct.
         UINT8 *restrict lineIn = imIn->image8[yy + offset];
@@ -605,6 +615,15 @@ _ImagingResampleVertical_16bpc(
     assert(imIn->image8 != imOut->image8);
 
     ImagingSectionEnter(&cookie);
+#if defined(RESAMPLE_WIDE)
+    {
+        (bigendian ? resample_vertical_u16be
+                   : resample_vertical_u16le)(imOut, imIn, ksize, bounds, kk);
+        MUTEX_UNLOCK(&imIn->mutex);
+        ImagingSectionLeave(&cookie);
+        return;
+    }
+#endif
 
     for (yy = 0; yy < ysize; yy++) {
         // imOut is a fresh allocation, so its row can be hoisted/restrict.
@@ -646,6 +665,16 @@ _ImagingResampleHorizontal_32bpc(
     assert(imIn->image32 != imOut->image32);
 
     ImagingSectionEnter(&cookie);
+#if defined(RESAMPLE_WIDE)
+    if (imIn->type == IMAGING_TYPE_FLOAT32
+            ? resample_horizontal_f32(imOut, imIn, offset, ksize, bounds, kk)
+            : imIn->type == IMAGING_TYPE_INT32 &&
+                  resample_horizontal_i32(imOut, imIn, offset, ksize, bounds, kk)) {
+        MUTEX_UNLOCK(&imIn->mutex);
+        ImagingSectionLeave(&cookie);
+        return;
+    }
+#endif
 
     switch (imIn->type) {
         case IMAGING_TYPE_INT32:
@@ -706,6 +735,16 @@ _ImagingResampleVertical_32bpc(
     assert(imIn->image32 != imOut->image32);
 
     ImagingSectionEnter(&cookie);
+#if defined(RESAMPLE_WIDE)
+    if (imIn->type == IMAGING_TYPE_FLOAT32 || imIn->type == IMAGING_TYPE_INT32) {
+        (imIn->type == IMAGING_TYPE_FLOAT32
+             ? resample_vertical_f32
+             : resample_vertical_i32)(imOut, imIn, ksize, bounds, kk);
+        MUTEX_UNLOCK(&imIn->mutex);
+        ImagingSectionLeave(&cookie);
+        return;
+    }
+#endif
 
     switch (imIn->type) {
         case IMAGING_TYPE_INT32:
