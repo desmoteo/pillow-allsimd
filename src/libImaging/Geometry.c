@@ -1290,6 +1290,25 @@ getfilter(Imaging im, int filterid) {
 #define TRANSFORM_TILE 64
 #endif
 
+/* perspective_transform for a row of TRANSFORM_TILE pixels from x: the
+   same expressions, in a loop of fixed length that the compiler
+   vectorizes, so that the divisions run several at once. */
+static void
+perspective_row(
+    double *restrict xs, double *restrict ys, const double *a, int x, int y
+) {
+    double a0 = a[0], a1 = a[1], a2 = a[2], a3 = a[3];
+    double a4 = a[4], a5 = a[5], a6 = a[6], a7 = a[7];
+    double yin = y + 0.5;
+    int i;
+    for (i = 0; i < TRANSFORM_TILE; i++) {
+        double xin = (x + i) + 0.5;
+        double den = a6 * xin + a7 * yin + 1;
+        xs[i] = (a0 * xin + a1 * yin + a2) / den;
+        ys[i] = (a3 * xin + a4 * yin + a5) / den;
+    }
+}
+
 int
 ImagingGenericTransform(
     Imaging imOut,
@@ -1363,22 +1382,52 @@ ImagingGenericTransform(
         }                                                                       \
     }
 
+    /* Perspective transforms: each row of a tile gets its coordinates at
+       once, from perspective_row. */
+#define PERSPECTIVE_TILES(filter)                                             \
+    for (ty = y0; ty < y1; ty += TRANSFORM_TILE) {                            \
+        int ty1 = ty + TRANSFORM_TILE < y1 ? ty + TRANSFORM_TILE : y1;        \
+        for (tx = x0; tx < x1; tx += TRANSFORM_TILE) {                        \
+            int i, n = (tx + TRANSFORM_TILE < x1 ? TRANSFORM_TILE : x1 - tx); \
+            for (y = ty; y < ty1; y++) {                                      \
+                double xs[TRANSFORM_TILE], ys[TRANSFORM_TILE];                \
+                perspective_row(xs, ys, transform_data, tx - x0, y - y0);     \
+                out = imOut->image[y] + tx * imOut->pixelsize;                \
+                for (i = 0; i < n; i++) {                                     \
+                    if (!filter(out, imIn, xs[i], ys[i]) && fill) {           \
+                        memset(out, 0, imOut->pixelsize);                     \
+                    }                                                         \
+                    out += imOut->pixelsize;                                  \
+                }                                                             \
+            }                                                                 \
+        }                                                                     \
+    }
+
 #if defined(TRANSFORM_SIMD)
-    /* Direct calls, which the compiler inlines, for the common cases.
-       Perspective transforms gain nothing from it: their two divisions
-       per pixel dominate. */
+    /* Direct calls, which the compiler inlines, for the common cases. */
     if (transform == affine_transform && filter == bilinear_filter32RGB_simd) {
         TRANSFORM_TILES(affine_transform, bilinear_filter32RGB_simd)
     } else if (transform == affine_transform && filter == bicubic_filter32RGB_simd) {
         TRANSFORM_TILES(affine_transform, bicubic_filter32RGB_simd)
     } else if (transform == quad_transform && filter == bilinear_filter32RGB_simd) {
         TRANSFORM_TILES(quad_transform, bilinear_filter32RGB_simd)
+    } else if (
+        transform == perspective_transform && filter == bilinear_filter32RGB_simd
+    ) {
+        PERSPECTIVE_TILES(bilinear_filter32RGB_simd)
+    } else if (
+        transform == perspective_transform && filter == bicubic_filter32RGB_simd
+    ) {
+        PERSPECTIVE_TILES(bicubic_filter32RGB_simd)
     } else
 #endif
-    {
+        if (transform == perspective_transform) {
+        PERSPECTIVE_TILES(filter)
+    } else {
         TRANSFORM_TILES(transform, filter)
     }
 #undef TRANSFORM_TILES
+#undef PERSPECTIVE_TILES
 
     MUTEX_UNLOCK(&imIn->mutex);
     ImagingSectionLeave(&cookie);
