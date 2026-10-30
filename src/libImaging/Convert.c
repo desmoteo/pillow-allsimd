@@ -169,6 +169,15 @@ l2rgb_pixel(UINT8 *restrict out, const UINT8 *restrict in) {
 
 static void
 l2rgb(UINT8 *restrict out, const UINT8 *restrict in, int xsize) {
+#if defined(IMAGING_SIMD_NEON)
+    /* Stores of four planes: on arm64 GCC makes those of byte loops at -O3
+       only, and builds the whole pixels with widening multiplies. */
+    for (; xsize >= 16; xsize -= 16, in += 16, out += 64) {
+        uint8x16_t v = vld1q_u8(in);
+        uint8x16x4_t px = {{v, v, v, vdupq_n_u8(255)}};
+        vst4q_u8(out, px);
+    }
+#endif
     CONVERT_PIXELS(l2rgb_pixel, out, in, xsize, 1, 4);
 }
 
@@ -842,8 +851,37 @@ rgb2rgba_pixel(UINT8 *restrict out, const UINT8 *restrict in) {
     memcpy(out, &v, sizeof(v));
 }
 
+#if defined(IMAGING_SIMD_NEON)
+/* 16 pixels at a time on arm64, where GCC's code for the loops below
+   depends more on the optimization level: ((v or ~v) & and) | or. */
+static inline int
+convert_mask16(
+    UINT8 *restrict out,
+    const UINT8 *restrict in,
+    int xsize,
+    int invert,
+    UINT32 and,
+    UINT32 or
+) {
+    int x = 0, k;
+    uint32x4_t a = vdupq_n_u32(and), o = vdupq_n_u32(or);
+    for (; x < xsize - 15; x += 16, in += 64, out += 64) {
+        for (k = 0; k < 4; k++) {
+            uint32x4_t v = vreinterpretq_u32_u8(vld1q_u8(in + k * 16));
+            v = vorrq_u32(vandq_u32(invert ? vmvnq_u32(v) : v, a), o);
+            vst1q_u8(out + k * 16, vreinterpretq_u8_u32(v));
+        }
+    }
+    return x;
+}
+#endif
+
 static void
 rgb2rgba(UINT8 *restrict out, const UINT8 *restrict in, int xsize) {
+#if defined(IMAGING_SIMD_NEON)
+    int x = convert_mask16(out, in, xsize, 0, ~0u, MAKE_UINT32(0, 0, 0, 255));
+    out += x * 4, in += x * 4, xsize -= x;
+#endif
     CONVERT_PIXELS(rgb2rgba_pixel, out, in, xsize, 4, 4);
 }
 
@@ -1133,6 +1171,10 @@ rgb2cmyk(UINT8 *restrict out, const UINT8 *restrict in, int xsize) {
     /* Note: no undercolour removal. A pixel at a time, which the compiler
        vectorizes the same way for every target; byte by byte, its AVX2
        code was 15% slower than its SSE4 code. */
+#if defined(IMAGING_SIMD_NEON)
+    int x = convert_mask16(out, in, xsize, 1, MAKE_UINT32(255, 255, 255, 0), 0);
+    out += x * 4, in += x * 4, xsize -= x;
+#endif
     CONVERT_PIXELS(rgb2cmyk_pixel, out, in, xsize, 4, 4);
 }
 
