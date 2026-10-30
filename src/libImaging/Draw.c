@@ -424,6 +424,26 @@ x_cmp(const void *x0, const void *x1) {
     }
 }
 
+/* Sorts the intersections of a scan line: a few, so an insertion sort,
+   in place of qsort's call overhead and comparisons through a pointer,
+   which took a large part of the time of filling polygons. The same order:
+   equal values are interchangeable. */
+static void
+sort_intersections(float *xx, int n) {
+    int i, k;
+    if (n > 32) {
+        qsort(xx, n, sizeof(float), x_cmp);
+        return;
+    }
+    for (i = 1; i < n; i++) {
+        float v = xx[i];
+        for (k = i; k > 0 && xx[k - 1] - v > 0; k--) {
+            xx[k] = xx[k - 1];
+        }
+        xx[k] = v;
+    }
+}
+
 static void
 draw_horizontal_lines(
     Imaging im,
@@ -579,7 +599,7 @@ polygon_generic(
                 }
             }
         }
-        qsort(xx, j, sizeof(float), x_cmp);
+        sort_intersections(xx, j);
         if (hasAlpha == 1) {
             int x_pos = j == 0 ? -1 : 0;
             for (i = 1; i < j; i += 2) {
