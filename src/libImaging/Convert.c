@@ -668,9 +668,80 @@ rgb2hsv_4(UINT8 *out, const UINT8 *in) {
 }
 #endif
 
+#if defined(IMAGING_SIMD_AVX2)
+/* rgb2hsv_4 for eight pixels: the same operations per lane. */
+static inline __m256i
+rgb2hsv_scale8(__m256d lo, __m256d hi) {
+    __m256d k = _mm256_set1_pd(255.0);
+    return _mm256_set_m128i(
+        _mm256_cvttpd_epi32(_mm256_mul_pd(hi, k)),
+        _mm256_cvttpd_epi32(_mm256_mul_pd(lo, k))
+    );
+}
+
+static inline void
+rgb2hsv_8(UINT8 *out, const UINT8 *in) {
+/* The low and high four floats as doubles, and two sets of four doubles
+   back to floats. */
+#define HSV_LO(v) _mm256_cvtps_pd(_mm256_castps256_ps128(v))
+#define HSV_HI(v) _mm256_cvtps_pd(_mm256_extractf128_ps(v, 1))
+#define HSV_PS(lo, hi) _mm256_set_m128(_mm256_cvtpd_ps(hi), _mm256_cvtpd_ps(lo))
+    __m256i pix = _mm256_loadu_si256((const __m256i *)in);
+    __m256i mask = _mm256_set1_epi32(0xff);
+    __m256i r = _mm256_and_si256(pix, mask);
+    __m256i g = _mm256_and_si256(_mm256_srli_epi32(pix, 8), mask);
+    __m256i b = _mm256_and_si256(_mm256_srli_epi32(pix, 16), mask);
+    __m256i maxc = _mm256_max_epi32(r, _mm256_max_epi32(g, b));
+    __m256i minc = _mm256_min_epi32(r, _mm256_min_epi32(g, b));
+    __m256i flat = _mm256_cmpeq_epi32(maxc, minc);
+    __m256 cr = _mm256_cvtepi32_ps(_mm256_sub_epi32(maxc, minc));
+    __m256 s = _mm256_div_ps(cr, _mm256_cvtepi32_ps(maxc));
+    __m256 rc = _mm256_div_ps(_mm256_cvtepi32_ps(_mm256_sub_epi32(maxc, r)), cr);
+    __m256 gc = _mm256_div_ps(_mm256_cvtepi32_ps(_mm256_sub_epi32(maxc, g)), cr);
+    __m256 bc = _mm256_div_ps(_mm256_cvtepi32_ps(_mm256_sub_epi32(maxc, b)), cr);
+    __m256d two = _mm256_set1_pd(2.0), four = _mm256_set1_pd(4.0);
+    __m256 hg = HSV_PS(
+        _mm256_sub_pd(_mm256_add_pd(two, HSV_LO(rc)), HSV_LO(bc)),
+        _mm256_sub_pd(_mm256_add_pd(two, HSV_HI(rc)), HSV_HI(bc))
+    );
+    __m256 hb = HSV_PS(
+        _mm256_sub_pd(_mm256_add_pd(four, HSV_LO(gc)), HSV_LO(rc)),
+        _mm256_sub_pd(_mm256_add_pd(four, HSV_HI(gc)), HSV_HI(rc))
+    );
+    __m256 h = _mm256_blendv_ps(
+        _mm256_blendv_ps(hb, hg, _mm256_castsi256_ps(_mm256_cmpeq_epi32(g, maxc))),
+        _mm256_sub_ps(bc, gc),
+        _mm256_castsi256_ps(_mm256_cmpeq_epi32(r, maxc))
+    );
+    __m256d one = _mm256_set1_pd(1.0), six = _mm256_set1_pd(6.0);
+    __m256d h0 = _mm256_add_pd(_mm256_div_pd(HSV_LO(h), six), one);
+    __m256d h1 = _mm256_add_pd(_mm256_div_pd(HSV_HI(h), six), one);
+    h0 = _mm256_blendv_pd(
+        h0, _mm256_sub_pd(h0, one), _mm256_cmp_pd(h0, one, _CMP_GE_OS)
+    );
+    h1 = _mm256_blendv_pd(
+        h1, _mm256_sub_pd(h1, one), _mm256_cmp_pd(h1, one, _CMP_GE_OS)
+    );
+    h0 = _mm256_cvtps_pd(_mm256_cvtpd_ps(h0));
+    h1 = _mm256_cvtps_pd(_mm256_cvtpd_ps(h1));
+    __m256i uh = _mm256_andnot_si256(flat, rgb2hsv_scale8(h0, h1));
+    __m256i us = _mm256_andnot_si256(flat, rgb2hsv_scale8(HSV_LO(s), HSV_HI(s)));
+    __m256i hsv = _mm256_or_si256(
+        _mm256_or_si256(uh, _mm256_slli_epi32(us, 8)), _mm256_slli_epi32(maxc, 16)
+    );
+    hsv = _mm256_or_si256(hsv, _mm256_andnot_si256(_mm256_set1_epi32(0xffffff), pix));
+    _mm256_storeu_si256((__m256i *)out, hsv);
+#undef HSV_LO
+#undef HSV_HI
+#undef HSV_PS
+}
+#endif
+
 static void
 rgb2hsv(UINT8 *out, const UINT8 *in, int xsize) {
-#if defined(IMAGING_SIMD_SSE4)
+#if defined(IMAGING_SIMD_AVX2)
+    CONVERT_ROW(rgb2hsv_8, 8, out, in, xsize, 4, 4);
+#elif defined(IMAGING_SIMD_SSE4)
     CONVERT_ROW(rgb2hsv_4, 4, out, in, xsize, 4, 4);
 #else
     int x;

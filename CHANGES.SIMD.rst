@@ -41,6 +41,8 @@ Based on Pillow 13.0.0
   kernels (2560x1600 to 26x16) 1.3x to 1.6x faster, now level with AVX2;
   RGB in the portable build sums three channels, not four (1.2x, level with
   Pillow 13.0 for big shrinks)
+- RGB -> HSV: AVX2 kernel for 8 pixels, the same operations per lane as
+  the SSE4 one; identical for all 16.7 million RGB values; 2.2x
 - RGB -> CMYK, L -> RGB/LA, RGB <-> RGBA a pixel at a time, which the
   compiler vectorizes (1.6x to 2.9x; the AVX2 build's CMYK was 15% slower
   than SSE4); ImageChops add and subtract with scale 1 in integers, other
