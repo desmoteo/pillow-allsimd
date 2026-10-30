@@ -55,6 +55,7 @@ BYTES = {
     "LA": 2,
     "RGB": 3,
     "RGBA": 4,
+    "YCbCr": 3,
     "I": 4,
     "F": 4,
     "I;16": 2,
@@ -204,6 +205,8 @@ def _(upd: Update) -> None:
         upd(y.tobytes())
         upd(y.convert("RGB").tobytes())
         upd(noise("RGBA", size, 9).convert("YCbCr").convert("RGB").tobytes())
+        # any YCbCr, out of the RGB range too, which clips
+        upd(noise("YCbCr", size, 11).convert("RGB").tobytes())
 
 
 @section("png filters")
@@ -361,7 +364,7 @@ def _(upd: Update) -> None:
     for mode in ("L", "LA", "RGB", "RGBA"):
         for size in ((1, 1), (5, 9), (67, 23), (203, 71)):
             im = noise(mode, size, size[1])
-            for r in (0.4, 1, 2.5, 7, 40):
+            for r in (0.4, 1, 2.5, 3, 3.6, 7, 40):
                 upd(im.filter(ImageFilter.BoxBlur(r)).tobytes())
                 upd(im.filter(ImageFilter.GaussianBlur(r)).tobytes())
                 upd(im.filter(ImageFilter.GaussianBlur((r, r / 3))).tobytes())
