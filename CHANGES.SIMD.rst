@@ -41,7 +41,13 @@ Based on Pillow 13.0.0
   kernels (2560x1600 to 26x16) 1.3x to 1.6x faster, now level with AVX2;
   RGB in the portable build sums three channels, not four (1.2x, level with
   Pillow 13.0 for big shrinks)
-- RGB -> CMYK a pixel at a time: the AVX2 build was 15% slower than SSE4
+- RGB -> CMYK, L -> RGB/LA, RGB <-> RGBA a pixel at a time, which the
+  compiler vectorizes (1.6x to 2.9x; the AVX2 build's CMYK was 15% slower
+  than SSE4); ImageChops add and subtract with scale 1 in integers, other
+  scales by table, lighter and darker without clipping (add 1.6x)
+- Images take transparent huge pages on Linux, as numpy arrays do: box
+  blur 1.5x (its vertical pass), ImageChops lighter 1.6x, most passes
+  over large images a few percent
 - x86: RGBa -> RGBA is exact (colour above alpha gave 0, alpha 0 gave
   colour 0); slightly slower
 - ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a

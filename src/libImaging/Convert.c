@@ -142,13 +142,11 @@ la2lA(UINT8 *out, const UINT8 *in, int xsize) {
 
 static void
 l2rgb(UINT8 *out, const UINT8 *in, int xsize) {
+    /* Whole pixels, which the compiler vectorizes; byte stores it doesn't. */
     int x;
     for (x = 0; x < xsize; x++) {
-        UINT8 v = *in++;
-        *out++ = v;
-        *out++ = v;
-        *out++ = v;
-        *out++ = 255;
+        UINT32 v = MAKE_UINT32(in[x], in[x], in[x], 255);
+        memcpy(out + x * 4, &v, sizeof(v));
     }
 }
 
@@ -745,13 +743,14 @@ hsv2rgb(UINT8 *out, const UINT8 *in, int xsize) {  // following colorsys.py
 
 static void
 rgb2rgba(UINT8 *out, const UINT8 *in, int xsize) {
+    /* Whole pixels, which the compiler vectorizes; byte stores it doesn't. */
+    const UINT32 alpha = MAKE_UINT32(0, 0, 0, 255);
     int x;
     for (x = 0; x < xsize; x++) {
-        *out++ = *in++;
-        *out++ = *in++;
-        *out++ = *in++;
-        *out++ = 255;
-        in++;
+        UINT32 v;
+        memcpy(&v, in + x * 4, sizeof(v));
+        v |= alpha;
+        memcpy(out + x * 4, &v, sizeof(v));
     }
 }
 
