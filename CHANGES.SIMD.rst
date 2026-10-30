@@ -45,6 +45,11 @@ Based on Pillow 13.0.0
   compiler vectorizes (1.6x to 2.9x; the AVX2 build's CMYK was 15% slower
   than SSE4); ImageChops add and subtract with scale 1 in integers, other
   scales by table, lighter and darker without clipping (add 1.6x)
+- Rank filters (min, max, median, any rank up to 11x11) on RGB, RGBA,
+  CMYK, LA and other 4-byte modes run all bands in one pass instead of
+  splitting and merging; min and max keep their row results in a ring of
+  rows and vectorize both passes; 3x3 median in registers (SSE4, AVX2,
+  NEON). RGB min/max 3x3 11x, median 3x3 5.3x, L median 3x3 2.8x
 - Images take transparent huge pages on Linux, as numpy arrays do: box
   blur 1.5x (its vertical pass), ImageChops lighter 1.6x, most passes
   over large images a few percent

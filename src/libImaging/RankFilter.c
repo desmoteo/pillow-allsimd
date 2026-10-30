@@ -13,6 +13,7 @@
  */
 
 #include "Imaging.h"
+#include "ImagingSIMD.h"
 
 /* Fast rank algorithm (due to Wirth), based on public domain code
    by Nicolas Devillard, available at http://ndevilla.free.fr */
@@ -130,16 +131,33 @@ RankNetworkPrune(UINT8 (*network)[2], int count, int rank) {
     return kept;
 }
 
+/* n bytes of the ps-byte pixel at pixel, repeated: an edge of a row. */
+static void
+RankFillPixels(UINT8 *dst, const UINT8 *pixel, int ps, int n) {
+    int k;
+    if (ps == 1) {
+        memset(dst, pixel[0], n);
+        return;
+    }
+    for (k = 0; k < n; k++) {
+        dst[k] = pixel[k % ps];
+    }
+}
+
 /* Size 3 to RANK_NETWORK_MAX, any rank: the size * size neighbours of
-   RANK_CHUNK output pixels go through a sorting network, pruned to what
+   RANK_CHUNK output bytes go through a sorting network, pruned to what
    wire rank needs, and v[rank] is the result. Each compare-exchange is a
    minimum and a maximum over a row of bytes, which compilers vectorise.
-   Returns 0 if out of memory.
+   Pixels are ps bytes, 1 or 4; with 4, each byte is filtered with the
+   same byte of its neighbours, so every band at once. Returns 0 if out
+   of memory.
    With margin 0, im is the image expanded by (size - 1) / 2 on each side;
    otherwise im has imOut's size and pixels outside it repeat its edges, as
    the expanded image would. */
 static int
-RankFilterNetwork_u8(Imaging imOut, Imaging im, int size, int rank, int margin) {
+RankFilterNetwork_u8(
+    Imaging imOut, Imaging im, int size, int rank, int margin, int ps
+) {
     /* An optimal network for 9 values. */
     static const UINT8 network3[25][2] = {{0, 1}, {3, 4}, {6, 7}, {1, 2}, {4, 5},
                                           {7, 8}, {0, 1}, {3, 4}, {6, 7}, {0, 3},
@@ -149,6 +167,7 @@ RankFilterNetwork_u8(Imaging imOut, Imaging im, int size, int rank, int margin) 
     /* Batcher's network for 128 values has 1471 comparators. */
     UINT8 network[1471][2];
     int n = size * size, count, x0, y, i, j, c;
+    int rowbytes = im->xsize * ps, outbytes = imOut->xsize * ps;
     UINT8(*v)[RANK_CHUNK];
 
     if (size == 3) {
@@ -166,91 +185,205 @@ RankFilterNetwork_u8(Imaging imOut, Imaging im, int size, int rank, int margin) 
     // Lanes past the end of the row are sorted too; keep them defined.
     memset(v, 0, (size_t)n * RANK_CHUNK);
     for (y = 0; y < imOut->ysize; y++) {
-        for (x0 = 0; x0 < imOut->xsize; x0 += RANK_CHUNK) {
-            int w = imOut->xsize - x0 < RANK_CHUNK ? imOut->xsize - x0 : RANK_CHUNK;
+        // RANK_CHUNK is a multiple of ps, so chunks hold whole pixels.
+        for (x0 = 0; x0 < outbytes; x0 += RANK_CHUNK) {
+            int w = outbytes - x0 < RANK_CHUNK ? outbytes - x0 : RANK_CHUNK;
             for (i = 0; i < size; i++) {
                 int yy = y + i - margin;
-                const UINT8 *row = im->image8
+                const UINT8 *row = (UINT8 *)im->image
                                        [yy < 0           ? 0
                                         : yy < im->ysize ? yy
                                                          : im->ysize - 1];
                 for (j = 0; j < size; j++) {
-                    int x = x0 + j - margin;
+                    int x = x0 + (j - margin) * ps;
                     UINT8 *dst = v[i * size + j];
-                    if (x >= 0 && x + w <= im->xsize) {
+                    if (x >= 0 && x + w <= rowbytes) {
                         memcpy(dst, &row[x], w);
                     } else {
                         // the edge pixels repeated before and after the row
                         int lead = x < 0 ? (-x < w ? -x : w) : 0;
-                        int tail = x + w > im->xsize ? x + w - im->xsize : 0;
+                        int tail = x + w > rowbytes ? x + w - rowbytes : 0;
                         if (tail > w - lead) {
                             tail = w - lead;
                         }
-                        memset(dst, row[0], lead);
+                        RankFillPixels(dst, row, ps, lead);
                         memcpy(dst + lead, &row[x + lead], w - lead - tail);
-                        memset(dst + w - tail, row[im->xsize - 1], tail);
+                        RankFillPixels(dst + w - tail, row + rowbytes - ps, ps, tail);
                     }
                 }
             }
             for (c = 0; c < count; c++) {
                 RankCompareExchange(v[network[c][0]], v[network[c][1]]);
             }
-            memcpy(&imOut->image8[y][x0], v[rank], w);
+            memcpy((UINT8 *)imOut->image[y] + x0, v[rank], w);
         }
     }
     free(v);
     return 1;
 }
 
+#if defined(IMAGING_SIMD_AVX2)
+#define RANK_VEC 32
+typedef __m256i rank_vec;
+#define RANK_LOAD(p) _mm256_loadu_si256((const __m256i *)(p))
+#define RANK_STORE(p, v) _mm256_storeu_si256((__m256i *)(p), v)
+#define RANK_VMIN(a, b) _mm256_min_epu8(a, b)
+#define RANK_VMAX(a, b) _mm256_max_epu8(a, b)
+#elif defined(IMAGING_SIMD_SSE4)
+#define RANK_VEC 16
+typedef __m128i rank_vec;
+#define RANK_LOAD(p) _mm_loadu_si128((const __m128i *)(p))
+#define RANK_STORE(p, v) _mm_storeu_si128((__m128i *)(p), v)
+#define RANK_VMIN(a, b) _mm_min_epu8(a, b)
+#define RANK_VMAX(a, b) _mm_max_epu8(a, b)
+#elif defined(IMAGING_SIMD_NEON)
+#define RANK_VEC 16
+typedef uint8x16_t rank_vec;
+#define RANK_LOAD(p) vld1q_u8(p)
+#define RANK_STORE(p, v) vst1q_u8(p, v)
+#define RANK_VMIN(a, b) vminq_u8(a, b)
+#define RANK_VMAX(a, b) vmaxq_u8(a, b)
+#endif
+
+#if defined(RANK_VEC)
+/* Median of 3 x 3 (rank 4), RANK_VEC output bytes at a time: the nine
+   neighbours are loaded from the rows and sorted in registers by the
+   19-comparator median network (Paeth), where the generic path above
+   copies them to buffers and sorts there. The median doesn't depend on
+   the sorting method, so the output is the same. margin and ps are as for
+   RankFilterNetwork_u8. */
+static void
+RankFilterMedian3_u8(Imaging imOut, Imaging im, int margin, int ps) {
+    int rowbytes = im->xsize * ps, outbytes = imOut->xsize * ps;
+    int x, y, i, j;
+    UINT8 window[3][RANK_VEC + 8], result[RANK_VEC];
+
+    for (y = 0; y < imOut->ysize; y++) {
+        const UINT8 *rows[3];
+        UINT8 *out = (UINT8 *)imOut->image[y];
+        for (i = 0; i < 3; i++) {
+            int r = y + i - margin;
+            rows[i] = (UINT8 *)im->image[r < 0 ? 0 : r < im->ysize ? r : im->ysize - 1];
+        }
+        for (x = 0; x < outbytes; x += RANK_VEC) {
+            /* Byte x of the output takes bytes base, base + ps and
+               base + 2 * ps of each row. */
+            int base = x - margin * ps;
+            rank_vec p[9], t;
+            if (base >= 0 && base + 2 * ps + RANK_VEC <= rowbytes) {
+                for (i = 0; i < 3; i++) {
+                    for (j = 0; j < 3; j++) {
+                        p[i * 3 + j] = RANK_LOAD(rows[i] + base + j * ps);
+                    }
+                }
+            } else {
+                /* The first and last vectors of a row: copy the window,
+                   repeating the edge pixels. Lanes past the end of the row
+                   are computed too, but not stored. */
+                int n = RANK_VEC + 2 * ps;
+                for (i = 0; i < 3; i++) {
+                    int lead = base < 0 ? -base : 0;
+                    int end = base + n > rowbytes ? rowbytes - base : n;
+                    RankFillPixels(window[i], rows[i], ps, lead);
+                    memcpy(window[i] + lead, rows[i] + base + lead, end - lead);
+                    RankFillPixels(
+                        window[i] + end, rows[i] + rowbytes - ps, ps, n - end
+                    );
+                    for (j = 0; j < 3; j++) {
+                        p[i * 3 + j] = RANK_LOAD(window[i] + j * ps);
+                    }
+                }
+            }
+#define RANK_SORT(a, b)           \
+    t = RANK_VMIN(p[a], p[b]);    \
+    p[b] = RANK_VMAX(p[a], p[b]); \
+    p[a] = t;
+            RANK_SORT(1, 2) RANK_SORT(4, 5) RANK_SORT(7, 8);
+            RANK_SORT(0, 1) RANK_SORT(3, 4) RANK_SORT(6, 7);
+            RANK_SORT(1, 2) RANK_SORT(4, 5) RANK_SORT(7, 8);
+            RANK_SORT(0, 3) RANK_SORT(5, 8) RANK_SORT(4, 7);
+            RANK_SORT(3, 6) RANK_SORT(1, 4) RANK_SORT(2, 5);
+            RANK_SORT(4, 7) RANK_SORT(4, 2) RANK_SORT(6, 4);
+            RANK_SORT(4, 2);
+#undef RANK_SORT
+            if (x + RANK_VEC <= outbytes) {
+                RANK_STORE(out + x, p[4]);
+            } else {
+                RANK_STORE(result, p[4]);
+                memcpy(out + x, result, outbytes - x);
+            }
+        }
+    }
+}
+#endif
+
 /* Minimum (rank 0) or maximum (rank size * size - 1) of any size: of each
-   row's size neighbours, then of size of those row results. Returns 0 if
-   out of memory. margin is as for RankFilterNetwork_u8. */
+   row's size neighbours, then of size of those row results. The row
+   results go to a ring of size rows, so the work stays in cache. Returns 0
+   if out of memory. margin and ps are as for RankFilterNetwork_u8. */
 static int
-RankFilterMinMax_u8(Imaging imOut, Imaging im, int size, int is_max, int margin) {
-    int xsize = imOut->xsize, ysize = imOut->ysize;
-    int x, y, k;
-    UINT8 *rows, *padded = NULL;
+RankFilterMinMax_u8(
+    Imaging imOut, Imaging im, int size, int is_max, int margin, int ps
+) {
+    int xsize = imOut->xsize * ps, ysize = imOut->ysize;
+    int x, y, k, j;
+    UINT8 *ring, *padded = NULL;
     if (xsize == 0 || ysize == 0) {
         return 1;
     }
-    rows = malloc((size_t)xsize * im->ysize);
+    ring = malloc((size_t)xsize * size);
     if (margin) {
-        padded = malloc((size_t)xsize + 2 * margin);
+        padded = malloc((size_t)xsize + 2 * margin * ps);
     }
-    if (!rows || (margin && !padded)) {
-        free(rows);
+    if (!ring || (margin && !padded)) {
+        free(ring);
         return 0;
     }
 
-#define RANK_ROW(r) \
-    (rows + (size_t)((r) < 0 ? 0 : (r) < im->ysize ? (r) : im->ysize - 1) * xsize)
-#define RANK_MINMAX(op)                                             \
-    for (y = 0; y < im->ysize; y++) {                               \
-        const UINT8 *in = im->image8[y];                            \
-        UINT8 *restrict row = rows + (size_t)y * xsize;             \
-        if (margin) {                                               \
-            /* the row with its edges repeated, as expanded */      \
-            memset(padded, in[0], margin);                          \
-            memcpy(padded + margin, in, xsize);                     \
-            memset(padded + margin + xsize, in[xsize - 1], margin); \
-            in = padded;                                            \
-        }                                                           \
-        memcpy(row, in, xsize);                                     \
-        for (k = 1; k < size; k++) {                                \
-            for (x = 0; x < xsize; x++) {                           \
-                row[x] = op(row[x], in[x + k]);                     \
-            }                                                       \
-        }                                                           \
-    }                                                               \
-    for (y = 0; y < ysize; y++) {                                   \
-        UINT8 *restrict out = imOut->image8[y];                     \
-        memcpy(out, RANK_ROW(y - margin), xsize);                   \
-        for (k = 1; k < size; k++) {                                \
-            const UINT8 *restrict row = RANK_ROW(y + k - margin);   \
-            for (x = 0; x < xsize; x++) {                           \
-                out[x] = op(out[x], row[x]);                        \
-            }                                                       \
-        }                                                           \
+/* Ring slot k holds the row result of source row k - margin, clipped to
+   the image; k - margin is the source row of window row k. */
+#define RANK_SLOT(k) (ring + (size_t)((k) % size) * xsize)
+#define RANK_HROW(op, k)                                                       \
+    do {                                                                       \
+        int r_ = (k) - margin;                                                 \
+        const UINT8 *in = (UINT8 *)im->image                                   \
+                              [r_ < 0           ? 0                            \
+                               : r_ < im->ysize ? r_                           \
+                                                : im->ysize - 1];              \
+        UINT8 *restrict row = RANK_SLOT(k);                                    \
+        if (margin) {                                                          \
+            /* the row with its edge pixels repeated, as expanded */           \
+            RankFillPixels(padded, in, ps, margin * ps);                       \
+            memcpy(padded + margin * ps, in, xsize);                           \
+            RankFillPixels(                                                    \
+                padded + margin * ps + xsize, in + xsize - ps, ps, margin * ps \
+            );                                                                 \
+            in = padded;                                                       \
+        }                                                                      \
+        memcpy(row, in, xsize);                                                \
+        for (j = 1; j < size; j++) {                                           \
+            /* restrict: without it, GCC's -O2 cost model leaves the loop */   \
+            /* scalar rather than check that the rows don't overlap */         \
+            const UINT8 *restrict src = in + j * ps;                           \
+            for (x = 0; x < xsize; x++) {                                      \
+                row[x] = op(row[x], src[x]);                                   \
+            }                                                                  \
+        }                                                                      \
+    } while (0)
+#define RANK_MINMAX(op)                                   \
+    for (k = 0; k < size - 1; k++) {                      \
+        RANK_HROW(op, k);                                 \
+    }                                                     \
+    for (y = 0; y < ysize; y++) {                         \
+        UINT8 *restrict out = (UINT8 *)imOut->image[y];   \
+        RANK_HROW(op, y + size - 1);                      \
+        memcpy(out, RANK_SLOT(y), xsize);                 \
+        for (j = 1; j < size; j++) {                      \
+            const UINT8 *restrict row = RANK_SLOT(y + j); \
+            for (x = 0; x < xsize; x++) {                 \
+                out[x] = op(out[x], row[x]);              \
+            }                                             \
+        }                                                 \
     }
 #define RANK_MIN(a, b) ((a) < (b) ? (a) : (b))
 #define RANK_MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -262,9 +395,10 @@ RankFilterMinMax_u8(Imaging imOut, Imaging im, int size, int is_max, int margin)
 #undef RANK_MIN
 #undef RANK_MAX
 #undef RANK_MINMAX
-#undef RANK_ROW
+#undef RANK_HROW
+#undef RANK_SLOT
 
-    free(rows);
+    free(ring);
     free(padded);
     return 1;
 }
@@ -327,12 +461,16 @@ ImagingRankFilter(Imaging im, int size, int rank) {
     ImagingSectionCookie cookie;
     ImagingSectionEnter(&cookie);
     if (im->image8 && (rank == 0 || rank == size2 - 1) && size > 1) {
-        if (!RankFilterMinMax_u8(imOut, im, size, rank != 0, 0)) {
+        if (!RankFilterMinMax_u8(imOut, im, size, rank != 0, 0, 1)) {
             ImagingSectionLeave(&cookie);
             goto nomemory;
         }
+#if defined(RANK_VEC)
+    } else if (im->image8 && size == 3 && rank == 4) {
+        RankFilterMedian3_u8(imOut, im, 0, 1);
+#endif
     } else if (im->image8 && size >= 3 && size <= RANK_NETWORK_MAX) {
-        if (!RankFilterNetwork_u8(imOut, im, size, rank, 0)) {
+        if (!RankFilterNetwork_u8(imOut, im, size, rank, 0, 1)) {
             ImagingSectionLeave(&cookie);
             goto nomemory;
         }
@@ -360,14 +498,19 @@ nomemory:
 }
 
 /* As ImagingRankFilter on im expanded by (size - 1) / 2 pixels that repeat
-   its edges, without making the expanded copy where the fast paths for
-   1-byte images can read the edges themselves. */
+   its edges, without making the expanded copy where the fast paths can
+   read the edges themselves. Those also take images of several 8-bit
+   bands in 4-byte pixels, filtering each band as ImagingRankFilter would
+   filter it alone. */
 Imaging
 ImagingRankFilterSameSize(Imaging im, int size, int rank) {
     Imaging imOut, imExpanded;
-    int ok;
-    if (im && im->image8 && im->type == IMAGING_TYPE_UINT8 && im->bands == 1 &&
-        im->xsize > 0 && im->ysize > 0 && size >= 3 && (size & 1) &&
+    int ok, ps;
+    ps = !im || im->type != IMAGING_TYPE_UINT8 ? 0
+         : im->image8 && im->bands == 1        ? 1
+         : im->image32 && im->pixelsize == 4   ? 4
+                                               : 0;
+    if (ps && im->xsize > 0 && im->ysize > 0 && size >= 3 && (size & 1) &&
         size <= RANK_NETWORK_MAX && rank >= 0 && rank < size * size) {
         ImagingSectionCookie cookie;
         imOut = ImagingNewDirty(im->mode, im->xsize, im->ysize);
@@ -376,9 +519,14 @@ ImagingRankFilterSameSize(Imaging im, int size, int rank) {
         }
         ImagingSectionEnter(&cookie);
         if (rank == 0 || rank == size * size - 1) {
-            ok = RankFilterMinMax_u8(imOut, im, size, rank != 0, (size - 1) / 2);
+            ok = RankFilterMinMax_u8(imOut, im, size, rank != 0, (size - 1) / 2, ps);
+#if defined(RANK_VEC)
+        } else if (size == 3 && rank == 4) {
+            RankFilterMedian3_u8(imOut, im, 1, ps);
+            ok = 1;
+#endif
         } else {
-            ok = RankFilterNetwork_u8(imOut, im, size, rank, (size - 1) / 2);
+            ok = RankFilterNetwork_u8(imOut, im, size, rank, (size - 1) / 2, ps);
         }
         ImagingSectionLeave(&cookie);
         if (!ok) {
