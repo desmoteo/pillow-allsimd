@@ -165,9 +165,10 @@ void static inline ImagingLineBoxBlur32x2(
 #endif
 
 /* Up to this radius a pass may use ImagingBoxBlurDirect instead of running
-   sums: always for radius 0, and with SSE4 for radius 1, and to
+   sums: always for radius 0, and with SIMD for radius 1, and to
    BOX_DIRECT_MAX where the fast form below applies. */
-#if defined(IMAGING_SIMD_SSE4)
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+#define BOX_DIRECT_SIMD
 #define BOX_DIRECT_MAX 4
 #else
 #define BOX_DIRECT_MAX 0
@@ -186,7 +187,7 @@ typedef struct {
 
 static void
 BoxDirectInit(BoxDirect *d, int radius, UINT32 ww, UINT32 fw) {
-#if defined(IMAGING_SIMD_SSE4)
+#if defined(BOX_DIRECT_SIMD)
     /* s, t, m and k for the integer radii 1 to 4, found by a search
        around m = ww * 2^(t - s - 8) and k = 2^(15 + t) / m. */
     static const unsigned short fast[4][4] = {
@@ -198,7 +199,7 @@ BoxDirectInit(BoxDirect *d, int radius, UINT32 ww, UINT32 fw) {
     d->fw = fw;
     d->fast = 0;
     d->direct = radius == 0;
-#if defined(IMAGING_SIMD_SSE4)
+#if defined(BOX_DIRECT_SIMD)
     if (radius >= 1 && radius <= BOX_DIRECT_MAX && fw == 0) {
         const unsigned short *f = fast[radius - 1];
         int c, cmax = 255 * (2 * radius + 1);
@@ -356,6 +357,71 @@ ImagingBoxBlurDirect(
         }
 #undef BOX_DIRECT_FAR
 #undef BOX_DIRECT_PAIRS
+    }
+#undef BOX_DIRECT_SUM
+#elif defined(IMAGING_SIMD_NEON)
+    /* The same with 16 bytes at a time: c, the sum of the box, in two
+       halves of 8 16-bit lanes */
+#define BOX_DIRECT_SUM(o)                                       \
+    {                                                           \
+        uint8x16_t v_ = vld1q_u8(src[1] + (o));                 \
+        c0 = vmovl_u8(vget_low_u8(v_)), c1 = vmovl_high_u8(v_); \
+        for (j = 2; j < count - 1; j++) {                       \
+            v_ = vld1q_u8(src[j] + (o));                        \
+            c0 = vaddw_u8(c0, vget_low_u8(v_));                 \
+            c1 = vaddw_high_u8(c1, v_);                         \
+        }                                                       \
+    }
+    if (d->fast) {
+        int16x8_t s = vdupq_n_s16(d->s), t = vdupq_n_s16(-d->t);
+        uint16x8_t k = vdupq_n_u16(d->k);
+        uint16x4_t m = vdup_n_u16(d->m);
+        for (; i <= n - 16; i += 16) {
+            uint16x8_t c0, c1, r[2];
+            int h;
+            BOX_DIRECT_SUM(i)
+            for (h = 0; h < 2; h++) {
+                uint16x8_t v = vaddq_u16(vshlq_u16(h ? c1 : c0, s), k);
+                /* the high halves of the 32-bit products: mulhi */
+                uint16x8_t hi = vuzp2q_u16(
+                    vreinterpretq_u16_u32(vmull_u16(vget_low_u16(v), m)),
+                    vreinterpretq_u16_u32(vmull_high_u16(v, vcombine_u16(m, m)))
+                );
+                r[h] = vshlq_u16(hi, t);
+            }
+            vst1q_u8(out + i, vcombine_u8(vmovn_u16(r[0]), vmovn_u16(r[1])));
+        }
+    } else {
+        /* The products exactly, in 32 bits: one instruction each on arm64,
+           where splitting the weights as for x86 was slower. vaddhn gives
+           (total + 2^23) >> 16. */
+        uint32x4_t vww = vdupq_n_u32(ww), vfw = vdupq_n_u32(fw);
+        uint32x4_t b23 = vdupq_n_u32(1 << 23);
+        for (; i <= n - 16; i += 16) {
+            uint16x8_t c0, c1;
+            uint8x8_t r[2];
+            uint8x16_t e0 = vld1q_u8(src[0] + i), e1 = vld1q_u8(src[count - 1] + i);
+            uint16x8_t e[2] = {
+                vaddl_u8(vget_low_u8(e0), vget_low_u8(e1)), vaddl_high_u8(e0, e1)
+            };
+            int h;
+            BOX_DIRECT_SUM(i)
+            for (h = 0; h < 2; h++) {
+                uint16x8_t c = h ? c1 : c0;
+                uint32x4_t lo = vmlaq_u32(
+                    vmulq_u32(vmovl_u16(vget_low_u16(c)), vww),
+                    vmovl_u16(vget_low_u16(e[h])),
+                    vfw
+                );
+                uint32x4_t hi = vmlaq_u32(
+                    vmulq_u32(vmovl_high_u16(c), vww), vmovl_high_u16(e[h]), vfw
+                );
+                r[h] = vshrn_n_u16(
+                    vcombine_u16(vaddhn_u32(lo, b23), vaddhn_u32(hi, b23)), 8
+                );
+            }
+            vst1q_u8(out + i, vcombine_u8(r[0], r[1]));
+        }
     }
 #undef BOX_DIRECT_SUM
 #endif
