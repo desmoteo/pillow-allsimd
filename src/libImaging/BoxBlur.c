@@ -3,6 +3,58 @@
 
 typedef UINT8 pixel[4];
 
+/* The running-sum box blur of a row of 4-byte pixels, for any vector
+   type: the caller defines V (the type), V_LOAD(i) (pixel i as four
+   32-bit channels), V_SET1, V_ADD, V_SUB, V_MUL and V_SAVE(x, bulk). */
+#define BOX_LINE_BLUR                                                                 \
+    {                                                                                 \
+        int x;                                                                        \
+        V acc, bulk;                                                                  \
+        V wws = V_SET1(ww);                                                           \
+        V fws = V_SET1(fw);                                                           \
+        /* Compute acc for -1 pixel (outside of image): from "-radius-1" to */        \
+        /* "-1" get first pixel, then from "0" to "radius-1". */                      \
+        acc = V_MUL(V_LOAD(0), V_SET1(radius + 1));                                   \
+        /* As radius can be bigger than xsize, iterate to edgeA -1. */                \
+        for (x = 0; x < edgeA - 1; x++) {                                             \
+            acc = V_ADD(acc, V_LOAD(x));                                              \
+        }                                                                             \
+        /* Then multiply remainder to last x. */                                      \
+        acc = V_ADD(acc, V_MUL(V_LOAD(x), V_SET1(radius - edgeA + 1)));               \
+        if (edgeA <= edgeB) {                                                         \
+            /* Subtract pixel from left ("0"). Add pixels from radius. */             \
+            for (x = 0; x < edgeA; x++) {                                             \
+                BOX_STEP(0, x + radius, 0, x + radius + 1);                           \
+            }                                                                         \
+            /* Subtract previous pixel from "-radius". Add from radius. */            \
+            for (x = edgeA; x < edgeB; x++) {                                         \
+                BOX_STEP(x - radius - 1, x + radius, x - radius - 1, x + radius + 1); \
+            }                                                                         \
+            /* Subtract previous pixel from "-radius". Add last pixel. */             \
+            for (x = edgeB; x <= lastx; x++) {                                        \
+                BOX_STEP(x - radius - 1, lastx, x - radius - 1, lastx);               \
+            }                                                                         \
+        } else {                                                                      \
+            for (x = 0; x < edgeB; x++) {                                             \
+                BOX_STEP(0, x + radius, 0, x + radius + 1);                           \
+            }                                                                         \
+            for (x = edgeB; x < edgeA; x++) {                                         \
+                BOX_STEP(0, lastx, 0, lastx);                                         \
+            }                                                                         \
+            for (x = edgeA; x <= lastx; x++) {                                        \
+                BOX_STEP(x - radius - 1, lastx, x - radius - 1, lastx);               \
+            }                                                                         \
+        }                                                                             \
+    }
+
+/* acc[0] += lineIn[add][0] - lineIn[subtract][0];
+   bulk[0] = (acc[0] * ww) + (lineIn[left][0] + lineIn[right][0]) * fw;
+   lineOut[x][0] = (UINT8)((bulk[0] + (1 << 23)) >> 24); */
+#define BOX_STEP(subtract, add, left, right)                                       \
+    acc = V_SUB(V_ADD(acc, V_LOAD(add)), V_LOAD(subtract));                        \
+    bulk = V_ADD(V_MUL(V_ADD(V_LOAD(left), V_LOAD(right)), fws), V_MUL(acc, wws)); \
+    V_SAVE(x, bulk);
+
 void static inline ImagingLineBoxBlur32(
     UINT32 *lineOut,
     UINT32 *lineIn,
@@ -13,91 +65,104 @@ void static inline ImagingLineBoxBlur32(
     UINT32 ww,
     UINT32 fw
 ) {
-    int x;
-    px4 acc;
-    px4 bulk;
-    px4 wws = px4_set1(ww);
-    px4 fws = px4_set1(fw);
-
-    // #define MOVE_ACC(acc, subtract, add)
-    //     acc[0] += lineIn[add][0] - lineIn[subtract][0];
-
-#define MOVE_ACC(acc, subtract, add) \
-    acc = px4_sub(px4_add(acc, px4_load(&lineIn[add])), px4_load(&lineIn[subtract]));
-
-    // #define ADD_FAR(bulk, acc, left, right)
-    //     bulk[0] = (acc[0] * ww) + (lineIn[left][0] + lineIn[right][0]) * fw;
-
-#define ADD_FAR(bulk, acc, left, right)                                           \
-    bulk = px4_add(                                                               \
-        px4_mul(px4_add(px4_load(&lineIn[left]), px4_load(&lineIn[right])), fws), \
-        px4_mul(acc, wws)                                                         \
-    );
-
-    // #define SAVE(x, bulk)
-    //    lineOut[x][0] = (UINT8)((bulk[0] + (1 << 23)) >> 24);
-
-#define SAVE(x, bulk) lineOut[x] = px4_round24(bulk)
-
-    /* Compute acc for -1 pixel (outside of image):
-       From "-radius-1" to "-1" get first pixel,
-       then from "0" to "radius-1". */
-    // acc[0] = lineIn[0][0] * (radius + 1);
-    acc = px4_mul(px4_load(&lineIn[0]), px4_set1(radius + 1));
-
-    /* As radius can be bigger than xsize, iterate to edgeA -1. */
-    for (x = 0; x < edgeA - 1; x++) {
-        // acc[0] += lineIn[x][0];
-        acc = px4_add(acc, px4_load(&lineIn[x]));
-    }
-    /* Then multiply remainder to last x. */
-    // acc[0] += lineIn[lastx][0] * (radius - edgeA + 1);
-    acc = px4_add(acc, px4_mul(px4_load(&lineIn[x]), px4_set1(radius - edgeA + 1)));
-
-    if (edgeA <= edgeB) {
-        /* Subtract pixel from left ("0").
-           Add pixels from radius. */
-        for (x = 0; x < edgeA; x++) {
-            MOVE_ACC(acc, 0, x + radius);
-            ADD_FAR(bulk, acc, 0, x + radius + 1);
-            SAVE(x, bulk);
-        }
-        /* Subtract previous pixel from "-radius".
-           Add pixels from radius. */
-        for (x = edgeA; x < edgeB; x++) {
-            MOVE_ACC(acc, x - radius - 1, x + radius);
-            ADD_FAR(bulk, acc, x - radius - 1, x + radius + 1);
-            SAVE(x, bulk);
-        }
-        /* Subtract previous pixel from "-radius".
-           Add last pixel. */
-        for (x = edgeB; x <= lastx; x++) {
-            MOVE_ACC(acc, x - radius - 1, lastx);
-            ADD_FAR(bulk, acc, x - radius - 1, lastx);
-            SAVE(x, bulk);
-        }
-    } else {
-        for (x = 0; x < edgeB; x++) {
-            MOVE_ACC(acc, 0, x + radius);
-            ADD_FAR(bulk, acc, 0, x + radius + 1);
-            SAVE(x, bulk);
-        }
-        for (x = edgeB; x < edgeA; x++) {
-            MOVE_ACC(acc, 0, lastx);
-            ADD_FAR(bulk, acc, 0, lastx);
-            SAVE(x, bulk);
-        }
-        for (x = edgeA; x <= lastx; x++) {
-            MOVE_ACC(acc, x - radius - 1, lastx);
-            ADD_FAR(bulk, acc, x - radius - 1, lastx);
-            SAVE(x, bulk);
-        }
-    }
-
-#undef MOVE_ACC
-#undef ADD_FAR
-#undef SAVE
+#define V px4
+#define V_LOAD(i) px4_load(&lineIn[i])
+#define V_SET1 px4_set1
+#define V_ADD px4_add
+#define V_SUB px4_sub
+#define V_MUL px4_mul
+#define V_SAVE(x, bulk) lineOut[x] = px4_round24(bulk)
+    BOX_LINE_BLUR
+#undef V
+#undef V_LOAD
+#undef V_SET1
+#undef V_ADD
+#undef V_SUB
+#undef V_MUL
+#undef V_SAVE
 }
+
+#if defined(IMAGING_SIMD_AVX2)
+/* Two rows at once, one in each 128-bit half: the same arithmetic per
+   channel with half the instructions. */
+static inline __m256i
+px8_load(const UINT32 *a, const UINT32 *b) {
+    return _mm256_cvtepu8_epi32(
+        _mm_unpacklo_epi32(_mm_cvtsi32_si128(*a), _mm_cvtsi32_si128(*b))
+    );
+}
+
+void static inline ImagingLineBoxBlur32x2(
+    UINT32 *lineOut0,
+    UINT32 *lineOut1,
+    UINT32 *lineIn0,
+    UINT32 *lineIn1,
+    int lastx,
+    int radius,
+    int edgeA,
+    int edgeB,
+    UINT32 ww,
+    UINT32 fw
+) {
+    const __m256i b23 = _mm256_set1_epi32(1 << 23);
+    const __m256i bytes = _mm256_setr_epi8(
+        0,
+        4,
+        8,
+        12,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        0,
+        4,
+        8,
+        12,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+    );
+#define V __m256i
+#define V_LOAD(i) px8_load(&lineIn0[i], &lineIn1[i])
+#define V_SET1 _mm256_set1_epi32
+#define V_ADD _mm256_add_epi32
+#define V_SUB _mm256_sub_epi32
+#define V_MUL _mm256_mullo_epi32
+#define V_SAVE(x, bulk)                                                   \
+    {                                                                     \
+        __m256i v_ = _mm256_shuffle_epi8(                                 \
+            _mm256_srli_epi32(_mm256_add_epi32(bulk, b23), 24), bytes     \
+        );                                                                \
+        lineOut0[x] = _mm_cvtsi128_si32(_mm256_castsi256_si128(v_));      \
+        lineOut1[x] = _mm_cvtsi128_si32(_mm256_extracti128_si256(v_, 1)); \
+    }
+    BOX_LINE_BLUR
+#undef V
+#undef V_LOAD
+#undef V_SET1
+#undef V_ADD
+#undef V_SUB
+#undef V_MUL
+#undef V_SAVE
+}
+#endif
 
 /* Radius below 1: each pixel and its two neighbours, edges repeated. */
 void static inline ImagingLineBoxBlurZero32(
@@ -253,23 +318,95 @@ deinterleave4(
 }
 #endif
 
-Imaging
-ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius) {
+/* passes horizontal box blurs. All passes run on one row before the next
+   row, so the row stays in cache: the same arithmetic as blurring the
+   whole image once per pass, with one read and one write of the image.
+   imOut may be imIn. */
+static Imaging
+ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int passes) {
     ImagingSectionCookie cookie;
 
-    int y;
+    int y, p;
 
     int radius = (int)floatRadius;
     UINT32 ww = (UINT32)(1 << 24) / (floatRadius * 2 + 1);
     UINT32 fw = ((1 << 24) - (radius * 2 + 1) * ww) / 2;
 
+    int lastx = imIn->xsize - 1;
     int edgeA = MIN(radius + 1, imIn->xsize);
     int edgeB = MAX(imIn->xsize - radius - 1, 0);
 
-    UINT32 *lineOut = calloc(imIn->xsize, sizeof(UINT32));
-    if (lineOut == NULL) {
+    /* Two row buffers the passes alternate between. */
+    UINT32 *buf[2];
+    buf[0] = calloc(imIn->xsize, sizeof(UINT32));
+    buf[1] = calloc(imIn->xsize, sizeof(UINT32));
+    if (buf[0] == NULL || buf[1] == NULL) {
+        free(buf[0]);
+        free(buf[1]);
         return ImagingError_MemoryError();
     }
+
+/* Runs the passes from row in: each one reads src and writes the other
+   buffer, except the last one, which writes out unless it reads it. */
+#define BLUR_PASSES(type, in, out, blur, zero)                         \
+    {                                                                  \
+        type *src_ = (type *)(in);                                     \
+        for (p = 0; p < passes; p++) {                                 \
+            type *dst_ = (p == passes - 1 && src_ != (type *)(out))    \
+                             ? (type *)(out)                           \
+                             : (type *)buf[p % 2];                     \
+            if (radius) {                                              \
+                blur(dst_, src_, lastx, radius, edgeA, edgeB, ww, fw); \
+            } else {                                                   \
+                zero(dst_, src_, lastx, ww, fw);                       \
+            }                                                          \
+            src_ = dst_;                                               \
+        }                                                              \
+        if (src_ != (type *)(out)) {                                   \
+            memcpy((out), src_, imIn->xsize * sizeof(type));           \
+        }                                                              \
+    }
+
+#if defined(IMAGING_SIMD_AVX2)
+    /* The same for two rows of 4-byte pixels at once. */
+    UINT32 *pair[2][2] = {{NULL, NULL}, {NULL, NULL}};
+#define BLUR_PASSES_2(in0, in1, out0, out1)                                 \
+    {                                                                       \
+        UINT32 *s0_ = (in0), *s1_ = (in1);                                  \
+        for (p = 0; p < passes; p++) {                                      \
+            int last_ = p == passes - 1;                                    \
+            UINT32 *d0_ = last_ && s0_ != (out0) ? (out0) : pair[p % 2][0]; \
+            UINT32 *d1_ = last_ && s1_ != (out1) ? (out1) : pair[p % 2][1]; \
+            if (radius) {                                                   \
+                ImagingLineBoxBlur32x2(                                     \
+                    d0_, d1_, s0_, s1_, lastx, radius, edgeA, edgeB, ww, fw \
+                );                                                          \
+            } else {                                                        \
+                ImagingLineBoxBlurZero32(d0_, s0_, lastx, ww, fw);          \
+                ImagingLineBoxBlurZero32(d1_, s1_, lastx, ww, fw);          \
+            }                                                               \
+            s0_ = d0_;                                                      \
+            s1_ = d1_;                                                      \
+        }                                                                   \
+        if (s0_ != (out0)) {                                                \
+            memcpy((out0), s0_, imIn->xsize * sizeof(UINT32));              \
+        }                                                                   \
+        if (s1_ != (out1)) {                                                \
+            memcpy((out1), s1_, imIn->xsize * sizeof(UINT32));              \
+        }                                                                   \
+    }
+    for (p = 0; p < 4; p++) {
+        pair[p / 2][p % 2] = malloc(imIn->xsize * sizeof(UINT32));
+        if (!pair[p / 2][p % 2]) {
+            for (p = 0; p < 4; p++) {
+                free(pair[p / 2][p % 2]);
+            }
+            free(buf[0]);
+            free(buf[1]);
+            return ImagingError_MemoryError();
+        }
+    }
+#endif
 
     ImagingSectionEnter(&cookie);
 
@@ -277,11 +414,62 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius) {
         y = 0;
 #if defined(IMAGING_SIMD_SSE4)
         UINT32 *lineIn4 = malloc(imIn->xsize * sizeof(UINT32));
-        if (lineIn4 == NULL) {
+        UINT32 *lineOut4 = malloc(imIn->xsize * sizeof(UINT32));
+        UINT32 *lineIn4b = malloc(imIn->xsize * sizeof(UINT32));
+        UINT32 *lineOut4b = malloc(imIn->xsize * sizeof(UINT32));
+        if (!lineIn4 || !lineOut4 || !lineIn4b || !lineOut4b) {
             ImagingSectionLeave(&cookie);
-            free(lineOut);
+            free(lineIn4);
+            free(lineOut4);
+            free(lineIn4b);
+            free(lineOut4b);
+            free(buf[0]);
+            free(buf[1]);
+#if defined(IMAGING_SIMD_AVX2)
+            for (p = 0; p < 4; p++) {
+                free(pair[p / 2][p % 2]);
+            }
+#endif
             return ImagingError_MemoryError();
         }
+#if defined(IMAGING_SIMD_AVX2)
+        // Eight rows: two groups of four, each a row of 4-byte pixels.
+        for (; y < imIn->ysize - 7; y += 8) {
+            interleave4(
+                lineIn4,
+                imIn->image8[y],
+                imIn->image8[y + 1],
+                imIn->image8[y + 2],
+                imIn->image8[y + 3],
+                imIn->xsize
+            );
+            interleave4(
+                lineIn4b,
+                imIn->image8[y + 4],
+                imIn->image8[y + 5],
+                imIn->image8[y + 6],
+                imIn->image8[y + 7],
+                imIn->xsize
+            );
+            BLUR_PASSES_2(lineIn4, lineIn4b, lineOut4, lineOut4b);
+            deinterleave4(
+                imOut->image8[y],
+                imOut->image8[y + 1],
+                imOut->image8[y + 2],
+                imOut->image8[y + 3],
+                lineOut4,
+                imIn->xsize
+            );
+            deinterleave4(
+                imOut->image8[y + 4],
+                imOut->image8[y + 5],
+                imOut->image8[y + 6],
+                imOut->image8[y + 7],
+                lineOut4b,
+                imIn->xsize
+            );
+        }
+#endif
         // All four input rows are read before any output row is written,
         // so imOut may be imIn.
         for (; y < imIn->ysize - 3; y += 4) {
@@ -293,94 +481,70 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius) {
                 imIn->image8[y + 3],
                 imIn->xsize
             );
-            if (radius) {
-                ImagingLineBoxBlur32(
-                    lineOut, lineIn4, imIn->xsize - 1, radius, edgeA, edgeB, ww, fw
-                );
-            } else {
-                ImagingLineBoxBlurZero32(lineOut, lineIn4, imIn->xsize - 1, ww, fw);
-            }
+            BLUR_PASSES(
+                UINT32,
+                lineIn4,
+                lineOut4,
+                ImagingLineBoxBlur32,
+                ImagingLineBoxBlurZero32
+            );
             deinterleave4(
                 imOut->image8[y],
                 imOut->image8[y + 1],
                 imOut->image8[y + 2],
                 imOut->image8[y + 3],
-                lineOut,
+                lineOut4,
                 imIn->xsize
             );
         }
         free(lineIn4);
+        free(lineOut4);
+        free(lineIn4b);
+        free(lineOut4b);
 #endif
-        if (radius) {
-            for (; y < imIn->ysize; y++) {
-                ImagingLineBoxBlur8(
-                    (imIn == imOut ? (UINT8 *)lineOut : imOut->image8[y]),
-                    imIn->image8[y],
-                    imIn->xsize - 1,
-                    radius,
-                    edgeA,
-                    edgeB,
-                    ww,
-                    fw
-                );
-                if (imIn == imOut) {
-                    // Commit.
-                    memcpy(imOut->image8[y], lineOut, imIn->xsize);
-                }
-            }
-        } else {
-            for (; y < imIn->ysize; y++) {
-                ImagingLineBoxBlurZero8(
-                    (imIn == imOut ? (UINT8 *)lineOut : imOut->image8[y]),
-                    imIn->image8[y],
-                    imIn->xsize - 1,
-                    ww,
-                    fw
-                );
-                if (imIn == imOut) {
-                    // Commit.
-                    memcpy(imOut->image8[y], lineOut, imIn->xsize);
-                }
-            }
+        for (; y < imIn->ysize; y++) {
+            BLUR_PASSES(
+                UINT8,
+                imIn->image8[y],
+                imOut->image8[y],
+                ImagingLineBoxBlur8,
+                ImagingLineBoxBlurZero8
+            );
         }
     } else {
-        if (radius) {
-            for (y = 0; y < imIn->ysize; y++) {
-                ImagingLineBoxBlur32(
-                    imIn == imOut ? (UINT32 *)lineOut : (UINT32 *)imOut->image32[y],
-                    (UINT32 *)imIn->image32[y],
-                    imIn->xsize - 1,
-                    radius,
-                    edgeA,
-                    edgeB,
-                    ww,
-                    fw
-                );
-                if (imIn == imOut) {
-                    // Commit.
-                    memcpy(imOut->image32[y], lineOut, imIn->xsize * 4);
-                }
-            }
-        } else {
-            for (y = 0; y < imIn->ysize; y++) {
-                ImagingLineBoxBlurZero32(
-                    imIn == imOut ? (UINT32 *)lineOut : (UINT32 *)imOut->image32[y],
-                    (UINT32 *)imIn->image32[y],
-                    imIn->xsize - 1,
-                    ww,
-                    fw
-                );
-                if (imIn == imOut) {
-                    // Commit.
-                    memcpy(imOut->image32[y], lineOut, imIn->xsize * 4);
-                }
-            }
+        y = 0;
+#if defined(IMAGING_SIMD_AVX2)
+        for (; y < imIn->ysize - 1; y += 2) {
+            BLUR_PASSES_2(
+                (UINT32 *)imIn->image32[y],
+                (UINT32 *)imIn->image32[y + 1],
+                (UINT32 *)imOut->image32[y],
+                (UINT32 *)imOut->image32[y + 1]
+            );
+        }
+#endif
+        for (; y < imIn->ysize; y++) {
+            BLUR_PASSES(
+                UINT32,
+                imIn->image32[y],
+                imOut->image32[y],
+                ImagingLineBoxBlur32,
+                ImagingLineBoxBlurZero32
+            );
         }
     }
+#undef BLUR_PASSES
 
     ImagingSectionLeave(&cookie);
 
-    free(lineOut);
+    free(buf[0]);
+    free(buf[1]);
+#if defined(IMAGING_SIMD_AVX2)
+#undef BLUR_PASSES_2
+    for (p = 0; p < 4; p++) {
+        free(pair[p / 2][p % 2]);
+    }
+#endif
 
     return imOut;
 }
@@ -401,6 +565,44 @@ ImagingBoxBlurColumns(
 ) {
     int b = 0;
 
+#if defined(IMAGING_SIMD_AVX2)
+    {
+        __m256i wws = _mm256_set1_epi32(ww);
+        __m256i fws = _mm256_set1_epi32(fw);
+        __m256i b23 = _mm256_set1_epi32(1 << 23);
+        /* packs and packus work within 128-bit lanes: this puts the
+           four groups of 8 results back in order. */
+        __m256i order = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
+        for (; b < size - 31; b += 32) {
+            __m256i r[4];
+#define COLUMNS_8(k)                                                \
+    {                                                               \
+        __m256i a = mm256_cvtepu8_epi32(&add[b + k * 8]);           \
+        __m256i s = mm256_cvtepu8_epi32(&sub[b + k * 8]);           \
+        __m256i f = mm256_cvtepu8_epi32(&far_row[b + k * 8]);       \
+        __m256i c = _mm256_loadu_si256((__m256i *)&acc[b + k * 8]); \
+        c = _mm256_sub_epi32(_mm256_add_epi32(c, a), s);            \
+        _mm256_storeu_si256((__m256i *)&acc[b + k * 8], c);         \
+        c = _mm256_add_epi32(                                       \
+            _mm256_mullo_epi32(c, wws),                             \
+            _mm256_mullo_epi32(_mm256_add_epi32(s, f), fws)         \
+        );                                                          \
+        r[k] = _mm256_srli_epi32(_mm256_add_epi32(c, b23), 24);     \
+    }
+            COLUMNS_8(0);
+            COLUMNS_8(1);
+            COLUMNS_8(2);
+            COLUMNS_8(3);
+#undef COLUMNS_8
+            __m256i v = _mm256_packus_epi16(
+                _mm256_packs_epi32(r[0], r[1]), _mm256_packs_epi32(r[2], r[3])
+            );
+            _mm256_storeu_si256(
+                (__m256i *)&out[b], _mm256_permutevar8x32_epi32(v, order)
+            );
+        }
+    }
+#endif
 #if defined(IMAGING_SIMD_SSE4)
     __m128i wws = _mm_set1_epi32(ww);
     __m128i fws = _mm_set1_epi32(fw);
@@ -507,6 +709,143 @@ ImagingVerticalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius) {
     return imOut;
 }
 
+/* passes vertical box blurs in one sweep down the image: pass k keeps the
+   rows pass k + 1 still needs in a ring of 2 * radius + 3 rows, and only
+   the last pass writes imOut. The same arithmetic as running the passes
+   one after the other, with one read and one write of the image instead
+   of one per pass. */
+typedef struct {
+    UINT32 *acc; /* running sums of the pass */
+    UINT8 *ring; /* its output rows, row i in slot i % ringRows */
+    int next;    /* next output row to compute */
+} BoxBlurStage;
+
+typedef struct {
+    Imaging imOut, imIn;
+    BoxBlurStage *stage;
+    int passes, radius, lasty, size, ringRows;
+    UINT32 ww, fw;
+} BoxBlurCascade;
+
+/* Row i of the input of pass k, clamped to the image. */
+static inline UINT8 *
+BoxBlurInputRow(BoxBlurCascade *c, int k, long long i) {
+    int row = i < 0 ? 0 : (i > c->lasty ? c->lasty : (int)i);
+    if (k == 0) {
+        return (UINT8 *)c->imIn->image[row];
+    }
+    return c->stage[k - 1].ring + (size_t)(row % c->ringRows) * c->size;
+}
+
+/* Computes the rows of pass k up to row upto, and those of the earlier
+   passes they need. */
+static void
+BoxBlurEnsure(BoxBlurCascade *c, int k, int upto) {
+    BoxBlurStage *st = &c->stage[k];
+    int radius = c->radius, lasty = c->lasty, size = c->size, b, i;
+    while (st->next <= upto) {
+        long long y = st->next;
+        if (y == 0) {
+            /* Window for row -1, as in ImagingVerticalBoxBlur. */
+            int inside = radius - 1 < lasty ? radius - 1 : lasty;
+            UINT32 after = radius - 1 > lasty ? (UINT32)(radius - 1 - lasty) : 0;
+            UINT8 *first, *last;
+            if (k > 0) {
+                BoxBlurEnsure(c, k - 1, after ? lasty : inside < 0 ? 0 : inside);
+            }
+            first = BoxBlurInputRow(c, k, 0);
+            for (b = 0; b < size; b++) {
+                st->acc[b] = first[b] * (UINT32)(radius + 1);
+            }
+            if (after) {
+                last = BoxBlurInputRow(c, k, lasty);
+                for (b = 0; b < size; b++) {
+                    st->acc[b] += last[b] * after;
+                }
+            }
+            for (i = 0; i <= inside; i++) {
+                UINT8 *row = BoxBlurInputRow(c, k, i);
+                for (b = 0; b < size; b++) {
+                    st->acc[b] += row[b];
+                }
+            }
+        }
+        if (k > 0) {
+            BoxBlurEnsure(
+                c, k - 1, y + radius + 1 < lasty ? (int)(y + radius + 1) : lasty
+            );
+        }
+        ImagingBoxBlurColumns(
+            k == c->passes - 1 ? (UINT8 *)c->imOut->image[y]
+                               : st->ring + (size_t)(y % c->ringRows) * size,
+            st->acc,
+            BoxBlurInputRow(c, k, y + radius),
+            BoxBlurInputRow(c, k, y - radius - 1),
+            BoxBlurInputRow(c, k, y + radius + 1),
+            size,
+            c->ww,
+            c->fw
+        );
+        st->next++;
+    }
+}
+
+/* Largest total size of the rings; above it, passes run one by one. */
+#define BOXBLUR_RINGS_MAX (8 * 1024 * 1024)
+
+/* Whether ImagingVerticalBoxBlurPasses should run the passes. */
+static int
+BoxBlurCascadeFits(Imaging im, float floatRadius, int passes) {
+    long long ringRows = 2 * (long long)(int)floatRadius + 3;
+    return passes > 1 && ringRows * im->linesize * (passes - 1) <= BOXBLUR_RINGS_MAX;
+}
+
+/* Returns imOut, or NULL if out of memory. imOut and imIn must be
+   distinct. */
+static Imaging
+ImagingVerticalBoxBlurPasses(
+    Imaging imOut, Imaging imIn, float floatRadius, int passes
+) {
+    ImagingSectionCookie cookie;
+    BoxBlurCascade c;
+    int k, ok = 1;
+    long long ringRows = 2 * (long long)(int)floatRadius + 3;
+
+    c.imOut = imOut;
+    c.imIn = imIn;
+    c.passes = passes;
+    c.radius = (int)floatRadius;
+    c.ww = (UINT32)(1 << 24) / (floatRadius * 2 + 1);
+    c.fw = ((1 << 24) - (c.radius * 2 + 1) * c.ww) / 2;
+    c.lasty = imIn->ysize - 1;
+    c.size = imIn->linesize;
+    c.ringRows = (int)ringRows;
+    c.stage = calloc(passes, sizeof(BoxBlurStage));
+    if (!c.stage) {
+        return NULL;
+    }
+    for (k = 0; k < passes; k++) {
+        c.stage[k].acc = calloc(c.size, sizeof(UINT32));
+        if (k < passes - 1) {
+            c.stage[k].ring = malloc((size_t)c.ringRows * c.size);
+        }
+        if (!c.stage[k].acc || (k < passes - 1 && !c.stage[k].ring)) {
+            ok = 0;
+        }
+    }
+    if (ok) {
+        ImagingSectionEnter(&cookie);
+        BoxBlurEnsure(&c, passes - 1, c.lasty);
+        ImagingSectionLeave(&cookie);
+    }
+    for (k = 0; k < passes; k++) {
+        free(c.stage[k].acc);
+        free(c.stage[k].ring);
+    }
+    free(c.stage);
+    return ok ? imOut : NULL;
+}
+
 Imaging
 ImagingBoxBlur(Imaging imOut, Imaging imIn, float xradius, float yradius, int n) {
     int i;
@@ -549,26 +888,30 @@ ImagingBoxBlur(Imaging imOut, Imaging imIn, float xradius, float yradius, int n)
        makes the last vertical pass end in imOut. */
     Imaging imTemp = NULL;
     Imaging src = imIn;
-    if (yradius != 0) {
+    /* With the vertical passes in one sweep, it reads the horizontal
+       result (or imIn) and writes imOut. */
+    int cascade = yradius != 0 && BoxBlurCascadeFits(imIn, yradius, n);
+    if (yradius != 0 && (!cascade || xradius != 0)) {
         imTemp = ImagingNewDirty(imIn->mode, imIn->xsize, imIn->ysize);
         if (!imTemp) {
             return NULL;
         }
     }
-
     if (xradius != 0) {
-        Imaging dst = (yradius != 0 && n % 2 == 1) ? imTemp : imOut;
-        if (!ImagingHorizontalBoxBlur(dst, imIn, xradius)) {
+        Imaging dst = (yradius != 0 && (cascade || n % 2 == 1)) ? imTemp : imOut;
+        if (!ImagingHorizontalBoxBlur(dst, imIn, xradius, n)) {
             goto error;
-        }
-        for (i = 1; i < n; i++) {
-            if (!ImagingHorizontalBoxBlur(dst, dst, xradius)) {
-                goto error;
-            }
         }
         src = dst;
     }
-    if (yradius != 0) {
+    if (cascade) {
+        if (!ImagingVerticalBoxBlurPasses(imOut, src, yradius, n)) {
+            goto error;
+        }
+        if (imTemp) {
+            ImagingDelete(imTemp);
+        }
+    } else if (yradius != 0) {
         for (i = 0; i < n; i++) {
             Imaging dst = (n - i) % 2 == 1 ? imOut : imTemp;
             if (!ImagingVerticalBoxBlur(dst, src, yradius)) {

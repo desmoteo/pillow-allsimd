@@ -13,7 +13,6 @@
  */
 
 #include "Imaging.h"
-#include "ImagingSIMD.h"
 
 /* Fast rank algorithm (due to Wirth), based on public domain code
    by Nicolas Devillard, available at http://ndevilla.free.fr */
