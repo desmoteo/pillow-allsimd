@@ -60,6 +60,10 @@ static __m128i inline mm_cvtepu8_epi32(const void *ptr) {
 #define mm_dpwssd(acc, a, b) _mm_add_epi32(acc, _mm_madd_epi16(a, b))
 #define mm256_dpwssd(acc, a, b) _mm256_add_epi32(acc, _mm256_madd_epi16(a, b))
 #endif
+/* The same without vpdpwssd, for sums that are one long dependency chain:
+   there pmaddwd stays out of the chain, and only the 1-cycle paddd is in it. */
+#define mm_madd_add(acc, a, b) _mm_add_epi32(acc, _mm_madd_epi16(a, b))
+#define mm256_madd_add(acc, a, b) _mm256_add_epi32(acc, _mm256_madd_epi16(a, b))
 #endif
 
 #if defined(IMAGING_SIMD_AVX2)

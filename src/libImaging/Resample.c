@@ -427,6 +427,21 @@ _ImagingResampleHorizontal_8bpc(
         // Verify caller allocated distinct buffers.
         assert(imIn->image != imOut->image);
         yy = 0;
+#if defined(RESAMPLE_HORIZONTAL_3BANDS_PORTABLE)
+        if (imIn->bands == 3) {
+            for (; yy < ysize; yy++) {
+                ImagingResampleHorizontalConvolution8u3(
+                    (UINT32 *)imOut->image32[yy],
+                    (UINT32 *)imIn->image32[yy + offset],
+                    xsize,
+                    bounds,
+                    kk,
+                    ksize,
+                    coefs_precision
+                );
+            }
+        }
+#endif
         for (; yy < ysize - 3; yy += 4) {
             ImagingResampleHorizontalConvolution8u4x(
                 (UINT32 *)imOut->image32[yy],
