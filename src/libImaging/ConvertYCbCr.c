@@ -358,16 +358,49 @@ static inline __m128i
 ycc_channel(__m128i px, int c) {
     return _mm_and_si128(_mm_srli_epi32(px, 8 * c), _mm_set1_epi32(0xff));
 }
+#if defined(IMAGING_SIMD_AVX2)
+/* The same for eight pixels. */
+static inline __m256i
+ycc_term8(__m256 v, float k) {
+    return _mm256_cvttps_epi32(
+        _mm256_add_ps(_mm256_mul_ps(v, _mm256_set1_ps(k)), _mm256_set1_ps(0.5f))
+    );
+}
+
+static inline __m256i
+ycc_channel8(__m256i px, int c) {
+    return _mm256_and_si256(_mm256_srli_epi32(px, 8 * c), _mm256_set1_epi32(0xff));
+}
+#endif
 #elif defined(IMAGING_SIMD_NEON)
 static inline int32x4_t
 ycc_term(float32x4_t v, float k) {
     return vcvtq_s32_f32(vaddq_f32(vmulq_n_f32(v, k), vdupq_n_f32(0.5f)));
 }
 
-static inline int32x4_t
-ycc_channel(uint32x4_t px, int c) {
-    return vreinterpretq_s32_u32(
-        vandq_u32(vshlq_u32(px, vdupq_n_s32(-8 * c)), vdupq_n_u32(0xff))
+/* Lanes 4 * q to 4 * q + 3 of a plane of 16 bytes, minus sub, as floats. */
+static inline float32x4_t
+ycc_quarter(uint8x16_t plane, int q, int sub) {
+    uint16x8_t h = q < 2 ? vmovl_u8(vget_low_u8(plane)) : vmovl_high_u8(plane);
+    uint32x4_t w = q % 2 == 0 ? vmovl_u16(vget_low_u16(h)) : vmovl_high_u16(h);
+    return vcvtq_f32_s32(vsubq_s32(vreinterpretq_s32_u32(w), vdupq_n_s32(sub)));
+}
+
+/* Four groups of 32-bit lanes to 16 bytes: wrapped, as (UINT8) does, or
+   clipped to 0..255. */
+static inline uint8x16_t
+ycc_wrap16(int32x4_t v0, int32x4_t v1, int32x4_t v2, int32x4_t v3) {
+    return vcombine_u8(
+        vmovn_u16(vreinterpretq_u16_s16(vcombine_s16(vmovn_s32(v0), vmovn_s32(v1)))),
+        vmovn_u16(vreinterpretq_u16_s16(vcombine_s16(vmovn_s32(v2), vmovn_s32(v3))))
+    );
+}
+
+static inline uint8x16_t
+ycc_clip16(int32x4_t v0, int32x4_t v1, int32x4_t v2, int32x4_t v3) {
+    return vcombine_u8(
+        vqmovun_s16(vcombine_s16(vqmovn_s32(v0), vqmovn_s32(v1))),
+        vqmovun_s16(vcombine_s16(vqmovn_s32(v2), vqmovn_s32(v3)))
     );
 }
 #endif
@@ -380,6 +413,47 @@ ImagingConvertRGB2YCbCr(UINT8 *out, const UINT8 *in, int pixels) {
     int y, cr, cb;
 
 #if defined(IMAGING_SIMD_SSE4)
+#if defined(IMAGING_SIMD_AVX2)
+    for (; x < pixels - 7; x += 8, in += 32, out += 32) {
+        __m256i px = _mm256_loadu_si256((const __m256i *)in);
+        __m256 fr = _mm256_cvtepi32_ps(ycc_channel8(px, 0));
+        __m256 fg = _mm256_cvtepi32_ps(ycc_channel8(px, 1));
+        __m256 fb = _mm256_cvtepi32_ps(ycc_channel8(px, 2));
+        __m256i vy = _mm256_srai_epi32(
+            _mm256_add_epi32(
+                _mm256_add_epi32(ycc_term8(fr, K_Y_R), ycc_term8(fg, K_Y_G)),
+                ycc_term8(fb, K_Y_B)
+            ),
+            SCALE
+        );
+        __m256i vcb = _mm256_srai_epi32(
+            _mm256_add_epi32(
+                _mm256_add_epi32(ycc_term8(fr, K_Cb_R), ycc_term8(fg, K_Cb_G)),
+                ycc_term8(fb, K_Cb_B)
+            ),
+            SCALE
+        );
+        __m256i vcr = _mm256_srai_epi32(
+            _mm256_add_epi32(
+                _mm256_add_epi32(ycc_term8(fr, K_Cb_B), ycc_term8(fg, K_Cr_G)),
+                ycc_term8(fb, K_Cr_B)
+            ),
+            SCALE
+        );
+        __m256i m = _mm256_set1_epi32(0xff), c128 = _mm256_set1_epi32(128);
+        __m256i bytes = _mm256_or_si256(
+            _mm256_and_si256(vy, m),
+            _mm256_or_si256(
+                _mm256_slli_epi32(_mm256_and_si256(_mm256_add_epi32(vcb, c128), m), 8),
+                _mm256_slli_epi32(_mm256_and_si256(_mm256_add_epi32(vcr, c128), m), 16)
+            )
+        );
+        bytes = _mm256_or_si256(
+            bytes, _mm256_and_si256(px, _mm256_set1_epi32((int)0xff000000))
+        );
+        _mm256_storeu_si256((__m256i *)out, bytes);
+    }
+#endif
     for (; x < pixels - 3; x += 4, in += 16, out += 16) {
         __m128i px = _mm_loadu_si128((const __m128i *)in);
         __m128 fr = _mm_cvtepi32_ps(ycc_channel(px, 0));
@@ -428,51 +502,48 @@ ImagingConvertRGB2YCbCr(UINT8 *out, const UINT8 *in, int pixels) {
         _mm_storeu_si128((__m128i *)out, bytes);
     }
 #elif defined(IMAGING_SIMD_NEON)
-    for (; x < pixels - 3; x += 4, in += 16, out += 16) {
-        uint32x4_t px = vreinterpretq_u32_u8(vld1q_u8(in));
-        float32x4_t fr = vcvtq_f32_s32(ycc_channel(px, 0));
-        float32x4_t fg = vcvtq_f32_s32(ycc_channel(px, 1));
-        float32x4_t fb = vcvtq_f32_s32(ycc_channel(px, 2));
-        int32x4_t vy = vshrq_n_s32(
-            vaddq_s32(
-                vaddq_s32(ycc_term(fr, K_Y_R), ycc_term(fg, K_Y_G)), ycc_term(fb, K_Y_B)
-            ),
-            SCALE
-        );
-        int32x4_t vcb = vshrq_n_s32(
-            vaddq_s32(
-                vaddq_s32(ycc_term(fr, K_Cb_R), ycc_term(fg, K_Cb_G)),
-                ycc_term(fb, K_Cb_B)
-            ),
-            SCALE
-        );
-        int32x4_t vcr = vshrq_n_s32(
-            vaddq_s32(
-                vaddq_s32(ycc_term(fr, K_Cb_B), ycc_term(fg, K_Cr_G)),
-                ycc_term(fb, K_Cr_B)
-            ),
-            SCALE
-        );
-        uint32x4_t m = vdupq_n_u32(0xff);
-        uint32x4_t bytes = vorrq_u32(
-            vandq_u32(vreinterpretq_u32_s32(vy), m),
-            vorrq_u32(
-                vshlq_n_u32(
-                    vandq_u32(
-                        vreinterpretq_u32_s32(vaddq_s32(vcb, vdupq_n_s32(128))), m
-                    ),
-                    8
+    /* 16 pixels as planes of r, g, b and alpha */
+    for (; x < pixels - 15; x += 16, in += 64, out += 64) {
+        uint8x16x4_t px = vld4q_u8(in);
+        int32x4_t vy[4], vcb[4], vcr[4];
+        int q;
+        for (q = 0; q < 4; q++) {
+            float32x4_t fr = ycc_quarter(px.val[0], q, 0);
+            float32x4_t fg = ycc_quarter(px.val[1], q, 0);
+            float32x4_t fb = ycc_quarter(px.val[2], q, 0);
+            vy[q] = vshrq_n_s32(
+                vaddq_s32(
+                    vaddq_s32(ycc_term(fr, K_Y_R), ycc_term(fg, K_Y_G)),
+                    ycc_term(fb, K_Y_B)
                 ),
-                vshlq_n_u32(
-                    vandq_u32(
-                        vreinterpretq_u32_s32(vaddq_s32(vcr, vdupq_n_s32(128))), m
+                SCALE
+            );
+            vcb[q] = vaddq_s32(
+                vshrq_n_s32(
+                    vaddq_s32(
+                        vaddq_s32(ycc_term(fr, K_Cb_R), ycc_term(fg, K_Cb_G)),
+                        ycc_term(fb, K_Cb_B)
                     ),
-                    16
-                )
-            )
-        );
-        bytes = vorrq_u32(bytes, vandq_u32(px, vdupq_n_u32(0xff000000)));
-        vst1q_u8(out, vreinterpretq_u8_u32(bytes));
+                    SCALE
+                ),
+                vdupq_n_s32(128)
+            );
+            vcr[q] = vaddq_s32(
+                vshrq_n_s32(
+                    vaddq_s32(
+                        vaddq_s32(ycc_term(fr, K_Cb_B), ycc_term(fg, K_Cr_G)),
+                        ycc_term(fb, K_Cr_B)
+                    ),
+                    SCALE
+                ),
+                vdupq_n_s32(128)
+            );
+        }
+        // (UINT8) of y, cb + 128 and cr + 128, with the alpha byte kept
+        px.val[0] = ycc_wrap16(vy[0], vy[1], vy[2], vy[3]);
+        px.val[1] = ycc_wrap16(vcb[0], vcb[1], vcb[2], vcb[3]);
+        px.val[2] = ycc_wrap16(vcr[0], vcr[1], vcr[2], vcr[3]);
+        vst4q_u8(out, px);
     }
 #endif
     for (; x < pixels; x++, in += 4, out += 4) {
@@ -500,6 +571,66 @@ ImagingConvertYCbCr2RGB(UINT8 *out, const UINT8 *in, int pixels) {
     int y, cr, cb;
 
 #if defined(IMAGING_SIMD_SSE4)
+#if defined(IMAGING_SIMD_AVX2)
+    for (; x < pixels - 7; x += 8, in += 32, out += 32) {
+        __m256i px = _mm256_loadu_si256((const __m256i *)in);
+        __m256i vy = ycc_channel8(px, 0), c128 = _mm256_set1_epi32(128);
+        __m256 fcb = _mm256_cvtepi32_ps(_mm256_sub_epi32(ycc_channel8(px, 1), c128));
+        __m256 fcr = _mm256_cvtepi32_ps(_mm256_sub_epi32(ycc_channel8(px, 2), c128));
+        __m256i vr =
+            _mm256_add_epi32(vy, _mm256_srai_epi32(ycc_term8(fcr, K_R_Cr), SCALE));
+        __m256i vg = _mm256_add_epi32(
+            vy,
+            _mm256_srai_epi32(
+                _mm256_add_epi32(ycc_term8(fcb, K_G_Cb), ycc_term8(fcr, K_G_Cr)), SCALE
+            )
+        );
+        __m256i vb =
+            _mm256_add_epi32(vy, _mm256_srai_epi32(ycc_term8(fcb, K_B_Cb), SCALE));
+        // as below, in each 128-bit lane: four pixels each
+        __m256i rg = _mm256_packs_epi32(vr, vg),
+                ba = _mm256_packs_epi32(vb, ycc_channel8(px, 3));
+        __m256i p = _mm256_packus_epi16(rg, ba);
+        p = _mm256_shuffle_epi8(
+            p,
+            _mm256_set_epi8(
+                15,
+                11,
+                7,
+                3,
+                14,
+                10,
+                6,
+                2,
+                13,
+                9,
+                5,
+                1,
+                12,
+                8,
+                4,
+                0,
+                15,
+                11,
+                7,
+                3,
+                14,
+                10,
+                6,
+                2,
+                13,
+                9,
+                5,
+                1,
+                12,
+                8,
+                4,
+                0
+            )
+        );
+        _mm256_storeu_si256((__m256i *)out, p);
+    }
+#endif
     for (; x < pixels - 3; x += 4, in += 16, out += 16) {
         __m128i px = _mm_loadu_si128((const __m128i *)in);
         __m128i vy = ycc_channel(px, 0);
@@ -526,29 +657,29 @@ ImagingConvertYCbCr2RGB(UINT8 *out, const UINT8 *in, int pixels) {
         _mm_storeu_si128((__m128i *)out, p);
     }
 #elif defined(IMAGING_SIMD_NEON)
-    for (; x < pixels - 3; x += 4, in += 16, out += 16) {
-        uint32x4_t px = vreinterpretq_u32_u8(vld1q_u8(in));
-        int32x4_t vy = ycc_channel(px, 0);
-        float32x4_t fcb =
-            vcvtq_f32_s32(vsubq_s32(ycc_channel(px, 1), vdupq_n_s32(128)));
-        float32x4_t fcr =
-            vcvtq_f32_s32(vsubq_s32(ycc_channel(px, 2), vdupq_n_s32(128)));
-        int32x4_t vr = vaddq_s32(vy, vshrq_n_s32(ycc_term(fcr, K_R_Cr), SCALE));
-        int32x4_t vg = vaddq_s32(
-            vy,
-            vshrq_n_s32(vaddq_s32(ycc_term(fcb, K_G_Cb), ycc_term(fcr, K_G_Cr)), SCALE)
-        );
-        int32x4_t vb = vaddq_s32(vy, vshrq_n_s32(ycc_term(fcb, K_B_Cb), SCALE));
-        uint8x8x4_t planes;
-        planes.val[0] = vqmovun_s16(vcombine_s16(vqmovn_s32(vr), vdup_n_s16(0)));
-        planes.val[1] = vqmovun_s16(vcombine_s16(vqmovn_s32(vg), vdup_n_s16(0)));
-        planes.val[2] = vqmovun_s16(vcombine_s16(vqmovn_s32(vb), vdup_n_s16(0)));
-        planes.val[3] =
-            vqmovun_s16(vcombine_s16(vqmovn_s32(ycc_channel(px, 3)), vdup_n_s16(0)));
-        // store 4 interleaved pixels from the low halves
-        uint8_t tmp[32];
-        vst4_u8(tmp, planes);
-        memcpy(out, tmp, 16);
+    /* 16 pixels as planes of y, cb, cr and alpha */
+    for (; x < pixels - 15; x += 16, in += 64, out += 64) {
+        uint8x16x4_t px = vld4q_u8(in);
+        int32x4_t vr[4], vg[4], vb[4];
+        int q;
+        for (q = 0; q < 4; q++) {
+            int32x4_t vy = vcvtq_s32_f32(ycc_quarter(px.val[0], q, 0));
+            float32x4_t fcb = ycc_quarter(px.val[1], q, 128);
+            float32x4_t fcr = ycc_quarter(px.val[2], q, 128);
+            vr[q] = vaddq_s32(vy, vshrq_n_s32(ycc_term(fcr, K_R_Cr), SCALE));
+            vg[q] = vaddq_s32(
+                vy,
+                vshrq_n_s32(
+                    vaddq_s32(ycc_term(fcb, K_G_Cb), ycc_term(fcr, K_G_Cr)), SCALE
+                )
+            );
+            vb[q] = vaddq_s32(vy, vshrq_n_s32(ycc_term(fcb, K_B_Cb), SCALE));
+        }
+        // clipped to 0..255; the alpha plane is kept
+        px.val[0] = ycc_clip16(vr[0], vr[1], vr[2], vr[3]);
+        px.val[1] = ycc_clip16(vg[0], vg[1], vg[2], vg[3]);
+        px.val[2] = ycc_clip16(vb[0], vb[1], vb[2], vb[3]);
+        vst4q_u8(out, px);
     }
 #endif
     for (; x < pixels; x++, in += 4, out += 4) {
