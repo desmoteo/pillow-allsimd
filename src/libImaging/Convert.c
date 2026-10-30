@@ -757,12 +757,78 @@ rgb2hsv_8(UINT8 *out, const UINT8 *in) {
 }
 #endif
 
+#if defined(IMAGING_SIMD_NEON)
+/* (int)(v * 255.0) for four floats, through doubles. */
+static inline int32x4_t
+rgb2hsv_scale_neon(float32x4_t v) {
+    float64x2_t k = vdupq_n_f64(255.0);
+    int64x2_t lo = vcvtq_s64_f64(vmulq_f64(vcvt_f64_f32(vget_low_f32(v)), k));
+    int64x2_t hi = vcvtq_s64_f64(vmulq_f64(vcvt_high_f64_f32(v), k));
+    return vcombine_s32(vmovn_s64(lo), vmovn_s64(hi));
+}
+
+/* rgb2hsv_4 for NEON: the same float and double operations as
+   rgb2hsv_row. None is a multiply followed by an add, so none can become
+   a fused multiply-add, in this code or in rgb2hsv_row. */
+static inline void
+rgb2hsv_neon4(UINT8 *out, const UINT8 *in) {
+    uint32x4_t pix = vreinterpretq_u32_u8(vld1q_u8(in));
+    uint32x4_t mask = vdupq_n_u32(0xff);
+    int32x4_t r = vreinterpretq_s32_u32(vandq_u32(pix, mask));
+    int32x4_t g = vreinterpretq_s32_u32(vandq_u32(vshrq_n_u32(pix, 8), mask));
+    int32x4_t b = vreinterpretq_s32_u32(vandq_u32(vshrq_n_u32(pix, 16), mask));
+    int32x4_t maxc = vmaxq_s32(r, vmaxq_s32(g, b));
+    int32x4_t minc = vminq_s32(r, vminq_s32(g, b));
+    uint32x4_t flat = vceqq_s32(maxc, minc);
+    float32x4_t cr = vcvtq_f32_s32(vsubq_s32(maxc, minc));
+    float32x4_t s = vdivq_f32(cr, vcvtq_f32_s32(maxc));
+    float32x4_t rc = vdivq_f32(vcvtq_f32_s32(vsubq_s32(maxc, r)), cr);
+    float32x4_t gc = vdivq_f32(vcvtq_f32_s32(vsubq_s32(maxc, g)), cr);
+    float32x4_t bc = vdivq_f32(vcvtq_f32_s32(vsubq_s32(maxc, b)), cr);
+    /* 2.0 + rc - bc and 4.0 + gc - rc are double, rounded back to float. */
+    float64x2_t two = vdupq_n_f64(2.0), four = vdupq_n_f64(4.0);
+    float64x2_t rc0 = vcvt_f64_f32(vget_low_f32(rc)), rc1 = vcvt_high_f64_f32(rc);
+    float64x2_t gc0 = vcvt_f64_f32(vget_low_f32(gc)), gc1 = vcvt_high_f64_f32(gc);
+    float64x2_t bc0 = vcvt_f64_f32(vget_low_f32(bc)), bc1 = vcvt_high_f64_f32(bc);
+    float32x4_t hg = vcvt_high_f32_f64(
+        vcvt_f32_f64(vsubq_f64(vaddq_f64(two, rc0), bc0)),
+        vsubq_f64(vaddq_f64(two, rc1), bc1)
+    );
+    float32x4_t hb = vcvt_high_f32_f64(
+        vcvt_f32_f64(vsubq_f64(vaddq_f64(four, gc0), rc0)),
+        vsubq_f64(vaddq_f64(four, gc1), rc1)
+    );
+    float32x4_t h = vbslq_f32(
+        vceqq_s32(r, maxc), vsubq_f32(bc, gc), vbslq_f32(vceqq_s32(g, maxc), hg, hb)
+    );
+    /* fmod(h / 6.0 + 1.0, 1.0), as in rgb2hsv_row */
+    float64x2_t one = vdupq_n_f64(1.0), six = vdupq_n_f64(6.0);
+    float64x2_t h0 = vaddq_f64(vdivq_f64(vcvt_f64_f32(vget_low_f32(h)), six), one);
+    float64x2_t h1 = vaddq_f64(vdivq_f64(vcvt_high_f64_f32(h), six), one);
+    h0 = vbslq_f64(vcgeq_f64(h0, one), vsubq_f64(h0, one), h0);
+    h1 = vbslq_f64(vcgeq_f64(h1, one), vsubq_f64(h1, one), h1);
+    /* stored in the float h before h * 255.0; h and s are in [0, 1), so
+       CLIP8 changes nothing */
+    int32x4_t uh = rgb2hsv_scale_neon(vcvt_high_f32_f64(vcvt_f32_f64(h0), h1));
+    int32x4_t us = rgb2hsv_scale_neon(s);
+    uint32x4_t hsv = vorrq_u32(
+        vbicq_u32(vreinterpretq_u32_s32(uh), flat),
+        vshlq_n_u32(vbicq_u32(vreinterpretq_u32_s32(us), flat), 8)
+    );
+    hsv = vorrq_u32(hsv, vshlq_n_u32(vreinterpretq_u32_s32(maxc), 16));
+    hsv = vorrq_u32(hsv, vandq_u32(pix, vdupq_n_u32(0xff000000)));
+    vst1q_u8(out, vreinterpretq_u8_u32(hsv));
+}
+#endif
+
 static void
 rgb2hsv(UINT8 *out, const UINT8 *in, int xsize) {
 #if defined(IMAGING_SIMD_AVX2)
     CONVERT_ROW(rgb2hsv_8, 8, out, in, xsize, 4, 4);
 #elif defined(IMAGING_SIMD_SSE4)
     CONVERT_ROW(rgb2hsv_4, 4, out, in, xsize, 4, 4);
+#elif defined(IMAGING_SIMD_NEON)
+    CONVERT_ROW(rgb2hsv_neon4, 4, out, in, xsize, 4, 4);
 #else
     int x;
     for (x = 0; x < xsize; x++, in += 4, out += 4) {
