@@ -245,74 +245,132 @@ typedef uint8x16_t rank_vec;
 #endif
 
 #if defined(RANK_VEC)
-/* Median of 3 x 3 (rank 4), RANK_VEC output bytes at a time: the nine
-   neighbours are loaded from the rows and sorted in registers by the
-   19-comparator median network (Paeth), where the generic path above
-   copies them to buffers and sorts there. The median doesn't depend on
-   the sorting method, so the output is the same. margin and ps are as for
+/* Medians of 3 x 3 (rank 4) and 5 x 5 (rank 12), RANK_VEC output bytes at
+   a time: the neighbours are loaded from the rows and go through a median
+   network in registers, where the generic path above copies them to
+   buffers and sorts there: Paeth's 19 comparators for 9 values,
+   Devillard's 99 for 25 (checked for all 2^25 inputs of 0 and 1, which by
+   the 0-1 principle covers all inputs). The compiler drops the halves of
+   comparators whose result isn't used. The median doesn't depend on the
+   sorting method, so the output is the same. margin and ps are as for
    RankFilterNetwork_u8. */
-static void
-RankFilterMedian3_u8(Imaging imOut, Imaging im, int margin, int ps) {
+#define RANK_SORT(a, b)           \
+    t = RANK_VMIN(p[a], p[b]);    \
+    p[b] = RANK_VMAX(p[a], p[b]); \
+    p[a] = t;
+
+static inline void
+RankFilterMedianVec_u8(Imaging imOut, Imaging im, int size, int margin, int ps) {
     int rowbytes = im->xsize * ps, outbytes = imOut->xsize * ps;
     int x, y, i, j;
-    UINT8 window[3][RANK_VEC + 8], result[RANK_VEC];
+    UINT8 window[5][RANK_VEC + 16], result[RANK_VEC];
 
     for (y = 0; y < imOut->ysize; y++) {
-        const UINT8 *rows[3];
+        const UINT8 *rows[5];
         UINT8 *out = (UINT8 *)imOut->image[y];
-        for (i = 0; i < 3; i++) {
+        for (i = 0; i < size; i++) {
             int r = y + i - margin;
             rows[i] = (UINT8 *)im->image[r < 0 ? 0 : r < im->ysize ? r : im->ysize - 1];
         }
         for (x = 0; x < outbytes; x += RANK_VEC) {
-            /* Byte x of the output takes bytes base, base + ps and
-               base + 2 * ps of each row. */
+            /* Byte x of the output takes bytes base + j * ps of each row,
+               j = 0 .. size - 1. */
             int base = x - margin * ps;
-            rank_vec p[9], t;
-            if (base >= 0 && base + 2 * ps + RANK_VEC <= rowbytes) {
-                for (i = 0; i < 3; i++) {
-                    for (j = 0; j < 3; j++) {
-                        p[i * 3 + j] = RANK_LOAD(rows[i] + base + j * ps);
+            rank_vec p[25], t;
+            if (base >= 0 && base + (size - 1) * ps + RANK_VEC <= rowbytes) {
+                for (i = 0; i < size; i++) {
+                    for (j = 0; j < size; j++) {
+                        p[i * size + j] = RANK_LOAD(rows[i] + base + j * ps);
                     }
                 }
             } else {
                 /* The first and last vectors of a row: copy the window,
                    repeating the edge pixels. Lanes past the end of the row
                    are computed too, but not stored. */
-                int n = RANK_VEC + 2 * ps;
-                for (i = 0; i < 3; i++) {
+                int n = RANK_VEC + (size - 1) * ps;
+                for (i = 0; i < size; i++) {
                     int lead = base < 0 ? -base : 0;
                     int end = base + n > rowbytes ? rowbytes - base : n;
+                    if (lead > n) {
+                        lead = n;
+                    }
+                    if (end < lead) {
+                        end = lead;
+                    }
                     RankFillPixels(window[i], rows[i], ps, lead);
                     memcpy(window[i] + lead, rows[i] + base + lead, end - lead);
                     RankFillPixels(
                         window[i] + end, rows[i] + rowbytes - ps, ps, n - end
                     );
-                    for (j = 0; j < 3; j++) {
-                        p[i * 3 + j] = RANK_LOAD(window[i] + j * ps);
+                    for (j = 0; j < size; j++) {
+                        p[i * size + j] = RANK_LOAD(window[i] + j * ps);
                     }
                 }
             }
-#define RANK_SORT(a, b)           \
-    t = RANK_VMIN(p[a], p[b]);    \
-    p[b] = RANK_VMAX(p[a], p[b]); \
-    p[a] = t;
-            RANK_SORT(1, 2) RANK_SORT(4, 5) RANK_SORT(7, 8);
-            RANK_SORT(0, 1) RANK_SORT(3, 4) RANK_SORT(6, 7);
-            RANK_SORT(1, 2) RANK_SORT(4, 5) RANK_SORT(7, 8);
-            RANK_SORT(0, 3) RANK_SORT(5, 8) RANK_SORT(4, 7);
-            RANK_SORT(3, 6) RANK_SORT(1, 4) RANK_SORT(2, 5);
-            RANK_SORT(4, 7) RANK_SORT(4, 2) RANK_SORT(6, 4);
-            RANK_SORT(4, 2);
-#undef RANK_SORT
-            if (x + RANK_VEC <= outbytes) {
-                RANK_STORE(out + x, p[4]);
+            if (size == 3) {
+                RANK_SORT(1, 2) RANK_SORT(4, 5) RANK_SORT(7, 8);
+                RANK_SORT(0, 1) RANK_SORT(3, 4) RANK_SORT(6, 7);
+                RANK_SORT(1, 2) RANK_SORT(4, 5) RANK_SORT(7, 8);
+                RANK_SORT(0, 3) RANK_SORT(5, 8) RANK_SORT(4, 7);
+                RANK_SORT(3, 6) RANK_SORT(1, 4) RANK_SORT(2, 5);
+                RANK_SORT(4, 7) RANK_SORT(4, 2) RANK_SORT(6, 4);
+                RANK_SORT(4, 2);
+                p[12] = p[4];
             } else {
-                RANK_STORE(result, p[4]);
+                RANK_SORT(0, 1) RANK_SORT(3, 4) RANK_SORT(2, 4);
+                RANK_SORT(2, 3) RANK_SORT(6, 7) RANK_SORT(5, 7);
+                RANK_SORT(5, 6) RANK_SORT(9, 10) RANK_SORT(8, 10);
+                RANK_SORT(8, 9) RANK_SORT(12, 13) RANK_SORT(11, 13);
+                RANK_SORT(11, 12) RANK_SORT(15, 16) RANK_SORT(14, 16);
+                RANK_SORT(14, 15) RANK_SORT(18, 19) RANK_SORT(17, 19);
+                RANK_SORT(17, 18) RANK_SORT(21, 22) RANK_SORT(20, 22);
+                RANK_SORT(20, 21) RANK_SORT(23, 24) RANK_SORT(2, 5);
+                RANK_SORT(3, 6) RANK_SORT(0, 6) RANK_SORT(0, 3);
+                RANK_SORT(4, 7) RANK_SORT(1, 7) RANK_SORT(1, 4);
+                RANK_SORT(11, 14) RANK_SORT(8, 14) RANK_SORT(8, 11);
+                RANK_SORT(12, 15) RANK_SORT(9, 15) RANK_SORT(9, 12);
+                RANK_SORT(13, 16) RANK_SORT(10, 16) RANK_SORT(10, 13);
+                RANK_SORT(20, 23) RANK_SORT(17, 23) RANK_SORT(17, 20);
+                RANK_SORT(21, 24) RANK_SORT(18, 24) RANK_SORT(18, 21);
+                RANK_SORT(19, 22) RANK_SORT(8, 17) RANK_SORT(9, 18);
+                RANK_SORT(0, 18) RANK_SORT(0, 9) RANK_SORT(10, 19);
+                RANK_SORT(1, 19) RANK_SORT(1, 10) RANK_SORT(11, 20);
+                RANK_SORT(2, 20) RANK_SORT(2, 11) RANK_SORT(12, 21);
+                RANK_SORT(3, 21) RANK_SORT(3, 12) RANK_SORT(13, 22);
+                RANK_SORT(4, 22) RANK_SORT(4, 13) RANK_SORT(14, 23);
+                RANK_SORT(5, 23) RANK_SORT(5, 14) RANK_SORT(15, 24);
+                RANK_SORT(6, 24) RANK_SORT(6, 15) RANK_SORT(7, 16);
+                RANK_SORT(7, 19) RANK_SORT(13, 21) RANK_SORT(15, 23);
+                RANK_SORT(7, 13) RANK_SORT(7, 15) RANK_SORT(1, 9);
+                RANK_SORT(3, 11) RANK_SORT(5, 17) RANK_SORT(11, 17);
+                RANK_SORT(9, 17) RANK_SORT(4, 10) RANK_SORT(6, 12);
+                RANK_SORT(7, 14) RANK_SORT(4, 6) RANK_SORT(4, 7);
+                RANK_SORT(12, 14) RANK_SORT(10, 14) RANK_SORT(6, 7);
+                RANK_SORT(10, 12) RANK_SORT(6, 10) RANK_SORT(6, 17);
+                RANK_SORT(12, 17) RANK_SORT(7, 17) RANK_SORT(7, 10);
+                RANK_SORT(12, 18) RANK_SORT(7, 12) RANK_SORT(10, 18);
+                RANK_SORT(12, 20) RANK_SORT(10, 20) RANK_SORT(10, 12);
+            }
+            if (x + RANK_VEC <= outbytes) {
+                RANK_STORE(out + x, p[12]);
+            } else {
+                RANK_STORE(result, p[12]);
                 memcpy(out + x, result, outbytes - x);
             }
         }
     }
+}
+#undef RANK_SORT
+
+/* Constant sizes, so that the loops and the networks are unrolled. */
+static void
+RankFilterMedian3_u8(Imaging imOut, Imaging im, int margin, int ps) {
+    RankFilterMedianVec_u8(imOut, im, 3, margin, ps);
+}
+
+static void
+RankFilterMedian5_u8(Imaging imOut, Imaging im, int margin, int ps) {
+    RankFilterMedianVec_u8(imOut, im, 5, margin, ps);
 }
 #endif
 
@@ -467,6 +525,8 @@ ImagingRankFilter(Imaging im, int size, int rank) {
 #if defined(RANK_VEC)
     } else if (im->image8 && size == 3 && rank == 4) {
         RankFilterMedian3_u8(imOut, im, 0, 1);
+    } else if (im->image8 && size == 5 && rank == 12) {
+        RankFilterMedian5_u8(imOut, im, 0, 1);
 #endif
     } else if (im->image8 && size >= 3 && size <= RANK_NETWORK_MAX) {
         if (!RankFilterNetwork_u8(imOut, im, size, rank, 0, 1)) {
@@ -499,7 +559,8 @@ nomemory:
 /* Whether ImagingRankFilterSameSize filters all bands of im at once
    faster than band by band. For 4-byte pixels it filters every byte,
    padding included, so it only pays off where the work per byte is small
-   (minimum, maximum, the vector 3 x 3 median) or there is no padding. */
+   (minimum, maximum, the vector 3 x 3 and 5 x 5 medians) or there is no
+   padding. */
 int
 ImagingRankFilterAllBands(Imaging im, int size, int rank) {
     if (!im || im->type != IMAGING_TYPE_UINT8 || !im->image32 || im->pixelsize != 4 ||
@@ -508,7 +569,7 @@ ImagingRankFilterAllBands(Imaging im, int size, int rank) {
         return 0;
     }
 #if defined(RANK_VEC)
-    if (size == 3 && rank == 4) {
+    if ((size == 3 && rank == 4) || (size == 5 && rank == 12)) {
         return 1;
     }
 #endif
@@ -541,6 +602,9 @@ ImagingRankFilterSameSize(Imaging im, int size, int rank) {
 #if defined(RANK_VEC)
         } else if (size == 3 && rank == 4) {
             RankFilterMedian3_u8(imOut, im, 1, ps);
+            ok = 1;
+        } else if (size == 5 && rank == 12) {
+            RankFilterMedian5_u8(imOut, im, 2, ps);
             ok = 1;
 #endif
         } else {

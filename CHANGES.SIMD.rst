@@ -53,8 +53,10 @@ Based on Pillow 13.0.0
 - Rank filters (min, max, median, any rank up to 11x11) on RGB, RGBA,
   CMYK, LA and other 4-byte modes run all bands in one pass instead of
   splitting and merging; min and max keep their row results in a ring of
-  rows and vectorize both passes; 3x3 median in registers (SSE4, AVX2,
-  NEON). RGB min/max 3x3 11x, median 3x3 5.3x, L median 3x3 2.8x
+  rows and vectorize both passes; 3x3 and 5x5 medians in registers
+  (SSE4, AVX2, NEON; Devillard's 99-comparator network for 5x5). RGB
+  min/max 3x3 11x, median 3x3 5.3x, median 5x5 2.4x, L median 3x3 2.8x,
+  median 5x5 2.5x (AVX2)
 - Images take transparent huge pages on Linux, as numpy arrays do: box
   blur 1.5x (its vertical pass), ImageChops lighter 1.6x, most passes
   over large images a few percent
