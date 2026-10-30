@@ -66,9 +66,17 @@ static __m128i inline mm_cvtepu8_epi32(const void *ptr) {
 #define mm256_madd_add(acc, a, b) _mm256_add_epi32(acc, _mm256_madd_epi16(a, b))
 #endif
 
+#if defined(IMAGING_SIMD_SSE4)
+static __m128i inline mm_cvtepu8_epi16(const void *ptr) {
+    return _mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)ptr));
+}
+#endif
 #if defined(IMAGING_SIMD_AVX2)
 static __m256i inline mm256_cvtepu8_epi32(const void *ptr) {
     return _mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)ptr));
+}
+static __m256i inline mm256_cvtepu8_epi16(const void *ptr) {
+    return _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)ptr));
 }
 #endif
 
