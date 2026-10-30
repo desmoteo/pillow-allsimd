@@ -33,7 +33,8 @@
 #   --no-compare      skip the output comparison between the builds
 #   --workdir DIR     working directory below the home directory on the
 #                     host (default: pillow-simd-test)
-#   --out DIR         local directory for results (default: test-results)
+#   --out DIR         local directory for results (default:
+#                     bench-results/test-results)
 #   --keep            keep the working directory on the host
 #
 # The working directory is created by this script and marked with a
@@ -59,7 +60,7 @@ log() { echo "==> $*" >&2; }
 
 HOST="" USER_OPT="" PORT="" IDENTITY="" REF="HEAD" PYV="3.13" DOCKER_BASE=""
 PLATFORM="" BUILDS="" JOBS="" PYTEST_ARGS='Tests -m "not mem"' COMPARE=1
-WORKDIR="pillow-simd-test" OUT="test-results" KEEP=0
+WORKDIR="pillow-simd-test" OUT="bench-results/test-results" KEEP=0
 SSH_EXTRA=()
 
 while [ $# -gt 0 ]; do
