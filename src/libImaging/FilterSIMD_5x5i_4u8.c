@@ -1,8 +1,11 @@
 void
-ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset) {
+ImagingFilter5x5i_4u8(
+    Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset, int precision
+) {
     int x, y;
 
-    offset += 1 << (PRECISION_BITS - 1);
+    offset += 1 << (precision - 1);
+    __m128i shift = _mm_cvtsi32_si128(precision);
 
     memcpy(imOut->image32[0], im->image32[0], im->linesize);
     memcpy(imOut->image32[1], im->image32[1], im->linesize);
@@ -174,10 +177,10 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offs
 
             MM_KERNEL_LOAD(1, x + 2);
             MM_KERNEL_SUM(ss0, 1, _mm256_unpacklo_epi8, 0, 0xaa);
-            ss0 = _mm256_srai_epi32(ss0, PRECISION_BITS);
+            ss0 = _mm256_sra_epi32(ss0, shift);
             MM_KERNEL_SUM(ss2, 1, _mm256_unpacklo_epi8, 0, 0x55);
             MM_KERNEL_SUM(ss2, 1, _mm256_unpackhi_epi8, 0, 0xaa);
-            ss2 = _mm256_srai_epi32(ss2, PRECISION_BITS);
+            ss2 = _mm256_sra_epi32(ss2, shift);
 
             pix00 = pix01;
             pix10 = pix11;
@@ -221,7 +224,7 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offs
             MM_KERNEL_SUM(ss0, 0, _mm256_unpacklo_epi8, 0, 0x00);
             MM_KERNEL_SUM(ss0, 0, _mm256_unpackhi_epi8, 0, 0x55);
             MM_KERNEL_SUM(ss0, 1, _mm256_unpacklo_epi8, 0, 0xaa);
-            ss0 = _mm256_srai_epi32(ss0, PRECISION_BITS);
+            ss0 = _mm256_sra_epi32(ss0, shift);
 
             ss0 = _mm256_packs_epi32(ss0, ss0);
             ss0 = _mm256_packus_epi16(ss0, ss0);
@@ -317,15 +320,15 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offs
 
             MM_KERNEL_LOAD(1, x + 2);
             MM_KERNEL_SUM(ss0, 1, _mm_unpacklo_epi8, 0, 0xaa);
-            ss0 = _mm_srai_epi32(ss0, PRECISION_BITS);
+            ss0 = _mm_sra_epi32(ss0, shift);
             MM_KERNEL_SUM(ss1, 1, _mm_unpacklo_epi8, 1, 0xaa);
-            ss1 = _mm_srai_epi32(ss1, PRECISION_BITS);
+            ss1 = _mm_sra_epi32(ss1, shift);
             MM_KERNEL_SUM(ss2, 1, _mm_unpacklo_epi8, 0, 0x55);
             MM_KERNEL_SUM(ss2, 1, _mm_unpackhi_epi8, 0, 0xaa);
-            ss2 = _mm_srai_epi32(ss2, PRECISION_BITS);
+            ss2 = _mm_sra_epi32(ss2, shift);
             MM_KERNEL_SUM(ss3, 1, _mm_unpacklo_epi8, 1, 0x55);
             MM_KERNEL_SUM(ss3, 1, _mm_unpackhi_epi8, 1, 0xaa);
-            ss3 = _mm_srai_epi32(ss3, PRECISION_BITS);
+            ss3 = _mm_sra_epi32(ss3, shift);
 
             pix00 = pix01;
             pix10 = pix11;
@@ -354,7 +357,7 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16 *kernel, INT32 offs
             MM_KERNEL_SUM(ss0, 0, _mm_unpacklo_epi8, 0, 0x00);
             MM_KERNEL_SUM(ss0, 0, _mm_unpackhi_epi8, 0, 0x55);
             MM_KERNEL_SUM(ss0, 1, _mm_unpacklo_epi8, 0, 0xaa);
-            ss0 = _mm_srai_epi32(ss0, PRECISION_BITS);
+            ss0 = _mm_sra_epi32(ss0, shift);
 
             ss0 = _mm_packs_epi32(ss0, ss0);
             ss0 = _mm_packus_epi16(ss0, ss0);
