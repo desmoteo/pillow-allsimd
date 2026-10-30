@@ -136,13 +136,9 @@ class RankFilter(Filter):
 
     def _filter_bands(self, image: _imaging.ImagingCore) -> _imaging.ImagingCore | None:
         """All bands of a multiband image at once, the same pixels as each
-        band alone, where the C fast paths can; otherwise None."""
-        if (
-            type(self).filter is RankFilter.filter
-            and image.mode in self._BAND_MODES
-            and 3 <= self.size <= 11
-        ):
-            return image.rankfilter(self.size, self.rank, True)
+        band alone, where that is faster; otherwise None."""
+        if type(self).filter is RankFilter.filter and image.mode in self._BAND_MODES:
+            return image.rankfilter(self.size, self.rank, True, True)
         return None
 
 

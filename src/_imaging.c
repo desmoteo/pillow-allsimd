@@ -2305,9 +2305,15 @@ _floodfill(ImagingObject *self, PyObject *args) {
 
 static PyObject *
 _rankfilter_impl(ImagingObject *self, PyObject *args) {
-    int size, rank, same_size = 0;
-    if (!PyArg_ParseTuple(args, "ii|p", &size, &rank, &same_size)) {
+    int size, rank, same_size = 0, all_bands = 0;
+    if (!PyArg_ParseTuple(args, "ii|pp", &size, &rank, &same_size, &all_bands)) {
         return NULL;
+    }
+
+    /* all_bands: filter every band of a multiband image at once, or return
+       None where that isn't faster than filtering band by band. */
+    if (all_bands && !ImagingRankFilterAllBands(self->image, size, rank)) {
+        Py_RETURN_NONE;
     }
 
     /* same_size: filter the image as if expanded by size // 2 pixels that
