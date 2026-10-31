@@ -2393,7 +2393,9 @@ class Image:
            The smaller ``reducing_gap``, the faster resizing.
            With ``reducing_gap`` greater or equal to 3.0, the result is
            indistinguishable from fair resampling in most cases.
-           The default value is None (no optimization).
+           The default value is None (no optimization). In Pillow-SIMD's
+           :ref:`fast mode <fast-mode>`, None means 3.0 for the bicubic,
+           Lanczos and MKS filters, except on I;16 images.
         :returns: An :py:class:`~PIL.Image.Image` object.
         """
 
@@ -2440,6 +2442,22 @@ class Image:
 
         if self.mode in ("1", "P"):
             resample = Resampling.NEAREST
+
+        if (
+            reducing_gap is None
+            and resample
+            in (
+                Resampling.BICUBIC,
+                Resampling.LANCZOS,
+                Resampling.MKS2013,
+                Resampling.MKS2021,
+            )
+            and not self.mode.startswith("I;16")
+            and get_fast()
+        ):
+            # Pillow-SIMD fast mode: downscales of 6x and more first shrink by
+            # an integer factor with reduce(); the shorter filters gain nothing
+            reducing_gap = 3.0
 
         if self.mode in ["LA", "RGBA"] and resample != Resampling.NEAREST:
             im = self.convert({"LA": "La", "RGBA": "RGBa"}[self.mode])
@@ -3411,7 +3429,8 @@ class SupportsArrowArrayInterface(Protocol):
     """
 
     def __arrow_c_array__(
-        self, requested_schema: PyCapsule = None  # type: ignore[name-defined]  # noqa: F821
+        self,
+        requested_schema: PyCapsule = None,  # type: ignore[name-defined]  # noqa: F821
     ) -> tuple[PyCapsule, PyCapsule]:  # type: ignore[name-defined]  # noqa: F821
         raise NotImplementedError()
 

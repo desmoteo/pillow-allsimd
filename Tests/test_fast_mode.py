@@ -595,3 +595,115 @@ def test_transform_nearest_exact() -> None:
         with Image.fast_mode():
             fast = fn(im, Image.Resampling.NEAREST)
         assert fast.tobytes() == exact.tobytes(), name
+
+
+# Blend (Blend.c): (in2 - in1) * alpha in 2^-15 units, rounded half up.
+
+
+@pytest.mark.parametrize("mode", ("L", "LA", "RGB", "RGBA", "CMYK"))
+def test_blend_close_to_exact(mode: str) -> None:
+    a = _noise(mode, (67, 23), 1)
+    b = _noise(mode, (67, 23), 2)
+    for alpha in (0.001, 0.25, 0.5, 0.77, 0.99999):
+        exact = Image.blend(a, b, alpha)
+        with Image.fast_mode():
+            fast = Image.blend(a, b, alpha)
+        assert _diff(fast, exact)[0] <= 1
+
+
+def test_blend_accuracy() -> None:
+    # the fast result is the float result rounded, but for values within
+    # 0.005 of a half; the exact one truncates
+    a = _noise("RGB", (67, 23), 3)
+    b = _noise("RGB", (67, 23), 4)
+    for alpha in (0.3, 0.71, 0.9):
+        values = [x + alpha * (y - x) for x, y in zip(a.tobytes(), b.tobytes())]
+        exact = Image.blend(a, b, alpha).tobytes()
+        with Image.fast_mode():
+            fast = Image.blend(a, b, alpha).tobytes()
+        # alpha in 2^-15 units moves a value by 0.004 at most
+        assert max(abs(f - v) for f, v in zip(fast, values)) < 0.505
+        assert sum(abs(e - v) >= 0.505 for e, v in zip(exact, values)) > len(values) / 3
+
+
+@pytest.mark.parametrize("alpha", (-0.5, 0, 1, 1.5))
+def test_blend_other_alphas_exact(alpha: float) -> None:
+    a = _noise("RGB", (67, 23), 5)
+    b = _noise("RGB", (67, 23), 6)
+    with Image.fast_mode():
+        fast = Image.blend(a, b, alpha)
+    assert fast.tobytes() == Image.blend(a, b, alpha).tobytes()
+
+
+# Large downscales (Image.py, resize): reducing_gap 3.0 when none is given,
+# for the filters it makes faster.
+
+FAST_DOWNSCALE_FILTERS = (
+    Image.Resampling.BICUBIC,
+    Image.Resampling.LANCZOS,
+    Image.Resampling.MKS2013,
+    Image.Resampling.MKS2021,
+)
+
+
+def _photo(size: tuple[int, int]) -> Image.Image:
+    return hopper("RGB").resize(size, Image.Resampling.BICUBIC)
+
+
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA", "I", "F"))
+@pytest.mark.parametrize("resample", FAST_DOWNSCALE_FILTERS)
+def test_downscale_reducing_gap(mode: str, resample: Image.Resampling) -> None:
+    im = _photo((509, 383)).convert(mode)
+    for size in ((60, 40), (84, 63), (31, 23)):
+        with Image.fast_mode():
+            fast = im.resize(size, resample)
+        assert fast.tobytes() == im.resize(size, resample, reducing_gap=3.0).tobytes()
+
+
+@pytest.mark.parametrize("resample", FAST_DOWNSCALE_FILTERS)
+def test_downscale_close_to_exact(resample: Image.Resampling) -> None:
+    # at photo sizes; the edges of tiny results differ more, where reduce()
+    # averages partial boxes
+    im = _photo((2048, 1536))
+    for size in ((320, 240), (256, 192), (128, 96)):
+        with Image.fast_mode():
+            fast = im.resize(size, resample)
+        largest, mean = _diff(fast, im.resize(size, resample))
+        assert largest <= 3
+        assert mean < 0.5
+
+
+def test_downscale_small_factors_exact() -> None:
+    # below 6x, reducing_gap 3.0 doesn't reduce
+    im = _photo((509, 383))
+    for size in ((300, 200), (100, 75), (509, 64)):
+        with Image.fast_mode():
+            fast = im.resize(size, Image.Resampling.LANCZOS)
+        assert fast.tobytes() == im.resize(size, Image.Resampling.LANCZOS).tobytes()
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    (
+        {"resample": Image.Resampling.LANCZOS, "reducing_gap": 2.0},
+        {"resample": Image.Resampling.NEAREST},
+        {"resample": Image.Resampling.BILINEAR},
+        {"resample": Image.Resampling.BOX},
+        {"resample": Image.Resampling.HAMMING},
+    ),
+)
+def test_downscale_other_arguments_exact(kwargs: dict[str, object]) -> None:
+    im = _photo((509, 383))
+    exact = im.resize((60, 40), **kwargs)  # type: ignore[arg-type]
+    with Image.fast_mode():
+        fast = im.resize((60, 40), **kwargs)  # type: ignore[arg-type]
+    assert fast.tobytes() == exact.tobytes()
+
+
+def test_downscale_i16_exact() -> None:
+    # reduce() doesn't take I;16 images
+    im = _photo((509, 383)).convert("L").convert("I;16")
+    exact = im.resize((60, 40), Image.Resampling.LANCZOS)
+    with Image.fast_mode():
+        fast = im.resize((60, 40), Image.Resampling.LANCZOS)
+    assert fast.tobytes() == exact.tobytes()

@@ -99,6 +99,18 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
      - at most 2 levels, 1 on photos (RGBA: more where alpha is low, from
        the premultiplication); against float interpolation 0.6% of values
        off by one, against 41% for the exact result
+   * - :py:func:`~PIL.Image.blend`, alpha between 0 and 1
+     - integer interpolation with alpha in 2^-15 units, rounded
+     - 1.7x, 4.1x
+     - at most 1 level; the float result rounded, but within 0.004 of a
+       half; the exact result is truncated
+   * - :py:meth:`~PIL.Image.Image.resize` with the bicubic, Lanczos and MKS
+       filters and no ``reducing_gap``, downscales of 6x and more, all modes
+       but I;16
+     - ``reducing_gap=3.0``: an integer shrink with
+       :py:meth:`~PIL.Image.Image.reduce` first
+     - 1/8 Lanczos: 1.9x, 2.5x; 1/16: 2.0x, 4.5x
+     - at most 2 levels at photo sizes; more at the edges of tiny results
 
 Other operations, and other arguments of these, use the exact kernels in
 fast mode too.
