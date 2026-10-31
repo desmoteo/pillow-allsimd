@@ -56,7 +56,7 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       with you as required reviewer, so nothing uploads without a click.
 - [x] (2026-11-03: uploaded; installed and checked on the x86 laptop, SSE4.1
       and `-C simd=avx2` builds, selftest and identical exact output; the
-      Jetson install is still to do) Dry run to TestPyPI (`gh workflow run release.yml -R
+      Orin was checked on the PyPI release instead) Dry run to TestPyPI (`gh workflow run release.yml -R
       desmoteo/pillow-allsimd --ref simd/pillow-13`, then approve); install
       from it on the x86 laptop and the Jetson.
 - [x] (2026-11-03) Install instructions (README, `PyPI.rst`, `docs/allsimd.rst`):
@@ -65,7 +65,11 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       (matplotlib, torchvision…) make pip install Pillow too, and the last
       one installed overwrites `PIL`: install everything else first, then
       `python3 -m pip uninstall -y pillow` and install pillow-allsimd.
-- [ ] The release: push the tag `allsimd-13.0.0.post0` (it clashes with
+- [x] (2026-11-03: on PyPI from the tag on a94a0c4f8, with a provenance
+      attestation; installed from PyPI on the x86 laptop, SSE4.1 by default and
+      AVX2 with `-C simd=avx2`, self-test and 1,106 SIMD, resample, filter and
+      convert tests passing; on the Orin, NEON by default, 3.9x the portable
+      build on a resize and 9.7x on a blur, the same tests passing) The release: push the tag `allsimd-13.0.0.post0` (it clashes with
       neither Pillow's nor Pillow-SIMD's tags, both in this repo; never
       `git push --tags`), then approve the upload. The tag
       must match `src/PIL/_version.py`. A version number can't be reused
