@@ -8,7 +8,8 @@
  * filter it in doubles, truncating the result; the compilers fuse their
  * multiply-adds differently on x86 and arm64. Here the positions are fixed
  * point, computed in exact integer arithmetic (perspective: integer
- * numerators and denominators, then one IEEE reciprocal and two products),
+ * numerators and denominators, then one IEEE division and two products, in
+ * 32-bit floats for images below TF_FLOAT_MAX on both sides),
  * rounded to 1/256 pixel, and the filters are integer sums of products with
  * one rounding at the end (bicubic: one more between its passes), so every
  * build on every architecture gives the same pixels. The scalar functions
@@ -22,6 +23,8 @@
 #include <stdint.h>
 
 #define TF_TILE 64
+/* perspective positions in floats for images below this on both sides */
+#define TF_FLOAT_MAX 32768
 /* a position as a 32.32 fixed-point number of pixels */
 #define TF_ONE ((int64_t)1 << 32)
 #define TF_LIMIT ((double)(1 << 30))
@@ -117,9 +120,10 @@ tf_map_init(TFMap *m, int method, const double *a) {
    Affine and quad positions are exact integer sums in 2^-32 pixel.
    Perspective ones are p = n * (512 / d) for the integer numerators n and
    denominator d, which are exact in doubles (below 2^53, the steps along a
-   row too, so a fused multiply-add gives the same sums): one IEEE division
-   and one product, truncated to an integer, the same in vectors and in
-   scalars; p is in 1/512 pixel, so (p + 1) >> 1 rounds it to 1/256. */
+   row too, so a fused multiply-add gives the same sums), converted to
+   floats below TF_FLOAT_MAX: one IEEE division and one product, truncated
+   to an integer, the same in vectors and in scalars; p is in 1/512 pixel,
+   so (p + 1) >> 1 rounds it to 1/256. */
 static void
 tf_row(
     const TFMap *m,
@@ -137,7 +141,146 @@ tf_row(
     char in[TF_TILE];
     int i;
 
-    if (m->method == IMAGING_TRANSFORM_PERSPECTIVE) {
+    if (m->method == IMAGING_TRANSFORM_PERSPECTIVE && im->xsize < TF_FLOAT_MAX &&
+        im->ysize < TF_FLOAT_MAX) {
+        /* The same in 32-bit floats from the exact sums, converted once:
+           p below 2^24, where a float's step is at most 1/512 pixel, and
+           four lanes per division. Conversion, division and product are
+           each rounded once, alike everywhere. */
+        const double nx0 = (double)(m->c[0] * u + m->c[1] * v + m->c[2]);
+        const double ny0 = (double)(m->c[3] * u + m->c[4] * v + m->c[5]);
+        const double d0 = (double)(m->c[6] * u + m->c[7] * v + m->c[8]);
+        const double sx = (double)(2 * m->c[0]), sy = (double)(2 * m->c[3]);
+        const double sd = (double)(2 * m->c[6]);
+        const float xlim = 512.0f * im->xsize, ylim = 512.0f * im->ysize;
+        i = 0;
+#if defined(IMAGING_SIMD_AVX2)
+        for (; i + 8 <= n; i += 8) {
+            const __m256d k0 =
+                _mm256_add_pd(_mm256_set1_pd(i), _mm256_setr_pd(0, 1, 2, 3));
+            const __m256d k1 =
+                _mm256_add_pd(_mm256_set1_pd(i), _mm256_setr_pd(4, 5, 6, 7));
+#define TF_F32_AVX2(base, step)                        \
+    _mm256_set_m128(                                   \
+        _mm256_cvtpd_ps(TF_LINE_AVX2(base, step, k1)), \
+        _mm256_cvtpd_ps(TF_LINE_AVX2(base, step, k0))  \
+    )
+            const __m256 r = _mm256_div_ps(_mm256_set1_ps(512.0f), TF_F32_AVX2(d0, sd));
+            const __m256 px = _mm256_mul_ps(TF_F32_AVX2(nx0, sx), r);
+            const __m256 py = _mm256_mul_ps(TF_F32_AVX2(ny0, sy), r);
+#undef TF_F32_AVX2
+            const __m256 zero = _mm256_setzero_ps();
+            const int bits = _mm256_movemask_ps(_mm256_and_ps(
+                _mm256_and_ps(
+                    _mm256_cmp_ps(px, zero, _CMP_GE_OQ),
+                    _mm256_cmp_ps(px, _mm256_set1_ps(xlim), _CMP_LT_OQ)
+                ),
+                _mm256_and_ps(
+                    _mm256_cmp_ps(py, zero, _CMP_GE_OQ),
+                    _mm256_cmp_ps(py, _mm256_set1_ps(ylim), _CMP_LT_OQ)
+                )
+            ));
+            const __m256i one = _mm256_set1_epi32(1), half = _mm256_set1_epi32(128);
+            int b;
+            _mm256_storeu_si256(
+                (__m256i *)(qx + i),
+                _mm256_sub_epi32(
+                    _mm256_srai_epi32(
+                        _mm256_add_epi32(_mm256_cvttps_epi32(px), one), 1
+                    ),
+                    half
+                )
+            );
+            _mm256_storeu_si256(
+                (__m256i *)(qy + i),
+                _mm256_sub_epi32(
+                    _mm256_srai_epi32(
+                        _mm256_add_epi32(_mm256_cvttps_epi32(py), one), 1
+                    ),
+                    half
+                )
+            );
+            for (b = 0; b < 8; b++) {
+                in[i + b] = (bits >> b) & 1;
+            }
+        }
+#endif
+#if defined(IMAGING_SIMD_SSE4)
+        for (; i + 4 <= n; i += 4) {
+            const __m128d k0 = _mm_add_pd(_mm_set1_pd(i), _mm_setr_pd(0, 1));
+            const __m128d k1 = _mm_add_pd(_mm_set1_pd(i), _mm_setr_pd(2, 3));
+#define TF_F32_SSE(base, step)                     \
+    _mm_movelh_ps(                                 \
+        _mm_cvtpd_ps(TF_LINE_SSE(base, step, k0)), \
+        _mm_cvtpd_ps(TF_LINE_SSE(base, step, k1))  \
+    )
+            const __m128 r = _mm_div_ps(_mm_set1_ps(512.0f), TF_F32_SSE(d0, sd));
+            const __m128 px = _mm_mul_ps(TF_F32_SSE(nx0, sx), r);
+            const __m128 py = _mm_mul_ps(TF_F32_SSE(ny0, sy), r);
+#undef TF_F32_SSE
+            const int bits = _mm_movemask_ps(_mm_and_ps(
+                _mm_and_ps(
+                    _mm_cmpge_ps(px, _mm_setzero_ps()),
+                    _mm_cmplt_ps(px, _mm_set1_ps(xlim))
+                ),
+                _mm_and_ps(
+                    _mm_cmpge_ps(py, _mm_setzero_ps()),
+                    _mm_cmplt_ps(py, _mm_set1_ps(ylim))
+                )
+            ));
+            _mm_storeu_si128((__m128i *)(qx + i), TF_Q_SSE(_mm_cvttps_epi32(px)));
+            _mm_storeu_si128((__m128i *)(qy + i), TF_Q_SSE(_mm_cvttps_epi32(py)));
+            in[i] = bits & 1;
+            in[i + 1] = (bits >> 1) & 1;
+            in[i + 2] = (bits >> 2) & 1;
+            in[i + 3] = (bits >> 3) & 1;
+        }
+#elif defined(IMAGING_SIMD_NEON)
+        for (; i + 4 <= n; i += 4) {
+            const float64x2_t k0 =
+                vaddq_f64(vdupq_n_f64(i), vcombine_f64(vdup_n_f64(0), vdup_n_f64(1)));
+            const float64x2_t k1 =
+                vaddq_f64(vdupq_n_f64(i), vcombine_f64(vdup_n_f64(2), vdup_n_f64(3)));
+#define TF_F32_NEON(base, step)                                                  \
+    vcvt_high_f32_f64(                                                           \
+        vcvt_f32_f64(TF_LINE_NEON(base, step, k0)), TF_LINE_NEON(base, step, k1) \
+    )
+            const float32x4_t r = vdivq_f32(vdupq_n_f32(512.0f), TF_F32_NEON(d0, sd));
+            const float32x4_t px = vmulq_f32(TF_F32_NEON(nx0, sx), r);
+            const float32x4_t py = vmulq_f32(TF_F32_NEON(ny0, sy), r);
+#undef TF_F32_NEON
+            const uint32x4_t ok = vandq_u32(
+                vandq_u32(
+                    vcgeq_f32(px, vdupq_n_f32(0)), vcltq_f32(px, vdupq_n_f32(xlim))
+                ),
+                vandq_u32(
+                    vcgeq_f32(py, vdupq_n_f32(0)), vcltq_f32(py, vdupq_n_f32(ylim))
+                )
+            );
+            const int32x4_t one = vdupq_n_s32(1), half = vdupq_n_s32(128);
+            vst1q_s32(
+                qx + i,
+                vsubq_s32(vshrq_n_s32(vaddq_s32(vcvtq_s32_f32(px), one), 1), half)
+            );
+            vst1q_s32(
+                qy + i,
+                vsubq_s32(vshrq_n_s32(vaddq_s32(vcvtq_s32_f32(py), one), 1), half)
+            );
+            in[i] = (char)(vgetq_lane_u32(ok, 0) & 1);
+            in[i + 1] = (char)(vgetq_lane_u32(ok, 1) & 1);
+            in[i + 2] = (char)(vgetq_lane_u32(ok, 2) & 1);
+            in[i + 3] = (char)(vgetq_lane_u32(ok, 3) & 1);
+        }
+#endif
+        for (; i < n; i++) {
+            const float r = 512.0f / (float)(d0 + i * sd);
+            const float px = (float)(nx0 + i * sx) * r, py = (float)(ny0 + i * sy) * r;
+            /* a zero denominator gives infinities or NaN: outside */
+            in[i] = px >= 0 && px < xlim && py >= 0 && py < ylim;
+            qx[i] = in[i] ? (((INT32)px + 1) >> 1) - 128 : 0;
+            qy[i] = in[i] ? (((INT32)py + 1) >> 1) - 128 : 0;
+        }
+    } else if (m->method == IMAGING_TRANSFORM_PERSPECTIVE) {
         const double nx0 = (double)(m->c[0] * u + m->c[1] * v + m->c[2]);
         const double ny0 = (double)(m->c[3] * u + m->c[4] * v + m->c[5]);
         const double d0 = (double)(m->c[6] * u + m->c[7] * v + m->c[8]);
