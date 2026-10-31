@@ -94,15 +94,15 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 - [x] Turn on issues (done 2026-11-02): `gh repo edit desmoteo/pillow-allsimd
       --enable-issues`. They are off, so problems can only be reported on
       uploadcare's tracker.
-- [ ] Issue template and contributing guide (`.github/ISSUE_TEMPLATE/`,
+- [x] (2026-11-02) Issue template and contributing guide (`.github/ISSUE_TEMPLATE/`,
       `.github/CONTRIBUTING.md`): they point to Pillow's tracker. Send
       Pillow-AllSIMD problems here; problems that Pillow itself has go to
       Pillow.
-- [ ] Security policy (`.github/SECURITY.md`): it sends reports to Pillow's
+- [x] (2026-11-02) Security policy (`.github/SECURITY.md`): it sends reports to Pillow's
       private advisories and Tidelift. Turn on private vulnerability
       reporting on the fork and write a policy for this code, pointing to
       Pillow for Pillow's own code.
-- [ ] README: say where to report problems.
+- [x] README: say where to report problems (its Contributing section already does).
 
 ## Outreach
 
@@ -119,9 +119,9 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 
 ## Pushes and pages
 
-- [ ] Push `142881bb3` to `simd/pillow-13` and `simd/master`; republish the
+- [x] Push `142881bb3` to `simd/pillow-13` and `simd/master`; republish the
       API docs (the About page names `design/OTHER_ARCHITECTURES.md`).
-- [ ] Push so that CI runs: a push whose last commit says `[ci skip]` skips
+- [x] Push so that CI runs: a push whose last commit says `[ci skip]` skips
       the tests for every commit in it. Push code commits on their own, or
       start the workflows by hand after such a push.
 
