@@ -95,3 +95,34 @@ def test_filter(width: int, mode: str, size: int) -> None:
             out = im.filter(flt)
             border = size // 2
             _assert_flat(out.crop((border, border, width - border, border + 2)))
+
+
+@pytest.mark.parametrize("mode", ("L", "LA", "RGB", "RGBA", "CMYK"))
+@pytest.mark.parametrize("radius", (0.4, 1, 2, 3, 4, (2, 0.5), (1, 3)))
+def test_box_blur_fused_matches_passes(
+    mode: str, radius: float | tuple[float, float]
+) -> None:
+    # one pass each way through a ring of rows: the same as a horizontal
+    # pass, then a vertical one
+    rx, ry = radius if isinstance(radius, tuple) else (radius, radius)
+    for size in (*SHAPES.values(), (1, 1), (3, 40), (40, 3)):
+        rnd = random.Random(f"{mode}{size}")
+        n = size[0] * size[1] * (1 if mode == "L" else 4)
+        im = Image.frombytes(mode, size, rnd.randbytes(n))
+        both = im.filter(ImageFilter.BoxBlur(radius))
+        h = im._new(im.im.box_blur((rx, 0), 1))
+        v = h._new(h.im.box_blur((0, ry), 1))
+        assert both.tobytes() == v.tobytes()
+
+
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA", "CMYK"))
+def test_point_table(mode: str) -> None:
+    # table lookups (NEON tbl) against the table itself
+    rnd = random.Random(mode)
+    bands = len(mode)
+    table = [rnd.randrange(256) for _ in range(256 * bands)]
+    for size in SHAPES.values():
+        im = Image.frombytes(mode, size, rnd.randbytes(size[0] * size[1] * bands))
+        out = im.point(table).tobytes()
+        src = im.tobytes()
+        assert out == bytes(table[(i % bands) * 256 + v] for i, v in enumerate(src))
