@@ -92,3 +92,32 @@ def aligned_arena() -> Generator[None]:
         yield
     finally:
         Image.core.set_alignment(alignment)
+
+
+# Pillow-AllSIMD: fast mode is on by default. These upstream tests check
+# values that Pillow's exact arithmetic gives (YCbCr histograms and colour
+# counts, rotated reference images, blend rounding), or compare a resize
+# without reducing_gap with ones with it, so they run with the exact kernels.
+EXACT_KERNEL_TESTS = {
+    "test_image_entropy.py::test_entropy",
+    "test_image_getcolors.py::test_getcolors",
+    "test_image_getdata.py::test_mode",
+    "test_image_histogram.py::test_histogram",
+    "test_image_histogram.py::test_histogram_masked",
+    "test_image_resize.py::TestReducingGapResize::test_reducing_gap_2",
+    "test_image_resize.py::TestReducingGapResize::test_reducing_gap_3",
+    "test_image_resize.py::TestReducingGapResize::test_reducing_gap_8",
+    "test_image_rotate.py::test_resample",
+    "test_image_rotate.py::test_translate",
+    "test_imagechops.py::test_blend",
+}
+
+
+@pytest.fixture(autouse=True)
+def exact_kernels_for_pillow_values(request: pytest.FixtureRequest) -> Generator[None]:
+    names = request.node.nodeid.split("[")[0].split("::")[1:]
+    if "::".join((request.node.path.name, *names)) not in EXACT_KERNEL_TESTS:
+        yield
+        return
+    with Image.fast_mode(False):
+        yield

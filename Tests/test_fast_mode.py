@@ -20,7 +20,9 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def restore_fast_mode() -> Generator[None]:
+    # The tests compare fast_mode() blocks with the exact kernels outside them
     previous = Image.get_fast()
+    Image.set_fast(False)
     yield
     Image.set_fast(previous)
 
@@ -30,7 +32,7 @@ def test_feature() -> None:
     assert features.version_feature("fast") is None
 
 
-def test_off_by_default() -> None:
+def test_on_by_default() -> None:
     env = {
         k: v
         for k, v in os.environ.items()
@@ -40,7 +42,7 @@ def test_off_by_default() -> None:
         [sys.executable, "-c", "from PIL import Image; print(Image.get_fast())"],
         env=env,
     )
-    assert out.strip() == b"False"
+    assert out.strip() == b"True"
 
 
 def test_set_get() -> None:
@@ -97,12 +99,12 @@ def test_env_unset() -> None:
 
 
 def test_env_at_import() -> None:
-    env = dict(os.environ, PILLOW_ALLSIMD_FAST="1")
+    env = dict(os.environ, PILLOW_ALLSIMD_FAST="0")
     out = subprocess.check_output(
         [sys.executable, "-c", "from PIL import Image; print(Image.get_fast())"],
         env=env,
     )
-    assert out.strip() == b"True"
+    assert out.strip() == b"False"
 
 
 def test_context_manager() -> None:
@@ -755,7 +757,7 @@ FAST_DOWNSCALE_FILTERS = (
 
 
 @shapes
-@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA", "I", "F"))
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA"))
 @pytest.mark.parametrize("resample", FAST_DOWNSCALE_FILTERS)
 def test_downscale_reducing_gap(
     mode: str, resample: Image.Resampling, shape: tuple[int, int]
@@ -818,6 +820,17 @@ def test_downscale_other_arguments_exact(
     with Image.fast_mode():
         fast = im.resize(size, **kwargs)  # type: ignore[arg-type]
     assert fast.tobytes() == exact.tobytes()
+
+
+@pytest.mark.parametrize("mode", ("I", "F"))
+def test_downscale_32bit_exact(mode: str) -> None:
+    # reduce() sums 32-bit pixels in 32 bits, which overflows for large values
+    im = Image.new(mode, (512, 9), 0x7FFFFFFF if mode == "I" else 3.4e38)
+    exact = im.resize((9, 512), Image.Resampling.LANCZOS)
+    with Image.fast_mode():
+        fast = im.resize((9, 512), Image.Resampling.LANCZOS)
+    assert fast.tobytes() == exact.tobytes()
+    assert fast.getpixel((0, 0)) == im.getpixel((0, 0))
 
 
 @shapes

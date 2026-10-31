@@ -3,7 +3,8 @@
  *
  * Fast mode: whether operations may use kernels that are faster than the
  * exact ones and whose results may differ from Pillow's by a documented
- * amount. Off by default; see APPROXIMATE_KERNELS_PLAN.md.
+ * amount. On by default; ImagingSetFast(0) selects the exact kernels.
+ * See APPROXIMATE_KERNELS_PLAN.md.
  *
  * The flags are a bit set (IMAGING_FAST_ALL is the only bit so far). An
  * operation reads them once, at its entry point, so one call never mixes
@@ -16,7 +17,7 @@
 #include <intrin.h>
 #endif
 
-static long fast_flags = 0;
+static long fast_flags = IMAGING_FAST_ALL;
 
 void
 ImagingSetFast(int flags) {

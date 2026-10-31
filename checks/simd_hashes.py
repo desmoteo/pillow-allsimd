@@ -34,6 +34,11 @@ T = Image.Transpose
 Update = Callable[[bytes], None]
 results: dict[str, str] = {}
 
+# Fast mode is on by default; every section but the "fast:" ones hashes the
+# exact kernels
+if hasattr(Image, "set_fast"):
+    Image.set_fast(False)
+
 
 def section(
     name: str,
