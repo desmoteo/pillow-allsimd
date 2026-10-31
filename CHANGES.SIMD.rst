@@ -200,8 +200,8 @@ Based on Pillow 13.0.0
 - Fast mode: resize() of 8-bit images with 4-byte pixels fuses the two
   passes through a ring of rows, keeps the horizontal sums to 2^-6 levels
   and multiplies in 16 bits in the vertical pass (pmulhrsw, vqrdmulh): within
-  1 level of the exact result and closer to a float resize; upscales 1.15x
-  to 1.29x (x86) and 1.29x to 1.46x (arm64), downscales to 1.18x on arm64
+  1 level of the exact result and closer to a float resize; upscales 1.16x
+  to 1.28x (x86) and 1.31x to 1.47x (arm64), downscales to 1.20x on arm64
   and within 4% on x86. The same pixels on every build
 
 Build

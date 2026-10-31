@@ -564,3 +564,39 @@ Fast mode (the default) before and after, best of 3 rounds, 2560x1600:
 - **Median 3x3** (x86 1.3x, arm64 1.6x), **reduce by 2 and 4** on arm64
   (1.4x), `point/L/table` on x86 (1.46x, no byte shuffle over 256
   entries without AVX-512 VBMI), and text (Hershey strokes, not glyphs).
+
+### Fast resize (`9e061d4e6`)
+
+Asked for after the round above: the 16-bit fast-mode resize
+(`ResampleFast.c`, described in SIMD_FAST_KERNELS.md), for 4-byte images.
+The passes are fused through a ring of rows, the horizontal sums kept to
+2^-6 levels, and the vertical pass multiplies in 16 bits. Benchmark at
+`9e061d4e6`, fast mode, against the tables at `ab4b5f813`:
+
+| Case | x86 | arm64 | arm64 vs OpenCV |
+|---|---|---|---|
+| RGB to 5478x3424 bicubic | 1.28x | 1.47x | 0.54 |
+| RGB to 5478x3424 bilinear | 1.18x | 1.42x | 0.91 |
+| RGBA to 5478x3424 bilinear | 1.17x | 1.31x | 2.29 (was 2.99) |
+| RGB to 2048x1280 bicubic | 0.96x | 1.19x | 0.77 |
+
+Geomean against Pillow 13.0 in fast mode: x86 6.08x to 6.13x, arm64 2.99x
+to 3.08x. Fast mode behind OpenCV: 23 cases on x86, 30 on arm64.
+
+- A first version had a 16-bit horizontal pass as well, per output pixel.
+  It was faster than the exact kernel on the Jetson, but 2.5 to 2.9 times
+  slower on x86, where Pillow-SIMD's AVX2 kernel puts two rows in a
+  register and two taps in each `pmaddwd`. Fast mode gives one result on
+  every machine, so the horizontal pass stays the exact kernels' sums,
+  with 6 more bits.
+- A NEON 4-row horizontal kernel with lane multiplies and shared
+  coefficient loads gained nothing: the kernel runs at IPC 3.7.
+- The `perf.py` A/B showed x86 downscales 10% slower where a standalone
+  loop showed none. The ring rows, 16 KB apart for 2048 pixels, shared L1
+  sets; rows aligned to cache lines and skewed by one line brought it to
+  2% to 4%. That rest is the 16-bit ring's doubled bytes over many taps.
+- What remains of the RGBA upscale gap on arm64 (2.3x): OpenCV doesn't
+  premultiply (here the premultiply and the table unpremultiply cost about
+  a quarter of the time), and its bilinear kernel uses 11-bit weights on
+  8-bit values.
+
