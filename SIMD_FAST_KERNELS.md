@@ -245,6 +245,7 @@ The exception is a pixel whose source position falls on the source's edge
 = 0): the exact path's doubles and the fixed point round it differently, so
 one may take it as inside and the other as outside, a few such pixels per
 image at most (the tests allow 4 per transform).
+
 Against bilinear interpolation in doubles at the exact positions (photo,
 rotation by 30 degrees): exact 41.4% of values off by one, fast 0.6%. RGBA
 differs more where alpha is low (up to 37 levels on the photo's alpha):
@@ -333,7 +334,9 @@ bounded by measurement:
   exact kernels are already as fast as `reduce()` plus a shorter filter (at
   1/8: 0.75x, 0.96x, 1.0x on x86).
 
-Both steps are exact kernels, so the hash is the same on every build.
+Both steps are exact kernels, so the result is as reproducible as they
+are: the `fast: downscale` hash (L, RGB, RGBA and F) is the same on SSE4,
+AVX2, NEON and scalar builds.
 
 **Accuracy** (2560x1600 photo to 426x266, 320x200 and 160x100): at most 2
 levels from the exact result, 0.2 to 0.4 on average; against the same

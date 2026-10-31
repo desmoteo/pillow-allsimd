@@ -3,10 +3,12 @@
 Fast mode (Pillow-SIMD)
 =======================
 
-By default every Pillow-SIMD build, whatever its instruction set, produces
-the same pixels as Pillow. Fast mode lets operations use kernels that are
-faster and whose results may differ from Pillow's by small, documented
-amounts. It is off unless you turn it on.
+By default Pillow-SIMD computes each operation with Pillow's arithmetic,
+or an integer form of it that rounds differently by one level at most in a
+few places (resize with 16-bit coefficients, RGB to L with 15-bit ones).
+Fast mode lets operations use kernels that are faster and whose results may
+differ from Pillow's by small, documented amounts. It is off unless you turn
+it on.
 
 This is a Pillow-SIMD feature: upstream Pillow has no fast mode. Check for it
 with ``features.check_feature("fast")``.
@@ -39,10 +41,12 @@ starts, so a call never mixes exact and fast kernels.
 What it guarantees
 ------------------
 
-* **Off by default.** With fast mode off, nothing changes.
+* **Off by default.** With fast mode off, nothing changes: the operations
+  run the kernels they run without fast mode.
 * **Deterministic.** A fast kernel's result depends only on its input and
   arguments, and is the same on every build and architecture of a given
-  Pillow-SIMD version.
+  Pillow-SIMD version. (Large downscales use the exact resize and reduce
+  kernels in another order, so they are as reproducible as those.)
 * **Bounded.** For each fast kernel, the largest difference from the exact
   result and its error against a float reference of the operation are
   documented below and checked by the tests.
@@ -82,7 +86,6 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
      - to YCbCr: 1.5x, 2.2x; to RGB: 1.3x, 1.7x
      - at most 1 level; against the float formulas 0.3% and 0.06% of values
        off by one, against 47% and 32% for the exact result
-
    * - :py:meth:`~PIL.Image.Image.convert` RGB, RGBA, RGBX → HSV
      - the same formulas, truncated exactly with one division in 32-bit
        floats per channel

@@ -4105,11 +4105,12 @@ def _apply_env_variables(env: dict[str, str] | None = None) -> None:
 def set_fast(enabled: bool = True) -> None:
     """
     Lets operations use faster kernels whose results may differ from
-    Pillow's by small, documented amounts, or goes back to the exact kernels,
-    which give Pillow's results on every build. Off by default; the
-    ``PILLOW_SIMD_FAST`` environment variable sets it when :py:mod:`PIL.Image`
-    is imported. The setting is process-wide, and each operation reads it
-    once when it starts.
+    Pillow's by small, documented amounts, or goes back to the exact kernels.
+    Off by default; the ``PILLOW_SIMD_FAST`` environment variable sets it
+    when :py:mod:`PIL.Image` is imported. The setting is process-wide, and
+    each operation reads it once when it starts. The operations with a fast
+    kernel, and how far their results may differ, are listed in
+    :ref:`fast-mode`.
 
     Check for the feature with ``features.check_feature("fast")``.
 
