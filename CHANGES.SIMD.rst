@@ -79,6 +79,10 @@ Based on Pillow 13.0.0
   box passes as one kernel with 8-bit weights in one pass, with exact bands
   near the edges: within 3 levels of the exact result, closer to a true
   Gaussian, 3.3x (x86) and 3.2x (arm64) faster at radius 1
+- Fast mode: RGB, RGBA, RGBX <-> YCbCr with JPEG's formulas at 14-bit
+  coefficients and one rounding: within 1 level of the exact result and
+  closer to the formulas (0.3% of values off by one, against 47%); to YCbCr
+  1.5x (x86) and 2.2x (arm64), back 1.3x and 1.7x
 - Pixel conversions written so that they vectorize under Python's
   ``-fno-strict-overflow`` (RGBA -> RGB 1.9x, RGB -> RGBA 1.9x, L -> RGB
   2.1x with AVX2); NEON loops for L -> RGB, RGB <-> RGBA and CMYK

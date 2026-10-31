@@ -743,6 +743,11 @@ extern void
 ImagingConvertRGB2YCbCr(UINT8 *out, const UINT8 *in, int pixels);
 extern void
 ImagingConvertYCbCr2RGB(UINT8 *out, const UINT8 *in, int pixels);
+/* fast mode (SIMD_FAST_KERNELS.md) */
+extern void
+ImagingConvertRGB2YCbCrFast(UINT8 *out, const UINT8 *in, int pixels);
+extern void
+ImagingConvertYCbCr2RGBFast(UINT8 *out, const UINT8 *in, int pixels);
 
 extern ImagingShuffler
 ImagingFindUnpacker(ModeID mode, RawModeID rawmode, int *bits_out);
