@@ -19,7 +19,9 @@ The plan, the catalogue of candidates and the evidence behind them are in
 - **Bounded.** The largest difference from the exact result and the error
   against a float reference of the operation are measured on the benchmark
   photo, `Tests/images/hopper.ppm` and noise, written below, and asserted by
-  `Tests/test_fast_mode.py`. The error against the reference must not be
+  `Tests/test_fast_mode.py` on six images, two landscape, two square and two
+  portrait of different sizes and proportions (`Tests/simd_shapes.py`), each
+  as noise and as a photograph. The error against the reference must not be
   worse than the exact path's.
 - **Falls back.** Arguments, modes or sizes the fast kernel doesn't take go
   to the exact path, which also reports the errors, so fast mode never
@@ -238,6 +240,11 @@ multiply-adds differently on x86 and arm64.
 **Accuracy.** At most 2 levels from the exact result (noise, hopper; every
 transform, mode and filter of the tests); 1 on the benchmark photo, mean
 0.4, about 40% of values differ, nearly all by the exact path's truncation.
+The exception is a pixel whose source position falls on the source's edge
+(rotating 75x211 by 30 degrees maps pixel (37, 30) to x = 37.5 - 75 sin 30°
+= 0): the exact path's doubles and the fixed point round it differently, so
+one may take it as inside and the other as outside, a few such pixels per
+image at most (the tests allow 4 per transform).
 Against bilinear interpolation in doubles at the exact positions (photo,
 rotation by 30 degrees): exact 41.4% of values off by one, fast 0.6%. RGBA
 differs more where alpha is low (up to 37 levels on the photo's alpha):
@@ -331,9 +338,9 @@ Both steps are exact kernels, so the hash is the same on every build.
 **Accuracy** (2560x1600 photo to 426x266, 320x200 and 160x100): at most 2
 levels from the exact result, 0.2 to 0.4 on average; against the same
 filter in floats (Pillow's F resize per channel) PSNR 52 to 56 dB, the
-exact result 59 to 61 dB. Tiny results differ more at their edges, where
-`reduce()` averages partial boxes (512x384 to 32x24: up to 9 levels on the
-border, 4 inside).
+exact result 59 to 61 dB. Small results differ more, most at their edges,
+where `reduce()` averages partial boxes (512x512 to 32x32: up to 4 levels
+inside, 9 on the border).
 
 **Speed** (2560x1600 RGB, one core, ms, exact → fast):
 
@@ -345,6 +352,6 @@ border, 4 inside).
 | 1/8 MKS2021 | 4.44 → 2.24 (2.0x) | 25.90 → 9.15 (2.8x) |
 
 **Code map.** `Image.resize()`, the `reducing_gap` default. Tests:
-`Tests/test_fast_mode.py` (equal to `reducing_gap=3.0`, close to exact at
-photo sizes, below 6x and with other filters, an explicit gap or I;16
-exact). Hashes: `fast: downscale`.
+`Tests/test_fast_mode.py` (equal to `reducing_gap=3.0`, close to exact,
+below 6x and with other filters, an explicit gap or I;16 exact; sources 8
+times the six shapes, up to 2408x960). Hashes: `fast: downscale`.
