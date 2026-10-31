@@ -7,7 +7,9 @@ along columns."""
 from __future__ import annotations
 
 import functools
+import platform
 import random
+import struct
 
 import pytest
 
@@ -26,6 +28,17 @@ SHAPES = {
 
 # @shapes runs a test once per shape, as its `shape` argument
 shapes = pytest.mark.parametrize("shape", list(SHAPES.values()), ids=list(SHAPES))
+
+# 32-bit x86: scalar builds there do double arithmetic on the x87 unit,
+# with 80-bit intermediates (the SIMD builds use SSE), so Pillow's float
+# steps can round differently from IEEE doubles
+X86_32 = struct.calcsize("P") == 4 and platform.machine().lower() in (
+    "x86_64",
+    "amd64",
+    "i386",
+    "i686",
+    "x86",
+)
 
 # bytes per pixel of tobytes(), where not 4
 _BYTES = {"1": 1, "L": 1, "P": 1, "LA": 2, "La": 2, "RGB": 3, "YCbCr": 3, "HSV": 3}

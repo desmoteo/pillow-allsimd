@@ -1110,6 +1110,12 @@ class pil_build_ext(build_ext):
             else:
                 args = [] if msvc else ["-msse4.1"]
                 simd = "SSE4.1"
+            if not msvc and all(a in ("i386", "i686", "x86") for a in arches):
+                # 32-bit x86 does double arithmetic on the x87 unit by default,
+                # with 80-bit intermediates, so results depend on register
+                # spills; with SSE4.1 required anyway, SSE arithmetic rounds as
+                # on x86-64 (MSVC uses SSE2 for it already)
+                args.append("-mfpmath=sse")
         elif arm64:
             if requested in ("sse4", "avx2", "avxvnni"):
                 msg = f"'-C simd={requested}' requires an x86 target"

@@ -23,7 +23,10 @@
 #   --python-version V  Python in the container (default: 3.13)
 #   --docker-base IMG base image (default: python:<version>-slim-trixie)
 #   --platform P      container platform, e.g. linux/arm64 to test arm64
-#                     under qemu on an x86-64 host (slow)
+#                     under qemu on an x86-64 host (slow); also linux/386,
+#                     arm/v7, riscv64, ppc64le and s390x (big-endian), which
+#                     build the portable C code (386: and SSE4 and AVX2
+#                     natively on an x86-64 host)
 #   --builds "N=OPT .."  builds to test, each a name and a -C simd= value
 #                     (default: per architecture, as simd_bench_remote.sh)
 #   -n, --jobs N      pytest-xdist workers per build (default: the host's
@@ -145,22 +148,27 @@ if [ -n "$PLATFORM" ]; then
     case "$PLATFORM" in
         linux/arm64*) ARCH=aarch64 ;;
         linux/amd64) ARCH=x86_64 ;;
-        *) die "unsupported --platform $PLATFORM (linux/arm64 or linux/amd64)" ;;
+        linux/386) ARCH=i686 ;;
+        linux/arm/v7) ARCH=armv7l ;;
+        linux/riscv64 | linux/ppc64le | linux/s390x) ARCH=${PLATFORM#linux/} ;;
+        *) die "unsupported --platform $PLATFORM (linux/arm64, amd64, 386, arm/v7, riscv64, ppc64le or s390x)" ;;
     esac
 fi
 case "$ARCH" in
     aarch64|arm64) DEFAULT_BUILDS="scalar=disable neon=auto" ;;
-    x86_64|amd64)
-        # SIMD builds only where the CPU can run them (none under qemu).
+    x86_64|amd64|i686)
+        # SIMD builds only where the CPU can run them (none under qemu; a
+        # 386 container runs natively on an x86-64 host)
         DEFAULT_BUILDS="scalar=disable"
-        if [ -z "$PLATFORM" ]; then
+        if [ -z "$PLATFORM" ] || { [ "$ARCH" = i686 ] && rsh 'uname -m' | grep -q x86_64; }; then
             for f in sse4_1:sse4=sse4 avx2:avx2=avx2 avx_vnni:avxvnni=avxvnni; do
                 if rsh "grep -qw ${f%%:*} /proc/cpuinfo" 2>/dev/null; then
                     DEFAULT_BUILDS="$DEFAULT_BUILDS ${f#*:}"
                 fi
             done
         fi ;;
-    *) DEFAULT_BUILDS="scalar=disable auto=auto" ;;
+    # the portable C code only: -C simd=auto is the same as disable
+    *) DEFAULT_BUILDS="auto=auto" ;;
 esac
 BUILDS=${BUILDS:-$DEFAULT_BUILDS}
 if [ -z "$JOBS" ]; then
