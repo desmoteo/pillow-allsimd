@@ -9,9 +9,10 @@ unpremultiply from phase 2, and phase 3 (large downscales) done; see
 
 ## Goal
 
-Pillow-SIMD's contract today is that every build (SSE4, AVX2, AVX-VNNI,
-NEON, portable C) produces the pixels Pillow produces. That contract stays
-the default. Beside it, an **opt-in fast mode** lets an operation use a
+Pillow-AllSIMD's contract today is that every build (SSE4, AVX2, AVX-VNNI,
+NEON, portable C) computes with Pillow's arithmetic, or an integer form of
+it that rounds differently by one level at most in a few places (resize,
+RGB -> L). That contract stays the default. Beside it, an **opt-in fast mode** lets an operation use a
 kernel that is faster and whose result may differ from Pillow's by a small,
 documented amount, the way OpenCV's `ALGO_HINT_APPROX`, libvips' vector
 paths and KleidiCV do. Users choose at run time, with an environment
@@ -40,15 +41,15 @@ Two findings shape the design:
 
 | Where | Proposed name | Behaviour |
 |---|---|---|
-| Environment | `PILLOW_SIMD_FAST` | `1`, `true`, `on`, `yes` enable; `0`, `false`, `off`, `no` and the empty string disable; anything else warns and is ignored. Read once when `PIL.Image` is imported, in `_apply_env_variables()`, like `PILLOW_BLOCKS_MAX`. |
+| Environment | `PILLOW_ALLSIMD_FAST` | `1`, `true`, `on`, `yes` enable; `0`, `false`, `off`, `no` and the empty string disable; anything else warns and is ignored. Read once when `PIL.Image` is imported, in `_apply_env_variables()`, like `PILLOW_BLOCKS_MAX`. |
 | Python | `PIL.Image.set_fast(enabled: bool = True) -> None`, `PIL.Image.get_fast() -> bool` | Process-wide. |
 | Python | `PIL.Image.fast_mode(enabled: bool = True)` | Context manager: sets the flag, restores the previous value on exit. Documented as process-wide (it changes the flag for every thread while active). |
-| Feature test | `PIL.features.check_feature("fast")` | True in Pillow-SIMD builds that have the switch (`_imaging.HAVE_FAST`), so code can detect it without catching AttributeError under upstream Pillow. |
+| Feature test | `PIL.features.check_feature("fast")` | True in Pillow-AllSIMD builds that have the switch (`_imaging.HAVE_FAST`), so code can detect it without catching AttributeError under upstream Pillow. |
 | C core | `_imaging.set_fast(int)`, `_imaging.get_fast()` | What the Python functions call. |
 | libImaging | `ImagingSetFast(int)`, `ImagingGetFast(void)` | A global word, written with release semantics and read with acquire (GCC/Clang `__atomic`, MSVC interlocked intrinsics), safe under free-threaded Python. |
 
 The stored value is a bit set with one bit used today ("all fast kernels").
-A later per-family selection (`PILLOW_SIMD_FAST=blur,resize`) would
+A later per-family selection (`PILLOW_ALLSIMD_FAST=blur,resize`) would
 then need no ABI change. Not part of this plan.
 
 ### Semantics
@@ -79,7 +80,7 @@ then need no ABI change. Not part of this plan.
 
 Ordered by expected gain over effort. Speeds are measured with the
 equivalent OpenCV or KleidiCV kernel on the benchmark machines (2560x1600,
-one core), the target for a Pillow-SIMD implementation. Errors are from the
+one core), the target for a Pillow-AllSIMD implementation. Errors are from the
 same measurements. "Ref." is the error against the float reference: maximum
 / share of values that differ.
 
@@ -96,12 +97,12 @@ same measurements. "Ref." is the error against the float reference: maximum
 
 Not in the catalogue, because the exact path is already as fast as
 OpenCV's, or the result has no rounding to relax: kernel filters
-(Pillow-SIMD is faster), rank filters and morphology, reductions, point
+(Pillow-AllSIMD is faster), rank filters and morphology, reductions, point
 tables, chops, transposes, conversions without arithmetic, drawing and text.
 Their remaining gaps are bytes per pixel (structural) or class-A changes.
 
 **Drawing (lines, polygons, text), assessed for phase 1 and left out.**
-Pillow-SIMD already beats OpenCV on lines (x86 2.02 vs 3.34 ms for 500
+Pillow-AllSIMD already beats OpenCV on lines (x86 2.02 vs 3.34 ms for 500
 lines 5 px wide; Jetson 3.51 vs 6.02), polygons (25.1 vs 28.4; 56.3 vs
 62.0) and rectangles; OpenCV's text (2.1 vs 3.2 ms) is Hershey strokes, not
 comparable glyphs. Where the time goes (x86, pillow-simd-perf's `analysis/drawprof.py`):
@@ -167,7 +168,7 @@ For each kernel:
    (all 2^24 RGB values for HSV and YCbCr, every alpha for the reciprocal
    tables); the fast path's hash is the same on every build.
 5. Benchmarks: a `-fast` variant of each branch build in pillow-simd-perf
-   (the same build run with `PILLOW_SIMD_FAST=1`), so the page shows
+   (the same build run with `PILLOW_ALLSIMD_FAST=1`), so the page shows
    exact and fast side by side; `analysis/accuracy.py` gains the Pillow fast
    rows. Done for the main builds, AVX2 and NEON (`branch-avx2-fast`,
    `branch-neon-fast`); the accuracy rows are in `analysis/gaussfast.py` and
@@ -242,7 +243,7 @@ What gets written, where, and when.
 |---|---|---|---|
 | `docs/reference/fast_mode.rst` (new, linked from the reference index) | users | what the flag does and doesn't do; how to enable it (environment, functions, context manager); the guarantees (default off, deterministic and the same on every build, may change between versions); a table per operation: fast kernel, speed-up on x86 and arm64, largest difference from the exact result, error against the float reference; caveats (process-wide, read once per call, pipelines that hash pixels) | phase 0, filled per kernel |
 | `docs/reference/Image.rst` | users | `set_fast`, `get_fast`, `fast_mode` with autodoc | phase 0 |
-| `docs/reference/block_allocator.rst`, or a new environment-variables section | users | `PILLOW_SIMD_FAST` with the other `PILLOW_*` variables | phase 0 |
+| `docs/reference/block_allocator.rst`, or a new environment-variables section | users | `PILLOW_ALLSIMD_FAST` with the other `PILLOW_*` variables | phase 0 |
 | `docs/releasenotes/<version>.rst` | users | "API additions" (the switch), and per release the fast kernels added or changed ("Other changes") | each release |
 | `README.md` | users | a short "Exact and fast modes" section: the default, how to opt in, a link to the reference page | phase 1 |
 | `SIMD_FAST_KERNELS.md` (new, repo root) | contributors and reviewers | per fast kernel: the algorithm, the arithmetic and where it rounds, the portable reference function, the SIMD versions and how they match it, the error analysis (method, inputs, numbers on both machines), the benchmark numbers, known limits (crossover σ, sizes); the rules every fast kernel follows (the semantics above) | grows with each kernel |
@@ -262,7 +263,7 @@ What gets written, where, and when.
 - `checks/simd_hashes.py --fast` hashes the fast path's areas, so the
   remote test scripts compare fast results across builds as they compare
   exact ones.
-- A CI job that imports Pillow with `PILLOW_SIMD_FAST=1` and checks
+- A CI job that imports Pillow with `PILLOW_ALLSIMD_FAST=1` and checks
   that the flag is on (environment handling end to end).
 
 ## Risks and open questions
@@ -286,6 +287,8 @@ What gets written, where, and when.
 
 1. Names: `PILLOW_SIMD_FAST` and `set_fast()` (with `get_fast()` and the
    `fast_mode()` context manager beside it).
+   With the rename to Pillow-AllSIMD (2026-10-31) the variable became
+   `PILLOW_ALLSIMD_FAST`; `PILLOW_SIMD_FAST` is still read when it isn't set.
 2. Large downscales (item 8) are under the same flag.
 3. Phase 1: Gaussian, YCbCr, HSV, geometric transforms; lines, polygons and
    text if useful, which the measurements above say they are not.

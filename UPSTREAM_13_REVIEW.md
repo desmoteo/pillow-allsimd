@@ -1,5 +1,8 @@
 # Pillow 12.3 and 13.0 as a source of optimizations for pillow-simd
 
+> Written before this fork was named Pillow-AllSIMD: "Pillow-SIMD" here
+> means this code base, the fork of uploadcare/pillow-simd.
+
 Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/x86-fixes-arm64-neon`; review written at `2e6edeec2`, step 1 of section 5 done in `311d9e4e5`.
 
 ## Where things stand (2026-10-29)

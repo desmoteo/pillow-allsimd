@@ -1,0 +1,53 @@
+cff-version: 1.2.0
+message: >-
+  If you use Pillow-AllSIMD, please cite it as below, and cite Pillow, whose
+  library and documentation it builds on, and Pillow-SIMD, which it forks.
+title: Pillow-AllSIMD
+abstract: >-
+  A fork of Pillow-SIMD, the SIMD build of the Pillow imaging library for
+  Python, with SIMD kernels for x86-64 (SSE4, AVX2, AVX-VNNI) and arm64
+  (NEON), Pillow's results by default and an opt-in fast mode.
+type: software
+authors:
+  - family-names: Ferrabone
+    given-names: Matteo
+  - name: Pillow-AllSIMD contributors
+repository-code: https://github.com/desmoteo/pillow-allsimd
+url: https://desmoteo.github.io/pillow-allsimd/
+license: MIT-CMU
+version: 13.0.0.post0
+keywords:
+  - imaging
+  - image processing
+  - SIMD
+  - AVX2
+  - NEON
+  - Python
+references:
+  - type: software
+    title: Pillow
+    abstract: The friendly PIL fork.
+    authors:
+      - family-names: Clark
+        given-names: Jeffrey A.
+      - name: Pillow contributors
+    repository-code: https://github.com/python-pillow/Pillow
+    url: https://python-pillow.org
+    license: MIT-CMU
+    version: 13.0.0
+  - type: software
+    title: Pillow-SIMD
+    abstract: A highly optimized, SIMD-accelerated version of Pillow.
+    authors:
+      - family-names: Karpinsky
+        given-names: Alexander
+      - name: Uploadcare
+      - name: Pillow-SIMD contributors
+    repository-code: https://github.com/uploadcare/pillow-simd
+    license: MIT-CMU
+  - type: software
+    title: Python Imaging Library (PIL)
+    authors:
+      - family-names: Lundh
+        given-names: Fredrik
+      - name: Secret Labs AB

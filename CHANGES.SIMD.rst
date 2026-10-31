@@ -1,10 +1,17 @@
-Changelog (Pillow-SIMD)
-=======================
+Changelog (Pillow-AllSIMD)
+==========================
 
-Unreleased
-----------
+Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
+
+13.0.0.post0 (unreleased)
+-------------------------
 
 Based on Pillow 13.0.0
+
+- The project is Pillow-AllSIMD (``pillow-allsimd``), a fork of Pillow-SIMD:
+  the distribution name, the documentation and the credits say so; the fast
+  mode variable is ``PILLOW_ALLSIMD_FAST`` (``PILLOW_SIMD_FAST``, its former
+  name, still works)
 
 - Merged Pillow 13.0.0: security fixes, free-threading locks (the SIMD
   paths run inside them), vertical-first resampling and the MKS2013 and
@@ -71,7 +78,7 @@ Based on Pillow 13.0.0
 - ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a
   container, on a remote host or locally, so the host's Python version does
   not matter
-- Fast mode switch: ``PILLOW_SIMD_FAST=1``, ``Image.set_fast()``,
+- Fast mode switch: ``PILLOW_ALLSIMD_FAST=1``, ``Image.set_fast()``,
   ``Image.get_fast()``, ``Image.fast_mode()`` and the ``fast`` feature.
   Off by default; it lets operations use kernels whose results may differ
   from Pillow's by small, documented amounts (``SIMD_FAST_KERNELS.md``)
@@ -218,6 +225,12 @@ Fixes
   BoxBlur and GaussianBlur reject NaN, infinite and >= 2**31 radii;
   ImagingExpand's size check no longer overflows or divides by zero; masked
   histograms of LA images count the alpha band
+
+Pillow-SIMD
+===========
+
+The changelog of Pillow-SIMD (https://github.com/uploadcare/pillow-simd), by
+Alexander Karpinsky and contributors, up to the fork.
 
 9.5.0.post2 & 9.4.0.post2 & 9.3.0.post2 & 9.2.0.post2 & 9.1.1.post2 & 9.0.0.post3
 ---------------------------------------------------------------------------------

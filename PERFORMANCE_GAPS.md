@@ -1,7 +1,7 @@
-# Where OpenCV and libvips are still faster than Pillow-SIMD, and why
+# Where OpenCV and libvips are still faster than Pillow-AllSIMD, and why
 
 As of `simd/pillow-13` at 28b55224b (2026-10-31), against the libraries in
-the [pillow-simd-perf](https://desmoteo.github.io/pillow-simd-perf/)
+the [pillow-simd-perf](https://desmoteo.github.io/pillow-allsimd-perf/)
 benchmark. The kernels themselves, including the approximate ones, are
 described in [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md); the
 measurements come from pillow-simd-perf's `analysis/` scripts (outputs in
@@ -117,7 +117,7 @@ and the unpremultiply of the 75 MB output, two sweeps OpenCV doesn't make
 ## Measured on arm64 (NEON build, Jetson Orin, CPU 2)
 
 Copy bandwidth on this core: 19.3 GB/s. The same pattern: add moves 15.4 GB/s
-in Pillow-SIMD and 15.8 in OpenCV, so the time ratio is again the byte ratio.
+in Pillow-AllSIMD and 15.8 in OpenCV, so the time ratio is again the byte ratio.
 Blur and resize split into their passes (ms):
 
 | Case | horizontal only | vertical only | both | cost of the temporary | OpenCV |
@@ -187,7 +187,7 @@ Measured split (x86 AVX2, ms, the benchmark's 500 boxes and 100 ROI
 polygons of 12 points, 2 px; pillow-simd-perf `analysis/` and
 `drawprof`-style timing of each part):
 
-| | Pillow-SIMD | OpenCV |
+| | Pillow-AllSIMD | OpenCV |
 |---|---|---|
 | boxes, outline 2 px | 1.80 (C) | 3.62 (thickness 2) |
 | boxes, 1 px | | 1.36 |

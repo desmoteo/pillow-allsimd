@@ -9,20 +9,28 @@ backend-path = [
 ]
 
 [project]
-name = "pillow-simd"
-description = "Python Imaging Library (fork)"
+name = "pillow-allsimd"
+description = "Python Imaging Library (Pillow fork with SIMD kernels for x86 and arm64)"
 readme = "PyPI.rst"
 keywords = [
+  "AVX2",
   "Imaging",
+  "NEON",
+  "SIMD",
 ]
 license = "MIT-CMU"
 license-files = [ "LICENSE" ]
+maintainers = [
+  { name = "Matteo Ferrabone", email = "matteo.ferrabone@gmail.com" },
+]
 authors = [
   { name = "Jeffrey 'Alex' Clark", email = "aclark@aclark.net" },
+  { name = "Alexander Karpinsky" },
+  { name = "Matteo Ferrabone" },
 ]
 requires-python = ">=3.11"
 classifiers = [
-  "Development Status :: 6 - Mature",
+  "Development Status :: 4 - Beta",
   "Programming Language :: Python :: 3 :: Only",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -81,14 +89,15 @@ optional-dependencies.tests = [
 optional-dependencies.xmp = [
   "defusedxml",
 ]
-urls."Release notes" = "https://pillow.readthedocs.io/en/stable/releasenotes/index.html"
-urls.Changelog = "https://github.com/python-pillow/Pillow/releases"
-urls.Documentation = "https://pillow.readthedocs.io"
-urls.Funding = "https://tidelift.com/lifter/search/pypi/pillow"
-urls.Homepage = "https://github.com/uploadcare/pillow-simd"
-urls.Mastodon = "https://fosstodon.org/@pillow"
-urls.Security = "https://pillow.readthedocs.io/en/stable/handbook/security.html"
-urls.Source = "https://github.com/uploadcare/pillow-simd"
+urls."Pillow release notes" = "https://pillow.readthedocs.io/en/stable/releasenotes/index.html"
+urls.Benchmarks = "https://desmoteo.github.io/pillow-allsimd-perf/"
+urls.Changelog = "https://github.com/desmoteo/pillow-allsimd/blob/simd/pillow-13/CHANGES.SIMD.rst"
+urls.Documentation = "https://desmoteo.github.io/pillow-allsimd/"
+urls.Homepage = "https://github.com/desmoteo/pillow-allsimd"
+urls.Issues = "https://github.com/desmoteo/pillow-allsimd/issues"
+urls.Pillow = "https://github.com/python-pillow/Pillow"
+urls.Pillow-SIMD = "https://github.com/uploadcare/pillow-simd"
+urls.Source = "https://github.com/desmoteo/pillow-allsimd"
 
 [tool.setuptools]
 packages = [

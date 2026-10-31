@@ -1,5 +1,8 @@
 # Full-API profile of pillow-simd 13: where time goes and what to optimise next
 
+> Written before this fork was named Pillow-AllSIMD: "Pillow-SIMD" here
+> means this code base, the fork of uploadcare/pillow-simd.
+
 Companion to [CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md), which covered only the operations the SIMD work targeted. This profile covers 207 operations across the public API, drawing and text included. It combines four measurements for each operation:
 
 - simulated cache and branch behaviour (callgrind),
@@ -143,7 +146,7 @@ Open:
 
 ## Second round (2026-10-30): compared with OpenCV, libvips and ImageMagick
 
-[desmoteo/pillow-simd-perf](https://desmoteo.github.io/pillow-simd-perf/) times 109 operations in Pillow, Pillow-SIMD, OpenCV, libvips and ImageMagick, each single-threaded. It runs on x86-64 and on the Jetson. The cases where another library was faster pointed at the changes below, all with output unchanged. Times are ms at 2560×1600, AVX2, laptop with turbo off (before → after).
+[desmoteo/pillow-allsimd-perf](https://desmoteo.github.io/pillow-allsimd-perf/) times 109 operations in Pillow, Pillow-SIMD, OpenCV, libvips and ImageMagick, each single-threaded. It runs on x86-64 and on the Jetson. The cases where another library was faster pointed at the changes below, all with output unchanged. Times are ms at 2560×1600, AVX2, laptop with turbo off (before → after).
 
 | Change | Commit | Result |
 |---|---|---|

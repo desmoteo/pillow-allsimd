@@ -1,6 +1,6 @@
 # Fast-mode kernels
 
-The kernels that run when fast mode is on (`PILLOW_SIMD_FAST=1`,
+The kernels that run when fast mode is on (`PILLOW_ALLSIMD_FAST=1`,
 `Image.set_fast()`; user documentation in `docs/reference/fast_mode.rst`).
 The plan, the catalogue of candidates and the evidence behind them are in
 [APPROXIMATE_KERNELS_PLAN.md](APPROXIMATE_KERNELS_PLAN.md) and
