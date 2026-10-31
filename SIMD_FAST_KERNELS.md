@@ -170,8 +170,9 @@ and scalar builds.
 
 **Speed** (2560x1600 RGB, one core, ms, exact → fast; OpenCV in brackets):
 x86 AVX2 8.96 → 3.06 (2.9x) [3.66]; arm64 NEON 35.57 → 17.74 (2.0x)
-[13.61]. On arm64 the two divisions per four lanes dominate; a reciprocal
-estimate with an exact integer correction step would remove them.
+[13.61]. On arm64 the two divisions per four lanes dominate, but a
+reciprocal estimate with a Newton step and an integer correction (the same
+floors) was slower: 24.1 ms against 17.8.
 
 **Code map.** `rgb2hsv_fast()`, with `rgb2hsv_fast_pixel()` defining the
 result. Tests: `Tests/test_fast_mode.py` (the floors over a lattice of every
