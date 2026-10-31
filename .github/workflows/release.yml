@@ -1,0 +1,96 @@
+name: Release
+
+# Pillow-AllSIMD's source package, published with trusted publishing (no
+# token): a tag named allsimd-* uploads it to PyPI, a manual run to
+# TestPyPI. Wheels are step 2 of design/PLAN.md.
+
+on:
+  push:
+    tags:
+      - "allsimd-*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_COLOR: 1
+
+jobs:
+  sdist:
+    if: github.repository == 'desmoteo/pillow-allsimd'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+
+      - name: Build the source package
+        run: |
+          python3 -m pip install build check-manifest twine
+          python3 -m build --sdist
+          python3 -m twine check --strict dist/*
+          python3 -m check_manifest
+
+      - name: Check the version against the tag
+        if: github.event_name == 'push'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(python3 -c "exec(open('src/PIL/_version.py').read()); print(__version__)")
+          [ "$TAG" = "allsimd-$version" ] || { echo "tag $TAG, version $version"; exit 1; }
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist-sdist
+          path: dist/*.tar.gz
+
+  testpypi-publish:
+    if: github.event_name == 'workflow_dispatch'
+    needs: sdist
+    runs-on: ubuntu-latest
+    name: Upload to TestPyPI
+    environment:
+      name: release-testpypi
+      url: https://test.pypi.org/p/pillow-allsimd
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist-sdist
+          path: dist
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          attestations: true
+
+  pypi-publish:
+    if: github.event_name == 'push'
+    needs: sdist
+    runs-on: ubuntu-latest
+    name: Upload to PyPI
+    environment:
+      name: release-pypi
+      url: https://pypi.org/p/pillow-allsimd
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist-sdist
+          path: dist
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          attestations: true

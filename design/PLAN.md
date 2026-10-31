@@ -33,38 +33,41 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       after axes and a render differently from one set on a new face
       (stock Pillow 12.3 too). The test's fresh font now does the same
       steps (2026-11-02).
-- [ ] Build and check the source package locally: `make sdist`,
+- [x] (2026-11-02) Build and check the source package locally: `make sdist`,
       check-manifest, `twine check`, then install it in a clean venv with
-      `-C simd=avx2`, with `CC="cc -mavx2"` and with the default.
-- [ ] Choose how to upload: from the wheel workflow with trusted publishing
-      (no token stored; step 2 then only adds jobs), or by hand with
-      `twine` and a token scoped to the project. Recommended: the workflow.
-- [ ] Workflow (`.github/workflows/wheels.yml`): the publish job runs only
-      when `github.event.repository.fork == false`, which never holds here
-      (the repo is a GitHub fork of uploadcare/pillow-simd). Condition on
-      `github.repository == 'desmoteo/pillow-allsimd'`; PyPI link
-      `https://pypi.org/p/pillow-allsimd`; turn off the wheel jobs, the
-      iOS builds and the nightly upload for now; fix `EXPECTED_DISTS` (83)
-      and check the SBOM file name the release job expects
-      (`pillow-*.cdx.json`).
-- [ ] PyPI and TestPyPI accounts with two-factor login. Under Publishing,
-      add a pending publisher on each: project `pillow-allsimd`, owner
-      `desmoteo`, repository `pillow-allsimd`, workflow `wheels.yml`,
-      environment `release-pypi` (`release-testpypi` on TestPyPI).
-- [ ] GitHub environments `release-pypi` and `release-testpypi`, with a
-      required reviewer, so nothing uploads without a click.
-- [ ] Dry run to TestPyPI; install from it on the x86 laptop and the
-      Jetson.
+      `-C simd=avx2`, with `CC="cc -mavx2"` and with the default. All
+      three build the expected kernels and pass the selftest and the SIMD,
+      fast-mode, resize, filter, font and conversion tests. The sdist had
+      included a local `docs/_build`; MANIFEST.in now prunes it.
+- [x] (2026-11-02) Upload from a workflow with trusted publishing (no token
+      stored): `.github/workflows/release.yml` builds and checks the
+      source package; a tag `allsimd-<version>` uploads it to PyPI (the job
+      checks that the tag matches `src/PIL/_version.py`), a manual run to
+      TestPyPI. Pillow's `wheels.yml` stays as it is (its publish jobs
+      never run in a fork) and ignores `allsimd-*` tags; step 2 adds the
+      arm64 wheels.
+- [ ] **You:** PyPI and TestPyPI accounts with two-factor login. Under
+      Publishing, add a pending publisher on each: project
+      `pillow-allsimd`, owner `desmoteo`, repository `pillow-allsimd`,
+      workflow `release.yml`, environment `release-pypi` on PyPI and
+      `release-testpypi` on TestPyPI.
+- [x] (2026-11-02) GitHub environments `release-pypi` (tags `allsimd-*`
+      only) and `release-testpypi` (branch `simd/pillow-13` only), each
+      with you as required reviewer, so nothing uploads without a click.
+- [ ] Dry run to TestPyPI (`gh workflow run release.yml -R
+      desmoteo/pillow-allsimd --ref simd/pillow-13`, then approve); install
+      from it on the x86 laptop and the Jetson.
 - [ ] Install instructions (README, `PyPI.rst`, `docs/allsimd.rst`):
       `python3 -m pip install pillow-allsimd`, with `-C simd=...` passed
       through pip; and the `PIL` conflict. Packages that depend on Pillow
       (matplotlib, torchvision…) make pip install Pillow too, and the last
       one installed overwrites `PIL`: install everything else first, then
       `python3 -m pip uninstall -y pillow` and install pillow-allsimd.
-- [ ] A release tag that clashes with neither Pillow's nor Pillow-SIMD's
-      tags (both are in this repo), e.g. `allsimd-13.0.0.post0`. The
-      version comes from `src/PIL/_version.py`, not the tag. A version
-      number can't be reused on PyPI, even after deleting it.
+- [ ] The release: push the tag `allsimd-13.0.0.post0` (it clashes with
+      neither Pillow's nor Pillow-SIMD's tags, both in this repo; never
+      `git push --tags`), then approve the upload. The tag
+      must match `src/PIL/_version.py`. A version number can't be reused
+      on PyPI, even after deleting it.
 - [ ] `CHANGES.SIMD.rst` entry for the first PyPI release.
 
 ### Step 2: arm64 wheels
