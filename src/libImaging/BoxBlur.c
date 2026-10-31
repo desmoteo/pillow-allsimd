@@ -1174,6 +1174,67 @@ ImagingVerticalBoxBlurPasses(
     return ok ? imOut : NULL;
 }
 
+/* One horizontal and one vertical pass whose boxes ImagingBoxBlurDirect
+   computes (integer radii up to BOX_DIRECT_MAX, or below 1): each row is
+   blurred horizontally into a ring of rows just before the vertical pass
+   first reads it, so the horizontal result stays in cache and needs no
+   image of its own. The same arithmetic as the two passes in turn. Returns
+   0 when the radii don't allow it, -1 if out of memory. */
+static int
+ImagingBoxBlurFused(Imaging imOut, Imaging imIn, float xradius, float yradius) {
+    ImagingSectionCookie cookie;
+    BoxDirect dx, dy;
+    const int rx = (int)xradius, ry = (int)yradius;
+    const UINT32 wwx = (UINT32)(1 << 24) / (xradius * 2 + 1);
+    const UINT32 wwy = (UINT32)(1 << 24) / (yradius * 2 + 1);
+    const int n = imIn->xsize * imIn->pixelsize, lasty = imIn->ysize - 1;
+    const UINT8 *src[2 * BOX_DIRECT_MAX + 3];
+    UINT8 *ring, *pad;
+    int y, i, made = -1;
+
+    BoxDirectInit(&dx, rx, wwx, ((1 << 24) - (rx * 2 + 1) * wwx) / 2);
+    BoxDirectInit(&dy, ry, wwy, ((1 << 24) - (ry * 2 + 1) * wwy) / 2);
+    if (!dx.direct || !dy.direct || dy.count > 2 * BOX_DIRECT_MAX + 3) {
+        return 0;
+    }
+    ring = malloc((size_t)dy.count * imIn->linesize);
+    pad = malloc((imIn->xsize + 2 * (BOX_DIRECT_MAX + 1)) * sizeof(UINT32));
+    if (!ring || !pad) {
+        free(ring);
+        free(pad);
+        return -1;
+    }
+
+    ImagingSectionEnter(&cookie);
+    for (y = 0; y <= lasty; y++) {
+        for (i = 0; i < dy.count; i++) {
+            /* row k of the box, clamped to the image, blurred horizontally
+               into slot k % count when first needed: the rows a box reads
+               span count rows, so none is overwritten while in use */
+            long long k = (long long)y - ry - 1 + i;
+            k = k < 0 ? 0 : (k > lasty ? lasty : k);
+            while (made < k) {
+                made++;
+                ImagingLineBoxBlurDirect(
+                    ring + (size_t)(made % dy.count) * imIn->linesize,
+                    (UINT8 *)imIn->image[made],
+                    n,
+                    imIn->pixelsize,
+                    &dx,
+                    pad
+                );
+            }
+            src[i] = ring + (size_t)(k % dy.count) * imIn->linesize;
+        }
+        ImagingBoxBlurDirect((UINT8 *)imOut->image[y], src, n, &dy);
+    }
+    ImagingSectionLeave(&cookie);
+
+    free(ring);
+    free(pad);
+    return 1;
+}
+
 Imaging
 ImagingBoxBlur(Imaging imOut, Imaging imIn, float xradius, float yradius, int n) {
     int i;
@@ -1208,6 +1269,16 @@ ImagingBoxBlur(Imaging imOut, Imaging imIn, float xradius, float yradius, int n)
         imIn->mode != IMAGING_MODE_CMYK && imIn->mode != IMAGING_MODE_L &&
         imIn->mode != IMAGING_MODE_LA && imIn->mode != IMAGING_MODE_La) {
         return ImagingError_ModeError();
+    }
+
+    if (n == 1 && xradius != 0 && yradius != 0) {
+        int done = ImagingBoxBlurFused(imOut, imIn, xradius, yradius);
+        if (done < 0) {
+            return ImagingError_MemoryError();
+        }
+        if (done) {
+            return imOut;
+        }
     }
 
     /* Horizontal passes work in place on rows. Vertical passes need a
