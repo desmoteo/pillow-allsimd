@@ -465,3 +465,102 @@ Jetson Orin, CPU 2, 2560x1600, best of 7, NEON build before and after:
 - **Exact transforms** (2.3x to 2.5x OpenCV): doubles, above.
 - **Reduce by 4** (1.35x) and **box blur** radius 2 and 10 (1.5x).
 - **RGBA upscales** (3.4x): as in round 2.
+
+## Round 4: fast mode by default, and perf on both machines (2026-10-31)
+
+Fast mode became the default (`754ef42ea`): exact mode is
+`PILLOW_ALLSIMD_FAST=0`. So this round compares the default, the published
+`-fast` variants, with OpenCV. With the results at `36580764d`, fast mode was
+behind OpenCV in 25 of 104 cases on x86 and 37 on arm64. The largest gaps were
+the RGBA upscale (arm64 3.4x, x86 1.4x to 1.7x), the 3x3 minimum and maximum
+(1.7x on both), the box blur at radius 2 (x86 1.8x) and fast HSV and
+YCbCr -> RGB on arm64 (1.3x).
+
+### Profiling on x86
+
+The laptop's `perf_event_paranoid` is 4, which blocks `perf` without
+privileges, but a container with `--cap-add PERFMON` may count its own
+events, as on the Jetson. `bench-results/prof-x86/` holds a Dockerfile
+(`pillow-simd-prof`: the benchmark image plus Debian's `linux-perf` and
+`valgrind`) and `prof.sh`, the x86 version of the Jetson scripts:
+symbols and counters per case, or `prof.sh hist BUILD CASE SYMBOL` for
+the samples per instruction. CPU 2 is a P-core, so the counters come from
+the `cpu_core` PMU. A/B timings now use `-O3` builds in the benchmark
+image on both machines (`bench-results/round4/x86ab.sh`, `jetson.sh`).
+The local `-O2` builds don't unroll some of these loops, so they can hide
+or invert a change.
+
+### Changed: the same pixels
+
+Fast mode (the default) before and after, best of 3 rounds, 2560x1600:
+
+| Case | x86 before | x86 after | x86 OpenCV | arm64 before | arm64 after | arm64 OpenCV |
+|---|---|---|---|---|---|---|
+| RGBA to 2048x1280 bilinear | 11.04 | 6.56 | 24.20 | 36.49 | 27.84 | 47.59 |
+| RGBA to 5478x3424 bilinear | 44.67 | 36.30 | 31.27 | 146.47 | 123.34 | 43.80 |
+| RGBA to 5478x3424 bicubic | 53.12 | 47.39 | 32.78 | 184.60 | 161.47 | 216.67 |
+| RGBA to 320x200 bilinear | 2.70 | 2.01 | 4.81 | 9.83 | 9.72 | 8.86 |
+| min 3x3 RGB | 2.08 | 1.72 | 1.21 | 5.18 | 3.76 | 3.08 |
+| max 3x3 RGB | 2.07 | 1.87 | 1.21 | 5.22 | 3.69 | 3.11 |
+| box blur RGB radius 2 | 5.61 | 3.83 | 2.79 | 15.55 | 15.13 | 10.44 |
+| RGB -> HSV | | | | 17.74 | 10.63 | 13.60 |
+| YCbCr -> RGB | | | | 7.17 | 4.68 | 5.69 |
+
+- **RGBA and LA resize**: Pillow converts to RGBa, resizes and converts
+  back, two sweeps of whole images (the RGBa result of an upscale is 75 MB).
+  `ImagingResampleAlpha` premultiplies each source row inside the
+  horizontal pass, into a scratch of four rows, since each source row is
+  read by one horizontal convolution. It removes the premultiplication
+  from the rows of the last pass while they are in the cache. When the
+  vertical pass comes first, or alone, it reads each row several times,
+  so it gets a premultiplied copy, as before. `perf` on x86 after the
+  change (bilinear upscale): unpremultiply 33%, vertical pass 27%,
+  horizontal 21%, premultiply 5%, at 4.5 instructions per cycle.
+- **Unpremultiply on arm64**: 31% of the same upscale there. The NEON
+  kernel made one float division per pixel, but its widenings and
+  conversions, not the divider, set the time. The scalar code's
+  `CLIP8(255 * c / a)` for every alpha and colour fits a 64 KB byte table.
+  Looking up two pixels per 64-bit word, four per iteration, takes 1.39
+  ns/px against 2.35. All checked against the scalar code over every pair.
+- **Min and max**: `memmove` was 31% of the 3x3 minimum on x86, the copy
+  of each row into a padded buffer. The inner bytes now read the row
+  itself, and the few at each end clamp the pixel index. The 3x3 filters
+  also skip the loop over the sources. They are now bound by memory: 32 MB
+  moved per call against OpenCV's 24 MB, the 4/3 of the RGB layout.
+- **Box blur, radius 1 to 4** (no running sums): the loop over the box's
+  sources reloaded each row pointer for every vector, at IPC 6 and 228
+  instructions per 32 bytes. With the count a constant per radius, GCC
+  unrolls it at `-O3` (not at `-O2`). On NEON it was already unrolled.
+  Its time there goes to loads that miss L1.
+- **Fast HSV on arm64**: the hue's numerator and denominator in 16-bit
+  lanes, one float division for the hue. The saturation floor(255 d / v)
+  is the unpremultiply table's entry for (v, d). Checked against the
+  scalar fast kernel on all 2^24 colours.
+- **Fast YCbCr -> RGB on arm64**: R and B have one product each, and
+  `vqrdmulh` of 2 (C - 128) and K is exactly ((C - 128) K + 2^13) >> 14 in
+  16-bit lanes. G sums two products before its one rounding, so it stays
+  32-bit, with `vrshrn`.
+
+### Tried and not kept
+
+- Unpremultiply on NEON with a reciprocal estimate and two Newton steps
+  (2.84 ns/px), or in 16-bit integers with a remainder correction (2.74):
+  both exact, both slower than the division (2.35) and the table (1.39).
+- The unpremultiply table on x86: 1.29 ns/px against 0.66 for the AVX2
+  kernel.
+- The HSV hue by reciprocal estimate on NEON: 2.75 ns/px against 2.48 with
+  the division.
+
+### What remains
+
+- **RGBA upscales**: x86 1.16x (bilinear) and 1.45x (bicubic) behind
+  OpenCV, arm64 2.8x (bilinear; the bicubic and Lanczos ones are ahead).
+  OpenCV doesn't premultiply. Pillow's resample passes compute in 32 bits
+  per channel; OpenCV's bilinear uses 11-bit weights in 16 bits. A fast
+  kernel with 16-bit arithmetic would close it, as in
+  APPROXIMATE_KERNELS_PLAN.md item 5.
+- **Layout**: copies, flips, chops, L -> RGB and the min, max and box
+  filters move 4 bytes per RGB pixel against OpenCV's 3, 1.3x to 1.6x.
+- **Median 3x3** (x86 1.3x, arm64 1.6x), **reduce by 2 and 4** on arm64
+  (1.4x), `point/L/table` on x86 (1.46x, no byte shuffle over 256
+  entries without AVX-512 VBMI), and text (Hershey strokes, not glyphs).
