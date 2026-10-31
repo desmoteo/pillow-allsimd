@@ -397,6 +397,25 @@ def _(upd: Update) -> None:
         Image.set_fast(previous)
 
 
+@section("fast: ycbcr")
+def _(upd: Update) -> None:
+    if not hasattr(Image, "set_fast"):
+        return
+    previous = Image.get_fast()
+    Image.set_fast(True)
+    try:
+        for mode in ("RGB", "RGBA"):
+            for size in ((1, 1), (7, 3), (31, 5), (67, 23), (203, 71)):
+                im = noise(mode, size, size[0] * 3 + size[1])
+                upd(im.convert("YCbCr").tobytes())
+                ycc = Image.frombytes(
+                    "YCbCr", size, noise("RGB", size, size[0]).tobytes()
+                )
+                upd(ycc.convert("RGB").tobytes())
+    finally:
+        Image.set_fast(previous)
+
+
 @section("resize 8-bit")
 def _(upd: Update) -> None:
     for mode in ("L", "LA", "RGB"):

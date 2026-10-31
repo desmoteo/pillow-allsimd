@@ -698,3 +698,312 @@ ImagingConvertYCbCr2RGB(UINT8 *out, const UINT8 *in, int pixels) {
         out[3] = a;
     }
 }
+
+/* Fast mode (SIMD_FAST_KERNELS.md): JPEG's BT.601 full-range conversion
+   with 14-bit coefficients and one rounding, as OpenCV and KleidiCV compute
+   it, in place of the tables above, whose terms are each floored. The
+   portable loops define the result; every value is an integer sum of
+   products in 32 bits, which the SSE4, AVX2 and NEON loops compute alike. */
+
+#define YCC_K_YR 4899    /* 0.299 * 2^14 */
+#define YCC_K_YG 9617    /* 0.587 */
+#define YCC_K_YB 1868    /* 0.114 */
+#define YCC_K_CBR -2765  /* -0.168736 */
+#define YCC_K_CBG -5427  /* -0.331264 */
+#define YCC_K_CRG -6860  /* -0.418688 */
+#define YCC_K_CRB -1332  /* -0.081312 */
+#define YCC_K_HALF 8192  /* 0.5 */
+#define YCC_K_RCR 22970  /* 1.402 */
+#define YCC_K_GCB -5638  /* -0.344136 */
+#define YCC_K_GCR -11700 /* -0.714136 */
+#define YCC_K_BCB 29032  /* 1.772 */
+/* 128 << 14, plus the rounding half */
+#define YCC_BIAS_C ((128 << 14) + (1 << 13))
+
+/* Cb and Cr reach 256 at most (pure blue, pure red), never below 0. */
+static inline UINT8
+ycc_fast_top(int v) {
+    return (UINT8)(v > 255 ? 255 : v);
+}
+
+static inline UINT8
+ycc_fast_clip(int v) {
+    return (UINT8)(v < 0 ? 0 : (v > 255 ? 255 : v));
+}
+
+void
+ImagingConvertRGB2YCbCrFast(UINT8 *out, const UINT8 *in, int pixels) {
+    int x = 0;
+#if defined(IMAGING_SIMD_SSE4)
+    const __m128i ky = _mm_setr_epi16(
+        YCC_K_YR, YCC_K_YG, YCC_K_YB, 0, YCC_K_YR, YCC_K_YG, YCC_K_YB, 0
+    );
+    const __m128i kcb = _mm_setr_epi16(
+        YCC_K_CBR, YCC_K_CBG, YCC_K_HALF, 0, YCC_K_CBR, YCC_K_CBG, YCC_K_HALF, 0
+    );
+    const __m128i kcr = _mm_setr_epi16(
+        YCC_K_HALF, YCC_K_CRG, YCC_K_CRB, 0, YCC_K_HALF, YCC_K_CRG, YCC_K_CRB, 0
+    );
+    const __m128i half = _mm_set1_epi32(1 << 13), biasc = _mm_set1_epi32(YCC_BIAS_C);
+    const __m128i top = _mm_set1_epi32(255), alpha = _mm_set1_epi32((int)0xff000000);
+#if defined(IMAGING_SIMD_AVX2)
+    {
+        /* 8 pixels; hadd works within 128-bit lanes, so the sums come out
+           as pixels 0 1 4 5 | 2 3 6 7 and a permute puts them in order. */
+        const __m256i ky8 = _mm256_broadcastsi128_si256(ky);
+        const __m256i kcb8 = _mm256_broadcastsi128_si256(kcb);
+        const __m256i kcr8 = _mm256_broadcastsi128_si256(kcr);
+        const __m256i half8 = _mm256_set1_epi32(1 << 13);
+        const __m256i biasc8 = _mm256_set1_epi32(YCC_BIAS_C);
+        const __m256i top8 = _mm256_set1_epi32(255);
+        const __m256i alpha8 = _mm256_set1_epi32((int)0xff000000);
+        for (; x + 8 <= pixels; x += 8) {
+            __m256i px = _mm256_loadu_si256((const __m256i *)(in + x * 4));
+            __m256i lo = mm256_cvtepu8_epi16(in + x * 4);
+            __m256i hi = mm256_cvtepu8_epi16(in + x * 4 + 16);
+            __m256i y = _mm256_permute4x64_epi64(
+                _mm256_hadd_epi32(
+                    _mm256_madd_epi16(lo, ky8), _mm256_madd_epi16(hi, ky8)
+                ),
+                0xd8
+            );
+            __m256i cb = _mm256_permute4x64_epi64(
+                _mm256_hadd_epi32(
+                    _mm256_madd_epi16(lo, kcb8), _mm256_madd_epi16(hi, kcb8)
+                ),
+                0xd8
+            );
+            __m256i cr = _mm256_permute4x64_epi64(
+                _mm256_hadd_epi32(
+                    _mm256_madd_epi16(lo, kcr8), _mm256_madd_epi16(hi, kcr8)
+                ),
+                0xd8
+            );
+            y = _mm256_srli_epi32(_mm256_add_epi32(y, half8), 14);
+            cb = _mm256_min_epi32(
+                _mm256_srli_epi32(_mm256_add_epi32(cb, biasc8), 14), top8
+            );
+            cr = _mm256_min_epi32(
+                _mm256_srli_epi32(_mm256_add_epi32(cr, biasc8), 14), top8
+            );
+            __m256i res = _mm256_or_si256(
+                _mm256_or_si256(y, _mm256_slli_epi32(cb, 8)),
+                _mm256_or_si256(_mm256_slli_epi32(cr, 16), _mm256_and_si256(px, alpha8))
+            );
+            _mm256_storeu_si256((__m256i *)(out + x * 4), res);
+        }
+    }
+#endif
+    /* 4 pixels: two halves as 16-bit words, R G B X per pixel; madd gives
+       (R kR + G kG, B kB) per pixel, hadd the sum. */
+    for (; x + 4 <= pixels; x += 4) {
+        __m128i px = _mm_loadu_si128((const __m128i *)(in + x * 4));
+        __m128i lo = _mm_cvtepu8_epi16(px),
+                hi = _mm_cvtepu8_epi16(_mm_srli_si128(px, 8));
+        __m128i y = _mm_hadd_epi32(_mm_madd_epi16(lo, ky), _mm_madd_epi16(hi, ky));
+        __m128i cb = _mm_hadd_epi32(_mm_madd_epi16(lo, kcb), _mm_madd_epi16(hi, kcb));
+        __m128i cr = _mm_hadd_epi32(_mm_madd_epi16(lo, kcr), _mm_madd_epi16(hi, kcr));
+        y = _mm_srli_epi32(_mm_add_epi32(y, half), 14);
+        cb = _mm_min_epi32(_mm_srli_epi32(_mm_add_epi32(cb, biasc), 14), top);
+        cr = _mm_min_epi32(_mm_srli_epi32(_mm_add_epi32(cr, biasc), 14), top);
+        __m128i res = _mm_or_si128(
+            _mm_or_si128(y, _mm_slli_epi32(cb, 8)),
+            _mm_or_si128(_mm_slli_epi32(cr, 16), _mm_and_si128(px, alpha))
+        );
+        _mm_storeu_si128((__m128i *)(out + x * 4), res);
+    }
+#elif defined(IMAGING_SIMD_NEON)
+    for (; x + 16 <= pixels; x += 16) {
+        uint8x16x4_t px = vld4q_u8(in + x * 4);
+        int16x8_t r[2], g[2], b[2];
+        int16x4_t vy[4], vcb[4], vcr[4];
+        int h, q;
+        r[0] = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(px.val[0])));
+        r[1] = vreinterpretq_s16_u16(vmovl_high_u8(px.val[0]));
+        g[0] = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(px.val[1])));
+        g[1] = vreinterpretq_s16_u16(vmovl_high_u8(px.val[1]));
+        b[0] = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(px.val[2])));
+        b[1] = vreinterpretq_s16_u16(vmovl_high_u8(px.val[2]));
+        for (q = 0; q < 4; q++) {
+            int16x4_t rq, gq, bq;
+            int32x4_t s;
+            h = q / 2;
+            rq = q % 2 ? vget_high_s16(r[h]) : vget_low_s16(r[h]);
+            gq = q % 2 ? vget_high_s16(g[h]) : vget_low_s16(g[h]);
+            bq = q % 2 ? vget_high_s16(b[h]) : vget_low_s16(b[h]);
+            s = vmlal_n_s16(
+                vmlal_n_s16(vmull_n_s16(rq, YCC_K_YR), gq, YCC_K_YG), bq, YCC_K_YB
+            );
+            vy[q] = vshrn_n_s32(vaddq_s32(s, vdupq_n_s32(1 << 13)), 14);
+            s = vmlal_n_s16(
+                vmlal_n_s16(vmull_n_s16(rq, YCC_K_CBR), gq, YCC_K_CBG), bq, YCC_K_HALF
+            );
+            vcb[q] = vshrn_n_s32(vaddq_s32(s, vdupq_n_s32(YCC_BIAS_C)), 14);
+            s = vmlal_n_s16(
+                vmlal_n_s16(vmull_n_s16(rq, YCC_K_HALF), gq, YCC_K_CRG), bq, YCC_K_CRB
+            );
+            vcr[q] = vshrn_n_s32(vaddq_s32(s, vdupq_n_s32(YCC_BIAS_C)), 14);
+        }
+        /* saturation clips 256 to 255 */
+        px.val[0] = vcombine_u8(
+            vqmovun_s16(vcombine_s16(vy[0], vy[1])),
+            vqmovun_s16(vcombine_s16(vy[2], vy[3]))
+        );
+        px.val[1] = vcombine_u8(
+            vqmovun_s16(vcombine_s16(vcb[0], vcb[1])),
+            vqmovun_s16(vcombine_s16(vcb[2], vcb[3]))
+        );
+        px.val[2] = vcombine_u8(
+            vqmovun_s16(vcombine_s16(vcr[0], vcr[1])),
+            vqmovun_s16(vcombine_s16(vcr[2], vcr[3]))
+        );
+        vst4q_u8(out + x * 4, px);
+    }
+#endif
+    for (; x < pixels; x++) {
+        const UINT8 *p = in + x * 4;
+        int r = p[0], g = p[1], b = p[2];
+        UINT8 a = p[3];
+        int y = (YCC_K_YR * r + YCC_K_YG * g + YCC_K_YB * b + (1 << 13)) >> 14;
+        int cb = (YCC_K_CBR * r + YCC_K_CBG * g + YCC_K_HALF * b + YCC_BIAS_C) >> 14;
+        int cr = (YCC_K_HALF * r + YCC_K_CRG * g + YCC_K_CRB * b + YCC_BIAS_C) >> 14;
+        out[x * 4 + 0] = (UINT8)y;
+        out[x * 4 + 1] = ycc_fast_top(cb);
+        out[x * 4 + 2] = ycc_fast_top(cr);
+        out[x * 4 + 3] = a;
+    }
+}
+
+void
+ImagingConvertYCbCr2RGBFast(UINT8 *out, const UINT8 *in, int pixels) {
+    int x = 0;
+#if defined(IMAGING_SIMD_SSE4)
+    /* 4 pixels: (Cb - 128, Cr - 128) as a pair of words per pixel, so one
+       madd per channel gives each pixel's sum. */
+    const __m128i pick =
+        _mm_setr_epi8(1, -1, 2, -1, 5, -1, 6, -1, 9, -1, 10, -1, 13, -1, 14, -1);
+    const __m128i c128 = _mm_set1_epi16(128);
+    const __m128i kr = _mm_set1_epi32((int)((UINT32)YCC_K_RCR << 16));
+    const __m128i kg =
+        _mm_set1_epi32((int)(((UINT32)(UINT16)YCC_K_GCR << 16) | (UINT16)YCC_K_GCB));
+    const __m128i kb = _mm_set1_epi32(YCC_K_BCB);
+    const __m128i half = _mm_set1_epi32(1 << 13), zero = _mm_setzero_si128();
+    const __m128i top = _mm_set1_epi32(255), lowbyte = _mm_set1_epi32(0xff);
+    const __m128i alpha = _mm_set1_epi32((int)0xff000000);
+#if defined(IMAGING_SIMD_AVX2)
+    {
+        /* 8 pixels, every step within a 32-bit lane */
+        const __m256i pick8 = _mm256_broadcastsi128_si256(pick);
+        const __m256i c1288 = _mm256_set1_epi16(128);
+        const __m256i kr8 = _mm256_broadcastsi128_si256(kr);
+        const __m256i kg8 = _mm256_broadcastsi128_si256(kg);
+        const __m256i kb8 = _mm256_broadcastsi128_si256(kb);
+        const __m256i half8 = _mm256_set1_epi32(1 << 13);
+        const __m256i zero8 = _mm256_setzero_si256();
+        const __m256i top8 = _mm256_set1_epi32(255);
+        const __m256i lowbyte8 = _mm256_set1_epi32(0xff);
+        const __m256i alpha8 = _mm256_set1_epi32((int)0xff000000);
+        for (; x + 8 <= pixels; x += 8) {
+            __m256i px = _mm256_loadu_si256((const __m256i *)(in + x * 4));
+            __m256i c = _mm256_sub_epi16(_mm256_shuffle_epi8(px, pick8), c1288);
+            __m256i y = _mm256_and_si256(px, lowbyte8);
+            __m256i r = _mm256_srai_epi32(
+                _mm256_add_epi32(_mm256_madd_epi16(c, kr8), half8), 14
+            );
+            __m256i g = _mm256_srai_epi32(
+                _mm256_add_epi32(_mm256_madd_epi16(c, kg8), half8), 14
+            );
+            __m256i b = _mm256_srai_epi32(
+                _mm256_add_epi32(_mm256_madd_epi16(c, kb8), half8), 14
+            );
+            r = _mm256_max_epi32(_mm256_min_epi32(_mm256_add_epi32(y, r), top8), zero8);
+            g = _mm256_max_epi32(_mm256_min_epi32(_mm256_add_epi32(y, g), top8), zero8);
+            b = _mm256_max_epi32(_mm256_min_epi32(_mm256_add_epi32(y, b), top8), zero8);
+            __m256i res = _mm256_or_si256(
+                _mm256_or_si256(r, _mm256_slli_epi32(g, 8)),
+                _mm256_or_si256(_mm256_slli_epi32(b, 16), _mm256_and_si256(px, alpha8))
+            );
+            _mm256_storeu_si256((__m256i *)(out + x * 4), res);
+        }
+    }
+#endif
+    for (; x + 4 <= pixels; x += 4) {
+        __m128i px = _mm_loadu_si128((const __m128i *)(in + x * 4));
+        __m128i c = _mm_sub_epi16(_mm_shuffle_epi8(px, pick), c128);
+        __m128i y = _mm_and_si128(px, lowbyte);
+        __m128i r = _mm_srai_epi32(_mm_add_epi32(_mm_madd_epi16(c, kr), half), 14);
+        __m128i g = _mm_srai_epi32(_mm_add_epi32(_mm_madd_epi16(c, kg), half), 14);
+        __m128i b = _mm_srai_epi32(_mm_add_epi32(_mm_madd_epi16(c, kb), half), 14);
+        r = _mm_max_epi32(_mm_min_epi32(_mm_add_epi32(y, r), top), zero);
+        g = _mm_max_epi32(_mm_min_epi32(_mm_add_epi32(y, g), top), zero);
+        b = _mm_max_epi32(_mm_min_epi32(_mm_add_epi32(y, b), top), zero);
+        __m128i res = _mm_or_si128(
+            _mm_or_si128(r, _mm_slli_epi32(g, 8)),
+            _mm_or_si128(_mm_slli_epi32(b, 16), _mm_and_si128(px, alpha))
+        );
+        _mm_storeu_si128((__m128i *)(out + x * 4), res);
+    }
+#elif defined(IMAGING_SIMD_NEON)
+    for (; x + 16 <= pixels; x += 16) {
+        uint8x16x4_t px = vld4q_u8(in + x * 4);
+        int16x8_t y[2], cb[2], cr[2];
+        int16x4_t vr[4], vg[4], vb[4];
+        int h, q;
+        y[0] = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(px.val[0])));
+        y[1] = vreinterpretq_s16_u16(vmovl_high_u8(px.val[0]));
+        cb[0] = vsubq_s16(
+            vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(px.val[1]))), vdupq_n_s16(128)
+        );
+        cb[1] = vsubq_s16(
+            vreinterpretq_s16_u16(vmovl_high_u8(px.val[1])), vdupq_n_s16(128)
+        );
+        cr[0] = vsubq_s16(
+            vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(px.val[2]))), vdupq_n_s16(128)
+        );
+        cr[1] = vsubq_s16(
+            vreinterpretq_s16_u16(vmovl_high_u8(px.val[2])), vdupq_n_s16(128)
+        );
+        for (q = 0; q < 4; q++) {
+            int16x4_t yq, cbq, crq;
+            int32x4_t hv = vdupq_n_s32(1 << 13);
+            h = q / 2;
+            yq = q % 2 ? vget_high_s16(y[h]) : vget_low_s16(y[h]);
+            cbq = q % 2 ? vget_high_s16(cb[h]) : vget_low_s16(cb[h]);
+            crq = q % 2 ? vget_high_s16(cr[h]) : vget_low_s16(cr[h]);
+            vr[q] = vadd_s16(yq, vshrn_n_s32(vmlal_n_s16(hv, crq, YCC_K_RCR), 14));
+            vg[q] = vadd_s16(
+                yq,
+                vshrn_n_s32(
+                    vmlal_n_s16(vmlal_n_s16(hv, cbq, YCC_K_GCB), crq, YCC_K_GCR), 14
+                )
+            );
+            vb[q] = vadd_s16(yq, vshrn_n_s32(vmlal_n_s16(hv, cbq, YCC_K_BCB), 14));
+        }
+        px.val[0] = vcombine_u8(
+            vqmovun_s16(vcombine_s16(vr[0], vr[1])),
+            vqmovun_s16(vcombine_s16(vr[2], vr[3]))
+        );
+        px.val[1] = vcombine_u8(
+            vqmovun_s16(vcombine_s16(vg[0], vg[1])),
+            vqmovun_s16(vcombine_s16(vg[2], vg[3]))
+        );
+        px.val[2] = vcombine_u8(
+            vqmovun_s16(vcombine_s16(vb[0], vb[1])),
+            vqmovun_s16(vcombine_s16(vb[2], vb[3]))
+        );
+        vst4q_u8(out + x * 4, px);
+    }
+#endif
+    for (; x < pixels; x++) {
+        const UINT8 *p = in + x * 4;
+        int y = p[0], cb = p[1] - 128, cr = p[2] - 128;
+        UINT8 a = p[3];
+        int r = y + ((YCC_K_RCR * cr + (1 << 13)) >> 14);
+        int g = y + ((YCC_K_GCB * cb + YCC_K_GCR * cr + (1 << 13)) >> 14);
+        int b = y + ((YCC_K_BCB * cb + (1 << 13)) >> 14);
+        out[x * 4 + 0] = ycc_fast_clip(r);
+        out[x * 4 + 1] = ycc_fast_clip(g);
+        out[x * 4 + 2] = ycc_fast_clip(b);
+        out[x * 4 + 3] = a;
+    }
+}

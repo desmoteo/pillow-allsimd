@@ -281,3 +281,89 @@ def test_unsharp_mask_close_to_exact() -> None:
     largest, mean = _diff(fast, im.filter(flt))
     assert largest <= 6
     assert mean <= 1
+
+
+# RGB <-> YCbCr (ConvertYCbCr.c): 14-bit coefficients, one rounding.
+
+
+def _lattice(step: int = 3) -> Image.Image:
+    # RGB values in steps of 3: 86 ** 3 pixels, every 8-bit triple's
+    # neighbourhood
+    values = range(0, 256, step)
+    data = bytes(c for r in values for g in values for b in values for c in (r, g, b))
+    n = len(values)
+    return Image.frombytes("RGB", (n * n, n), data)
+
+
+def _ycbcr_reference(r: int, g: int, b: int) -> tuple[int, int, int]:
+    def rnd(v: float) -> int:
+        return min(255, max(0, math.floor(v + 0.5)))
+
+    return (
+        rnd(0.299 * r + 0.587 * g + 0.114 * b),
+        rnd(128 - 0.168736 * r - 0.331264 * g + 0.5 * b),
+        rnd(128 + 0.5 * r - 0.418688 * g - 0.081312 * b),
+    )
+
+
+def _rgb_reference(y: int, cb: int, cr: int) -> tuple[int, int, int]:
+    def rnd(v: float) -> int:
+        return min(255, max(0, math.floor(v + 0.5)))
+
+    cb -= 128
+    cr -= 128
+    return (
+        rnd(y + 1.402 * cr),
+        rnd(y - 0.344136 * cb - 0.714136 * cr),
+        rnd(y + 1.772 * cb),
+    )
+
+
+@pytest.mark.parametrize("mode", ("RGB", "RGBA", "RGBX"))
+def test_ycbcr_close_to_exact(mode: str) -> None:
+    im = _lattice().convert(mode)
+    with Image.fast_mode():
+        fast = im.convert("YCbCr")
+    largest, mean = _diff(fast, im.convert("YCbCr"))
+    assert largest <= 1
+    assert mean < 0.5
+    assert fast.tobytes() != im.convert("YCbCr").tobytes()
+
+
+def test_ycbcr_inverse_close_to_exact() -> None:
+    im = Image.frombytes("YCbCr", _lattice().size, _lattice().tobytes())
+    with Image.fast_mode():
+        fast = im.convert("RGB")
+    largest, mean = _diff(fast, im.convert("RGB"))
+    assert largest <= 1
+    assert mean < 0.5
+
+
+def test_ycbcr_accuracy() -> None:
+    # against the float formulas, the fast result is off by 1 at most, and
+    # less often than the exact tables
+    rnd = random.Random(5)
+    pixels = [tuple(rnd.randrange(256) for _ in range(3)) for _ in range(20000)]
+    data = bytes(c for p in pixels for c in p)
+    rgb = Image.frombytes("RGB", (len(pixels), 1), data)
+    ycc = Image.frombytes("YCbCr", (len(pixels), 1), data)
+    for convert, im, ref in (
+        ("YCbCr", rgb, _ycbcr_reference),
+        ("RGB", ycc, _rgb_reference),
+    ):
+        expected = bytes(c for p in pixels for c in ref(*p))
+        with Image.fast_mode():
+            fast = im.convert(convert).tobytes()
+        exact = im.convert(convert).tobytes()
+        off = [abs(a - b) for a, b in zip(fast, expected)]
+        assert max(off) <= 1
+        exact_off = sum(a != b for a, b in zip(exact, expected))
+        assert sum(v != 0 for v in off) * 10 < exact_off
+
+
+def test_ycbcr_other_conversions_exact() -> None:
+    # palette images convert through the exact code
+    im = hopper("P")
+    with Image.fast_mode():
+        fast = im.convert("YCbCr")
+    assert fast.tobytes() == im.convert("YCbCr").tobytes()

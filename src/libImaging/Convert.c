@@ -2316,6 +2316,19 @@ static struct {
  * @return        The resulting Imaging object,
  *                or NULL with a Python exception set on failure.
  */
+/* The fast-mode version of a conversion's row function (SIMD_FAST_KERNELS.md),
+   or the function itself. */
+static ImagingShuffler
+fast_converter(ImagingShuffler convert) {
+    if (convert == ImagingConvertRGB2YCbCr) {
+        return ImagingConvertRGB2YCbCrFast;
+    }
+    if (convert == ImagingConvertYCbCr2RGB) {
+        return ImagingConvertYCbCr2RGBFast;
+    }
+    return convert;
+}
+
 Imaging
 ImagingConvert(
     Imaging imOut, Imaging imIn, ModeID mode, ImagingPalette palette, int dither
@@ -2362,6 +2375,11 @@ ImagingConvert(
             convert = converters[i].convert;
             break;
         }
+    }
+
+    /* fast mode, read once for the whole conversion */
+    if (convert && (ImagingGetFast() & IMAGING_FAST_ALL)) {
+        convert = fast_converter(convert);
     }
 
     if (!convert) {

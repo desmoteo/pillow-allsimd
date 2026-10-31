@@ -98,3 +98,46 @@ runs. Tests: `Tests/test_fast_mode.py` (difference from exact per mode and
 radius, exact edge bands, closer to a true Gaussian, uniform images stay
 uniform, fall-backs). Hashes: `fast: gaussian` in `checks/simd_hashes.py`.
 Measurements: pillow-simd-perf `analysis/` (accuracy) and the σ sweep.
+
+## RGB ↔ YCbCr (`ConvertYCbCr.c`)
+
+**Operation.** `Image.convert("YCbCr")` from RGB, RGBA and RGBX, and
+`convert("RGB")` from YCbCr: the conversion table's row functions, switched
+in `ImagingConvert()` (`fast_converter()`). Palette images and the JPEG 2000
+decoder keep the exact functions.
+
+**Exact path.** Per-term INT16 tables with 6 fractional bits, summed and
+shifted right: each sum is floored, so about half the values are one below
+the rounded result of JPEG's formulas.
+
+**Fast kernel.** JPEG's BT.601 full-range formulas with 14-bit coefficients
+(`Y = 4899 R + 9617 G + 1868 B`, ..., `R = Y + 22970 (Cr - 128)`, ...) and
+one rounding, as OpenCV and KleidiCV compute them. Every value is an integer
+sum of products in 32 bits:
+
+- x86: RGB→YCbCr with `pmaddwd` on the pixels as 16-bit words and `phaddd`
+  (4 pixels per SSE4 step, 8 per AVX2 step with a permute to undo the
+  per-lane order); YCbCr→RGB with `pshufb` making (Cb, Cr) word pairs and one
+  `pmaddwd` per channel.
+- NEON: 16 pixels per step through `vld4q`/`vst4q`, `vmull_n_s16` and
+  `vmlal_n_s16` per quarter, `vshrn` and saturating narrows.
+- Cb and Cr reach 256 at most (pure blue, pure red), clipped to 255;
+  YCbCr→RGB clips to 0..255; the fourth byte is copied, as before.
+
+**Accuracy** (all 2^24 inputs in each direction): at most 1 level from the
+exact result. Against the float formulas, rounded: RGB→YCbCr 0.29% of values
+off by one (exact: 47.2%), YCbCr→RGB 0.06% (exact: 32.1%). The hashes of the
+whole domain are the same on SSE4, AVX2, NEON and scalar builds.
+
+**Speed** (2560x1600 RGB, one core, ms, exact → fast; OpenCV in brackets):
+
+| | x86 AVX2 | arm64 NEON |
+|---|---|---|
+| RGB→YCbCr | 3.14 → 2.04 (1.5x) [2.57] | 17.41 → 7.81 (2.2x) [10.37] |
+| YCbCr→RGB | 2.00 → 1.58 (1.3x) [2.47] | 12.22 → 7.19 (1.7x) [5.69] |
+
+**Code map.** `ImagingConvertRGB2YCbCrFast()`, `ImagingConvertYCbCr2RGBFast()`
+(the scalar loop at the end of each defines the result). Tests:
+`Tests/test_fast_mode.py` (difference from exact over a lattice of every
+third value, accuracy against the float formulas, palette images
+unchanged). Hashes: `fast: ycbcr`.

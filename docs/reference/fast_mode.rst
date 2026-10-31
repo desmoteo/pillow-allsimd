@@ -75,10 +75,17 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
      - radius 0.5: 4.0x, 4.4x; 1: 3.3x, 3.2x; 2: 2.5x, 2.6x; 4: 1.5x, 2.3x
      - at most 3 levels, 0.1 to 0.7 on average; closer to a true Gaussian
        than the exact result
+   * - :py:meth:`~PIL.Image.Image.convert` RGB, RGBA, RGBX → YCbCr and
+       YCbCr → RGB
+     - JPEG's formulas with 14-bit coefficients and one rounding, in place
+       of tables that floor each term
+     - to YCbCr: 1.5x, 2.2x; to RGB: 1.3x, 1.7x
+     - at most 1 level; against the float formulas 0.3% and 0.06% of values
+       off by one, against 47% and 32% for the exact result
 
 Other operations, and other arguments of these, use the exact kernels in
-fast mode too. More fast kernels are planned: RGB↔YCbCr and RGB→HSV
-conversions, and the affine, perspective and quad transforms.
+fast mode too. More fast kernels are planned: RGB→HSV, and the affine,
+perspective and quad transforms.
 
 Functions
 ---------

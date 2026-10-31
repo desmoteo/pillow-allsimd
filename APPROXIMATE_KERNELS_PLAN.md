@@ -1,8 +1,8 @@
 # Plan: fast approximate kernels beside the bit-exact ones
 
 Status: decided 2026-10-31 (names, scope, phase 1). Phase 0 (the switch)
-done; phase 1: the Gaussian blur done (see
-[SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md)), YCbCr, HSV and the transforms
+done; phase 1: the Gaussian blur and YCbCr done (see
+[SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md)), HSV and the transforms
 next. Evidence and measurements are in
 [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md).
 
