@@ -4084,6 +4084,59 @@ _draw_polygon(ImagingDrawObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+/* The outline of a polygon kept inside it, width wide (see
+   ImagingDrawPolygonInside): ImageDraw.polygon() with an outline width
+   above 1. */
+static PyObject *
+_draw_polygon_inside(ImagingDrawObject *self, PyObject *args) {
+    double *xy;
+    int *ixy;
+    Py_ssize_t n, i;
+
+    PyObject *data;
+    int ink, mask_ink, width;
+    if (!PyArg_ParseTuple(args, "Oiii", &data, &ink, &mask_ink, &width)) {
+        return NULL;
+    }
+
+    n = PyPath_Flatten(data, &xy);
+    if (n < 0) {
+        return NULL;
+    }
+    if (n < 2) {
+        PyErr_SetString(
+            PyExc_TypeError, "coordinate list must contain at least 2 coordinates"
+        );
+        free(xy);
+        return NULL;
+    }
+
+    /* The vertices as draw_polygon converts them */
+    ixy = (int *)calloc(n, 2 * sizeof(int));
+    if (ixy == NULL) {
+        free(xy);
+        return ImagingError_MemoryError();
+    }
+    for (i = 0; i < n; i++) {
+        ixy[i + i] = (int)xy[i + i];
+        ixy[i + i + 1] = (int)xy[i + i + 1];
+    }
+    free(xy);
+
+    int result;
+    Py_BEGIN_CRITICAL_SECTION2(self, self->image);
+    result = ImagingDrawPolygonInside(
+        self->image->image, n, ixy, &ink, &mask_ink, width, self->blend
+    );
+    Py_END_CRITICAL_SECTION2();
+
+    free(ixy);
+    if (result < 0) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
 static PyObject *
 _draw_rectangle(ImagingDrawObject *self, PyObject *args) {
     double *xy;
@@ -4145,6 +4198,7 @@ static struct PyMethodDef _draw_methods[] = {
     {"draw_lines", (PyCFunction)_draw_lines, METH_VARARGS},
     {"draw_outline", (PyCFunction)_draw_outline, METH_VARARGS},
     {"draw_polygon", (PyCFunction)_draw_polygon, METH_VARARGS},
+    {"draw_polygon_inside", (PyCFunction)_draw_polygon_inside, METH_VARARGS},
     {"draw_rectangle", (PyCFunction)_draw_rectangle, METH_VARARGS},
     {"draw_points", (PyCFunction)_draw_points, METH_VARARGS},
     {"draw_arc", (PyCFunction)_draw_arc, METH_VARARGS},

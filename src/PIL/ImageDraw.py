@@ -356,13 +356,9 @@ class ImageDraw:
                 self.draw.draw_polygon(xy, ink, 0, width)
             elif self.im is not None:
                 # To avoid expanding the polygon outwards,
-                # use the fill as a mask
-                mask = Image.new("1", self.im.size)
+                # use the fill as a mask (made over the polygon only, in C)
                 mask_ink = self._getink(1)[0]
-                draw = Draw(mask)
-                draw.draw.draw_polygon(xy, mask_ink, 1)
-
-                self.draw.draw_polygon(xy, ink, 0, width * 2 - 1, mask.im)
+                self.draw.draw_polygon_inside(xy, ink, mask_ink, width * 2 - 1)
 
     def regular_polygon(
         self,
