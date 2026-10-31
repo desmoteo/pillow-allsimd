@@ -110,8 +110,9 @@ RGB → HSV, the affine, perspective and quad transforms and rotate(),
 blend() and large downscales). The
 [benchmark page](https://desmoteo.github.io/pillow-simd-perf/) shows the
 AVX2 and NEON builds in fast mode beside the exact ones. See the
-[fast mode reference](docs/reference/fast_mode.rst) and
-[SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md).
+[fast mode reference](https://desmoteo.github.io/pillow-simd/reference/fast_mode.html)
+in the [API documentation](https://desmoteo.github.io/pillow-simd/) of this
+branch, and [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md).
 
 
 ## Design documents
