@@ -1,7 +1,7 @@
 /*
  * The Imaging library
  *
- * Fast mode Gaussian blur (APPROXIMATE_KERNELS_PLAN.md, item 1). The exact
+ * Fast mode Gaussian blur (design/APPROXIMATE_KERNELS_PLAN.md, item 1). The exact
  * Gaussian (BoxBlur.c) runs three extended box passes, each rounded to 8
  * bits and each a sweep over the image. Here the same three boxes are
  * convolved into one kernel, its weights rounded once to 8 bits summing to

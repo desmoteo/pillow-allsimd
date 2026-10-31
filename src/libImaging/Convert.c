@@ -921,7 +921,7 @@ rgb2hsv(UINT8 *out, const UINT8 *in, int xsize) {
 #endif
 }
 
-/* Fast mode (SIMD_FAST_KERNELS.md): rgb2hsv_row's hue and saturation
+/* Fast mode (design/SIMD_FAST_KERNELS.md): rgb2hsv_row's hue and saturation
    truncated exactly, h = floor(255 n / (6 d)) and s = floor(255 d / v), with
    d = max - min and n the hue's numerator in 0 .. 6 d. One float division
    gives these floors exactly: the numerators are integers below 2^24, and a
@@ -2610,7 +2610,7 @@ static struct {
  * @return        The resulting Imaging object,
  *                or NULL with a Python exception set on failure.
  */
-/* The fast-mode version of a conversion's row function (SIMD_FAST_KERNELS.md),
+/* The fast-mode version of a conversion's row function (design/SIMD_FAST_KERNELS.md),
    or the function itself. */
 static ImagingShuffler
 fast_converter(ImagingShuffler convert) {

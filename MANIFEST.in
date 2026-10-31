@@ -18,6 +18,7 @@ graft patches
 graft src
 graft depends
 graft winbuild
+graft design
 graft docs
 graft _custom_build
 

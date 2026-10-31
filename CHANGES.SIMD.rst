@@ -88,7 +88,7 @@ Based on Pillow 13.0.0
 - Fast mode switch: ``PILLOW_ALLSIMD_FAST=1``, ``Image.set_fast()``,
   ``Image.get_fast()``, ``Image.fast_mode()`` and the ``fast`` feature.
   Off by default; it lets operations use kernels whose results may differ
-  from Pillow's by small, documented amounts (``SIMD_FAST_KERNELS.md``)
+  from Pillow's by small, documented amounts (``design/SIMD_FAST_KERNELS.md``)
 - Fast mode: GaussianBlur and UnsharpMask up to radius 6 apply Pillow's three
   box passes as one kernel with 8-bit weights in one pass, with exact bands
   near the edges: within 3 levels of the exact result, closer to a true
@@ -202,7 +202,7 @@ Based on Pillow 13.0.0
   the code around them. ``-C simd=native`` passes ``-mcpu=native`` on POWER
   and is refused on RISC-V with a hint. The portable build passes the test
   suite on riscv64, ppc64le, s390x, armv7 and 32-bit x86
-  (``OTHER_ARCHITECTURES.md``); ``checks/simd_test_remote.sh`` takes those
+  (``design/OTHER_ARCHITECTURES.md``); ``checks/simd_test_remote.sh`` takes those
   platforms, and ``checks/simd_hashes.py`` hashes I and F pixels
   little-endian, so big-endian builds compare
 - Fast mode: resize() of 8-bit images with 4-byte pixels fuses the two

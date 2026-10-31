@@ -2,7 +2,8 @@
  * The Imaging library
  *
  * Fast mode affine, perspective and quad transforms with the bilinear and
- * bicubic filters (APPROXIMATE_KERNELS_PLAN.md, item 4; SIMD_FAST_KERNELS.md).
+ * bicubic filters (design/APPROXIMATE_KERNELS_PLAN.md, item 4;
+ * design/SIMD_FAST_KERNELS.md).
  *
  * The exact transforms compute each pixel's source position in doubles and
  * filter it in doubles, truncating the result; the compilers fuse their

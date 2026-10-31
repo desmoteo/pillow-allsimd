@@ -1,4 +1,4 @@
-/* Fast mode (SIMD_FAST_KERNELS.md): resize of 8-bit images with 4-byte
+/* Fast mode (design/SIMD_FAST_KERNELS.md): resize of 8-bit images with 4-byte
  * pixels, the two passes fused, with 6 more bits between them and the
  * vertical pass in 16-bit lanes.
  *

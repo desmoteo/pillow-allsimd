@@ -758,7 +758,7 @@ extern void
 ImagingConvertRGB2YCbCr(UINT8 *out, const UINT8 *in, int pixels);
 extern void
 ImagingConvertYCbCr2RGB(UINT8 *out, const UINT8 *in, int pixels);
-/* fast mode (SIMD_FAST_KERNELS.md) */
+/* fast mode (design/SIMD_FAST_KERNELS.md) */
 extern void
 ImagingConvertRGB2YCbCrFast(UINT8 *out, const UINT8 *in, int pixels);
 extern void

@@ -699,7 +699,7 @@ ImagingConvertYCbCr2RGB(UINT8 *out, const UINT8 *in, int pixels) {
     }
 }
 
-/* Fast mode (SIMD_FAST_KERNELS.md): JPEG's BT.601 full-range conversion
+/* Fast mode (design/SIMD_FAST_KERNELS.md): JPEG's BT.601 full-range conversion
    with 14-bit coefficients and one rounding, as OpenCV and KleidiCV compute
    it, in place of the tables above, whose terms are each floored. The
    portable loops define the result; every value is an integer sum of
