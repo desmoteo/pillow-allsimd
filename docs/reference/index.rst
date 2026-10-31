@@ -34,6 +34,7 @@ Reference
    PSDraw
    PixelAccess
    features
+   fast_mode
    ../PIL
    plugins
    internal_design

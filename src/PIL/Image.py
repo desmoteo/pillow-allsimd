@@ -4069,6 +4069,68 @@ def _apply_env_variables(env: dict[str, str] | None = None) -> None:
         except ValueError as e:
             warnings.warn(f"{var_name}: {e}")
 
+    if "PILLOW_SIMD_FAST" in env_dict:
+        value = env_dict["PILLOW_SIMD_FAST"].strip().lower()
+        if value in ("1", "true", "on", "yes"):
+            set_fast(True)
+        elif value in ("", "0", "false", "off", "no"):
+            set_fast(False)
+        else:
+            warnings.warn("PILLOW_SIMD_FAST is not a boolean")
+
+
+# --------------------------------------------------------------------
+# Fast mode (Pillow-SIMD)
+
+
+def set_fast(enabled: bool = True) -> None:
+    """
+    Lets operations use faster kernels whose results may differ from
+    Pillow's by small, documented amounts, or goes back to the exact kernels,
+    which give Pillow's results on every build. Off by default; the
+    ``PILLOW_SIMD_FAST`` environment variable sets it when :py:mod:`PIL.Image`
+    is imported. The setting is process-wide, and each operation reads it
+    once when it starts.
+
+    Check for the feature with ``features.check_feature("fast")``.
+
+    :param enabled: ``True`` for the fast kernels, ``False`` for the exact ones.
+    """
+    core.set_fast(1 if enabled else 0)
+
+
+def get_fast() -> bool:
+    """
+    Whether operations may use the fast kernels; see :py:func:`set_fast`.
+    """
+    return core.get_fast()
+
+
+class fast_mode:
+    """
+    Context manager that calls :py:func:`set_fast` on entry and restores the
+    previous setting on exit::
+
+        with Image.fast_mode():
+            im = im.filter(ImageFilter.GaussianBlur(2))
+
+    The setting is process-wide: it applies to every thread while the block
+    runs.
+
+    :param enabled: The setting inside the block.
+    """
+
+    def __init__(self, enabled: bool = True) -> None:
+        self._enabled = enabled
+        self._previous = False
+
+    def __enter__(self) -> None:
+        self._previous = get_fast()
+        set_fast(self._enabled)
+
+    def __exit__(self, *args: object) -> None:
+        set_fast(self._previous)
+
 
 _apply_env_variables()
 atexit.register(core.clear_cache)

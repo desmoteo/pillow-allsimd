@@ -96,6 +96,7 @@ _LIB_IMAGING = (
     "Draw",
     "Effects",
     "EpsEncode",
+    "Fast",
     "Fill",
     "Filter",
     "FliDecode",
