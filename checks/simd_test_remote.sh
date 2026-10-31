@@ -46,6 +46,11 @@
 # podman usable by that user, and access to the base image, Debian packages
 # and PyPI; HTTP(S)_PROXY and NO_PROXY set on the host are passed on.
 #
+# The image has the optional test dependencies (Tk, Qt, Arrow, psutil,
+# IPython, ImageMagick, djpeg, a Polish locale, a virtual display), and the
+# extra test images of this checkout, if installed with
+# depends/install_extra_test_images.sh, are copied with the ref.
+#
 # Examples:
 #   checks/simd_test_remote.sh -u ubuntu 192.0.2.10
 #   checks/simd_test_remote.sh --python-version 3.14 -n 4 192.0.2.10
@@ -181,10 +186,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libjpeg62-turbo-dev zlib1g-dev libpng-dev libtiff-dev libwebp-dev \
         libfreetype-dev liblcms2-dev libopenjp2-7-dev libharfbuzz-dev \
         libfribidi-dev libraqm-dev libimagequant-dev libavif-dev libxcb1-dev \
+        libtk8.6 xvfb xauth libjpeg-turbo-progs imagemagick locales \
+        libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/* \
+    && echo 'pl_PL ISO-8859-2' >> /etc/locale.gen && locale-gen \
     && pip install --no-cache-dir setuptools wheel pybind11 \
         pytest pytest-timeout pytest-xdist packaging defusedxml olefile \
-    && (pip install --no-cache-dir --only-binary :all: numpy || true)
+        psutil ipython markdown2 \
+    && (pip install --no-cache-dir --only-binary :all: numpy || true) \
+    && (pip install --no-cache-dir --only-binary :all: \
+        pyarrow nanoarrow arro3-core arro3-compute PyQt6 || true)
 DOCKERFILE
 " >/dev/null || die "could not build the image (no access to $DOCKER_BASE, Debian or PyPI?)"
 
@@ -199,6 +210,13 @@ renv() {
 log "copying $COMMIT to $HOST:$WORKDIR"
 rsh "rm -rf $WORKDIR && mkdir -p $WORKDIR/src && touch $WORKDIR/$MARKER"
 git -C "$REPO" archive --format=tar "$COMMIT" | rsh "tar -x -C $WORKDIR/src"
+# The extra test images (depends/install_extra_test_images.sh), if this
+# checkout has them: they are ignored by git, so not in the archive.
+EXTRA=$(git -C "$REPO" ls-files --others --ignored --exclude-standard Tests/images)
+if [ -n "$EXTRA" ]; then
+    log "copying the extra test images"
+    (cd "$REPO" && printf '%s\n' "$EXTRA" | tar -cf - -T -) | rsh "tar -x -C $WORKDIR/src"
+fi
 # The harness is taken from the working tree, so older refs can be compared.
 rsh "cat > $WORKDIR/simd_bench.py" < "$REPO/checks/simd_bench.py"
 
@@ -228,7 +246,11 @@ for b in $BUILDS; do
     # Tests run from the source tree for Tests/images, against the build.
     if renv "cd build-$name
         PYTHONPATH=/work/$name python3 -c 'from PIL import Image; print(\"Pillow\", Image.__version__)'
-        PYTHONPATH=/work/$name python3 -m pytest -p no:cacheprovider -q -rfE $XDIST \
+        # A virtual display for the Tk and X11 screen grab tests; Qt draws
+        # off screen
+        export QT_QPA_PLATFORM=offscreen
+        XVFB=\$(command -v xvfb-run >/dev/null && echo 'xvfb-run -a' || true)
+        PYTHONPATH=/work/$name \$XVFB python3 -m pytest -p no:cacheprovider -q -rfE $XDIST \
             --junitxml=../junit-$name.xml $PYTEST_ARGS" > "$DEST/test-$name.log" 2>&1; then
         log "$name: $(tail -1 "$DEST/test-$name.log")"
     else
