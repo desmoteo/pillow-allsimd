@@ -2340,6 +2340,8 @@ _resize_impl(ImagingObject *self, PyObject *args) {
     int xsize, ysize;
     int filter = IMAGING_TRANSFORM_NEAREST;
     float box[4] = {0, 0, 0, 0};
+    // Pillow-AllSIMD: an RGBA or LA image, resized premultiplied by alpha
+    int alpha = 0;
 
     imIn = self->image;
     box[2] = imIn->xsize;
@@ -2347,14 +2349,15 @@ _resize_impl(ImagingObject *self, PyObject *args) {
 
     if (!PyArg_ParseTuple(
             args,
-            "(ii)|i(ffff)",
+            "(ii)|i(ffff)i",
             &xsize,
             &ysize,
             &filter,
             &box[0],
             &box[1],
             &box[2],
-            &box[3]
+            &box[3],
+            &alpha
         )) {
         return NULL;
     }
@@ -2375,9 +2378,13 @@ _resize_impl(ImagingObject *self, PyObject *args) {
         return ImagingError_ValueError("box can't be empty");
     }
 
-    // If box's coordinates are int and box size matches requested size
-    if (box[0] - (int)box[0] == 0 && box[2] - box[0] == xsize &&
-        box[1] - (int)box[1] == 0 && box[3] - box[1] == ysize) {
+    if (alpha && filter != IMAGING_TRANSFORM_NEAREST) {
+        imOut = ImagingResampleAlpha(imIn, xsize, ysize, filter, box);
+    } else if (
+        box[0] - (int)box[0] == 0 && box[2] - box[0] == xsize &&
+        box[1] - (int)box[1] == 0 && box[3] - box[1] == ysize
+    ) {
+        // box's coordinates are int and box size matches requested size
         imOut = ImagingCrop(imIn, box[0], box[1], box[2], box[3]);
     } else if (filter == IMAGING_TRANSFORM_NEAREST) {
         double a[8];

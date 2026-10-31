@@ -425,6 +425,8 @@ ImagingTransverse(Imaging imOut, Imaging imIn);
 extern Imaging
 ImagingResample(Imaging imIn, int xsize, int ysize, int filter, float box[4]);
 extern Imaging
+ImagingResampleAlpha(Imaging imIn, int xsize, int ysize, int filter, float box[4]);
+extern Imaging
 ImagingReduce(Imaging imIn, int xscale, int yscale, int box[4]);
 extern int
 ImagingTransform(
@@ -762,6 +764,10 @@ ImagingConvertRGB2YCbCrFast(UINT8 *out, const UINT8 *in, int pixels);
 extern void
 ImagingConvertYCbCr2RGBFast(UINT8 *out, const UINT8 *in, int pixels);
 
+extern ImagingShuffler
+ImagingFindPremultiply(ModeID mode);
+extern ImagingShuffler
+ImagingFindUnpremultiply(ModeID mode);
 extern ImagingShuffler
 ImagingFindUnpacker(ModeID mode, RawModeID rawmode, int *bits_out);
 extern ImagingShuffler

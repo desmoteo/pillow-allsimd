@@ -2465,9 +2465,17 @@ class Image:
             reducing_gap = 3.0
 
         if self.mode in ["LA", "RGBA"] and resample != Resampling.NEAREST:
-            im = self.convert({"LA": "La", "RGBA": "RGBa"}[self.mode])
-            im = im.resize(size, resample, box, reducing_gap)
-            return im.convert(self.mode)
+            if reducing_gap is not None and (
+                int((box[2] - box[0]) / size[0] / reducing_gap) > 1
+                or int((box[3] - box[1]) / size[1] / reducing_gap) > 1
+            ):
+                im = self.convert({"LA": "La", "RGBA": "RGBa"}[self.mode])
+                im = im.resize(size, resample, box, reducing_gap)
+                return im.convert(self.mode)
+            # Pillow-AllSIMD: the same pixels, premultiplied by alpha inside
+            # the resize passes rather than by two whole-image conversions
+            self.load()
+            return self._new(self.im.resize(size, resample, box, 1))
 
         self.load()
 

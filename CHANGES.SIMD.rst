@@ -178,6 +178,25 @@ Based on Pillow 13.0.0
   a table of every source and destination alpha (128 KB, built on first
   use), with NEON for the rest: the same pixels, 1.25x; reduce() by 4x4 of
   4-byte images in NEON pairwise sums (1.15x)
+- resize() of RGBA and LA images premultiplies the source rows inside the
+  first resample pass and removes it from the rows of the last, where they
+  are in the cache, instead of converting the whole image to RGBa and back.
+  The same pixels; x86 1.1x to 1.7x (2048x1280 bilinear 1.68x), arm64
+  1.1x to 1.3x
+- arm64: RGBa -> RGBA (and so RGBA resizes) looks up 255 * c / alpha in a
+  64 KB table of the scalar code's results, two pixels per 64-bit word:
+  1.7x on Cortex-A78AE, where the float kernel was bound by conversions
+  (on x86 the table is slower than the vector kernels, which stay)
+- arm64, fast mode: RGB -> HSV computes the hue in 16-bit lanes with one
+  division and takes the saturation from that table (1.67x); YCbCr -> RGB
+  multiplies Cr and Cb in 16-bit lanes with rounding doubling multiplies
+  (1.53x). The same pixels as before; both now faster than OpenCV
+- MinFilter and MaxFilter of the same size: the row ends clamp the pixel
+  index instead of copying each row into a padded buffer, and the 3x3
+  filters skip the loop over the sources (3x3 RGB: 1.1x to 1.2x AVX2,
+  1.4x NEON)
+- Box blur radii 1 to 4 without running sums: the sum's sources unrolled
+  per radius (radius 2 RGB: 1.46x AVX2 at -O3)
 
 Build
 
