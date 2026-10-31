@@ -6,11 +6,15 @@ import pytest
 
 from PIL import Image, ImageFilter
 
+from .simd_shapes import SHAPES
+
 # SIMD kernels process several pixels at once. The pixels left over at the
 # end of a row must get exactly the same arithmetic, so identical input
 # pixels give identical output pixels wherever they are in the row.
 
 WIDTHS = (1, 3, 5, 7, 9, 17)
+# rows of those widths, and the six test shapes
+SIZES = [(w, 2) for w in WIDTHS] + list(SHAPES.values())
 
 
 def _colors(bands: int, count: int = 40) -> list[tuple[int, ...]]:
@@ -23,7 +27,7 @@ def _assert_flat(im: Image.Image) -> None:
     assert pixels == [pixels[0]] * len(pixels)
 
 
-@pytest.mark.parametrize("width", WIDTHS)
+@pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize(
     "mode_in, mode_out",
     (
@@ -36,10 +40,10 @@ def _assert_flat(im: Image.Image) -> None:
         ("RGBa", "RGBA"),
     ),
 )
-def test_convert(width: int, mode_in: str, mode_out: str) -> None:
+def test_convert(size: tuple[int, int], mode_in: str, mode_out: str) -> None:
     bands = len(mode_in)
     for color in _colors(bands):
-        im = Image.new(mode_in, (width, 2), color)
+        im = Image.new(mode_in, size, color)
         _assert_flat(im.convert(mode_out))
 
 
@@ -60,18 +64,20 @@ def test_unpremultiply_every_value() -> None:
     assert out == expected
 
 
-@pytest.mark.parametrize("width", WIDTHS)
+@pytest.mark.parametrize("size", SIZES)
 @pytest.mark.parametrize("mode", ("RGBA", "LA"))
-def test_alpha_composite(width: int, mode: str) -> None:
+def test_alpha_composite(size: tuple[int, int], mode: str) -> None:
     bands = len(mode)
     colors = _colors(bands)
     for dst, src in zip(colors, reversed(colors)):
-        im_dst = Image.new(mode, (width, 2), dst)
-        im_src = Image.new(mode, (width, 2), src)
+        im_dst = Image.new(mode, size, dst)
+        im_src = Image.new(mode, size, src)
         _assert_flat(Image.alpha_composite(im_dst, im_src))
 
 
-@pytest.mark.parametrize("width", (5, 6, 7, 9, 17, 21, 23))
+@pytest.mark.parametrize(
+    "width", (5, 6, 7, 9, 17, 21, 23, *(w for w, _ in SHAPES.values()))
+)
 @pytest.mark.parametrize("mode", ("L", "LA", "RGB", "RGBA", "CMYK"))
 @pytest.mark.parametrize("size", (3, 5))
 def test_filter(width: int, mode: str, size: int) -> None:

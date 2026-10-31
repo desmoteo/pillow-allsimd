@@ -6,6 +6,8 @@ import pytest
 
 from PIL import Image, ImageDraw
 
+from .simd_shapes import SHAPES
+
 # Drawing paths that Pillow-SIMD implements differently from Pillow and
 # that must give Pillow's pixels.
 
@@ -28,7 +30,8 @@ def _upstream_polygon_outline(
 @pytest.mark.parametrize("mode", ("1", "L", "I;16", "I", "F", "RGB", "RGBA", "LA", "P"))
 def test_polygon_outline_matches_full_mask(mode: str) -> None:
     rnd = random.Random(mode)
-    for size in ((120, 80), (17, 300), (1, 1), (5, 90)):
+    # the six test shapes, and slivers
+    for size in (*SHAPES.values(), (120, 80), (17, 300), (1, 1), (5, 90)):
         expected = Image.new(mode, size)
         actual = Image.new(mode, size)
         w, h = size
