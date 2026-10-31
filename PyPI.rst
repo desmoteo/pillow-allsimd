@@ -5,8 +5,9 @@ Pillow-AllSIMD is a fork of `Pillow-SIMD <https://github.com/uploadcare/pillow-s
 the SIMD build of `Pillow <https://python-pillow.org>`_, the friendly PIL fork.
 It is a drop-in replacement for the Pillow version it follows (now 13.0.0):
 the same ``PIL`` package and API, with SIMD kernels for x86-64 (SSE4, AVX2,
-AVX-VNNI) and arm64 (NEON). By default the results follow Pillow's
-arithmetic; an opt-in fast mode trades a few levels of precision for speed.
+AVX-VNNI) and arm64 (NEON). By default a fast mode trades a few levels of
+precision for speed in some operations; exact mode follows Pillow's
+arithmetic.
 
 Status: beta, built from source; see the repository for what is
 accelerated, how it is tested and the benchmarks.

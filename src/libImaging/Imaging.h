@@ -193,7 +193,7 @@ extern void
 ImagingMemorySetBlockAllocator(ImagingMemoryArena arena, int use_block_allocator);
 
 /* Fast mode (Fast.c): operations may use kernels whose results differ from
-   Pillow's by a documented amount. Off by default. */
+   Pillow's by a documented amount. On by default. */
 #define IMAGING_FAST_ALL 1
 extern void
 ImagingSetFast(int flags);

@@ -6,7 +6,7 @@ title: Pillow-AllSIMD
 abstract: >-
   A fork of Pillow-SIMD, the SIMD build of the Pillow imaging library for
   Python, with SIMD kernels for x86-64 (SSE4, AVX2, AVX-VNNI) and arm64
-  (NEON), Pillow's results by default and an opt-in fast mode.
+  (NEON), a fast mode by default and Pillow's results in exact mode.
 type: software
 authors:
   - family-names: Ferrabone

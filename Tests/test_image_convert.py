@@ -399,6 +399,11 @@ def _ycc_term(v: int, k: float) -> int:
 @pytest.mark.parametrize("width", (1, 3, 5, 61))
 def test_ycbcr_conversions_exact(width: int) -> None:
     # Pixels are converted several at a time, then one at a time.
+    with Image.fast_mode(False):
+        _check_ycbcr_conversions(width)
+
+
+def _check_ycbcr_conversions(width: int) -> None:
     values = [(r * 37) % 256 for r in range(width * 64 * 3)]
     data = bytes(values)
     rgb = Image.frombytes("RGB", (width, 64), data)

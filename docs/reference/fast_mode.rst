@@ -3,36 +3,38 @@
 Fast mode (Pillow-AllSIMD)
 ==========================
 
-By default Pillow-AllSIMD computes each operation with Pillow's arithmetic,
-or an integer form of it that rounds differently by one level at most in a
-few places (resize with 16-bit coefficients, RGB to L with 15-bit ones).
 Fast mode lets operations use kernels that are faster and whose results may
-differ from Pillow's by small, documented amounts. It is off unless you turn
-it on.
+differ from Pillow's by small, documented amounts. It is on by default: the
+operations listed below use their fast kernels. The other operations, and
+every operation in exact mode (fast mode off), compute with Pillow's
+arithmetic, or an integer form of it that rounds differently by one level at
+most in a few places (resize with 16-bit coefficients, RGB to L with 15-bit
+ones). Fast mode was off by default until October 2026.
 
 This is a Pillow-AllSIMD feature: neither Pillow nor Pillow-SIMD has a fast
 mode. Check for it with ``features.check_feature("fast")``.
 
-Turning it on
--------------
+Turning it off
+--------------
 
 Set the ``PILLOW_ALLSIMD_FAST`` environment variable before
 :py:mod:`PIL.Image` is imported (``PILLOW_SIMD_FAST``, its former name, is
-read when ``PILLOW_ALLSIMD_FAST`` isn't set). ``1``, ``true``, ``on`` and ``yes`` turn fast mode on; ``0``,
-``false``, ``off``, ``no`` and an empty value turn it off. Any other value
-gives a warning and leaves the setting unchanged::
+read when ``PILLOW_ALLSIMD_FAST`` isn't set). ``0``, ``false``, ``off``,
+``no`` and an empty value turn fast mode off; ``1``, ``true``, ``on`` and
+``yes`` turn it on. Any other value gives a warning and leaves the setting
+unchanged::
 
-    PILLOW_ALLSIMD_FAST=1 python3 app.py
+    PILLOW_ALLSIMD_FAST=0 python3 app.py
 
 Or call :py:func:`~PIL.Image.set_fast`, or use the
-:py:class:`~PIL.Image.fast_mode` context manager::
+:py:class:`~PIL.Image.fast_mode` context manager for one block::
 
     from PIL import Image, ImageFilter, features
 
     if features.check_feature("fast"):
-        Image.set_fast(True)
+        Image.set_fast(False)
 
-    with Image.fast_mode():
+    with Image.fast_mode(False):
         blurred = im.filter(ImageFilter.GaussianBlur(2))
 
 The setting is process-wide: it applies to every thread, including while a
@@ -42,8 +44,8 @@ starts, so a call never mixes exact and fast kernels.
 What it guarantees
 ------------------
 
-* **Off by default.** With fast mode off, nothing changes: the operations
-  run the kernels they run without fast mode.
+* **Exact when off.** With fast mode off, the operations run the exact
+  kernels, the same as before fast mode existed.
 * **Deterministic.** A fast kernel's result depends only on its input and
   arguments, and is the same on every build and architecture of a given
   Pillow-AllSIMD version. (Large downscales use the exact resize and reduce
@@ -56,8 +58,8 @@ What it guarantees
 * **Not stable across versions.** A later release may change a fast kernel's
   results when the kernel improves. The exact path follows Pillow.
 
-Leave fast mode off if you compare pixels with reference images, or cache or
-deduplicate images by their content.
+Turn fast mode off if you compare pixels with reference images made by
+Pillow, or cache or deduplicate images by their content across versions.
 
 Operations with a fast kernel
 -----------------------------
@@ -111,8 +113,8 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
      - at most 1 level; the float result rounded, but within 0.004 of a
        half; the exact result is truncated
    * - :py:meth:`~PIL.Image.Image.resize` with the bicubic, Lanczos and MKS
-       filters and no ``reducing_gap``, downscales of 6x and more, all modes
-       but I;16
+       filters and no ``reducing_gap``, downscales of 6x and more, 8-bit
+       modes
      - ``reducing_gap=3.0``: an integer shrink with
        :py:meth:`~PIL.Image.Image.reduce` first
      - 1/8 Lanczos: 1.9x, 2.5x; 1/16: 2.0x, 4.5x

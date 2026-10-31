@@ -198,4 +198,5 @@ def test_rgb_to_hsv_exact() -> None:
     im = Image.new("RGB", (width, len(colors) // width))
     im.putdata(colors)
     expected = [_rgb2hsv_reference(*c) for c in colors]
-    assert list(im.convert("HSV").get_flattened_data()) == expected
+    with Image.fast_mode(False):
+        assert list(im.convert("HSV").get_flattened_data()) == expected

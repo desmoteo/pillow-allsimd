@@ -17,13 +17,13 @@ For Pillow itself, please refer to its
 - **SIMD on every common CPU.** Pillow-SIMD targets x86; Pillow-AllSIMD
   carries its kernels further on x86-64 (SSE4, AVX2, AVX-VNNI) and ports
   them to arm64 (NEON), with portable C that compilers vectorize elsewhere.
-- **Pillow's results by default.** The operations follow Pillow's
-  arithmetic, or an integer form of it that rounds differently by one level
-  at most in a few places, and every SIMD kernel is checked against the
-  scalar code on every build.
-- **Faster still, when asked.** An opt-in fast mode uses kernels whose
-  results differ by a few documented levels at most, the same on every
-  build and architecture.
+- **Fast by default.** Some operations use fast kernels whose results
+  differ from Pillow's by a few documented levels at most, the same on
+  every build and architecture.
+- **Pillow's results when asked.** In exact mode the operations follow
+  Pillow's arithmetic, or an integer form of it that rounds differently by
+  one level at most in a few places, and every SIMD kernel is checked
+  against the scalar code on every build.
 - **Following Pillow.** Each Pillow release is merged, and changes that
   suit Pillow-SIMD are offered to it.
 
@@ -143,16 +143,18 @@ Other architectures build the portable C code.
 
 ## Exact and fast modes
 
-By default the operations follow Pillow's arithmetic, or an integer form
-of it that rounds differently by one level at most in a few places (resize,
-RGB → L). Fast mode, off unless you set `PILLOW_ALLSIMD_FAST=1` or call
-`Image.set_fast()`, lets some operations use faster kernels whose results
-differ by a few levels at most and are the same on every build and
-architecture (so far the Gaussian blur, 3.3x at radius 1, RGB ↔ YCbCr,
-RGB → HSV, the affine, perspective and quad transforms and rotate(),
-blend() and large downscales). The
+Fast mode is on by default: some operations use faster kernels whose
+results differ from Pillow's by a few levels at most and are the same on
+every build and architecture (so far the Gaussian blur, 3.3x at radius 1,
+RGB ↔ YCbCr, RGB → HSV, the affine, perspective and quad transforms and
+rotate(), blend() and large downscales). The other operations follow
+Pillow's arithmetic, or an integer form of it that rounds differently by
+one level at most in a few places (resize, RGB → L). Exact mode, with
+`PILLOW_ALLSIMD_FAST=0` or `Image.set_fast(False)`, does that for every
+operation: use it to compare pixels with images made by Pillow, or to
+cache images by their content across versions. The
 [benchmark page][allsimd-perf-page] shows the
-AVX2 and NEON builds in fast mode beside the exact ones. See the
+AVX2 and NEON builds in both modes. See the
 [fast mode reference](https://desmoteo.github.io/pillow-allsimd/reference/fast_mode.html)
 in the [API documentation][allsimd-docs] of this
 branch, and [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md).
@@ -178,9 +180,9 @@ Notes on the SIMD work, kept with the code they describe:
 - [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md): how OpenCV,
   KleidiCV, Carotene and libvips implement those kernels, approximate ones
   included, measured for speed and accuracy.
-- [APPROXIMATE_KERNELS_PLAN.md](APPROXIMATE_KERNELS_PLAN.md): a proposed
-  opt-in fast mode with approximate kernels beside the exact ones, chosen at
-  run time.
+- [APPROXIMATE_KERNELS_PLAN.md](APPROXIMATE_KERNELS_PLAN.md): the plan of
+  fast mode, approximate kernels beside the exact ones, chosen at run time
+  (opt-in in the plan, on by default now).
 - [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md): the fast-mode kernels, how
   each keeps its results the same on every build, their accuracy and speed.
 - [SIMD_EXPLAINER_PLAN.md](SIMD_EXPLAINER_PLAN.md): the outline of a detailed

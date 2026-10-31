@@ -2394,8 +2394,8 @@ class Image:
            With ``reducing_gap`` greater or equal to 3.0, the result is
            indistinguishable from fair resampling in most cases.
            The default value is None (no optimization). In Pillow-AllSIMD's
-           :ref:`fast mode <fast-mode>`, None means 3.0 for the bicubic,
-           Lanczos and MKS filters, except on I;16 images.
+           :ref:`fast mode <fast-mode>`, on by default, None means 3.0 for
+           the bicubic, Lanczos and MKS filters on 8-bit images.
         :returns: An :py:class:`~PIL.Image.Image` object.
         """
 
@@ -2452,11 +2452,16 @@ class Image:
                 Resampling.MKS2013,
                 Resampling.MKS2021,
             )
+            and self.mode not in ("I", "F")
             and not self.mode.startswith("I;16")
+            and (box is None or len(box) == 4)
             and get_fast()
         ):
-            # Pillow-AllSIMD fast mode: downscales of 6x and more first shrink by
-            # an integer factor with reduce(); the shorter filters gain nothing
+            # Pillow-AllSIMD fast mode: downscales of 6x and more of 8-bit
+            # images first shrink by an integer factor with reduce(); the
+            # shorter filters gain nothing. (reduce() sums 32-bit pixels in
+            # 32 bits, so I and F images keep the exact path. A malformed box
+            # is left to the check in C.)
             reducing_gap = 3.0
 
         if self.mode in ["LA", "RGBA"] and resample != Resampling.NEAREST:
@@ -4109,10 +4114,12 @@ def _apply_env_variables(env: dict[str, str] | None = None) -> None:
 def set_fast(enabled: bool = True) -> None:
     """
     Lets operations use faster kernels whose results may differ from
-    Pillow's by small, documented amounts, or goes back to the exact kernels.
-    Off by default; the ``PILLOW_ALLSIMD_FAST`` environment variable (or
-    ``PILLOW_SIMD_FAST``, its former name) sets it when :py:mod:`PIL.Image`
-    is imported. The setting is process-wide, and
+    Pillow's by small, documented amounts, or goes back to the exact kernels,
+    which follow Pillow's arithmetic. On by default; the
+    ``PILLOW_ALLSIMD_FAST`` environment variable (or ``PILLOW_SIMD_FAST``,
+    its former name) sets it when :py:mod:`PIL.Image` is imported, so
+    ``PILLOW_ALLSIMD_FAST=0`` gives the exact kernels. The setting is
+    process-wide, and
     each operation reads it once when it starts. The operations with a fast
     kernel, and how far their results may differ, are listed in
     :ref:`fast-mode`.
@@ -4134,9 +4141,10 @@ def get_fast() -> bool:
 class fast_mode:
     """
     Context manager that calls :py:func:`set_fast` on entry and restores the
-    previous setting on exit::
+    previous setting on exit, for example to use the exact kernels in one
+    place::
 
-        with Image.fast_mode():
+        with Image.fast_mode(False):
             im = im.filter(ImageFilter.GaussianBlur(2))
 
     The setting is process-wide: it applies to every thread while the block

@@ -7,9 +7,9 @@ the Python Imaging Library (PIL). It is a drop-in replacement for the Pillow
 version it follows, now 13.0.0: the same ``PIL`` package and API, built with
 SIMD kernels for x86-64 (SSE4, AVX2, AVX-VNNI) and arm64 (NEON).
 
-* **Aim:** Pillow's results, faster, on every common CPU; by default the
-  operations follow Pillow's arithmetic, and an opt-in :ref:`fast mode
-  <fast-mode>` trades a few documented levels for more speed.
+* **Aim:** Pillow, faster, on every common CPU; by default :ref:`fast mode
+  <fast-mode>` trades a few documented levels for more speed, and exact mode
+  follows Pillow's arithmetic.
 * **State:** beta, version |release| on Pillow 13.0.0, built from source;
   tested on x86-64 and arm64. See :doc:`allsimd`.
 * **Credits:** PIL is by Fredrik Lundh and contributors; Pillow by Jeffrey

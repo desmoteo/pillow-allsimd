@@ -1,16 +1,18 @@
 # Fast-mode kernels
 
-The kernels that run when fast mode is on (`PILLOW_ALLSIMD_FAST=1`,
-`Image.set_fast()`; user documentation in `docs/reference/fast_mode.rst`).
+The kernels that run when fast mode is on, which it is by default
+(`PILLOW_ALLSIMD_FAST=0` or `Image.set_fast(False)` turn it off; user
+documentation in `docs/reference/fast_mode.rst`).
 The plan, the catalogue of candidates and the evidence behind them are in
 [APPROXIMATE_KERNELS_PLAN.md](APPROXIMATE_KERNELS_PLAN.md) and
 [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md).
 
 ## Rules every fast kernel follows
 
-- **Off by default.** The exact path is untouched; the fast kernel is a
-  separate function the operation's entry point calls when
-  `ImagingGetFast() & IMAGING_FAST_ALL` is set, read once per call.
+- **Beside the exact path.** The exact path is untouched; the fast kernel
+  is a separate function the operation's entry point calls when
+  `ImagingGetFast() & IMAGING_FAST_ALL` is set (the default), read once per
+  call.
 - **Deterministic.** A portable C function defines the result. The SSE4,
   AVX2 and NEON versions compute the same integer arithmetic, so every build
   on every architecture gives the same pixels; `checks/simd_hashes.py` has a

@@ -15,13 +15,14 @@ Aim
 * **SIMD on every common CPU.** Pillow-SIMD targets x86; Pillow-AllSIMD
   carries its kernels further on x86-64 (SSE4, AVX2, AVX-VNNI) and ports them
   to arm64 (NEON), with portable C that compilers vectorize elsewhere.
-* **Pillow's results by default.** The operations follow Pillow's arithmetic,
-  or an integer form of it that rounds differently by one level at most in a
-  few places (resize with 16-bit coefficients, RGB to L with 15-bit ones), and
-  each SIMD kernel is checked against the scalar code on every build.
-* **Faster still, when asked.** :ref:`fast-mode` uses kernels whose results
-  differ by a few documented levels at most, the same on every build and
-  architecture.
+* **Fast by default.** :ref:`fast-mode` uses kernels whose results differ
+  from Pillow's by a few documented levels at most, the same on every build
+  and architecture.
+* **Pillow's results when asked.** In exact mode the operations follow
+  Pillow's arithmetic, or an integer form of it that rounds differently by one
+  level at most in a few places (resize with 16-bit coefficients, RGB to L
+  with 15-bit ones), and each SIMD kernel is checked against the scalar code
+  on every build.
 * **Following Pillow.** Each Pillow release is merged, and changes that suit
   Pillow-SIMD are offered to it.
 

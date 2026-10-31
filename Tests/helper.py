@@ -291,7 +291,11 @@ def _cached_hopper(mode: str) -> Image.Image:
     else:
         im = hopper()
     try:
-        im = im.convert(mode)
+        # Pillow-AllSIMD: Pillow's test images, from the exact kernels, so
+        # that tests run with them do not depend on the fast mode setting
+        # of the test that first made them
+        with Image.fast_mode(False):
+            im = im.convert(mode)
     except ImportError:
         if mode == "LAB":
             im = Image.open("Tests/images/hopper.Lab.tif")

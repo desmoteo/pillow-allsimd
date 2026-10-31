@@ -12,6 +12,13 @@ Based on Pillow 13.0.0
   the distribution name, the documentation and the credits say so; the fast
   mode variable is ``PILLOW_ALLSIMD_FAST`` (``PILLOW_SIMD_FAST``, its former
   name, still works)
+- Fast mode is on by default: the operations with a fast kernel (Gaussian
+  blur, RGB <-> YCbCr, RGB -> HSV, transforms and rotate(), blend(), large
+  downscales) give results within a few documented levels of Pillow's.
+  ``PILLOW_ALLSIMD_FAST=0`` or ``Image.set_fast(False)`` selects the exact
+  kernels, as before. Large downscales take the reduce() shortcut on 8-bit
+  images only (32-bit sums overflow on I and F images), and leave a
+  malformed box to resize()'s own error
 
 - Merged Pillow 13.0.0: security fixes, free-threading locks (the SIMD
   paths run inside them), vertical-first resampling and the MKS2013 and
