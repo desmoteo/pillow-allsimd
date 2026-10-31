@@ -350,10 +350,29 @@ normalize_coeffs_8bpc(int outSize, int ksize, double *prekk) {
     return coefs_precision;
 }
 
+/* For the resize of RGBA and LA images, which Pillow resizes premultiplied
+   by alpha: the 8-bit passes premultiply the source rows they read (each
+   row once, into `scratch`, four rows of the source's width) and remove the
+   premultiplication from the rows they write, in place, while those are in
+   the cache. The results are those of converting to RGBa or La, resizing
+   and converting back. NULL members do nothing; the other passes ignore
+   it. */
+struct resample_alpha {
+    ImagingShuffler premultiply;
+    ImagingShuffler unpremultiply;
+    UINT8 *scratch;
+};
+
 // Internal. Caller must guarantee imIn and imOut are distinct buffers.
 static void
 _ImagingResampleHorizontal_8bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *prekk
+    Imaging imOut,
+    Imaging imIn,
+    int offset,
+    int ksize,
+    int *bounds,
+    double *prekk,
+    const struct resample_alpha *alpha
 ) {
     ImagingSectionCookie cookie;
     int ss0;
@@ -442,33 +461,52 @@ _ImagingResampleHorizontal_8bpc(
             }
         }
 #endif
-        for (; yy < ysize - 3; yy += 4) {
-            ImagingResampleHorizontalConvolution8u4x(
-                (UINT32 *)imOut->image32[yy],
-                (UINT32 *)imOut->image32[yy + 1],
-                (UINT32 *)imOut->image32[yy + 2],
-                (UINT32 *)imOut->image32[yy + 3],
-                (UINT32 *)imIn->image32[yy + offset],
-                (UINT32 *)imIn->image32[yy + offset + 1],
-                (UINT32 *)imIn->image32[yy + offset + 2],
-                (UINT32 *)imIn->image32[yy + offset + 3],
-                xsize,
-                bounds,
-                kk,
-                ksize,
-                coefs_precision
-            );
-        }
-        for (; yy < ysize; yy++) {
-            ImagingResampleHorizontalConvolution8u(
-                (UINT32 *)imOut->image32[yy],
-                (UINT32 *)imIn->image32[yy + offset],
-                xsize,
-                bounds,
-                kk,
-                ksize,
-                coefs_precision
-            );
+        // The source rows, or their premultiplied copies in the scratch rows
+        UINT32 *in[4];
+        int i, n;
+        for (; yy < ysize; yy += n) {
+            n = ysize - yy < 4 ? 1 : 4;
+            for (i = 0; i < n; i++) {
+                in[i] = (UINT32 *)imIn->image32[yy + offset + i];
+                if (alpha && alpha->premultiply) {
+                    UINT8 *row = alpha->scratch + (size_t)i * imIn->linesize;
+                    alpha->premultiply(row, (UINT8 *)in[i], imIn->xsize);
+                    in[i] = (UINT32 *)row;
+                }
+            }
+            if (n == 4) {
+                ImagingResampleHorizontalConvolution8u4x(
+                    (UINT32 *)imOut->image32[yy],
+                    (UINT32 *)imOut->image32[yy + 1],
+                    (UINT32 *)imOut->image32[yy + 2],
+                    (UINT32 *)imOut->image32[yy + 3],
+                    in[0],
+                    in[1],
+                    in[2],
+                    in[3],
+                    xsize,
+                    bounds,
+                    kk,
+                    ksize,
+                    coefs_precision
+                );
+            } else {
+                ImagingResampleHorizontalConvolution8u(
+                    (UINT32 *)imOut->image32[yy],
+                    in[0],
+                    xsize,
+                    bounds,
+                    kk,
+                    ksize,
+                    coefs_precision
+                );
+            }
+            if (alpha && alpha->unpremultiply) {
+                for (i = 0; i < n; i++) {
+                    UINT8 *row = (UINT8 *)imOut->image32[yy + i];
+                    alpha->unpremultiply(row, row, xsize);
+                }
+            }
         }
     }
     MUTEX_UNLOCK(&imIn->mutex);
@@ -478,7 +516,13 @@ _ImagingResampleHorizontal_8bpc(
 // Internal. Caller must guarantee imIn and imOut are distinct buffers.
 static void
 _ImagingResampleVertical_8bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *prekk
+    Imaging imOut,
+    Imaging imIn,
+    int offset,
+    int ksize,
+    int *bounds,
+    double *prekk,
+    const struct resample_alpha *alpha
 ) {
     ImagingSectionCookie cookie;
     int ss0;
@@ -536,6 +580,10 @@ _ImagingResampleVertical_8bpc(
                 coefs_precision,
                 xsize
             );
+            if (alpha && alpha->unpremultiply) {
+                UINT8 *row = (UINT8 *)imOut->image32[yy];
+                alpha->unpremultiply(row, row, xsize);
+            }
         }
     }
     MUTEX_UNLOCK(&imIn->mutex);
@@ -545,7 +593,13 @@ _ImagingResampleVertical_8bpc(
 // Internal. Caller must guarantee imIn and imOut are distinct buffers.
 static void
 _ImagingResampleHorizontal_16bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *kk
+    Imaging imOut,
+    Imaging imIn,
+    int offset,
+    int ksize,
+    int *bounds,
+    double *kk,
+    const struct resample_alpha *alpha
 ) {
     ImagingSectionCookie cookie;
     double ss;
@@ -605,7 +659,13 @@ _ImagingResampleHorizontal_16bpc(
 // Internal. Caller must guarantee imIn and imOut are distinct buffers.
 static void
 _ImagingResampleVertical_16bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *kk
+    Imaging imOut,
+    Imaging imIn,
+    int offset,
+    int ksize,
+    int *bounds,
+    double *kk,
+    const struct resample_alpha *alpha
 ) {
     ImagingSectionCookie cookie;
     double ss;
@@ -665,7 +725,13 @@ _ImagingResampleVertical_16bpc(
 // Internal. Caller must guarantee imIn and imOut are distinct buffers.
 static void
 _ImagingResampleHorizontal_32bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *kk
+    Imaging imOut,
+    Imaging imIn,
+    int offset,
+    int ksize,
+    int *bounds,
+    double *kk,
+    const struct resample_alpha *alpha
 ) {
     ImagingSectionCookie cookie;
     double ss;
@@ -735,7 +801,13 @@ _ImagingResampleHorizontal_32bpc(
 // Internal. Caller must guarantee imIn and imOut are distinct buffers.
 static void
 _ImagingResampleVertical_32bpc(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *kk
+    Imaging imOut,
+    Imaging imIn,
+    int offset,
+    int ksize,
+    int *bounds,
+    double *kk,
+    const struct resample_alpha *alpha
 ) {
     ImagingSectionCookie cookie;
     double ss;
@@ -801,7 +873,13 @@ _ImagingResampleVertical_32bpc(
 }
 
 typedef void (*ResampleFunction)(
-    Imaging imOut, Imaging imIn, int offset, int ksize, int *bounds, double *kk
+    Imaging imOut,
+    Imaging imIn,
+    int offset,
+    int ksize,
+    int *bounds,
+    double *kk,
+    const struct resample_alpha *alpha
 );
 
 static Imaging
@@ -812,11 +890,32 @@ ImagingResampleInner(
     struct filter *filterp,
     float box[4],
     ResampleFunction ResampleHorizontal,
-    ResampleFunction ResampleVertical
+    ResampleFunction ResampleVertical,
+    int alpha
 );
 
-Imaging
-ImagingResample(Imaging imIn, int xsize, int ysize, int filter, float box[4]) {
+/* Premultiplies an RGBA or LA image by alpha and removes that again, in
+   place. Returns -1 when out of memory. */
+static int
+premultiply_round_trip(Imaging im) {
+    ImagingShuffler premultiply = ImagingFindPremultiply(im->mode);
+    ImagingShuffler unpremultiply = ImagingFindUnpremultiply(im->mode);
+    UINT8 *row = malloc(im->linesize);
+    int y;
+    if (!row && im->linesize) {
+        ImagingError_MemoryError();
+        return -1;
+    }
+    for (y = 0; y < im->ysize; y++) {
+        premultiply(row, (UINT8 *)im->image32[y], im->xsize);
+        unpremultiply((UINT8 *)im->image32[y], row, im->xsize);
+    }
+    free(row);
+    return 0;
+}
+
+static Imaging
+resample(Imaging imIn, int xsize, int ysize, int filter, float box[4], int alpha) {
     struct filter *filterp;
     ResampleFunction ResampleHorizontal;
     ResampleFunction ResampleVertical;
@@ -875,8 +974,36 @@ ImagingResample(Imaging imIn, int xsize, int ysize, int filter, float box[4]) {
     }
 
     return ImagingResampleInner(
-        imIn, xsize, ysize, filterp, box, ResampleHorizontal, ResampleVertical
+        imIn, xsize, ysize, filterp, box, ResampleHorizontal, ResampleVertical, alpha
     );
+}
+
+Imaging
+ImagingResample(Imaging imIn, int xsize, int ysize, int filter, float box[4]) {
+    return resample(imIn, xsize, ysize, filter, box, 0);
+}
+
+/* Resizes an RGBA or LA image as Pillow does, premultiplied by alpha, with
+   the result in the same mode: the same pixels as converting to RGBa or La,
+   resizing and converting back, without the two whole-image conversions. */
+Imaging
+ImagingResampleAlpha(Imaging imIn, int xsize, int ysize, int filter, float box[4]) {
+    Imaging imOut;
+    if (!ImagingFindPremultiply(imIn->mode) || !imIn->image32) {
+        return (Imaging)ImagingError_ModeError();
+    }
+    // As the resize binding does: an integer box of the output's size is a
+    // crop, premultiplied and back
+    if (box[0] - (int)box[0] == 0 && box[2] - box[0] == xsize &&
+        box[1] - (int)box[1] == 0 && box[3] - box[1] == ysize) {
+        imOut = ImagingCrop(imIn, box[0], box[1], box[2], box[3]);
+        if (imOut && premultiply_round_trip(imOut)) {
+            ImagingDelete(imOut);
+            return NULL;
+        }
+        return imOut;
+    }
+    return resample(imIn, xsize, ysize, filter, box, 1);
 }
 
 static Imaging
@@ -887,10 +1014,14 @@ ImagingResampleInner(
     struct filter *filterp,
     float box[4],
     ResampleFunction ResampleHorizontal,
-    ResampleFunction ResampleVertical
+    ResampleFunction ResampleVertical,
+    int alpha
 ) {
     Imaging imTemp = NULL;
     Imaging imOut = NULL;
+    struct resample_alpha horiz_alpha = {NULL, NULL, NULL};
+    struct resample_alpha vert_alpha = {NULL, NULL, NULL};
+    ImagingShuffler premultiply = NULL, unpremultiply = NULL;
 
     int i, second_pass, need_horizontal, need_vertical, error = 0;
     int ybox_first, ybox_last;
@@ -939,21 +1070,56 @@ ImagingResampleInner(
         }
     }
 
-#define PASS(function, w, h, offset, ksize, bounds, kk) \
-    second_pass = imTemp != NULL;                       \
-    imTemp = ImagingNewDirty(imIn->mode, w, h);         \
-    if (!imTemp) {                                      \
-        if (second_pass) {                              \
-            ImagingDelete(imIn);                        \
-        }                                               \
-        error = 1;                                      \
-        goto end;                                       \
-    }                                                   \
-    function(imTemp, imIn, offset, ksize, bounds, kk);  \
-    if (second_pass) {                                  \
-        ImagingDelete(imIn);                            \
-    }                                                   \
+#define PASS(function, w, h, offset, ksize, bounds, kk, alphap) \
+    second_pass = imTemp != NULL;                               \
+    imTemp = ImagingNewDirty(imIn->mode, w, h);                 \
+    if (!imTemp) {                                              \
+        if (second_pass) {                                      \
+            ImagingDelete(imIn);                                \
+        }                                                       \
+        error = 1;                                              \
+        goto end;                                               \
+    }                                                           \
+    function(imTemp, imIn, offset, ksize, bounds, kk, alphap);  \
+    if (second_pass) {                                          \
+        ImagingDelete(imIn);                                    \
+    }                                                           \
     imIn = imTemp;
+
+    if (alpha) {
+        premultiply = ImagingFindPremultiply(imIn->mode);
+        unpremultiply = ImagingFindUnpremultiply(imIn->mode);
+        if (horizontal_first && need_horizontal) {
+            // The horizontal pass premultiplies each source row it reads
+            horiz_alpha.premultiply = premultiply;
+            horiz_alpha.scratch = malloc(4 * (size_t)imIn->linesize);
+            if (!horiz_alpha.scratch && imIn->linesize) {
+                ImagingError_MemoryError();
+                error = 1;
+                goto end;
+            }
+        } else if (need_vertical) {
+            // The vertical pass reads each row several times, so it reads a
+            // premultiplied copy, which the first pass then deletes
+            imTemp = ImagingNewDirty(imIn->mode, imIn->xsize, imIn->ysize);
+            if (!imTemp) {
+                error = 1;
+                goto end;
+            }
+            for (i = 0; i < imIn->ysize; i++) {
+                premultiply(
+                    (UINT8 *)imTemp->image32[i], (UINT8 *)imIn->image32[i], imIn->xsize
+                );
+            }
+            imIn = imTemp;
+        }
+        // The last pass removes the premultiplication from its rows
+        if (horizontal_first ? need_vertical : !need_horizontal) {
+            vert_alpha.unpremultiply = unpremultiply;
+        } else {
+            horiz_alpha.unpremultiply = unpremultiply;
+        }
+    }
 
     if (horizontal_first) {
         if (need_horizontal) {
@@ -964,11 +1130,21 @@ ImagingResampleInner(
                 ybox_first,
                 ksize_horiz,
                 bounds_horiz,
-                kk_horiz
+                kk_horiz,
+                &horiz_alpha
             );
         }
         if (need_vertical) {
-            PASS(ResampleVertical, xsize, ysize, 0, ksize_vert, bounds_vert, kk_vert);
+            PASS(
+                ResampleVertical,
+                xsize,
+                ysize,
+                0,
+                ksize_vert,
+                bounds_vert,
+                kk_vert,
+                &vert_alpha
+            );
         }
     } else {
         if (need_vertical) {
@@ -979,17 +1155,26 @@ ImagingResampleInner(
                 0,
                 ksize_vert,
                 bounds_vert,
-                kk_vert
+                kk_vert,
+                &vert_alpha
             );
         }
         if (need_horizontal) {
             PASS(
-                ResampleHorizontal, xsize, ysize, 0, ksize_horiz, bounds_horiz, kk_horiz
+                ResampleHorizontal,
+                xsize,
+                ysize,
+                0,
+                ksize_horiz,
+                bounds_horiz,
+                kk_horiz,
+                &horiz_alpha
             );
         }
     }
 
 end:
+    free(horiz_alpha.scratch);
     if (ksize_horiz) {
         free(bounds_horiz);
         free(kk_horiz);
@@ -1007,6 +1192,11 @@ end:
     } else {
         // none of the previous steps are performed, copying
         imOut = ImagingCopy(imIn);
+        // premultiplied and back, as resizing an RGBa or La copy would be
+        if (imOut && alpha && premultiply_round_trip(imOut)) {
+            ImagingDelete(imOut);
+            return NULL;
+        }
     }
 
     return imOut;

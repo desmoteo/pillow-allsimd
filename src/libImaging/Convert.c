@@ -502,6 +502,67 @@ neon_unpremultiply_16(uint8x16x4_t *px) {
 }
 #endif
 
+#if defined(IMAGING_SIMD_NEON) && \
+    (!defined(__BYTE_ORDER__) || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#define UNPREMULTIPLY_TABLE
+/* The scalar code's results for every alpha (rows) and c: removing
+   premultiplication by table lookups, two pixels per 64-bit word, is 1.7
+   times as fast on the Cortex-A78AE as neon_unpremultiply_16, which
+   converts to floats (on x86 it's slower than the vector kernels). Built on
+   first use; while another thread builds it, the vector kernel runs. */
+static UINT8 unpremultiply_table[256 * 256];
+static long unpremultiply_state = 0; /* 0 missing, 1 being built, 2 built */
+
+static void
+unpremultiply_build(void) {
+    unsigned int alpha, c;
+    for (alpha = 0; alpha < 256; alpha++) {
+        for (c = 0; c < 256; c++) {
+            unpremultiply_table[alpha * 256 + c] =
+                alpha == 0 || alpha == 255 ? c : CLIP8((255 * c) / alpha);
+        }
+    }
+}
+
+static const UINT8 *
+unpremultiply_lookup(void) {
+#if defined(__GNUC__) || defined(__clang__)
+    long expected = 0;
+    if (__atomic_load_n(&unpremultiply_state, __ATOMIC_ACQUIRE) == 2) {
+        return unpremultiply_table;
+    }
+    if (__atomic_compare_exchange_n(
+            &unpremultiply_state, &expected, 1, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE
+        )) {
+        unpremultiply_build();
+        __atomic_store_n(&unpremultiply_state, 2, __ATOMIC_RELEASE);
+        return unpremultiply_table;
+    }
+#elif defined(_MSC_VER)
+    if (_InterlockedOr(&unpremultiply_state, 0) == 2) {
+        return unpremultiply_table;
+    }
+    if (_InterlockedCompareExchange(&unpremultiply_state, 1, 0) == 0) {
+        unpremultiply_build();
+        _InterlockedExchange(&unpremultiply_state, 2);
+        return unpremultiply_table;
+    }
+#endif
+    return NULL;
+}
+
+/* Two little-endian RGBa pixels */
+static inline uint64_t
+unpremultiply_2px(const UINT8 *table, uint64_t p) {
+    const UINT8 *t0 = table + (((p >> 24) & 255) << 8);
+    const UINT8 *t1 = table + ((p >> 56) << 8);
+    return (uint64_t)t0[p & 255] | (uint64_t)t0[(p >> 8) & 255] << 8 |
+           (uint64_t)t0[(p >> 16) & 255] << 16 | (p & 0xff000000u) |
+           (uint64_t)t1[(p >> 32) & 255] << 32 | (uint64_t)t1[(p >> 40) & 255] << 40 |
+           (uint64_t)t1[(p >> 48) & 255] << 48 | (p & 0xff00000000000000ull);
+}
+#endif
+
 #if defined(CONVERT_VECTOR)
 /* Runs a kernel for `step` pixels over a row. The last xsize % step
    pixels go through the same kernel via zero-padded buffers, so the
@@ -974,63 +1035,77 @@ rgb2hsv_fast(UINT8 *out, const UINT8 *in, int xsize) {
         }
     }
 #elif defined(IMAGING_SIMD_NEON)
+    /* The hue's numerator and denominator in 16-bit lanes, then one float
+       division for 4 lanes; the saturation floor(255 d / v) is the
+       unpremultiply table's entry for v and d (d <= v), or a division while
+       another thread builds the table. 1.75 times as fast on the
+       Cortex-A78AE as all in 32-bit lanes with two divisions (a reciprocal
+       estimate with Newton steps was slower than the division). */
+#if defined(UNPREMULTIPLY_TABLE)
+    const UINT8 *table = unpremultiply_lookup();
+#else
+    const UINT8 *table = NULL;
+#endif
     for (; x + 16 <= xsize; x += 16) {
         uint8x16x4_t px = vld4q_u8(in + x * 4);
         uint8x16_t v8 = vmaxq_u8(px.val[0], vmaxq_u8(px.val[1], px.val[2]));
-        uint8x16_t min8 = vminq_u8(px.val[0], vminq_u8(px.val[1], px.val[2]));
+        uint8x16_t d8 =
+            vsubq_u8(v8, vminq_u8(px.val[0], vminq_u8(px.val[1], px.val[2])));
         uint16x8_t hq[2], sq[2];
-        int k;
-        for (k = 0; k < 4; k++) {
-#define HSV_Q(plane)                                                            \
-    vreinterpretq_s32_u32(                                                      \
-        k % 2 ? vmovl_high_u16(                                                 \
-                    k < 2 ? vmovl_u8(vget_low_u8(plane)) : vmovl_high_u8(plane) \
-                )                                                               \
-              : vmovl_u16(vget_low_u16(                                         \
-                    k < 2 ? vmovl_u8(vget_low_u8(plane)) : vmovl_high_u8(plane) \
-                ))                                                              \
-    )
-            int32x4_t r = HSV_Q(px.val[0]), g = HSV_Q(px.val[1]), b = HSV_Q(px.val[2]);
-            int32x4_t v = HSV_Q(v8);
-            int32x4_t d = vsubq_s32(v, HSV_Q(min8));
-#undef HSV_Q
-            uint32x4_t rmax = vceqq_s32(r, v);
-            uint32x4_t gmax = vbicq_u32(vceqq_s32(g, v), rmax);
-            int32x4_t d2 = vaddq_s32(d, d), d4 = vaddq_s32(d2, d2);
-            int32x4_t d6 = vaddq_s32(d4, d2);
-            int32x4_t n = vbslq_s32(
+        int half, k;
+        for (half = 0; half < 2; half++) {
+#define HSV_H(plane) \
+    vreinterpretq_s16_u16(half ? vmovl_high_u8(plane) : vmovl_u8(vget_low_u8(plane)))
+            int16x8_t r = HSV_H(px.val[0]), g = HSV_H(px.val[1]), b = HSV_H(px.val[2]);
+            int16x8_t v = HSV_H(v8), d = HSV_H(d8);
+#undef HSV_H
+            uint16x8_t rmax = vceqq_s16(r, v), gmax = vbicq_u16(vceqq_s16(g, v), rmax);
+            int16x8_t d2 = vaddq_s16(d, d), d4 = vaddq_s16(d2, d2);
+            int16x8_t d6 = vaddq_s16(d4, d2);
+            int16x8_t n = vbslq_s16(
                 rmax,
-                vsubq_s32(g, b),
-                vbslq_s32(
-                    gmax, vaddq_s32(d2, vsubq_s32(b, r)), vaddq_s32(d4, vsubq_s32(r, g))
+                vsubq_s16(g, b),
+                vbslq_s16(
+                    gmax, vaddq_s16(d2, vsubq_s16(b, r)), vaddq_s16(d4, vsubq_s16(r, g))
                 )
             );
-            n = vaddq_s32(n, vandq_s32(vreinterpretq_s32_u32(vcltzq_s32(n)), d6));
-            uint32x4_t flat = vceqzq_s32(d);
-            int32x4_t h = vcvtq_s32_f32(
-                vdivq_f32(vcvtq_f32_s32(vmulq_n_s32(n, 255)), vcvtq_f32_s32(d6))
-            );
-            int32x4_t sat = vcvtq_s32_f32(
-                vdivq_f32(vcvtq_f32_s32(vmulq_n_s32(d, 255)), vcvtq_f32_s32(v))
-            );
-            h = vbicq_s32(h, vreinterpretq_s32_u32(flat));
-            sat = vbicq_s32(sat, vreinterpretq_s32_u32(flat));
-            if (k % 2 == 0) {
-                hq[k / 2] =
-                    vcombine_u16(vmovn_u32(vreinterpretq_u32_s32(h)), vdup_n_u16(0));
-                sq[k / 2] =
-                    vcombine_u16(vmovn_u32(vreinterpretq_u32_s32(sat)), vdup_n_u16(0));
-            } else {
-                hq[k / 2] = vcombine_u16(
-                    vget_low_u16(hq[k / 2]), vmovn_u32(vreinterpretq_u32_s32(h))
-                );
-                sq[k / 2] = vcombine_u16(
-                    vget_low_u16(sq[k / 2]), vmovn_u32(vreinterpretq_u32_s32(sat))
-                );
+            uint32x4_t q[2], sat[2];
+            n = vaddq_s16(n, vandq_s16(vreinterpretq_s16_u16(vcltzq_s16(n)), d6));
+            for (k = 0; k < 2; k++) {
+                /* d = 0 divides 0 by 0: NaN converts to 0, cleared below */
+                float32x4_t nf =
+                    vcvtq_f32_s32(vmovl_s16(k ? vget_high_s16(n) : vget_low_s16(n)));
+                float32x4_t df =
+                    vcvtq_f32_s32(vmovl_s16(k ? vget_high_s16(d6) : vget_low_s16(d6)));
+                q[k] = vcvtq_u32_f32(vdivq_f32(vmulq_n_f32(nf, 255.0f), df));
+                if (!table) {
+                    float32x4_t sd = vcvtq_f32_s32(
+                        vmovl_s16(k ? vget_high_s16(d) : vget_low_s16(d))
+                    );
+                    float32x4_t sv = vcvtq_f32_s32(
+                        vmovl_s16(k ? vget_high_s16(v) : vget_low_s16(v))
+                    );
+                    sat[k] = vcvtq_u32_f32(vdivq_f32(vmulq_n_f32(sd, 255.0f), sv));
+                }
+            }
+            hq[half] = vcombine_u16(vmovn_u32(q[0]), vmovn_u32(q[1]));
+            if (!table) {
+                sq[half] = vcombine_u16(vmovn_u32(sat[0]), vmovn_u32(sat[1]));
             }
         }
-        px.val[0] = vcombine_u8(vmovn_u16(hq[0]), vmovn_u16(hq[1]));
-        px.val[1] = vcombine_u8(vmovn_u16(sq[0]), vmovn_u16(sq[1]));
+        uint8x16_t flat = vceqzq_u8(d8);
+        px.val[0] = vbicq_u8(vcombine_u8(vmovn_u16(hq[0]), vmovn_u16(hq[1])), flat);
+        if (table) {
+            UINT8 vv[16], dd[16], ss[16];
+            vst1q_u8(vv, v8);
+            vst1q_u8(dd, d8);
+            for (k = 0; k < 16; k++) {
+                ss[k] = table[vv[k] * 256 + dd[k]];
+            }
+            px.val[1] = vld1q_u8(ss);
+        } else {
+            px.val[1] = vbicq_u8(vcombine_u8(vmovn_u16(sq[0]), vmovn_u16(sq[1])), flat);
+        }
         px.val[2] = v8;
         vst4q_u8(out + x * 4, px);
     }
@@ -1310,7 +1385,20 @@ rgba2rgbA(UINT8 *out, const UINT8 *in, int xsize) {
 #if defined(IMAGING_SIMD_SSE4)
     CONVERT_ROW(rgba2rgbA_4, 4, out + x * 4, in + x * 4, xsize - x, 4, 4);
 #else
-    // The NEON kernel is exact, so the scalar code below can finish the row.
+    // The NEON kernel and the table are exact, so the scalar code below can
+    // finish the row.
+#if defined(UNPREMULTIPLY_TABLE)
+    const UINT8 *table = unpremultiply_lookup();
+    if (table) {
+        for (; x < xsize - 3; x += 4) {
+            uint64_t p[2];
+            memcpy(p, in + x * 4, sizeof(p));
+            p[0] = unpremultiply_2px(table, p[0]);
+            p[1] = unpremultiply_2px(table, p[1]);
+            memcpy(out + x * 4, p, sizeof(p));
+        }
+    }
+#endif
     for (; x < xsize - 15; x += 16) {
         uint8x16x4_t px = vld4q_u8(in + x * 4);
         neon_unpremultiply_16(&px);
@@ -2338,6 +2426,24 @@ tobilevel(Imaging imOut, Imaging imIn) {
 #if defined(_MSC_VER)
 #pragma optimize("", on)
 #endif
+
+/* Row functions that premultiply a 4-byte RGBA or LA image's pixels by
+   alpha, or remove that, as the RGBa and La conversions do, for the resize
+   of those images (Resample.c). Removing it works in place. NULL for other
+   modes. */
+ImagingShuffler
+ImagingFindPremultiply(ModeID mode) {
+    return mode == IMAGING_MODE_RGBA ? rgbA2rgba
+           : mode == IMAGING_MODE_LA ? lA2la
+                                     : NULL;
+}
+
+ImagingShuffler
+ImagingFindUnpremultiply(ModeID mode) {
+    return mode == IMAGING_MODE_RGBA ? rgba2rgbA
+           : mode == IMAGING_MODE_LA ? la2lA
+                                     : NULL;
+}
 
 /* ------------------- */
 /* Conversion handlers */

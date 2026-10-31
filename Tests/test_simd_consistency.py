@@ -198,3 +198,54 @@ def test_point_table(mode: str) -> None:
         out = im.point(table).tobytes()
         src = im.tobytes()
         assert out == bytes(table[(i % bands) * 256 + v] for i, v in enumerate(src))
+
+
+def _alpha_image(mode: str, size: tuple[int, int]) -> Image.Image:
+    # every alpha value, with colours both below and above it
+    rnd = random.Random(size[0] * 7 + size[1])
+    n = size[0] * size[1] * 4
+    data = bytes(rnd.randrange(256) if i % 4 != 3 else (i // 4) % 256 for i in range(n))
+    return Image.frombytes("RGBA", size, data).convert(mode)
+
+
+@pytest.mark.parametrize("mode", ("RGBA", "LA"))
+@pytest.mark.parametrize(
+    "resample",
+    (
+        Image.Resampling.BOX,
+        Image.Resampling.BILINEAR,
+        Image.Resampling.HAMMING,
+        Image.Resampling.BICUBIC,
+        Image.Resampling.LANCZOS,
+        Image.Resampling.MKS2013,
+        Image.Resampling.MKS2021,
+    ),
+)
+@pytest.mark.parametrize(
+    "size, box",
+    (
+        ((61, 37), None),  # upscale: horizontal, then vertical
+        ((13, 9), None),  # downscale
+        ((37, 5), None),  # vertical first, a 2x larger height reduction
+        ((23, 17), None),  # horizontal only
+        ((41, 11), None),  # vertical only
+        ((10, 6), (3, 2, 13, 8)),  # an integer box of the output's size: a crop
+        ((12, 7), (2.5, 1.25, 30.5, 15.75)),
+    ),
+)
+def test_resize_alpha_matches_premultiplied_conversions(
+    mode: str,
+    resample: Image.Resampling,
+    size: tuple[int, int],
+    box: tuple[float, float, float, float] | None,
+) -> None:
+    # RGBA and LA images are premultiplied inside the resize passes; the
+    # pixels must be those of converting, resizing and converting back
+    im = _alpha_image(mode, (41, 17))
+    premultiplied = im.convert({"LA": "La", "RGBA": "RGBa"}[mode])
+    with Image.fast_mode(False):
+        for reducing_gap in (None, 2.0):
+            expected = premultiplied.resize(size, resample, box, reducing_gap)
+            result = im.resize(size, resample, box, reducing_gap)
+            assert result.mode == mode
+            assert result.tobytes() == expected.convert(mode).tobytes()

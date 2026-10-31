@@ -398,7 +398,21 @@ RankFilterMedian5_u8(Imaging imOut, Imaging im, int margin, int ps) {
 static void
 RankMinMaxLine(UINT8 *restrict out, const UINT8 **src, int count, int n, int is_max) {
     int x = 0, j;
-    if (is_max) {
+    if (count == 3) {
+        /* the 3x3 filters, without the loop over the sources */
+        const UINT8 *s0 = src[0], *s1 = src[1], *s2 = src[2];
+        if (is_max) {
+            for (; x + RANK_VEC <= n; x += RANK_VEC) {
+                rank_vec v = RANK_VMAX(RANK_LOAD(s0 + x), RANK_LOAD(s1 + x));
+                RANK_STORE(out + x, RANK_VMAX(v, RANK_LOAD(s2 + x)));
+            }
+        } else {
+            for (; x + RANK_VEC <= n; x += RANK_VEC) {
+                rank_vec v = RANK_VMIN(RANK_LOAD(s0 + x), RANK_LOAD(s1 + x));
+                RANK_STORE(out + x, RANK_VMIN(v, RANK_LOAD(s2 + x)));
+            }
+        }
+    } else if (is_max) {
         for (; x + RANK_VEC <= n; x += RANK_VEC) {
             rank_vec v = RANK_LOAD(src[0] + x);
             for (j = 1; j < count; j++) {
@@ -435,45 +449,60 @@ RankFilterMinMax_u8(
     Imaging imOut, Imaging im, int size, int is_max, int margin, int ps
 ) {
     int xsize = imOut->xsize * ps, ysize = imOut->ysize;
+    /* with a margin, the bytes at each end whose neighbours are partly
+       outside the row: edge pixels repeated, as expanded */
+    int edge = margin * ps < xsize / 2 ? margin * ps : (xsize + 1) / 2;
+    int inner = xsize - 2 * edge;
     int y, k, j;
-    UINT8 *ring, *padded = NULL;
+    UINT8 *ring;
     const UINT8 **src;
     if (xsize == 0 || ysize == 0) {
         return 1;
     }
     ring = malloc((size_t)xsize * size);
     src = malloc(size * sizeof(*src));
-    if (margin) {
-        padded = malloc((size_t)xsize + 2 * margin * ps);
-    }
-    if (!ring || !src || (margin && !padded)) {
+    if (!ring || !src) {
         free(ring);
         free(src);
-        free(padded);
         return 0;
     }
 
 /* Ring slot k holds the row result of source row k - margin, clipped to
-   the image; k - margin is the source row of window row k. */
+   the image; k - margin is the source row of window row k. Without a
+   margin, the source rows are expanded and the row results start at
+   their first pixel; with one, the inner bytes read the row itself and
+   the edges clamp the pixel index. */
 #define RANK_SLOT(k) (ring + (size_t)((k) % size) * xsize)
-#define RANK_HROW(op, k)                                                       \
-    do {                                                                       \
-        int r_ = (k) - margin;                                                 \
-        const UINT8 *in = (UINT8 *)im->image                                   \
-                              [r_ < 0           ? 0                            \
-                               : r_ < im->ysize ? r_                           \
-                                                : im->ysize - 1];              \
-        UINT8 *restrict row = RANK_SLOT(k);                                    \
-        if (margin) {                                                          \
-            /* the row with its edge pixels repeated, as expanded */           \
-            RankFillPixels(padded, in, ps, margin * ps);                       \
-            memcpy(padded + margin * ps, in, xsize);                           \
-            RankFillPixels(                                                    \
-                padded + margin * ps + xsize, in + xsize - ps, ps, margin * ps \
-            );                                                                 \
-            in = padded;                                                       \
-        }                                                                      \
-        RANK_LINE(op, row, in + j * ps);                                       \
+#define RANK_HROW(op, k)                                          \
+    do {                                                          \
+        int r_ = (k) - margin;                                    \
+        const UINT8 *in = (UINT8 *)im->image                      \
+                              [r_ < 0           ? 0               \
+                               : r_ < im->ysize ? r_              \
+                                                : im->ysize - 1]; \
+        UINT8 *restrict row = RANK_SLOT(k);                       \
+        if (margin) {                                             \
+            int x_, last_ = imOut->xsize - 1;                     \
+            if (inner > 0) {                                      \
+                RANK_LINE(op, row + edge, in + j * ps, inner);    \
+            }                                                     \
+            for (x_ = 0; x_ < xsize; x_++) {                      \
+                int p_ = x_ / ps - margin, c_ = x_ % ps;          \
+                UINT8 v_;                                         \
+                if (x_ == edge && inner > 0) {                    \
+                    x_ += inner - 1;                              \
+                    continue;                                     \
+                }                                                 \
+                v_ = in[(p_ < 0 ? 0 : p_) * ps + c_];             \
+                for (j = 1; j < size; j++) {                      \
+                    int q_ = p_ + j > last_ ? last_ : p_ + j;     \
+                    v_ = op(v_, in[(q_ < 0 ? 0 : q_) * ps + c_]); \
+                }                                                 \
+                row[x_] = v_;                                     \
+            }                                                     \
+        } else {                                                  \
+            RANK_LINE(op, row, in + j * ps, xsize);               \
+        }                                                         \
     } while (0)
 #define RANK_MINMAX(op)                                 \
     for (k = 0; k < size - 1; k++) {                    \
@@ -482,25 +511,25 @@ RankFilterMinMax_u8(
     for (y = 0; y < ysize; y++) {                       \
         UINT8 *restrict out = (UINT8 *)imOut->image[y]; \
         RANK_HROW(op, y + size - 1);                    \
-        RANK_LINE(op, out, RANK_SLOT(y + j));           \
+        RANK_LINE(op, out, RANK_SLOT(y + j), xsize);    \
     }
 #if defined(RANK_VEC)
-/* dst = op of source(j) for j = 0 .. size - 1 */
-#define RANK_LINE(op, dst, source) \
-    for (j = 0; j < size; j++) {   \
-        src[j] = (source);         \
-    }                              \
-    RankMinMaxLine(dst, src, size, xsize, is_max);
+/* dst = op of source(j) for j = 0 .. size - 1, n bytes */
+#define RANK_LINE(op, dst, source, n) \
+    for (j = 0; j < size; j++) {      \
+        src[j] = (source);            \
+    }                                 \
+    RankMinMaxLine(dst, src, size, n, is_max);
 #else
-#define RANK_LINE(op, dst, source)                                          \
+#define RANK_LINE(op, dst, source, n)                                       \
     j = 0;                                                                  \
-    memcpy(dst, (source), xsize);                                           \
+    memcpy(dst, (source), n);                                               \
     for (j = 1; j < size; j++) {                                            \
         /* restrict: without it, GCC's cost model leaves the loop scalar */ \
         /* rather than check that the rows don't overlap */                 \
         const UINT8 *restrict s_ = (source);                                \
         UINT8 *restrict d_ = (dst);                                         \
-        for (int x_ = 0; x_ < xsize; x_++) {                                \
+        for (int x_ = 0; x_ < (n); x_++) {                                  \
             d_[x_] = op(d_[x_], s_[x_]);                                    \
         }                                                                   \
     }
@@ -521,7 +550,6 @@ RankFilterMinMax_u8(
 
     free(ring);
     free(src);
-    free(padded);
     return 1;
 }
 

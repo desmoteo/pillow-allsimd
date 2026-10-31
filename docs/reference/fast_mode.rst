@@ -86,13 +86,14 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
        YCbCr → RGB
      - JPEG's formulas with 14-bit coefficients and one rounding, in place
        of tables that floor each term
-     - to YCbCr: 1.5x, 2.2x; to RGB: 1.3x, 1.7x
+     - to YCbCr: 1.5x, 2.2x; to RGB: 1.3x, 2.6x
      - at most 1 level; against the float formulas 0.3% and 0.06% of values
        off by one, against 47% and 32% for the exact result
    * - :py:meth:`~PIL.Image.Image.convert` RGB, RGBA, RGBX → HSV
-     - the same formulas, truncated exactly with one division in 32-bit
-       floats per channel
-     - 2.9x, 2.0x
+     - the same formulas, truncated exactly: one division in 32-bit floats
+       per channel (arm64: for the hue, with the saturation from a table of
+       its 65,536 values)
+     - 2.9x, 3.3x
      - hue 1 above the exact result for 0.3% of colours; saturation and value
        the same
    * - :py:meth:`~PIL.Image.Image.transform` (affine, extent, perspective,
