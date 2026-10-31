@@ -226,6 +226,10 @@ clip8(int in, int precision) {
 }
 
 #include "ResampleSIMDHorizontalConv.c"
+/* again, with 16-bit results for fast mode (ResampleFast.c) */
+#define RESAMPLE_OUT16
+#include "ResampleSIMDHorizontalConv.c"
+#undef RESAMPLE_OUT16
 #include "ResampleSIMDVerticalConv.c"
 #include "ResampleSIMD32bpc.c"
 
@@ -872,6 +876,8 @@ _ImagingResampleVertical_32bpc(
     ImagingSectionLeave(&cookie);
 }
 
+#include "ResampleFast.c"
+
 typedef void (*ResampleFunction)(
     Imaging imOut,
     Imaging imIn,
@@ -1024,6 +1030,7 @@ ImagingResampleInner(
     ImagingShuffler premultiply = NULL, unpremultiply = NULL;
 
     int i, second_pass, need_horizontal, need_vertical, error = 0;
+    int fast = ImagingGetFast() & IMAGING_FAST_ALL, fast_done = 0;
     int ybox_first, ybox_last;
     int ksize_horiz = 0, ksize_vert = 0;
     int *bounds_horiz, *bounds_vert;
@@ -1085,6 +1092,33 @@ ImagingResampleInner(
         ImagingDelete(imIn);                                    \
     }                                                           \
     imIn = imTemp;
+
+    /* Fast mode: 8-bit images with 4-byte pixels, the passes fused and the
+       vertical one in 16-bit lanes (ResampleFast.c), unless its sums could
+       overflow */
+    if (fast && horizontal_first && need_vertical && imIn->image32 &&
+        imIn->type == IMAGING_TYPE_UINT8 && imIn->pixelsize == 4 &&
+        ResampleHorizontal == _ImagingResampleHorizontal_8bpc) {
+        fast_done = resample_fast8(
+            &imOut,
+            imIn,
+            xsize,
+            ysize,
+            need_horizontal,
+            ksize_horiz,
+            bounds_horiz,
+            kk_horiz,
+            ksize_vert,
+            bounds_vert,
+            kk_vert,
+            need_horizontal ? ybox_first : 0,
+            alpha ? ImagingFindPremultiply(imIn->mode) : NULL,
+            alpha ? ImagingFindUnpremultiply(imIn->mode) : NULL
+        );
+        if (fast_done) {
+            goto end;
+        }
+    }
 
     if (alpha) {
         premultiply = ImagingFindPremultiply(imIn->mode);
@@ -1182,6 +1216,9 @@ end:
     if (ksize_vert) {
         free(bounds_vert);
         free(kk_vert);
+    }
+    if (fast_done) {
+        return imOut;
     }
     if (error) {
         return NULL;

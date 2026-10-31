@@ -502,6 +502,39 @@ def _(upd: Update) -> None:
         Image.set_fast(previous)
 
 
+@section("fast: resize")
+def _(upd: Update) -> None:
+    # 4-byte images: the fused passes, 16-bit vertical products
+    # (ResampleFast.c), premultiplied for RGBA and LA
+    if not hasattr(Image, "set_fast"):
+        return
+    previous = Image.get_fast()
+    Image.set_fast(True)
+    try:
+        for mode in ("RGB", "RGBA", "LA", "CMYK"):
+            for w, h in ((1, 1), (3, 2), (17, 9), (67, 23), (203, 71)):
+                im = noise(mode, (w, h), w + 3 * h)
+                for r in (
+                    R.BOX,
+                    R.BILINEAR,
+                    R.HAMMING,
+                    R.BICUBIC,
+                    R.LANCZOS,
+                    R.MKS2013,
+                    R.MKS2021,
+                ):
+                    for size in (
+                        (w * 2 + 3, h * 3 + 1),
+                        (max(1, w // 3), max(1, h // 2)),
+                        (w, h + 4),
+                    ):
+                        upd(im.resize(size, r).tobytes())
+                    box = (0.5, 0.25, w - 0.25, h - 0.5)
+                    upd(im.resize((7, 5), r, box=box).tobytes())
+    finally:
+        Image.set_fast(previous)
+
+
 @section("resize 8-bit")
 def _(upd: Update) -> None:
     for mode in ("L", "LA", "RGB"):

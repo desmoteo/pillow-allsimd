@@ -147,7 +147,8 @@ Fast mode is on by default: some operations use faster kernels whose
 results differ from Pillow's by a few levels at most and are the same on
 every build and architecture (so far the Gaussian blur, 3.3x at radius 1,
 RGB ↔ YCbCr, RGB → HSV, the affine, perspective and quad transforms and
-rotate(), blend() and large downscales). The other operations follow
+rotate(), blend(), resize() of RGB, RGBA and other 4-byte images, and
+large downscales). The other operations follow
 Pillow's arithmetic, or an integer form of it that rounds differently by
 one level at most in a few places (resize, RGB → L). Exact mode, with
 `PILLOW_ALLSIMD_FAST=0` or `Image.set_fast(False)`, does that for every

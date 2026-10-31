@@ -738,11 +738,13 @@ class TestCoreResample16bpc:
 def test_l_matches_rgb_band(
     resample: Image.Resampling, size: tuple[int, int], new_size: tuple[int, int]
 ) -> None:
-    # 1-byte and 4-byte images have separate kernels with the same
-    # arithmetic per channel. Covers row strips and partial vectors.
-    im = hopper("L").resize(size)
-    expected = Image.merge("RGB", (im, im, im)).resize(new_size, resample)
-    assert_image_equal(im.resize(new_size, resample), expected.getchannel(0))
+    # 1-byte and 4-byte images have separate exact kernels with the same
+    # arithmetic per channel. Covers row strips and partial vectors. (Fast
+    # mode has a resize kernel for 4-byte images only.)
+    with Image.fast_mode(False):
+        im = hopper("L").resize(size)
+        expected = Image.merge("RGB", (im, im, im)).resize(new_size, resample)
+        assert_image_equal(im.resize(new_size, resample), expected.getchannel(0))
 
 
 @pytest.mark.parametrize("mode", ("F", "I", "I;16", "I;16B"))

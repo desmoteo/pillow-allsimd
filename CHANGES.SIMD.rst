@@ -197,6 +197,12 @@ Based on Pillow 13.0.0
   1.4x NEON)
 - Box blur radii 1 to 4 without running sums: the sum's sources unrolled
   per radius (radius 2 RGB: 1.46x AVX2 at -O3)
+- Fast mode: resize() of 8-bit images with 4-byte pixels fuses the two
+  passes through a ring of rows, keeps the horizontal sums to 2^-6 levels
+  and multiplies in 16 bits in the vertical pass (pmulhrsw, vqrdmulh): within
+  1 level of the exact result and closer to a float resize; upscales 1.15x
+  to 1.29x (x86) and 1.29x to 1.46x (arm64), downscales to 1.18x on arm64
+  and within 4% on x86. The same pixels on every build
 
 Build
 

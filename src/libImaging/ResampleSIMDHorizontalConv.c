@@ -1,17 +1,47 @@
+/* Included twice by Resample.c: as is, the exact kernels, with 8-bit
+   results; with RESAMPLE_OUT16 defined, the kernels for fast mode's resize
+   (ResampleFast.c), whose results keep 6 more bits. Those are called with
+   coefs_precision - 6, so they round there, and RH_PACK clips each pixel's
+   four 16-bit values to 0 .. 255 * 2^6 and stores them doubled in a 64-bit
+   word. The sums are the same integers. */
+#if defined(RESAMPLE_OUT16)
+#define RH(name) name##_16
+#define RH_OUT uint64_t
+#else
+#define RH(name) name
+#define RH_OUT UINT32
+#endif
+
+#if !defined(RESAMPLE_OUT16)
 /* Each output pixel is one sum over the whole kernel, a chain of dependent
    additions, so these kernels use mm_madd_add and not mm_dpwssd: vpdpwssd
    (AVX-VNNI) would put its multiply in the chain, about 5 cycles per tap
    instead of 1, which made shrinks with long kernels 1.5x slower than AVX2
    (2560x1600 to 26x16). */
+#endif
 
 #if defined(IMAGING_SIMD_SSE4)
 
+/* Four 16-bit values (the low half of v, after packs_epi32) as stored */
+#if defined(RESAMPLE_OUT16)
+static inline uint64_t
+RH(rh_pack_sse)(__m128i v) {
+    uint64_t r;
+    v = _mm_min_epi16(_mm_max_epi16(v, _mm_setzero_si128()), _mm_set1_epi16(255 << 6));
+    _mm_storel_epi64((__m128i *)&r, _mm_add_epi16(v, v));
+    return r;
+}
+#define RH_PACK_SSE(v) RH(rh_pack_sse)(v)
+#else
+#define RH_PACK_SSE(v) _mm_cvtsi128_si32(_mm_packus_epi16(v, v))
+#endif
+
 void
-ImagingResampleHorizontalConvolution8u4x(
-    UINT32 *restrict lineOut0,
-    UINT32 *restrict lineOut1,
-    UINT32 *restrict lineOut2,
-    UINT32 *restrict lineOut3,
+RH(ImagingResampleHorizontalConvolution8u4x)(
+    RH_OUT *restrict lineOut0,
+    RH_OUT *restrict lineOut1,
+    RH_OUT *restrict lineOut2,
+    RH_OUT *restrict lineOut3,
     UINT32 *restrict lineIn0,
     UINT32 *restrict lineIn1,
     UINT32 *restrict lineIn2,
@@ -338,12 +368,19 @@ ImagingResampleHorizontalConvolution8u4x(
             sss1 = _mm256_srai_epi32(sss1, coefs_precision);
             sss0 = _mm256_packs_epi32(sss0, zero);
             sss1 = _mm256_packs_epi32(sss1, zero);
+#if defined(RESAMPLE_OUT16)
+            lineOut0[xx] = RH_PACK_SSE(_mm256_extracti128_si256(sss0, 0));
+            lineOut1[xx] = RH_PACK_SSE(_mm256_extracti128_si256(sss0, 1));
+            lineOut2[xx] = RH_PACK_SSE(_mm256_extracti128_si256(sss1, 0));
+            lineOut3[xx] = RH_PACK_SSE(_mm256_extracti128_si256(sss1, 1));
+#else
             sss0 = _mm256_packus_epi16(sss0, zero);
             sss1 = _mm256_packus_epi16(sss1, zero);
             lineOut0[xx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(sss0, 0));
             lineOut1[xx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(sss0, 1));
             lineOut2[xx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(sss1, 0));
             lineOut3[xx] = _mm_cvtsi128_si32(_mm256_extracti128_si256(sss1, 1));
+#endif
         }
 #else
         {
@@ -448,18 +485,18 @@ ImagingResampleHorizontalConvolution8u4x(
             sss1 = _mm_packs_epi32(sss1, sss1);
             sss2 = _mm_packs_epi32(sss2, sss2);
             sss3 = _mm_packs_epi32(sss3, sss3);
-            lineOut0[xx] = _mm_cvtsi128_si32(_mm_packus_epi16(sss0, sss0));
-            lineOut1[xx] = _mm_cvtsi128_si32(_mm_packus_epi16(sss1, sss1));
-            lineOut2[xx] = _mm_cvtsi128_si32(_mm_packus_epi16(sss2, sss2));
-            lineOut3[xx] = _mm_cvtsi128_si32(_mm_packus_epi16(sss3, sss3));
+            lineOut0[xx] = RH_PACK_SSE(sss0);
+            lineOut1[xx] = RH_PACK_SSE(sss1);
+            lineOut2[xx] = RH_PACK_SSE(sss2);
+            lineOut3[xx] = RH_PACK_SSE(sss3);
         }
 #endif
     }
 }
 
 void
-ImagingResampleHorizontalConvolution8u(
-    UINT32 *restrict lineOut,
+RH(ImagingResampleHorizontalConvolution8u)(
+    RH_OUT *restrict lineOut,
     UINT32 *restrict lineIn,
     int xsize,
     int *xbounds,
@@ -833,20 +870,28 @@ ImagingResampleHorizontalConvolution8u(
         }
         sss = _mm_srai_epi32(sss, coefs_precision);
         sss = _mm_packs_epi32(sss, sss);
-        lineOut[xx] = _mm_cvtsi128_si32(_mm_packus_epi16(sss, sss));
+        lineOut[xx] = RH_PACK_SSE(sss);
     }
 }
 
 #elif defined(IMAGING_SIMD_NEON)
 
 /* Shifts and saturates four 32-bit sums to bytes, as the SSE4 code does
-   with srai, packs_epi32 and packus_epi16. */
-static inline UINT32
-neon_resample_pack(int32x4_t sss, int coefs_precision) {
+   with srai, packs_epi32 and packus_epi16 (or, with RESAMPLE_OUT16, to the
+   doubled 16-bit values RH_PACK_SSE stores). */
+static inline RH_OUT
+RH(neon_resample_pack)(int32x4_t sss, int coefs_precision) {
     int16x4_t s16 = vqmovn_s32(vshlq_s32(sss, vdupq_n_s32(-coefs_precision)));
+#if defined(RESAMPLE_OUT16)
+    s16 = vmin_s16(vmax_s16(s16, vdup_n_s16(0)), vdup_n_s16(255 << 6));
+    return vget_lane_u64(vreinterpret_u64_s16(vadd_s16(s16, s16)), 0);
+#else
     uint8x8_t u8 = vqmovun_s16(vcombine_s16(s16, s16));
     return vget_lane_u32(vreinterpret_u32_u8(u8), 0);
+#endif
 }
+
+#if !defined(RESAMPLE_OUT16)
 
 /* Adds sum(pixel[x] * k[x]) for one output pixel of a 4-byte row to sss. */
 static inline int32x4_t
@@ -878,13 +923,14 @@ neon_resample_horiz_px(const UINT8 *in, const INT16 *k, int xmax, int32x4_t sss)
     }
     return vaddq_s32(sss, sss1);
 }
+#endif
 
 void
-ImagingResampleHorizontalConvolution8u4x(
-    UINT32 *restrict lineOut0,
-    UINT32 *restrict lineOut1,
-    UINT32 *restrict lineOut2,
-    UINT32 *restrict lineOut3,
+RH(ImagingResampleHorizontalConvolution8u4x)(
+    RH_OUT *restrict lineOut0,
+    RH_OUT *restrict lineOut1,
+    RH_OUT *restrict lineOut2,
+    RH_OUT *restrict lineOut3,
     UINT32 *restrict lineIn0,
     UINT32 *restrict lineIn1,
     UINT32 *restrict lineIn2,
@@ -903,19 +949,19 @@ ImagingResampleHorizontalConvolution8u4x(
         xmin = xbounds[xx * 2 + 0];
         xmax = xbounds[xx * 2 + 1];
         k = &kk[xx * kmax];
-        lineOut0[xx] = neon_resample_pack(
+        lineOut0[xx] = RH(neon_resample_pack)(
             neon_resample_horiz_px((UINT8 *)&lineIn0[xmin], k, xmax, initial),
             coefs_precision
         );
-        lineOut1[xx] = neon_resample_pack(
+        lineOut1[xx] = RH(neon_resample_pack)(
             neon_resample_horiz_px((UINT8 *)&lineIn1[xmin], k, xmax, initial),
             coefs_precision
         );
-        lineOut2[xx] = neon_resample_pack(
+        lineOut2[xx] = RH(neon_resample_pack)(
             neon_resample_horiz_px((UINT8 *)&lineIn2[xmin], k, xmax, initial),
             coefs_precision
         );
-        lineOut3[xx] = neon_resample_pack(
+        lineOut3[xx] = RH(neon_resample_pack)(
             neon_resample_horiz_px((UINT8 *)&lineIn3[xmin], k, xmax, initial),
             coefs_precision
         );
@@ -923,8 +969,8 @@ ImagingResampleHorizontalConvolution8u4x(
 }
 
 void
-ImagingResampleHorizontalConvolution8u(
-    UINT32 *restrict lineOut,
+RH(ImagingResampleHorizontalConvolution8u)(
+    RH_OUT *restrict lineOut,
     UINT32 *restrict lineIn,
     int xsize,
     int *xbounds,
@@ -938,7 +984,7 @@ ImagingResampleHorizontalConvolution8u(
     for (xx = 0; xx < xsize; xx++) {
         xmin = xbounds[xx * 2 + 0];
         xmax = xbounds[xx * 2 + 1];
-        lineOut[xx] = neon_resample_pack(
+        lineOut[xx] = RH(neon_resample_pack)(
             neon_resample_horiz_px(
                 (UINT8 *)&lineIn[xmin], &kk[xx * kmax], xmax, initial
             ),
@@ -951,10 +997,24 @@ ImagingResampleHorizontalConvolution8u(
 
 /* Portable version of the kernels above, with the same arithmetic:
    16-bit coefficients, 32-bit accumulators, rounding by adding half. */
+#if defined(RESAMPLE_OUT16)
+static inline INT16
+RH(rh_clip)(int in, int precision) {
+    in >>= precision;
+    return (INT16)(2 * (in < 0 ? 0 : in > 255 << 6 ? 255 << 6 : in));
+}
+#define RH_CLIP(in, precision) RH(rh_clip)(in, precision)
+#define RH_ELEM INT16
+#define RH_FULL (255 << 7)
+#else
+#define RH_CLIP(in, precision) clip8(in, precision)
+#define RH_ELEM UINT8
+#define RH_FULL 255
+#endif
 
 void
-ImagingResampleHorizontalConvolution8u(
-    UINT32 *restrict lineOut,
+RH(ImagingResampleHorizontalConvolution8u)(
+    RH_OUT *restrict lineOut,
     UINT32 *restrict lineIn,
     int xsize,
     int *xbounds,
@@ -967,7 +1027,8 @@ ImagingResampleHorizontalConvolution8u(
 
     for (xx = 0; xx < xsize; xx++) {
         int ss0, ss1, ss2, ss3;
-        UINT8 *in, *out;
+        UINT8 *in;
+        RH_ELEM *out;
         xmin = xbounds[xx * 2 + 0];
         xmax = xbounds[xx * 2 + 1];
         k = &kk[xx * kmax];
@@ -979,20 +1040,22 @@ ImagingResampleHorizontalConvolution8u(
             ss2 += in[x * 4 + 2] * k[x];
             ss3 += in[x * 4 + 3] * k[x];
         }
-        out = (UINT8 *)&lineOut[xx];
-        out[0] = clip8(ss0, coefs_precision);
-        out[1] = clip8(ss1, coefs_precision);
-        out[2] = clip8(ss2, coefs_precision);
-        out[3] = clip8(ss3, coefs_precision);
+        out = (RH_ELEM *)&lineOut[xx];
+        out[0] = RH_CLIP(ss0, coefs_precision);
+        out[1] = RH_CLIP(ss1, coefs_precision);
+        out[2] = RH_CLIP(ss2, coefs_precision);
+        out[3] = RH_CLIP(ss3, coefs_precision);
     }
 }
 
 /* The same for 3-band images: the fourth byte is padding, so it isn't
    summed (a quarter of the work), and gets 255 like decoded RGB pixels. */
+#if !defined(RESAMPLE_HORIZONTAL_3BANDS_PORTABLE)
 #define RESAMPLE_HORIZONTAL_3BANDS_PORTABLE
+#endif
 static void
-ImagingResampleHorizontalConvolution8u3(
-    UINT32 *restrict lineOut,
+RH(ImagingResampleHorizontalConvolution8u3)(
+    RH_OUT *restrict lineOut,
     UINT32 *restrict lineIn,
     int xsize,
     int *xbounds,
@@ -1005,7 +1068,8 @@ ImagingResampleHorizontalConvolution8u3(
 
     for (xx = 0; xx < xsize; xx++) {
         int ss0, ss1, ss2;
-        UINT8 *in, *out;
+        UINT8 *in;
+        RH_ELEM *out;
         xmin = xbounds[xx * 2 + 0];
         xmax = xbounds[xx * 2 + 1];
         k = &kk[xx * kmax];
@@ -1016,20 +1080,20 @@ ImagingResampleHorizontalConvolution8u3(
             ss1 += in[x * 4 + 1] * k[x];
             ss2 += in[x * 4 + 2] * k[x];
         }
-        out = (UINT8 *)&lineOut[xx];
-        out[0] = clip8(ss0, coefs_precision);
-        out[1] = clip8(ss1, coefs_precision);
-        out[2] = clip8(ss2, coefs_precision);
-        out[3] = 255;
+        out = (RH_ELEM *)&lineOut[xx];
+        out[0] = RH_CLIP(ss0, coefs_precision);
+        out[1] = RH_CLIP(ss1, coefs_precision);
+        out[2] = RH_CLIP(ss2, coefs_precision);
+        out[3] = RH_FULL;
     }
 }
 
 void
-ImagingResampleHorizontalConvolution8u4x(
-    UINT32 *restrict lineOut0,
-    UINT32 *restrict lineOut1,
-    UINT32 *restrict lineOut2,
-    UINT32 *restrict lineOut3,
+RH(ImagingResampleHorizontalConvolution8u4x)(
+    RH_OUT *restrict lineOut0,
+    RH_OUT *restrict lineOut1,
+    RH_OUT *restrict lineOut2,
+    RH_OUT *restrict lineOut3,
     UINT32 *restrict lineIn0,
     UINT32 *restrict lineIn1,
     UINT32 *restrict lineIn2,
@@ -1040,22 +1104,26 @@ ImagingResampleHorizontalConvolution8u4x(
     int kmax,
     int coefs_precision
 ) {
-    ImagingResampleHorizontalConvolution8u(
+    RH(ImagingResampleHorizontalConvolution8u)(
         lineOut0, lineIn0, xsize, xbounds, kk, kmax, coefs_precision
     );
-    ImagingResampleHorizontalConvolution8u(
+    RH(ImagingResampleHorizontalConvolution8u)(
         lineOut1, lineIn1, xsize, xbounds, kk, kmax, coefs_precision
     );
-    ImagingResampleHorizontalConvolution8u(
+    RH(ImagingResampleHorizontalConvolution8u)(
         lineOut2, lineIn2, xsize, xbounds, kk, kmax, coefs_precision
     );
-    ImagingResampleHorizontalConvolution8u(
+    RH(ImagingResampleHorizontalConvolution8u)(
         lineOut3, lineIn3, xsize, xbounds, kk, kmax, coefs_precision
     );
 }
 
+#undef RH_CLIP
+#undef RH_ELEM
+#undef RH_FULL
 #endif
 
+#if !defined(RESAMPLE_OUT16)
 /* 1-byte pixels. Taps go 8, 4 and 2 at a time as 16-bit products summed
    into 32 bits, then one at a time. Integer sums don't depend on the order,
    so the results match the scalar code. */
@@ -1268,3 +1336,8 @@ ImagingResampleHorizontalConvolution1u(
     );
 }
 #endif
+#endif /* !RESAMPLE_OUT16: the 1-byte kernels */
+
+#undef RH_PACK_SSE
+#undef RH_OUT
+#undef RH

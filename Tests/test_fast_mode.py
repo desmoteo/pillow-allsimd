@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import threading
+from array import array
 
 import pytest
 
@@ -767,7 +768,8 @@ def test_downscale_reducing_gap(
         size = scaled(shape, k)
         with Image.fast_mode():
             fast = im.resize(size, resample)
-        assert fast.tobytes() == im.resize(size, resample, reducing_gap=3.0).tobytes()
+            reduced = im.resize(size, resample, reducing_gap=3.0)
+        assert fast.tobytes() == reduced.tobytes()
 
 
 @shapes
@@ -791,13 +793,15 @@ def test_downscale_close_to_exact(
 
 
 @shapes
-def test_downscale_small_factors_exact(shape: tuple[int, int]) -> None:
-    # below 6x, reducing_gap 3.0 doesn't reduce
+def test_downscale_small_factors_no_reduce(shape: tuple[int, int]) -> None:
+    # below 6x, reducing_gap 3.0 doesn't reduce: the same as a gap too large
+    # to reduce
     im = photo("RGB", scaled(shape, 4))
     for size in (scaled(shape, 2), scaled(shape, 0.8), (shape[0] * 4, shape[1])):
         with Image.fast_mode():
             fast = im.resize(size, Image.Resampling.LANCZOS)
-        assert fast.tobytes() == im.resize(size, Image.Resampling.LANCZOS).tobytes()
+            unreduced = im.resize(size, Image.Resampling.LANCZOS, reducing_gap=1000.0)
+        assert fast.tobytes() == unreduced.tobytes()
 
 
 @shapes
@@ -811,15 +815,19 @@ def test_downscale_small_factors_exact(shape: tuple[int, int]) -> None:
         {"resample": Image.Resampling.HAMMING},
     ),
 )
-def test_downscale_other_arguments_exact(
+def test_downscale_other_arguments_no_reduce(
     kwargs: dict[str, object], shape: tuple[int, int]
 ) -> None:
+    # an explicit reducing_gap is kept, and the shorter filters don't reduce
     im = photo("RGB", scaled(shape, 8))
     size = scaled(shape, 0.5)
-    exact = im.resize(size, **kwargs)  # type: ignore[arg-type]
+    gap = kwargs.get("reducing_gap", 1000.0)
     with Image.fast_mode():
         fast = im.resize(size, **kwargs)  # type: ignore[arg-type]
-    assert fast.tobytes() == exact.tobytes()
+        expected = im.resize(
+            size, kwargs["resample"], reducing_gap=gap  # type: ignore[arg-type]
+        )
+    assert fast.tobytes() == expected.tobytes()
 
 
 @pytest.mark.parametrize("mode", ("I", "F"))
@@ -842,3 +850,141 @@ def test_downscale_i16_exact(shape: tuple[int, int]) -> None:
     with Image.fast_mode():
         fast = im.resize(size, Image.Resampling.LANCZOS)
     assert fast.tobytes() == exact.tobytes()
+
+
+# Resize (ResampleFast.c): images with 4-byte pixels, the exact horizontal
+# sums kept to 2^-6 levels, the vertical pass in rounded 16-bit products.
+
+RESIZE_FILTERS = (
+    Image.Resampling.BOX,
+    Image.Resampling.BILINEAR,
+    Image.Resampling.HAMMING,
+    Image.Resampling.BICUBIC,
+    Image.Resampling.LANCZOS,
+    Image.Resampling.MKS2013,
+    Image.Resampling.MKS2021,
+)
+
+
+def _resized(
+    im: Image.Image, size: tuple[int, int], resample: Image.Resampling, fast: bool
+) -> Image.Image:
+    with Image.fast_mode(fast):
+        return im.resize(size, resample)
+
+
+@shapes
+@pytest.mark.parametrize("mode", ("RGB", "RGBX", "CMYK", "LA", "RGBA"))
+@pytest.mark.parametrize("resample", RESIZE_FILTERS)
+def test_resize_close_to_exact(
+    mode: str, resample: Image.Resampling, shape: tuple[int, int]
+) -> None:
+    # within 1 level of the exact result, 2 for RGBA and LA compared
+    # premultiplied (as resized; the colour of a pixel with little alpha
+    # differs more once divided by it)
+    premultiplied = {"RGBA": "RGBa", "LA": "La"}.get(mode)
+    w, h = shape
+    sizes = [scaled(shape, k) for k in (2.3, 1.31, 0.7, 0.41)]
+    sizes += [(round(w * 0.6), round(h * 0.8)), (round(w * 0.3), round(h * 0.55))]
+    for im in images(mode, shape):
+        for size in sizes:
+            exact = _resized(im, size, resample, False)
+            fast = _resized(im, size, resample, True)
+            assert (fast.mode, fast.size) == (exact.mode, exact.size)
+            if premultiplied:
+                exact, fast = exact.convert(premultiplied), fast.convert(premultiplied)
+            largest, mean = _diff(fast, exact)
+            assert largest <= (2 if premultiplied else 1)
+            assert mean < 0.3
+
+
+def _float_resize(
+    im: Image.Image, size: tuple[int, int], resample: Image.Resampling
+) -> bytes:
+    # each band resized in floats, rounded and clipped once
+    bands = [
+        bytes(
+            min(255, max(0, math.floor(v + 0.5)))
+            for v in array("f", band.convert("F").resize(size, resample).tobytes())
+        )
+        for band in im.split()
+    ]
+    return bytes(b[i] for i in range(len(bands[0])) for b in bands)
+
+
+@shapes
+@pytest.mark.parametrize(
+    "resample",
+    (Image.Resampling.BILINEAR, Image.Resampling.BICUBIC, Image.Resampling.LANCZOS),
+)
+def test_resize_accuracy(resample: Image.Resampling, shape: tuple[int, int]) -> None:
+    # against a float resize, values off by one are a fifth as common as in
+    # the exact result at most, whose 8-bit intermediate rounds every pixel
+    im = photo("RGB", shape)
+    # an upscale, and a downscale the fast kernel takes: the height reduced
+    # less than twice as much as the width (else the vertical pass goes first)
+    for size in (scaled(shape, 2.3), (round(shape[0] * 0.6), round(shape[1] * 0.8))):
+        expected = _float_resize(im, size, resample)
+        fast = _resized(im, size, resample, True).tobytes()
+        exact = _resized(im, size, resample, False).tobytes()
+        fast_off = sum(a != b for a, b in zip(fast, expected))
+        exact_off = sum(a != b for a, b in zip(exact, expected))
+        assert fast_off * 5 < exact_off
+        # both clip the intermediate to 0 .. 255 at the filters' overshoots,
+        # which the float resize keeps
+        fast_max = max(abs(a - b) for a, b in zip(fast, expected))
+        assert fast_max <= max(abs(a - b) for a, b in zip(exact, expected)) + 1
+
+
+@shapes
+def test_resize_uses_the_fast_kernel(shape: tuple[int, int]) -> None:
+    im = noise("RGB", shape)
+    size = scaled(shape, 1.7)
+    bicubic = Image.Resampling.BICUBIC
+    assert (
+        _resized(im, size, bicubic, True).tobytes()
+        != _resized(im, size, bicubic, False).tobytes()
+    )
+
+
+@shapes
+@pytest.mark.parametrize("mode", ("L", "I", "F", "I;16"))
+def test_resize_other_modes_exact(mode: str, shape: tuple[int, int]) -> None:
+    im = noise(mode, shape)
+    for resample in (Image.Resampling.BILINEAR, Image.Resampling.LANCZOS):
+        for k in (2.3, 0.7):
+            size = scaled(shape, k)
+            assert (
+                _resized(im, size, resample, True).tobytes()
+                == _resized(im, size, resample, False).tobytes()
+            )
+
+
+@shapes
+def test_resize_one_pass_exact(shape: tuple[int, int]) -> None:
+    # the fast kernel needs the vertical pass after the horizontal one: a
+    # resize of the width only, or the height reduced far more than the
+    # width, keeps the exact passes
+    im = noise("RGB", shape)
+    w, h = shape
+    for size in ((w * 2 + 1, h), (w // 2, h), (w - 1, max(1, h // 4))):
+        assert (
+            _resized(im, size, Image.Resampling.BICUBIC, True).tobytes()
+            == _resized(im, size, Image.Resampling.BICUBIC, False).tobytes()
+        )
+
+
+@shapes
+@pytest.mark.parametrize("mode", ("RGBA", "LA"))
+def test_resize_alpha_matches_premultiplied_resize(
+    mode: str, shape: tuple[int, int]
+) -> None:
+    # premultiplied inside the fused passes, as when converting first
+    premultiplied = {"RGBA": "RGBa", "LA": "La"}[mode]
+    im = noise(mode, shape)
+    for resample in RESIZE_FILTERS:
+        size = scaled(shape, 1.6)
+        with Image.fast_mode():
+            fast = im.resize(size, resample)
+            expected = im.convert(premultiplied).resize(size, resample).convert(mode)
+        assert fast.tobytes() == expected.tobytes()
