@@ -9,8 +9,19 @@ AVX-VNNI) and arm64 (NEON). By default a fast mode trades a few levels of
 precision for speed in some operations; exact mode follows Pillow's
 arithmetic.
 
-Status: beta, built from source; see the repository for what is
-accelerated, how it is tested and the benchmarks.
+Status: beta. It is published as a source package and compiles on
+installation, so the libraries that `building Pillow from source
+<https://desmoteo.github.io/pillow-allsimd/installation/building-from-source.html>`_
+needs must be installed. It installs the ``PIL`` package: install your other
+packages first, then replace Pillow with it::
+
+    python3 -m pip uninstall -y pillow pillow-simd
+    python3 -m pip install -C simd=avx2 pillow-allsimd
+
+Without ``-C simd=...`` the build uses SSE4.1 on x86 and NEON on arm64;
+``avx2`` suits x86 CPUs since Intel Haswell and AMD Excavator, except some
+Pentium, Celeron and Atom models. See the repository for the other
+options, what is accelerated, how it is tested and the benchmarks.
 
 - `Pillow-AllSIMD repository and readme <https://github.com/desmoteo/pillow-allsimd>`_
 - `Documentation <https://desmoteo.github.io/pillow-allsimd/>`_

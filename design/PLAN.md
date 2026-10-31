@@ -46,7 +46,7 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       TestPyPI. Pillow's `wheels.yml` stays as it is (its publish jobs
       never run in a fork) and ignores `allsimd-*` tags; step 2 adds the
       arm64 wheels.
-- [ ] **You:** PyPI and TestPyPI accounts with two-factor login. Under
+- [x] (2026-11-03) **You:** PyPI and TestPyPI accounts with two-factor login. Under
       Publishing, add a pending publisher on each: project
       `pillow-allsimd`, owner `desmoteo`, repository `pillow-allsimd`,
       workflow `release.yml`, environment `release-pypi` on PyPI and
@@ -54,10 +54,12 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 - [x] (2026-11-02) GitHub environments `release-pypi` (tags `allsimd-*`
       only) and `release-testpypi` (branch `simd/pillow-13` only), each
       with you as required reviewer, so nothing uploads without a click.
-- [ ] Dry run to TestPyPI (`gh workflow run release.yml -R
+- [x] (2026-11-03: uploaded; installed and checked on the x86 laptop, SSE4.1
+      and `-C simd=avx2` builds, selftest and identical exact output; the
+      Jetson install is still to do) Dry run to TestPyPI (`gh workflow run release.yml -R
       desmoteo/pillow-allsimd --ref simd/pillow-13`, then approve); install
       from it on the x86 laptop and the Jetson.
-- [ ] Install instructions (README, `PyPI.rst`, `docs/allsimd.rst`):
+- [x] (2026-11-03) Install instructions (README, `PyPI.rst`, `docs/allsimd.rst`):
       `python3 -m pip install pillow-allsimd`, with `-C simd=...` passed
       through pip; and the `PIL` conflict. Packages that depend on Pillow
       (matplotlib, torchvision…) make pip install Pillow too, and the last
@@ -67,8 +69,10 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       neither Pillow's nor Pillow-SIMD's tags, both in this repo; never
       `git push --tags`), then approve the upload. The tag
       must match `src/PIL/_version.py`. A version number can't be reused
-      on PyPI, even after deleting it.
-- [ ] `CHANGES.SIMD.rst` entry for the first PyPI release.
+      on PyPI, even after deleting it. **The tagged commit's message must
+      not contain `[ci skip]`**: GitHub then skips the tag push's workflows
+      too (the first tag, on 0b0fa7ebc, started nothing).
+- [x] (2026-11-03) `CHANGES.SIMD.rst` entry for the first PyPI release.
 
 ### Step 2: arm64 wheels
 
