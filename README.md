@@ -35,7 +35,9 @@ For Pillow itself, please refer to its
 - Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson
   Orin): Pillow's test suite on every build (scalar, SSE4, AVX2, NEON),
   the SIMD consistency tests and per-kernel output hashes that compare the
-  builds (`checks/simd_hashes.py`).
+  builds (`checks/simd_hashes.py`). The portable build also passes the
+  suite on riscv64, ppc64le, s390x, armv7 and 32-bit x86, under QEMU
+  ([OTHER_ARCHITECTURES.md](OTHER_ARCHITECTURES.md)).
 - [API documentation][allsimd-docs] (Pillow's, with this fork's additions)
   and [benchmarks][allsimd-perf-page] against Pillow, Pillow-SIMD, OpenCV,
   libvips and ImageMagick.
@@ -138,7 +140,8 @@ faster with GCC 12 and 14 (not with GCC 11).
 The mode filter, histograms, `ImageChops.offset`, floodfill, polygon fills
 and text rendering (per-font caches of glyphs and advances) have faster
 portable C code on every architecture.
-Other architectures build the portable C code.
+Other architectures build the portable C code (tested on riscv64, ppc64le,
+s390x, armv7 and 32-bit x86: [OTHER_ARCHITECTURES.md](OTHER_ARCHITECTURES.md)).
 
 
 ## Exact and fast modes
@@ -186,6 +189,9 @@ Notes on the SIMD work, kept with the code they describe:
   (opt-in in the plan, on by default now).
 - [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md): the fast-mode kernels, how
   each keeps its results the same on every build, their accuracy and speed.
+- [OTHER_ARCHITECTURES.md](OTHER_ARCHITECTURES.md): RISC-V, POWER, s390x,
+  32-bit ARM and x86: the upstream requests, the RISC-V vector pull request,
+  and the portable builds tested on each.
 - [SIMD_EXPLAINER_PLAN.md](SIMD_EXPLAINER_PLAN.md): the outline of a detailed
   explanation of every optimization on both architectures.
 
@@ -252,8 +258,10 @@ The `simd` option accepts:
 - `avx2`: SSE4.1 and AVX2 (x86 only).
 - `avxvnni`: SSE4.1, AVX2 and AVX-VNNI (x86 only: Intel Alder Lake,
   Sapphire Rapids and newer, AMD Zen 5). Faster integer filters and resize.
-- `native`: everything the build machine's CPU supports (`-march=native`),
-  including AVX-512 in compiler-generated code. Only runs on similar CPUs.
+- `native`: everything the build machine's CPU supports (`-march=native`;
+  `-mcpu=native` on POWER), including AVX-512 in compiler-generated code.
+  Only runs on similar CPUs. Not for RISC-V, where GCC has no native
+  option: use `CC="cc -march=rv64gcv"` for the vector extension.
 - `native512`: like `native`, with 512-bit vectors preferred (x86 only).
 - `neon`: NEON (arm64 only).
 - `disable`: portable C code only, on any architecture.
