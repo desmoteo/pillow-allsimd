@@ -331,7 +331,8 @@ row results.
   lanes (a reciprocal with an integer correction was slower, round 1);
   YCbCr's 32-bit products, which a 16-bit form would make coarser.
 - **Reduce by 4 and L rotate 90 on arm64** (1.7x, 1.4x): generic NEON
-  paths, on operations of 1.4 to 1.6 ms.
+  paths, on operations of 1.4 to 1.6 ms. (Round 3: reduce by 4 1.15x
+  faster.)
 - **Drawing**: text (Hershey strokes, not comparable) and outline polygons
   (the scan and the wide lines, as before).
 
@@ -353,3 +354,114 @@ Where Pillow-AllSIMD computes in floats, FP16 doesn't fit:
   so a fast kernel that gives the same result everywhere would emulate
   FP16 rounding in FP32 there, slower than the FP32 kernel; and these
   filters already beat OpenCV on both machines.
+
+## Round 3: NEON (results at 36580764d)
+
+The published tables give each case's speed-up over Pillow 13.0 on both
+machines. On arm64 it was often a fraction of the x86 one: alpha composite
+1.01x against 6.85x, the exact transforms 1.1x to 1.25x against 2.0x to
+2.9x, the conversions between 3- and 4-byte pixels about 1x against 4.7x
+to 6.8x. Part of that is the baseline (Pillow 13.0's x86 wheel is slow on
+those conversions, which the arm64 one compiles well and which run at
+copy bandwidth there); the rest is NEON code that was missing or slow.
+This round went through the cases where Pillow-AllSIMD on arm64 is behind
+OpenCV or libvips, or barely ahead of Pillow 13.0.
+
+### Profiling on the Jetson
+
+`perf` works there: `perf_event_paranoid` is 2 and the kernel exposes the
+Cortex-A78 PMU, so a process can count its own user-space events. Docker's
+default seccomp profile blocks `perf_event_open` unless the container has
+`--cap-add PERFMON`. The `pillow-simd-prof` image adds Debian's
+`linux-perf` and `valgrind` to the benchmark image. `perf annotate`
+crashes (perf 6.12) on `ImagingGenericTransform`. A histogram of the
+addresses from `perf script`, mapped onto `objdump`, gives the same
+listing (`bench-results/neon/prof/hist.sh`).
+
+### Changed: the same pixels
+
+Jetson Orin, CPU 2, 2560x1600, best of 7, NEON build before and after:
+
+| Case | before (ms) | after (ms) | | OpenCV | fast mode |
+|---|---|---|---|---|---|
+| rotate RGBA 30 bicubic | 334.3 | 210.8 | 1.59x | 102.4 | 96.4 |
+| rotate RGB 30 bicubic | 264.8 | 201.2 | 1.32x | 80.3 | 79.4 |
+| rotate RGB 30 bilinear | 108.0 | 73.3 | 1.47x | 35.3 | 40.5 |
+| rotate RGBA 30 bilinear | 130.5 | 84.7 | 1.54x | | |
+| perspective RGB bilinear | 121.1 | 96.8 | 1.25x | 39.0 | 52.0 |
+| perspective RGB bicubic | 317.7 | 244.3 | 1.30x | | |
+| quad RGB bilinear | 125.4 | 91.2 | 1.37x | | |
+| alpha composite RGBA | 21.9 | 17.6 | 1.25x | 241 | |
+| reduce RGB by 4 | 1.64 | 1.43 | 1.15x | 1.06 | |
+
+- **Exact transforms.** 81% of rotate bicubic was in the scalar
+  `bicubic_filter32RGB`: 590 instructions and about 180 cycles per pixel,
+  3.2 per cycle, so bound by instruction count. The x86 vector filters
+  convert each byte to double. On arm64 that form was slower than the
+  scalar code (round 1). The new NEON filters keep the scalar code's
+  arithmetic:
+  - `BILINEAR` and `BICUBIC` get bytes there, so `b - a` and `p1` to `p4`
+    are integers. They are computed for the 4 bands of two rows at once
+    in 16-bit lanes, and converted to double through float, which holds
+    them exactly.
+  - The rest is `vfmaq_f64`, the fused multiply-adds that GCC and clang
+    make of the scalar expressions on arm64.
+
+  That halved the instructions (33.2G to 17.8G) but gained only 4% for
+  RGB bicubic: IPC fell to 1.9. Each pixel is one chain of about 100
+  cycles of dependent operations (conversions, three fused multiply-adds
+  each way), and its 190 instructions overflow the A78's reorder window,
+  so successive pixels hardly overlapped. On top of that, the 3-byte RGB
+  store went from a vector register through the stack to two general
+  loads, which held 35% of the samples.
+
+  The fix has three parts:
+  - Pixels go in pairs, when both have their whole source window inside
+    the image (the others take the one-pixel filter).
+  - Bytes are stored straight from the vector register.
+  - The pair's coordinates are checked in double before any conversion.
+
+  The way GCC compiled the pair was worth 4% to 8%. Bicubic runs better
+  written without a loop over the two pixels, bilinear with one, and a
+  `tbl` beat narrowing with `uzp` for the bytes of two pixels. The exact
+  path is still 2.5x OpenCV: per pixel it converts 64 integers to double
+  and runs about 30 two-lane fused multiply-adds. Fast mode's fixed-point
+  filters are level with OpenCV.
+- **Alpha composite.** One division per pixel, `coef1 = sa 255² 128 /
+  outa`, bound the scalar loop at about 12 cycles a pixel. NEON with a
+  vector division and an exact correction, or with a reciprocal estimate
+  and a correction, was slower than the scalar loop (30.9 and 29.8 against
+  26.5 ms in a microbenchmark), and so was a table with scalar channel
+  arithmetic (24.6 ms). The division depends only on the two alphas, so
+  NEON now reads `coef1` from a table of all 65536 pairs and does the
+  channel products in vectors:
+  - 128 KB, built at first use in 0.33 ms;
+  - an atomic state makes it thread-safe, and a call that finds another
+    thread building it runs the scalar loop;
+  - `test_alpha_composite_every_alpha` checks every pair against the
+    scalar formula.
+- **Reduce by 4x4** of 4-byte images: pairwise sums (`vpaddlq`,
+  `vpadalq`) over the 4 rows, 8 output pixels per step, rounded with
+  `vrshrn`.
+
+### Tried and not kept
+
+- Resize: a horizontal kernel for 4 rows at once, sharing the coefficient
+  loads: no gain.
+- Transposes of 1-byte images in 16x16 blocks: slower than the 8x8 ones.
+- The NEON transform filters a pixel at a time: 1.04x to 1.29x
+  (latency, above).
+- "transpose L rotate 90" was 20% slower after the changes in every A/B
+  run, but by its place in the sequence: run alone, both builds take
+  1.48 ms.
+
+### What remains on arm64
+
+- **YCbCr <-> RGB** (2.1x and 1.7x OpenCV, exact) and **RGB -> HSV**
+  (2.6x): IPC 1.3 to 1.8 with backend stalls. YCbCr converts each term to
+  float and back. A 16-bit integer form that reproduces Pillow's tables
+  exactly would avoid that, but it isn't written. Fast mode is at OpenCV's
+  level for both.
+- **Exact transforms** (2.3x to 2.5x OpenCV): doubles, above.
+- **Reduce by 4** (1.35x) and **box blur** radius 2 and 10 (1.5x).
+- **RGBA upscales** (3.4x): as in round 2.
