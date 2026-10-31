@@ -1119,6 +1119,8 @@ BoxBlurEnsure(BoxBlurCascade *c, int k, int upto) {
 
 /* Largest total size of the rings; above it, passes run one by one. */
 #define BOXBLUR_RINGS_MAX (8 * 1024 * 1024)
+/* the ring of a fused blur, kept small enough to stay in cache */
+#define BOXBLUR_FUSED_MAX (4 * 1024 * 1024)
 
 /* Whether ImagingVerticalBoxBlurPasses should run the passes. */
 static int
@@ -1174,64 +1176,168 @@ ImagingVerticalBoxBlurPasses(
     return ok ? imOut : NULL;
 }
 
-/* One horizontal and one vertical pass whose boxes ImagingBoxBlurDirect
-   computes (integer radii up to BOX_DIRECT_MAX, or below 1): each row is
-   blurred horizontally into a ring of rows just before the vertical pass
-   first reads it, so the horizontal result stays in cache and needs no
-   image of its own. The same arithmetic as the two passes in turn. Returns
-   0 when the radii don't allow it, -1 if out of memory. */
+/* The rows of a fused blur: row k of imIn blurred horizontally into slot
+   k % rows of a ring the first time it is asked for. */
+typedef struct {
+    Imaging im;
+    UINT8 *ring, *pad;
+    int rows, made, n;
+    const BoxDirect *d;
+    int radius, lastx, edgeA, edgeB;
+    UINT32 ww, fw;
+} BoxFusedRows;
+
+static inline const UINT8 *
+box_fused_row(BoxFusedRows *f, long long k) {
+    const int lasty = f->im->ysize - 1;
+    k = k < 0 ? 0 : (k > lasty ? lasty : k);
+    while (f->made < k) {
+        UINT8 *dst, *src;
+#if defined(IMAGING_SIMD_AVX2)
+        /* running sums two rows at a time; the ring has a row to spare */
+        if (!f->d->direct && f->made + 2 <= lasty) {
+            UINT8 *dst2 = f->ring + (size_t)((f->made + 2) % f->rows) * f->im->linesize;
+            dst = f->ring + (size_t)((f->made + 1) % f->rows) * f->im->linesize;
+            ImagingLineBoxBlur32x2(
+                (UINT32 *)dst,
+                (UINT32 *)dst2,
+                (UINT32 *)f->im->image[f->made + 1],
+                (UINT32 *)f->im->image[f->made + 2],
+                f->lastx,
+                f->radius,
+                f->edgeA,
+                f->edgeB,
+                f->ww,
+                f->fw
+            );
+            f->made += 2;
+            continue;
+        }
+#endif
+        f->made++;
+        dst = f->ring + (size_t)(f->made % f->rows) * f->im->linesize;
+        src = (UINT8 *)f->im->image[f->made];
+        if (f->d->direct) {
+            ImagingLineBoxBlurDirect(dst, src, f->n, f->im->pixelsize, f->d, f->pad);
+        } else {
+            ImagingLineBoxBlur32(
+                (UINT32 *)dst,
+                (UINT32 *)src,
+                f->lastx,
+                f->radius,
+                f->edgeA,
+                f->edgeB,
+                f->ww,
+                f->fw
+            );
+        }
+    }
+    return f->ring + (size_t)(k % f->rows) * f->im->linesize;
+}
+
+/* One horizontal and one vertical pass: each row is blurred horizontally
+   into a ring of 2 * yradius + 3 rows just before the vertical pass first
+   reads it, so the horizontal result stays in cache and needs no image of
+   its own; the same arithmetic as the two passes in turn. Each pass takes
+   its boxes directly (integer radii up to BOX_DIRECT_MAX, or below 1) or
+   with running sums, those of the horizontal pass only for 4-byte pixels
+   (8-bit images blur four rows at a time in the unfused pass). Returns 0
+   when it doesn't apply, -1 if out of memory. */
 static int
 ImagingBoxBlurFused(Imaging imOut, Imaging imIn, float xradius, float yradius) {
     ImagingSectionCookie cookie;
     BoxDirect dx, dy;
+    BoxFusedRows f;
     const int rx = (int)xradius, ry = (int)yradius;
     const UINT32 wwx = (UINT32)(1 << 24) / (xradius * 2 + 1);
     const UINT32 wwy = (UINT32)(1 << 24) / (yradius * 2 + 1);
-    const int n = imIn->xsize * imIn->pixelsize, lasty = imIn->ysize - 1;
-    const UINT8 *src[2 * BOX_DIRECT_MAX + 3];
-    UINT8 *ring, *pad;
-    int y, i, made = -1;
+    const UINT32 fwy = ((1 << 24) - (ry * 2 + 1) * wwy) / 2;
+    const int lasty = imIn->ysize - 1, size = imIn->linesize;
+    /* the rows a vertical box reads, and one made ahead */
+    long long ringBytes = (2 * (long long)ry + 4) * size;
+    UINT32 *acc = NULL;
+    int y, i;
 
     BoxDirectInit(&dx, rx, wwx, ((1 << 24) - (rx * 2 + 1) * wwx) / 2);
-    BoxDirectInit(&dy, ry, wwy, ((1 << 24) - (ry * 2 + 1) * wwy) / 2);
-    if (!dx.direct || !dy.direct || dy.count > 2 * BOX_DIRECT_MAX + 3) {
+    BoxDirectInit(&dy, ry, wwy, fwy);
+    if ((!dx.direct && !imIn->image32) || ringBytes > BOXBLUR_FUSED_MAX ||
+        (dy.direct && dy.count > 2 * BOX_DIRECT_MAX + 3)) {
         return 0;
     }
-    ring = malloc((size_t)dy.count * imIn->linesize);
-    pad = malloc((imIn->xsize + 2 * (BOX_DIRECT_MAX + 1)) * sizeof(UINT32));
-    if (!ring || !pad) {
-        free(ring);
-        free(pad);
+    f.im = imIn;
+    f.rows = 2 * ry + 4;
+    f.made = -1;
+    f.n = imIn->xsize * imIn->pixelsize;
+    f.d = &dx;
+    f.radius = rx;
+    f.lastx = imIn->xsize - 1;
+    f.edgeA = MIN(rx + 1, imIn->xsize);
+    f.edgeB = MAX(imIn->xsize - rx - 1, 0);
+    f.ww = wwx;
+    f.fw = dx.fw;
+    f.ring = malloc((size_t)ringBytes);
+    f.pad = malloc((imIn->xsize + 2 * (BOX_DIRECT_MAX + 1)) * sizeof(UINT32));
+    if (!dy.direct) {
+        acc = calloc(size, sizeof(UINT32));
+    }
+    if (!f.ring || !f.pad || (!dy.direct && !acc)) {
+        free(f.ring);
+        free(f.pad);
+        free(acc);
         return -1;
     }
 
     ImagingSectionEnter(&cookie);
-    for (y = 0; y <= lasty; y++) {
-        for (i = 0; i < dy.count; i++) {
-            /* row k of the box, clamped to the image, blurred horizontally
-               into slot k % count when first needed: the rows a box reads
-               span count rows, so none is overwritten while in use */
-            long long k = (long long)y - ry - 1 + i;
-            k = k < 0 ? 0 : (k > lasty ? lasty : k);
-            while (made < k) {
-                made++;
-                ImagingLineBoxBlurDirect(
-                    ring + (size_t)(made % dy.count) * imIn->linesize,
-                    (UINT8 *)imIn->image[made],
-                    n,
-                    imIn->pixelsize,
-                    &dx,
-                    pad
-                );
+    if (dy.direct) {
+        const UINT8 *src[2 * BOX_DIRECT_MAX + 3];
+        for (y = 0; y <= lasty; y++) {
+            /* the rows a box reads span count rows, so none is
+               overwritten while in use */
+            for (i = 0; i < dy.count; i++) {
+                src[i] = box_fused_row(&f, (long long)y - ry - 1 + i);
             }
-            src[i] = ring + (size_t)(k % dy.count) * imIn->linesize;
+            ImagingBoxBlurDirect((UINT8 *)imOut->image[y], src, size, &dy);
         }
-        ImagingBoxBlurDirect((UINT8 *)imOut->image[y], src, n, &dy);
+    } else {
+        /* ImagingVerticalBoxBlur's running sums, from the ring: the window
+           for row -1, then a row in and a row out per output row */
+        const int inside = ry - 1 < lasty ? ry - 1 : lasty;
+        const UINT32 after = ry - 1 > lasty ? (UINT32)(ry - 1 - lasty) : 0;
+        int b;
+        {
+            const UINT8 *first = box_fused_row(&f, 0);
+            for (b = 0; b < size; b++) {
+                acc[b] = first[b] * (UINT32)(ry + 1);
+            }
+            if (after) {
+                /* a short image: the ring holds every row */
+                const UINT8 *last = box_fused_row(&f, lasty);
+                for (b = 0; b < size; b++) {
+                    acc[b] += last[b] * after;
+                }
+            }
+        }
+        for (i = 0; i <= inside; i++) {
+            const UINT8 *row = box_fused_row(&f, i);
+            for (b = 0; b < size; b++) {
+                acc[b] += row[b];
+            }
+        }
+        for (y = 0; y <= lasty; y++) {
+            /* rows y - ry - 1 to y + ry + 1, count rows */
+            const UINT8 *add = box_fused_row(&f, (long long)y + ry);
+            const UINT8 *far_row = box_fused_row(&f, (long long)y + ry + 1);
+            const UINT8 *sub = box_fused_row(&f, (long long)y - ry - 1);
+            ImagingBoxBlurColumns(
+                (UINT8 *)imOut->image[y], acc, add, sub, far_row, size, wwy, fwy
+            );
+        }
     }
     ImagingSectionLeave(&cookie);
 
-    free(ring);
-    free(pad);
+    free(acc);
+    free(f.ring);
+    free(f.pad);
     return 1;
 }
 
