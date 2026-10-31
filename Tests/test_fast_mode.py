@@ -367,3 +367,48 @@ def test_ycbcr_other_conversions_exact() -> None:
     with Image.fast_mode():
         fast = im.convert("YCbCr")
     assert fast.tobytes() == im.convert("YCbCr").tobytes()
+
+
+# RGB -> HSV (Convert.c, rgb2hsv_fast): the formulas' truncation, exact.
+
+
+def _hsv_floor(r: int, g: int, b: int) -> tuple[int, int, int]:
+    v = max(r, g, b)
+    d = v - min(r, g, b)
+    if not d:
+        return 0, 0, v
+    if r == v:
+        n = g - b
+    elif g == v:
+        n = 2 * d + b - r
+    else:
+        n = 4 * d + r - g
+    if n < 0:
+        n += 6 * d
+    return 255 * n // (6 * d), 255 * d // v, v
+
+
+@pytest.mark.parametrize("mode", ("RGB", "RGBA", "RGBX"))
+def test_hsv_exact_floors(mode: str) -> None:
+    im = _lattice()
+    raw = im.tobytes()
+    expected = bytes(
+        c
+        for i in range(0, len(raw), 3)
+        for c in _hsv_floor(raw[i], raw[i + 1], raw[i + 2])
+    )
+    with Image.fast_mode():
+        fast = im.convert(mode).convert("HSV")
+    assert fast.tobytes() == expected
+
+
+def test_hsv_close_to_exact() -> None:
+    im = _lattice()
+    with Image.fast_mode():
+        fast = im.convert("HSV")
+    exact = im.convert("HSV")
+    largest, _ = _diff(fast, exact)
+    assert largest <= 1
+    # saturation and value are the same; some hues are 1 above
+    for k in (1, 2):
+        assert fast.getchannel(k).tobytes() == exact.getchannel(k).tobytes()
