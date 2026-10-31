@@ -545,6 +545,55 @@ ImagingReduce2x2_4u8(Imaging imOut, Imaging imIn, int box[4]) {
     }
 }
 
+/* 4x4: 8 output pixels per step from 32 input pixels of each of the four
+   rows, de-interleaved; neighbours summed in pairs with widening (vpaddl,
+   then vpadal for the next rows), the pairs summed (vpadd), and
+   (sum + 8) >> 4 as the scalar code rounds. */
+static void
+ImagingReduce4x4_4u8(Imaging imOut, Imaging imIn, int box[4]) {
+    int x, y, c, r;
+    int xsize = box[2] / 4;
+
+    for (y = 0; y < box[3] / 4; y++) {
+        int yy = box[1] + y * 4;
+        UINT8 *line[4];
+        UINT8 *out = (UINT8 *)imOut->image[y];
+        for (r = 0; r < 4; r++) {
+            line[r] = (UINT8 *)imIn->image[yy + r];
+        }
+        for (x = 0; x < xsize - 7; x += 8) {
+            int xx = box[0] + x * 4;
+            uint16x8_t a[4], b[4];
+            uint8x8x4_t o;
+            for (r = 0; r < 4; r++) {
+                uint8x16x4_t pa = vld4q_u8(&line[r][xx * 4]);
+                uint8x16x4_t pb = vld4q_u8(&line[r][xx * 4 + 64]);
+                for (c = 0; c < 4; c++) {
+                    a[c] = r ? vpadalq_u8(a[c], pa.val[c]) : vpaddlq_u8(pa.val[c]);
+                    b[c] = r ? vpadalq_u8(b[c], pb.val[c]) : vpaddlq_u8(pb.val[c]);
+                }
+            }
+            for (c = 0; c < 4; c++) {
+                o.val[c] = vrshrn_n_u16(vpaddq_u16(a[c], b[c]), 4);
+            }
+            vst4_u8(&out[x * 4], o);
+        }
+        for (; x < xsize; x++) {
+            int xx = box[0] + x * 4;
+            for (c = 0; c < 4; c++) {
+                UINT32 ss = 0;
+                int k;
+                for (r = 0; r < 4; r++) {
+                    for (k = 0; k < 4; k++) {
+                        ss += line[r][(xx + k) * 4 + c];
+                    }
+                }
+                out[x * 4 + c] = (ss + 8) >> 4;
+            }
+        }
+    }
+}
+
 static void
 ImagingReduce2x1_4u8(Imaging imOut, Imaging imIn, int box[4]) {
     int x, y, c;
@@ -782,6 +831,8 @@ ImagingReduce_4u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscal
         ImagingReduce2x1_4u8(imOut, imIn, box);
     } else if (xscale == 2 && yscale == 2) {
         ImagingReduce2x2_4u8(imOut, imIn, box);
+    } else if (xscale == 4 && yscale == 4) {
+        ImagingReduce4x4_4u8(imOut, imIn, box);
     } else if (xscale <= 4 && yscale <= 16) {
         ImagingReduceNxN_4u8_neon(imOut, imIn, box, xscale, yscale);
     } else if (xscale <= 512) {

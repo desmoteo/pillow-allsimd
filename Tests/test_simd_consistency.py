@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import random
 
 import pytest
@@ -56,9 +57,11 @@ def test_unpremultiply_every_value() -> None:
     )
     out = Image.frombytes("RGBa", (256, 256), data).convert("RGBA").tobytes()
     expected = bytes(
-        v
-        if i % 4 == 3 or data[i - i % 4 + 3] in (0, 255)
-        else min(255, 255 * v // data[i - i % 4 + 3])
+        (
+            v
+            if i % 4 == 3 or data[i - i % 4 + 3] in (0, 255)
+            else min(255, 255 * v // data[i - i % 4 + 3])
+        )
         for i, v in enumerate(data)
     )
     assert out == expected
@@ -73,6 +76,43 @@ def test_alpha_composite(size: tuple[int, int], mode: str) -> None:
         im_dst = Image.new(mode, size, dst)
         im_src = Image.new(mode, size, src)
         _assert_flat(Image.alpha_composite(im_dst, im_src))
+
+
+@pytest.mark.skipif(
+    platform.machine().lower() in ("x86_64", "amd64", "i386", "i686"),
+    reason="the x86 kernels take a reciprocal estimate (CHANGES.SIMD.rst)",
+)
+def test_alpha_composite_every_alpha() -> None:
+    # Every source alpha over every destination alpha: the scalar code's
+    # integers, which NEON takes from a table of its divisions
+    def div255(v: int) -> int:
+        return ((v >> 8) + v) >> 8
+
+    src = [
+        (sa * 7 % 256, (sa + da * 3) % 256, da * 11 % 256, sa)
+        for sa in range(256)
+        for da in range(256)
+    ]
+    dst = [
+        (da * 5 % 256, (sa * 13 + 1) % 256, sa ^ da, da)
+        for sa in range(256)
+        for da in range(256)
+    ]
+    expected: list[int] = []
+    for s, d in zip(src, dst):
+        if s[3] == 0:
+            expected += d
+            continue
+        outa255 = s[3] * 255 + d[3] * (255 - s[3])
+        coef1 = s[3] * 255 * 255 * 128 // outa255
+        coef2 = 255 * 128 - coef1
+        expected += [
+            div255(s[c] * coef1 + d[c] * coef2 + (0x80 << 7)) >> 7 for c in range(3)
+        ]
+        expected.append(div255(outa255 + 0x80))
+    im_src = Image.frombytes("RGBA", (256, 256), bytes(v for p in src for v in p))
+    im_dst = Image.frombytes("RGBA", (256, 256), bytes(v for p in dst for v in p))
+    assert Image.alpha_composite(im_dst, im_src).tobytes() == bytes(expected)
 
 
 @pytest.mark.parametrize(
@@ -113,6 +153,38 @@ def test_box_blur_fused_matches_passes(
         h = im._new(im.im.box_blur((rx, 0), 1))
         v = h._new(h.im.box_blur((0, ry), 1))
         assert both.tobytes() == v.tobytes()
+
+
+@pytest.mark.parametrize("mode", ("RGB", "RGBA"))
+@pytest.mark.parametrize(
+    "resample", (Image.Resampling.BILINEAR, Image.Resampling.BICUBIC)
+)
+@pytest.mark.parametrize(
+    "method", (Image.Transform.AFFINE, Image.Transform.PERSPECTIVE)
+)
+def test_transform_pairs_match_single_pixels(
+    mode: str, resample: Image.Resampling, method: Image.Transform
+) -> None:
+    # On arm64, pairs of pixels whose source pixels are inside the image go
+    # through filters for two; the others, and any output one pixel wide,
+    # one at a time. Coefficients with few binary digits give each pixel
+    # the same coordinates in a column of its own, shifted by k.
+    a, b, c, d, e, f = 0.8125, 0.3125, -3.25, -0.25, 0.9375, 2.5
+    for size in SHAPES.values():
+        rnd = random.Random(f"{mode}{size}")
+        im = Image.frombytes(mode, size, rnd.randbytes(size[0] * size[1] * len(mode)))
+        out_size = (size[0] + 6, size[1] + 4)
+
+        def coeffs(k: int) -> tuple[float, ...]:
+            if method == Image.Transform.AFFINE:
+                return (a, b, c + a * k, d, e, f + d * k)
+            return (a, b, c + a * k, d, e, f + d * k, 0, 2**-10)
+
+        full = im.transform(out_size, method, coeffs(0), resample)
+        for k in range(out_size[0]):
+            column = im.transform((1, out_size[1]), method, coeffs(k), resample)
+            expected = full.crop((k, 0, k + 1, out_size[1]))
+            assert column.tobytes() == expected.tobytes(), k
 
 
 @pytest.mark.parametrize("mode", ("L", "RGB", "RGBA", "CMYK"))

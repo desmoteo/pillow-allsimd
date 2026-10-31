@@ -237,6 +237,123 @@ alpha_composite_8px(__m256i mm_dst, __m256i mm_src) {
     )
 #endif
 
+#if defined(IMAGING_SIMD_NEON)
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <intrin.h>
+#endif
+/* coef1 of the scalar code for every source and destination alpha: the
+   division per pixel bound the loop on a Cortex-A78AE (about 12 cycles a
+   pixel), and a vector division or reciprocal with an exact correction was
+   no faster. 128 KB, built by the first call that finds it missing; a call
+   that finds another thread building it uses the scalar loop. */
+static UINT16 ac_coef1_table[256 * 256];
+static long ac_coef1_state = 0; /* 0 missing, 1 being built, 2 built */
+
+static void
+ac_coef1_build(void) {
+    UINT32 sa, da;
+    for (sa = 1; sa < 256; sa++) {
+        for (da = 0; da < 256; da++) {
+            UINT32 outa255 = sa * 255 + da * (255 - sa);
+            ac_coef1_table[sa * 256 + da] =
+                (UINT16)(sa * 255 * 255 * (1 << PRECISION_BITS) / outa255);
+        }
+    }
+}
+
+static const UINT16 *
+ac_coef1_lookup(void) {
+#if defined(__GNUC__) || defined(__clang__)
+    long expected = 0;
+    if (__atomic_load_n(&ac_coef1_state, __ATOMIC_ACQUIRE) == 2) {
+        return ac_coef1_table;
+    }
+    if (__atomic_compare_exchange_n(
+            &ac_coef1_state, &expected, 1, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE
+        )) {
+        ac_coef1_build();
+        __atomic_store_n(&ac_coef1_state, 2, __ATOMIC_RELEASE);
+        return ac_coef1_table;
+    }
+#elif defined(_MSC_VER)
+    if (_InterlockedOr(&ac_coef1_state, 0) == 2) {
+        return ac_coef1_table;
+    }
+    if (_InterlockedCompareExchange(&ac_coef1_state, 1, 0) == 0) {
+        ac_coef1_build();
+        _InterlockedExchange(&ac_coef1_state, 2);
+        return ac_coef1_table;
+    }
+#endif
+    return NULL;
+}
+
+/* SHIFTFORDIV255(a v + b w + bias) of 8 lanes, in 32 bits, narrowed */
+static inline uint16x8_t
+ac_blend8(uint16x8_t v, uint16x8_t a, uint16x8_t w, uint16x8_t b, UINT32 bias) {
+    uint32x4_t lo = vmlal_u16(
+        vmull_u16(vget_low_u16(v), vget_low_u16(a)), vget_low_u16(w), vget_low_u16(b)
+    );
+    uint32x4_t hi = vmlal_high_u16(vmull_high_u16(v, a), w, b);
+    lo = vaddq_u32(lo, vdupq_n_u32(bias));
+    hi = vaddq_u32(hi, vdupq_n_u32(bias));
+    return vcombine_u16(
+        vshrn_n_u32(vaddq_u32(vshrq_n_u32(lo, 8), lo), 8),
+        vshrn_n_u32(vaddq_u32(vshrq_n_u32(hi, 8), hi), 8)
+    );
+}
+
+/* Sixteen pixels with the scalar loop's arithmetic, coef1 from the table;
+   pixels whose source alpha is 0 keep the destination. */
+static inline void
+alpha_composite_16px_neon(
+    rgba8 *out, const rgba8 *dst, const rgba8 *src, const UINT16 *table
+) {
+    const uint8x16x4_t d = vld4q_u8((const UINT8 *)dst);
+    const uint8x16x4_t s = vld4q_u8((const UINT8 *)src);
+    const uint8x16_t keep = vceqzq_u8(s.val[3]);
+    UINT8 sa[16], da[16];
+    UINT16 cf[16];
+    uint16x8_t c1[2], c2[2], r[2];
+    uint8x16x4_t res;
+    int i, c, h;
+    vst1q_u8(sa, s.val[3]);
+    vst1q_u8(da, d.val[3]);
+    for (i = 0; i < 16; i++) {
+        cf[i] = table[sa[i] * 256 + da[i]];
+    }
+    for (h = 0; h < 2; h++) {
+        c1[h] = vld1q_u16(cf + 8 * h);
+        c2[h] = vsubq_u16(vdupq_n_u16(255 * (1 << PRECISION_BITS)), c1[h]);
+    }
+    for (c = 0; c < 3; c++) {
+        for (h = 0; h < 2; h++) {
+            const uint16x8_t sv =
+                h ? vmovl_high_u8(s.val[c]) : vmovl_u8(vget_low_u8(s.val[c]));
+            const uint16x8_t dv =
+                h ? vmovl_high_u8(d.val[c]) : vmovl_u8(vget_low_u8(d.val[c]));
+            r[h] = vshrq_n_u16(
+                ac_blend8(sv, c1[h], dv, c2[h], 0x80 << PRECISION_BITS), PRECISION_BITS
+            );
+        }
+        res.val[c] =
+            vbslq_u8(keep, d.val[c], vcombine_u8(vmovn_u16(r[0]), vmovn_u16(r[1])));
+    }
+    /* alpha: SHIFTFORDIV255(sa 255 + da (255 - sa) + 0x80) */
+    for (h = 0; h < 2; h++) {
+        const uint16x8_t sv =
+            h ? vmovl_high_u8(s.val[3]) : vmovl_u8(vget_low_u8(s.val[3]));
+        const uint16x8_t dv =
+            h ? vmovl_high_u8(d.val[3]) : vmovl_u8(vget_low_u8(d.val[3]));
+        r[h] =
+            ac_blend8(sv, vdupq_n_u16(255), dv, vsubq_u16(vdupq_n_u16(255), sv), 0x80);
+    }
+    res.val[3] =
+        vbslq_u8(keep, d.val[3], vcombine_u8(vmovn_u16(r[0]), vmovn_u16(r[1])));
+    vst4q_u8((UINT8 *)out, res);
+}
+#endif
+
 /* Composites one row of xsize pixels: out may be dst, for in place. */
 static void
 alpha_composite_row(
@@ -270,6 +387,14 @@ alpha_composite_row(
         memcpy(&out[x], tmp_out, n * sizeof(rgba8));
     }
 #else
+#if defined(IMAGING_SIMD_NEON)
+    {
+        const UINT16 *table = ac_coef1_lookup();
+        for (; table && x + 16 <= xsize; x += 16) {
+            alpha_composite_16px_neon(&out[x], &dst[x], &src[x], table);
+        }
+    }
+#endif
     for (; x < xsize; x += 1) {
         if (src[x].a == 0) {
             // Copy 4 bytes at once.
