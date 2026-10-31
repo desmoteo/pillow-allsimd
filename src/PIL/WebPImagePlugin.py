@@ -157,6 +157,8 @@ class WebPImageFile(ImageFile.ImageFile):
             self._get_next()  # Advance to the requested frame
 
     def load(self) -> Image.core.PixelAccess | None:
+        if self.__loaded != self.__logical_frame and self._load_still():
+            return super().load()
         if self.__loaded != self.__logical_frame:
             self._seek(self.__logical_frame)
 
@@ -171,6 +173,23 @@ class WebPImageFile(ImageFile.ImageFile):
             self.tile = [ImageFile._Tile("raw", (0, 0, *self.size), 0, self.rawmode)]
 
         return super().load()
+
+    def _load_still(self) -> bool:
+        # Pillow-AllSIMD: a one-frame file decodes straight into the image
+        if self.is_animated or self.__logical_frame or self.__physical_frame:
+            return False
+        im = Image.core.new(self.mode, self.size)
+        duration = self._decoder.decode_still(im.ptr)
+        if duration is None:
+            return False
+        self.im = im
+        self.info["timestamp"], self.info["duration"] = 0, duration
+        self.__loaded = 0
+        if self.fp and self._exclusive_fp:
+            self.fp.close()
+        self.fp = None
+        self.tile = []
+        return True
 
     def load_seek(self, pos: int) -> None:
         pass

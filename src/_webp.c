@@ -508,6 +508,69 @@ _anim_decoder_get_next(PyObject *self, PyObject *args) {
     return ret;
 }
 
+/* A still image, decoded straight into the image's memory: what
+   get_next() gives for the first frame of a one-frame file (the decoder
+   decodes a key frame into a cleared canvas without blending), without the
+   decoder's canvas and the two copies through a bytes object. Returns the
+   frame's duration, or None when it doesn't apply (animations, a frame
+   smaller than the canvas, image memory in several blocks): the caller then
+   uses get_next(). */
+PyObject *
+_anim_decoder_decode_still(PyObject *self, PyObject *args) {
+    PyObject *i0;
+    Imaging im;
+    WebPAnimDecoderObject *decp = (WebPAnimDecoderObject *)self;
+    WebPIterator iter;
+    WebPDecoderConfig config;
+    ImagingSectionCookie cookie;
+    VP8StatusCode status;
+    int y, duration;
+
+    if (!PyArg_ParseTuple(args, "O", &i0)) {
+        return NULL;
+    }
+    if (!PyCapsule_IsValid(i0, IMAGING_MAGIC)) {
+        PyErr_Format(PyExc_TypeError, "Expected '%s' Capsule", IMAGING_MAGIC);
+        return NULL;
+    }
+    im = (Imaging)PyCapsule_GetPointer(i0, IMAGING_MAGIC);
+    if (decp->info.frame_count != 1 || im->pixelsize != 4 ||
+        im->xsize != (int)decp->info.canvas_width ||
+        im->ysize != (int)decp->info.canvas_height || im->ysize < 1) {
+        Py_RETURN_NONE;
+    }
+    for (y = 1; y < im->ysize; y++) {
+        if ((UINT8 *)im->image[y] != (UINT8 *)im->image[0] + (size_t)y * im->linesize) {
+            Py_RETURN_NONE;
+        }
+    }
+    if (!WebPDemuxGetFrame(WebPAnimDecoderGetDemuxer(decp->dec), 1, &iter)) {
+        Py_RETURN_NONE;
+    }
+    if (iter.x_offset || iter.y_offset || iter.width != im->xsize ||
+        iter.height != im->ysize || !WebPInitDecoderConfig(&config)) {
+        WebPDemuxReleaseIterator(&iter);
+        Py_RETURN_NONE;
+    }
+    config.output.colorspace = MODE_RGBA;
+    config.output.is_external_memory = 1;
+    config.output.u.RGBA.rgba = (uint8_t *)im->image[0];
+    config.output.u.RGBA.stride = im->linesize;
+    config.output.u.RGBA.size = (size_t)im->linesize * im->ysize;
+
+    ImagingSectionEnter(&cookie);
+    status = WebPDecode(iter.fragment.bytes, iter.fragment.size, &config);
+    ImagingSectionLeave(&cookie);
+    duration = iter.duration;
+    WebPDemuxReleaseIterator(&iter);
+    WebPFreeDecBuffer(&config.output);
+    if (status != VP8_STATUS_OK) {
+        PyErr_SetString(PyExc_OSError, "failed to read next frame");
+        return NULL;
+    }
+    return PyLong_FromLong(duration);
+}
+
 PyObject *
 _anim_decoder_reset(PyObject *self, PyObject *args) {
     WebPAnimDecoderObject *decp = (WebPAnimDecoderObject *)self;
@@ -539,6 +602,10 @@ static struct PyMethodDef _anim_decoder_methods[] = {
     {"get_info", (PyCFunction)_anim_decoder_get_info, METH_NOARGS, "get_info"},
     {"get_chunk", (PyCFunction)_anim_decoder_get_chunk, METH_VARARGS, "get_chunk"},
     {"get_next", (PyCFunction)_anim_decoder_get_next, METH_NOARGS, "get_next"},
+    {"decode_still",
+     (PyCFunction)_anim_decoder_decode_still,
+     METH_VARARGS,
+     "decode_still"},
     {"reset", (PyCFunction)_anim_decoder_reset, METH_NOARGS, "reset"},
     {NULL, NULL} /* sentinel */
 };
