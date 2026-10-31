@@ -109,6 +109,16 @@ Based on Pillow 13.0.0
   reducing_gap uses 3.0, so downscales of 6x and more shrink with reduce()
   first: within 2 levels at photo sizes, 1/8 Lanczos 1.9x (x86) and 2.5x
   (arm64)
+- BoxBlur with one pass each way and radii the direct kernel takes
+  (integers up to 4, below 1): each row is blurred horizontally into a ring
+  of rows just before the vertical pass reads it, instead of through a full
+  temporary image; the same pixels (radius 1 2.1x, 2 1.7x, 3 1.5x, AVX2)
+- arm64: point() tables on 8-bit bands with NEON lookups (tbl, tbx) in the
+  256-entry tables, a row's bands as planes so each table loads once (L
+  1.9x, RGB 1.3x, both now level with or ahead of OpenCV)
+- Fast mode: perspective positions in 32-bit floats from the exact integer
+  sums (images below 32768 pixels a side), four lanes per division on SSE4
+  and NEON, eight on AVX2; still the same on every build (arm64 1.2x)
 - WebP: one-frame files decode straight into the image with libwebp's
   simple API, without the animation decoder's canvas and two copies (the
   same pixels; 1.38x, 2560x1600 RGB, now ahead of OpenCV)
