@@ -35,6 +35,17 @@
 
 #endif /* IMAGING_SIMD_DISABLE */
 
+/* Inlined at every call, for kernels that should see an argument as a
+   constant where a call site passes one (a shift count): plain inline
+   leaves a large body that is called twice out of line. */
+#if defined(__GNUC__) || defined(__clang__)
+#define SIMD_FORCE_INLINE static inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define SIMD_FORCE_INLINE static __forceinline
+#else
+#define SIMD_FORCE_INLINE static inline
+#endif
+
 #if defined(IMAGING_SIMD_SSE4)
 /* Unaligned 32-bit load. */
 static INT32 inline mm_load_si32(const void *ptr) {
