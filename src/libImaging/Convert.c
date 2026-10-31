@@ -850,6 +850,186 @@ rgb2hsv(UINT8 *out, const UINT8 *in, int xsize) {
 #endif
 }
 
+/* Fast mode (SIMD_FAST_KERNELS.md): rgb2hsv_row's hue and saturation
+   truncated exactly, h = floor(255 n / (6 d)) and s = floor(255 d / v), with
+   d = max - min and n the hue's numerator in 0 .. 6 d. One float division
+   gives these floors exactly: the numerators are integers below 2^24, and a
+   quotient that isn't an integer is at least 1/1530 from one, far more than
+   its rounding error. rgb2hsv_row's float and double steps fall 1 short at
+   some of those boundaries. */
+static inline void
+rgb2hsv_fast_pixel(UINT8 *out, const UINT8 *in) {
+    int r = in[0], g = in[1], b = in[2];
+    int v = MAX(r, MAX(g, b)), d = v - MIN(r, MIN(g, b));
+    int h = 0, sat = 0;
+    if (d) {
+        int n = r == v ? g - b : (g == v ? 2 * d + b - r : 4 * d + r - g);
+        if (n < 0) {
+            n += 6 * d;
+        }
+        h = (int)((float)(255 * n) / (float)(6 * d));
+        sat = (int)((float)(255 * d) / (float)v);
+    }
+    out[0] = (UINT8)h;
+    out[1] = (UINT8)sat;
+    out[2] = (UINT8)v;
+    out[3] = in[3];
+}
+
+static void
+rgb2hsv_fast(UINT8 *out, const UINT8 *in, int xsize) {
+    int x = 0;
+#if defined(IMAGING_SIMD_AVX2)
+    {
+        const __m256i m8 = _mm256_set1_epi32(0xff), zero = _mm256_setzero_si256();
+        const __m256i alpha = _mm256_set1_epi32((int)0xff000000);
+        for (; x + 8 <= xsize; x += 8) {
+            __m256i px = _mm256_loadu_si256((const __m256i *)(in + x * 4));
+            __m256i r = _mm256_and_si256(px, m8);
+            __m256i g = _mm256_and_si256(_mm256_srli_epi32(px, 8), m8);
+            __m256i b = _mm256_and_si256(_mm256_srli_epi32(px, 16), m8);
+            __m256i v = _mm256_max_epi32(r, _mm256_max_epi32(g, b));
+            __m256i d =
+                _mm256_sub_epi32(v, _mm256_min_epi32(r, _mm256_min_epi32(g, b)));
+            __m256i rmax = _mm256_cmpeq_epi32(r, v);
+            __m256i gmax = _mm256_andnot_si256(rmax, _mm256_cmpeq_epi32(g, v));
+            __m256i d2 = _mm256_add_epi32(d, d), d4 = _mm256_add_epi32(d2, d2);
+            __m256i d6 = _mm256_add_epi32(d4, d2);
+            __m256i n = _mm256_add_epi32(d4, _mm256_sub_epi32(r, g));
+            n = _mm256_blendv_epi8(
+                n, _mm256_add_epi32(d2, _mm256_sub_epi32(b, r)), gmax
+            );
+            n = _mm256_blendv_epi8(n, _mm256_sub_epi32(g, b), rmax);
+            n = _mm256_add_epi32(n, _mm256_and_si256(_mm256_cmpgt_epi32(zero, n), d6));
+            __m256i flat = _mm256_cmpeq_epi32(d, zero);
+            __m256i h = _mm256_cvttps_epi32(_mm256_div_ps(
+                _mm256_cvtepi32_ps(_mm256_sub_epi32(_mm256_slli_epi32(n, 8), n)),
+                _mm256_cvtepi32_ps(d6)
+            ));
+            __m256i sat = _mm256_cvttps_epi32(_mm256_div_ps(
+                _mm256_cvtepi32_ps(_mm256_sub_epi32(_mm256_slli_epi32(d, 8), d)),
+                _mm256_cvtepi32_ps(v)
+            ));
+            h = _mm256_andnot_si256(flat, h);
+            sat = _mm256_andnot_si256(flat, sat);
+            _mm256_storeu_si256(
+                (__m256i *)(out + x * 4),
+                _mm256_or_si256(
+                    _mm256_or_si256(h, _mm256_slli_epi32(sat, 8)),
+                    _mm256_or_si256(
+                        _mm256_slli_epi32(v, 16), _mm256_and_si256(px, alpha)
+                    )
+                )
+            );
+        }
+    }
+#endif
+#if defined(IMAGING_SIMD_SSE4)
+    {
+        const __m128i m8 = _mm_set1_epi32(0xff), zero = _mm_setzero_si128();
+        const __m128i alpha = _mm_set1_epi32((int)0xff000000);
+        for (; x + 4 <= xsize; x += 4) {
+            __m128i px = _mm_loadu_si128((const __m128i *)(in + x * 4));
+            __m128i r = _mm_and_si128(px, m8);
+            __m128i g = _mm_and_si128(_mm_srli_epi32(px, 8), m8);
+            __m128i b = _mm_and_si128(_mm_srli_epi32(px, 16), m8);
+            __m128i v = _mm_max_epi32(r, _mm_max_epi32(g, b));
+            __m128i d = _mm_sub_epi32(v, _mm_min_epi32(r, _mm_min_epi32(g, b)));
+            __m128i rmax = _mm_cmpeq_epi32(r, v);
+            __m128i gmax = _mm_andnot_si128(rmax, _mm_cmpeq_epi32(g, v));
+            __m128i d2 = _mm_add_epi32(d, d), d4 = _mm_add_epi32(d2, d2);
+            __m128i d6 = _mm_add_epi32(d4, d2);
+            __m128i n = _mm_add_epi32(d4, _mm_sub_epi32(r, g));
+            n = _mm_blendv_epi8(n, _mm_add_epi32(d2, _mm_sub_epi32(b, r)), gmax);
+            n = _mm_blendv_epi8(n, _mm_sub_epi32(g, b), rmax);
+            n = _mm_add_epi32(n, _mm_and_si128(_mm_cmpgt_epi32(zero, n), d6));
+            __m128i flat = _mm_cmpeq_epi32(d, zero);
+            __m128i h = _mm_cvttps_epi32(_mm_div_ps(
+                _mm_cvtepi32_ps(_mm_sub_epi32(_mm_slli_epi32(n, 8), n)),
+                _mm_cvtepi32_ps(d6)
+            ));
+            __m128i sat = _mm_cvttps_epi32(_mm_div_ps(
+                _mm_cvtepi32_ps(_mm_sub_epi32(_mm_slli_epi32(d, 8), d)),
+                _mm_cvtepi32_ps(v)
+            ));
+            h = _mm_andnot_si128(flat, h);
+            sat = _mm_andnot_si128(flat, sat);
+            _mm_storeu_si128(
+                (__m128i *)(out + x * 4),
+                _mm_or_si128(
+                    _mm_or_si128(h, _mm_slli_epi32(sat, 8)),
+                    _mm_or_si128(_mm_slli_epi32(v, 16), _mm_and_si128(px, alpha))
+                )
+            );
+        }
+    }
+#elif defined(IMAGING_SIMD_NEON)
+    for (; x + 16 <= xsize; x += 16) {
+        uint8x16x4_t px = vld4q_u8(in + x * 4);
+        uint8x16_t v8 = vmaxq_u8(px.val[0], vmaxq_u8(px.val[1], px.val[2]));
+        uint8x16_t min8 = vminq_u8(px.val[0], vminq_u8(px.val[1], px.val[2]));
+        uint16x8_t hq[2], sq[2];
+        int k;
+        for (k = 0; k < 4; k++) {
+#define HSV_Q(plane)                                                            \
+    vreinterpretq_s32_u32(                                                      \
+        k % 2 ? vmovl_high_u16(                                                 \
+                    k < 2 ? vmovl_u8(vget_low_u8(plane)) : vmovl_high_u8(plane) \
+                )                                                               \
+              : vmovl_u16(vget_low_u16(                                         \
+                    k < 2 ? vmovl_u8(vget_low_u8(plane)) : vmovl_high_u8(plane) \
+                ))                                                              \
+    )
+            int32x4_t r = HSV_Q(px.val[0]), g = HSV_Q(px.val[1]), b = HSV_Q(px.val[2]);
+            int32x4_t v = HSV_Q(v8);
+            int32x4_t d = vsubq_s32(v, HSV_Q(min8));
+#undef HSV_Q
+            uint32x4_t rmax = vceqq_s32(r, v);
+            uint32x4_t gmax = vbicq_u32(vceqq_s32(g, v), rmax);
+            int32x4_t d2 = vaddq_s32(d, d), d4 = vaddq_s32(d2, d2);
+            int32x4_t d6 = vaddq_s32(d4, d2);
+            int32x4_t n = vbslq_s32(
+                rmax,
+                vsubq_s32(g, b),
+                vbslq_s32(
+                    gmax, vaddq_s32(d2, vsubq_s32(b, r)), vaddq_s32(d4, vsubq_s32(r, g))
+                )
+            );
+            n = vaddq_s32(n, vandq_s32(vreinterpretq_s32_u32(vcltzq_s32(n)), d6));
+            uint32x4_t flat = vceqzq_s32(d);
+            int32x4_t h = vcvtq_s32_f32(
+                vdivq_f32(vcvtq_f32_s32(vmulq_n_s32(n, 255)), vcvtq_f32_s32(d6))
+            );
+            int32x4_t sat = vcvtq_s32_f32(
+                vdivq_f32(vcvtq_f32_s32(vmulq_n_s32(d, 255)), vcvtq_f32_s32(v))
+            );
+            h = vbicq_s32(h, vreinterpretq_s32_u32(flat));
+            sat = vbicq_s32(sat, vreinterpretq_s32_u32(flat));
+            if (k % 2 == 0) {
+                hq[k / 2] =
+                    vcombine_u16(vmovn_u32(vreinterpretq_u32_s32(h)), vdup_n_u16(0));
+                sq[k / 2] =
+                    vcombine_u16(vmovn_u32(vreinterpretq_u32_s32(sat)), vdup_n_u16(0));
+            } else {
+                hq[k / 2] = vcombine_u16(
+                    vget_low_u16(hq[k / 2]), vmovn_u32(vreinterpretq_u32_s32(h))
+                );
+                sq[k / 2] = vcombine_u16(
+                    vget_low_u16(sq[k / 2]), vmovn_u32(vreinterpretq_u32_s32(sat))
+                );
+            }
+        }
+        px.val[0] = vcombine_u8(vmovn_u16(hq[0]), vmovn_u16(hq[1]));
+        px.val[1] = vcombine_u8(vmovn_u16(sq[0]), vmovn_u16(sq[1]));
+        px.val[2] = v8;
+        vst4q_u8(out + x * 4, px);
+    }
+#endif
+    for (; x < xsize; x++) {
+        rgb2hsv_fast_pixel(out + x * 4, in + x * 4);
+    }
+}
+
 static void
 hsv2rgb(UINT8 *out, const UINT8 *in, int xsize) {  // following colorsys.py
 
@@ -2325,6 +2505,9 @@ fast_converter(ImagingShuffler convert) {
     }
     if (convert == ImagingConvertYCbCr2RGB) {
         return ImagingConvertYCbCr2RGBFast;
+    }
+    if (convert == rgb2hsv) {
+        return rgb2hsv_fast;
     }
     return convert;
 }

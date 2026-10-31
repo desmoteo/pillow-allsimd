@@ -83,9 +83,15 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
      - at most 1 level; against the float formulas 0.3% and 0.06% of values
        off by one, against 47% and 32% for the exact result
 
+   * - :py:meth:`~PIL.Image.Image.convert` RGB, RGBA, RGBX → HSV
+     - the same formulas, truncated exactly with one division in 32-bit
+       floats per channel
+     - 2.9x, 2.0x
+     - hue 1 above the exact result for 0.3% of colours; saturation and value
+       the same
+
 Other operations, and other arguments of these, use the exact kernels in
-fast mode too. More fast kernels are planned: RGB→HSV, and the affine,
-perspective and quad transforms.
+fast mode too. Fast affine, perspective and quad transforms are planned.
 
 Functions
 ---------

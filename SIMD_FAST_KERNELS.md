@@ -141,3 +141,38 @@ whole domain are the same on SSE4, AVX2, NEON and scalar builds.
 `Tests/test_fast_mode.py` (difference from exact over a lattice of every
 third value, accuracy against the float formulas, palette images
 unchanged). Hashes: `fast: ycbcr`.
+
+## RGB → HSV (`Convert.c`, `rgb2hsv_fast`)
+
+**Operation.** `Image.convert("HSV")` from RGB, RGBA and RGBX, switched in
+`fast_converter()`.
+
+**Exact path.** colorsys's formulas in float32 for the ratios and double for
+`h / 6 + 1` modulo 1, then truncated: `(int)(h * 255.0)`. The float steps
+sometimes land just below an integer the exact ratio reaches, and the
+truncation then gives 1 less.
+
+**Fast kernel.** The same formulas, truncated exactly: with `d = max - min`
+and the hue's numerator `n` (`g - b`, `2d + b - r` or `4d + r - g` by the
+largest channel, Pillow's tie order, plus `6d` if negative),
+`h = floor(255 n / 6d)`, `s = floor(255 d / max)`, `v = max`. One float32
+division gives each floor exactly: the numerator and denominator are
+integers below 2^24, and a quotient that isn't an integer is at least
+1/1530 from one, far more than the division's rounding error, so the result
+doesn't depend on the floating-point unit. Integer channels, selects and the
+division in 8 (AVX2), 4 (SSE4) or 4 × 4 (NEON, after `vld4q`) lanes; pixels
+with `max == min` are masked to 0, as before.
+
+**Accuracy** (all 2^24 inputs): equal to the exact integer floors;
+saturation and value equal to the exact path's everywhere, hue 1 above it
+for 0.28% of inputs and equal elsewhere. The same hash on SSE4, AVX2, NEON
+and scalar builds.
+
+**Speed** (2560x1600 RGB, one core, ms, exact → fast; OpenCV in brackets):
+x86 AVX2 8.96 → 3.06 (2.9x) [3.66]; arm64 NEON 35.57 → 17.74 (2.0x)
+[13.61]. On arm64 the two divisions per four lanes dominate; a reciprocal
+estimate with an exact integer correction step would remove them.
+
+**Code map.** `rgb2hsv_fast()`, with `rgb2hsv_fast_pixel()` defining the
+result. Tests: `Tests/test_fast_mode.py` (the floors over a lattice of every
+third value, saturation and value equal to exact). Hashes: `fast: hsv`.

@@ -83,6 +83,10 @@ Based on Pillow 13.0.0
   coefficients and one rounding: within 1 level of the exact result and
   closer to the formulas (0.3% of values off by one, against 47%); to YCbCr
   1.5x (x86) and 2.2x (arm64), back 1.3x and 1.7x
+- Fast mode: RGB, RGBA, RGBX -> HSV with the hue and saturation truncated
+  exactly (one 32-bit float division each): the hue is 1 above the exact
+  result for 0.3% of colours, saturation and value are the same; 2.9x (x86),
+  2.0x (arm64)
 - Pixel conversions written so that they vectorize under Python's
   ``-fno-strict-overflow`` (RGBA -> RGB 1.9x, RGB -> RGBA 1.9x, L -> RGB
   2.1x with AVX2); NEON loops for L -> RGB, RGB <-> RGBA and CMYK
