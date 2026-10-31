@@ -203,9 +203,12 @@ multiply-adds differently on x86 and arm64.
   the numerators and the denominator as exact integers (coefficients times
   2^36, below 2^53, so in doubles a fused or separate multiply-add gives
   the same sums), then `p = n * (512 / d)`, one IEEE division and one
-  product, which every unit computes alike, truncated to 1/512 pixel: two
-  lanes per step on SSE4 (`divpd`), four on AVX2 (`vdivpd`), two on NEON
-  (`fdiv`), truncated by `cvttpd2dq` or `fcvtzs`.
+  product, which every unit computes alike, truncated to 1/512 pixel. For
+  images below 32768 pixels on both sides the sums are converted to 32-bit
+  floats first (p stays below 2^24, where a float's step is at most 1/512
+  pixel), so a division takes four lanes on SSE4 and NEON (`divps`,
+  `fdiv .4s`) and eight on AVX2, truncated by `cvttps2dq` or `fcvtzs`;
+  larger images use doubles. FP16 can't hold p (it stops at 65504).
 - Each position, minus half a pixel, is rounded to 1/256 pixel; the integer
   part picks the pixels, the fraction the weights. A pixel is outside if
   its position is (the exact path's test, at the fixed point's
@@ -261,14 +264,16 @@ brackets):
 | rotate 30° RGB bilinear | 39.6 → 14.8 (2.7x) [29.9] | 108.3 → 41.1 (2.6x) [35.4] |
 | rotate 30° RGB bicubic | 98.3 → 33.6 (2.9x) [62.7] | 263.7 → 78.6 (3.4x) [79.2] |
 | rotate 30° RGBA bicubic | 109.0 → 40.7 (2.7x) | 340.9 → 97.3 (3.5x) |
-| perspective RGB bilinear | 32.3 → 15.2 (2.1x) | 117.5 → 61.5 (1.9x) |
+| perspective RGB bilinear | 32.3 → 15.2 (2.1x) | 117.5 → 50.5 (2.3x) |
 | rotate 30° L bilinear | 35.1 → 12.5 (2.8x) | 60.8 → 31.7 (1.9x) |
 | perspective L bilinear | 27.1 → 14.1 (1.9x) | 67.5 → 48.7 (1.4x) |
 | rotate 30° L bicubic | 84.4 → 43.5 (1.9x) | 126.6 → 69.5 (1.8x) |
 
 The x86 machine had a browser running for this table; OpenCV's numbers
-are from a quiet run. On arm64 the perspective's divisions dominate (fast
-affine positions 42 ms, perspective 55 ms for the same shift).
+are from a quiet run. On arm64 the perspective's divisions dominated (fast
+affine positions 42 ms, perspective 55 ms for the same shift, with doubles);
+in floats it went from 60.7 to 50.5 ms. On x86 the floats change nothing
+(14.2 against 14.0 ms): the divisions weren't the cost there.
 
 **Code map.** `tf_map_init()` and `tf_region_ok()` set up and check the
 fixed point; `tf_row()` gives the positions and kinds of a row;

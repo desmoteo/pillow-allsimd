@@ -229,3 +229,127 @@ the 5x5 ones (63.5 vs 102.8), the unsharp mask (74.8 vs 97.8) and
 RGB→RGBA. Geomean over all 109 cases against Pillow 13, at 28b55224b:
 NEON 2.40x against OpenCV's 2.06x; on x86 AVX2 5.22x, AVX-VNNI 5.34x
 against 3.40x.
+
+## Round 2: after fast mode (results at 7fab6973b)
+
+Every case where OpenCV, libvips or ImageMagick beat the fastest
+Pillow-AllSIMD build (exact or fast mode) by 3% or more in the published
+run: 29 cases on x86, 42 on arm64. Grouped by cause, with what this round
+changed (x86 numbers: Docker -O3, CPU 2; arm64: Jetson Orin, CPU 2).
+
+### Benchmark artifacts, fixed in pillow-allsimd-perf
+
+- `codec/thumbnail/jpeg`: Pillow took 0.02 ms against 9 to 21 ms for the
+  others. `draft()` already gave the 320x200 size, so `thumbnail()`
+  returned without decoding; the case now loads the image.
+- `codec/encode/png` against libvips (1.6x, 1.5x): libvips' `pngsave`
+  writes no row filter by default, a 12.2 MB file against Pillow's 7.5 MB.
+  With `filter="all"`, the adaptive filtering Pillow, libpng (OpenCV) and
+  ImageMagick do, it takes 671 ms against Pillow-AllSIMD's 561 and OpenCV's
+  530; the benchmark now asks for it.
+
+### Bytes per pixel (structural)
+
+Pillow keeps RGB in 4 bytes per pixel, OpenCV in 3. The memory-bound
+operations run at the same bandwidth as OpenCV's and so take about 4/3 of
+its time: `chops/RGB/difference` moves 48 MB in 1.91 ms (25 GB/s), OpenCV 36
+MB in 1.37 ms (26 GB/s). The same for the other chops, flips and rotate
+180, `point/RGB/invert`, L -> RGB, RGB <-> RGBA, fast blend and reduce by 2
+(1.1x to 1.45x). Each call also writes a freshly allocated output, as
+OpenCV's do. The 3x3 min, max and median filters on RGB (1.3x to 1.7x) are
+in this group too: min and max are already separable, through a ring of
+row results.
+
+### Closed or narrowed this round
+
+| Case | Before | After | Other |
+|---|---|---|---|
+| `blur/box/RGB/2`, x86 | 9.56 ms | 5.71 ms | OpenCV 3.20 |
+| `blur/box/RGB/1`, x86 | 8.65 ms | 4.14 ms | OpenCV 2.72 |
+| `codec/decode/webp`, x86 | 105.0 ms | 76.1 ms | OpenCV 78.9 |
+| `codec/decode/jpeg`, x86 | 16.7 ms | 15.9 ms | (ahead before) |
+| `blur/box/RGB/2`, arm64 | 20.10 ms | 15.54 ms | OpenCV 10.43 |
+| `point/L/table`, arm64 | 3.55 ms | 1.87 ms | OpenCV 2.58 |
+| `point/RGB/table`, arm64 | 10.14 ms | 7.89 ms | OpenCV 7.76 |
+| `codec/decode/webp`, arm64 | 108.6 ms | 93.0 ms | OpenCV 94.3 |
+| `rotate/RGB/perspective/bilinear`, fast, arm64 | 60.7 ms | 50.5 ms | OpenCV 39.1 |
+
+- **Box blur** with one pass each way: the horizontal result went through
+  a full temporary image (16 MB to allocate, write and read back). Now each
+  row is blurred horizontally into a ring of 2r + 3 rows just before the
+  vertical pass reads it, for the radii the direct kernel takes (integers
+  up to 4, and below 1). Same pixels. Radius 3 is now level with OpenCV
+  (6.98 against 6.52 ms); radius 10 keeps the running sums.
+- **WebP**: Pillow decodes every file through libwebp's animation decoder,
+  which composes a canvas, then copies the frame into a bytes object and
+  again into the image. One-frame files now decode with `WebPDecode`
+  straight into the image's memory (the decoder's own first-frame path,
+  so the same pixels). libwebp alone: 74.5 ms through the simple API, 94.6
+  through the animation decoder.
+- **JPEG**: libjpeg-turbo writes RGB images as 4-byte pixels itself
+  (`JCS_EXT_RGBX`) instead of Pillow expanding each row.
+- **PNG**: the "up" filter is undone 16 bytes at a time.
+- **Lookup tables on arm64** (`point()` with a table, 1.3x behind): NEON
+  looks up 16 bytes in a 256-entry table with one `tbl` and three `tbx`.
+  RGB rows are split into band planes first, so each band's table is
+  loaded once per row (looking up the three bands of 16 pixels with their
+  tables reloaded gained nothing: 10.1 ms).
+- **Fast-mode perspective on arm64** (1.6x behind): positions in 32-bit
+  floats, four lanes per division instead of two (see below).
+
+### Tried and not kept
+
+- PNG sub, average and Paeth one pixel per vector step, as libpng does:
+  1.4x to 2.2x slower than the scalar loops (Paeth 80 -> 152 ms per
+  2560x1600 image). The left neighbour makes each pixel wait for the one
+  before, a chain of about ten vector operations, where the scalar code
+  runs the 3 or 4 byte positions as independent chains.
+- JPEG encoding from 4-byte pixels (`JCS_EXT_RGBX` input): 3 to 7% slower
+  than packing them to 3 bytes first.
+- WebP encoding through libwebp's own importers instead of Pillow's
+  per-pixel loop: 0.5%, within noise.
+- zlib-ng: Pillow's 13.0 wheel links zlib-ng 2.3.3; against Debian's zlib
+  1.3.1 it inflates rows without filters in the same 60 ms and deflates at
+  level 6 in about the same time (515 against 530 ms, the same 7.51 MB
+  file), so it isn't worth a build dependency for this data.
+
+### What remains, and why
+
+- **PNG decode** (1.15x): inflate is about 60% of it; the rest is the
+  scalar Paeth and sub filters (above). **WebP on arm64** and **WebP
+  encode** (1.07x to 1.14x): libwebp itself, Debian's 1.5.0 against
+  OpenCV's bundled build.
+- **RGBA upscales** (x86 1.4x to 1.6x, arm64 3.4x): OpenCV resizes RGBA
+  without premultiplying. Pillow premultiplies the source, resizes and
+  unpremultiplies the 18.8 Mpx result (about a third of the arm64 time),
+  and its 4-channel bilinear upscale is itself about 2x OpenCV's on arm64,
+  which fusing the two resize passes (APPROXIMATE_KERNELS_PLAN.md, item 5)
+  would address.
+- **`point/L/table` on x86** (1.46x): AVX2 has no 256-entry byte shuffle
+  (`vpermb` needs AVX-512 VBMI), so the lookups stay scalar.
+- **HSV and YCbCr -> RGB on arm64** (1.3x): HSV's two divisions per four
+  lanes (a reciprocal with an integer correction was slower, round 1);
+  YCbCr's 32-bit products, which a 16-bit form would make coarser.
+- **Reduce by 4 and L rotate 90 on arm64** (1.7x, 1.4x): generic NEON
+  paths, on operations of 1.4 to 1.6 ms.
+- **Drawing**: text (Hershey strokes, not comparable) and outline polygons
+  (the scan and the wide lines, as before).
+
+### FP16
+
+Where Pillow-AllSIMD computes in floats, FP16 doesn't fit:
+
+- The exact paths that use floats (HSV, blend, float kernel filters, the
+  transforms and the resize of F, I and I;16 images in doubles) must keep
+  their float arithmetic to keep their results.
+- Fast mode's kernels are integer, except two divisions. HSV's must give
+  exact floors of 255 n / 6d, beyond FP16's 11-bit significand.
+  Perspective positions reach 512 times the image width, beyond FP16's
+  largest value, 65504. Perspective now uses FP32 instead of FP64, which
+  holds them within 1/512 pixel below 32768 pixels a side.
+- The one place FP16 arithmetic could double throughput is the float
+  kernel filters on arm64 (Cortex-A78 has FP16 vectors, 8 lanes). But x86
+  has no FP16 arithmetic before AVX512-FP16 (the Core Ultra 9 has none),
+  so a fast kernel that gives the same result everywhere would emulate
+  FP16 rounding in FP32 there, slower than the FP32 kernel; and these
+  filters already beat OpenCV on both machines.
