@@ -746,26 +746,25 @@ ImagingDrawLine(Imaging im, int x0, int y0, int x1, int y1, const void *ink_, in
     return 0;
 }
 
-int
-ImagingDrawWideLine(
+/* A wide line as a quadrilateral, through hline (the image's own, or one
+   that applies a mask). */
+static int
+wide_line(
     Imaging im,
+    DRAW *draw,
+    INT32 ink,
     int x0,
     int y0,
     int x1,
     int y1,
-    const void *ink_,
     int width,
-    int op,
+    hline_handler hline,
     Imaging mask
 ) {
-    DRAW *draw;
-    INT32 ink;
     int dx, dy;
     double big_hypotenuse, small_hypotenuse, ratio_max, ratio_min;
     int dxmin, dxmax, dymin, dymax;
     Edge e[4];
-
-    DRAWINIT();
 
     dx = x1 - x0;
     dy = y1 - y0;
@@ -796,8 +795,28 @@ ImagingDrawWideLine(
         add_edge(e + 2, vertices[2][0], vertices[2][1], vertices[3][0], vertices[3][1]);
         add_edge(e + 3, vertices[3][0], vertices[3][1], vertices[0][0], vertices[0][1]);
 
-        polygon_generic(im, 4, e, ink, 0, draw->hline, mask);
+        return polygon_generic(im, 4, e, ink, 0, hline, mask);
     }
+}
+
+int
+ImagingDrawWideLine(
+    Imaging im,
+    int x0,
+    int y0,
+    int x1,
+    int y1,
+    const void *ink_,
+    int width,
+    int op,
+    Imaging mask
+) {
+    DRAW *draw;
+    INT32 ink;
+
+    DRAWINIT();
+
+    wide_line(im, draw, ink, x0, y0, x1, y1, width, draw->hline, mask);
     return 0;
 }
 
@@ -858,6 +877,37 @@ ImagingDrawRectangle(
     return 0;
 }
 
+/* The edge list of a filled polygon; e has room for count edges. */
+static int
+polygon_edges(int count, const int *xy, Edge *e) {
+    int i, n, x0, y0, x1, y1;
+    for (i = n = 0; i < count - 1; i++) {
+        x0 = xy[i * 2];
+        y0 = xy[i * 2 + 1];
+        x1 = xy[i * 2 + 2];
+        y1 = xy[i * 2 + 3];
+        if (y0 == y1 && i != 0 && y0 == xy[i * 2 - 1]) {
+            // This is a horizontal line,
+            // that immediately follows another horizontal line
+            Edge *last_e = &e[n - 1];
+            if (x1 > x0 && x0 > xy[i * 2 - 2]) {
+                // They are both increasing in x
+                last_e->xmax = x1;
+                continue;
+            } else if (x1 < x0 && x0 < xy[i * 2 - 2]) {
+                // They are both decreasing in x
+                last_e->xmin = x1;
+                continue;
+            }
+        }
+        add_edge(&e[n++], x0, y0, x1, y1);
+    }
+    if (xy[i * 2] != xy[0] || xy[i * 2 + 1] != xy[1]) {
+        add_edge(&e[n++], xy[i * 2], xy[i * 2 + 1], xy[0], xy[1]);
+    }
+    return n;
+}
+
 int
 ImagingDrawPolygon(
     Imaging im,
@@ -880,37 +930,13 @@ ImagingDrawPolygon(
     DRAWINIT();
 
     if (fill) {
-        /* Build edge list */
         /* malloc check ok, using calloc */
         Edge *e = calloc(count, sizeof(Edge));
         if (!e) {
             (void)ImagingError_MemoryError();
             return -1;
         }
-        for (i = n = 0; i < count - 1; i++) {
-            x0 = xy[i * 2];
-            y0 = xy[i * 2 + 1];
-            x1 = xy[i * 2 + 2];
-            y1 = xy[i * 2 + 3];
-            if (y0 == y1 && i != 0 && y0 == xy[i * 2 - 1]) {
-                // This is a horizontal line,
-                // that immediately follows another horizontal line
-                Edge *last_e = &e[n - 1];
-                if (x1 > x0 && x0 > xy[i * 2 - 2]) {
-                    // They are both increasing in x
-                    last_e->xmax = x1;
-                    continue;
-                } else if (x1 < x0 && x0 < xy[i * 2 - 2]) {
-                    // They are both decreasing in x
-                    last_e->xmin = x1;
-                    continue;
-                }
-            }
-            add_edge(&e[n++], x0, y0, x1, y1);
-        }
-        if (xy[i * 2] != xy[0] || xy[i * 2 + 1] != xy[1]) {
-            add_edge(&e[n++], xy[i * 2], xy[i * 2 + 1], xy[0], xy[1]);
-        }
+        n = polygon_edges(count, xy, e);
         polygon_generic(im, n, e, ink, 0, draw->hline, mask);
         free(e);
 
@@ -946,85 +972,203 @@ ImagingDrawPolygon(
     return 0;
 }
 
+/* A polygon's fill as spans per row, the mask for its inside outline. */
+typedef struct {
+    hline_handler hline; /* the image's own, unmasked */
+    int y0, rows;        /* rows y0 .. y0 + rows - 1 */
+    int *first;          /* row r's spans: first[r] .. first[r + 1] - 1 */
+    int *spans;          /* n (y, x0, x1) triples; once built, sorted by row
+                            and x0 and disjoint within a row */
+    int n, cap;
+    int failed;
+} SpanMask;
+
+/* Records the span that hline8 would fill in an L image of im's size. */
+static void
+hline_record(Imaging im, int x0, int y0, int x1, int ink, Imaging mask) {
+    SpanMask *m = (SpanMask *)mask;
+    if (y0 < 0 || y0 >= im->ysize || x0 >= im->xsize || x1 < 0) {
+        return;
+    }
+    x0 = x0 < 0 ? 0 : x0;
+    x1 = x1 >= im->xsize ? im->xsize - 1 : x1;
+    if (x0 > x1 || m->failed) {
+        return;
+    }
+    if (m->n == m->cap) {
+        int cap = m->cap ? m->cap * 2 : 256;
+        int *p = realloc(m->spans, sizeof(int) * 3 * (size_t)cap);
+        if (!p) {
+            m->failed = 1;
+            return;
+        }
+        m->spans = p;
+        m->cap = cap;
+    }
+    m->spans[3 * m->n] = y0;
+    m->spans[3 * m->n + 1] = x0;
+    m->spans[3 * m->n + 2] = x1;
+    m->n++;
+}
+
+/* Sorts the recorded spans by row (counting) and x0 (insertion, rows
+   have a few), merges those that overlap or touch, and indexes them by
+   row. */
+static int
+span_mask_build(SpanMask *m) {
+    int i, r, k, end, ymax, *out;
+    if (m->failed) {
+        return -1;
+    }
+    if (!m->n) {
+        return 0;
+    }
+    m->y0 = ymax = m->spans[0];
+    for (i = 1; i < m->n; i++) {
+        const int y = m->spans[3 * i];
+        m->y0 = y < m->y0 ? y : m->y0;
+        ymax = y > ymax ? y : ymax;
+    }
+    m->rows = ymax - m->y0 + 1;
+    m->first = calloc((size_t)m->rows + 1, sizeof(int));
+    out = malloc(sizeof(int) * 3 * (size_t)m->n);
+    if (!m->first || !out) {
+        free(out);
+        return -1;
+    }
+    for (i = 0; i < m->n; i++) {
+        m->first[m->spans[3 * i] - m->y0 + 1]++;
+    }
+    for (r = 0; r < m->rows; r++) {
+        m->first[r + 1] += m->first[r];
+    }
+    /* scatter by row; first[r] moves to row r's next free slot */
+    for (i = 0; i < m->n; i++) {
+        const int r_ = m->spans[3 * i] - m->y0;
+        int j = m->first[r_]++;
+        out[3 * j] = m->spans[3 * i];
+        out[3 * j + 1] = m->spans[3 * i + 1];
+        out[3 * j + 2] = m->spans[3 * i + 2];
+    }
+    free(m->spans);
+    m->spans = out;
+    /* first[r] is now row r's end; sort and merge each row in place, and
+       set first[r] to its start among the merged spans */
+    k = 0;
+    end = 0;
+    for (r = 0; r < m->rows; r++) {
+        const int start = end, row_start = k;
+        end = m->first[r];
+        for (i = start + 1; i < end; i++) {
+            const int x0 = out[3 * i + 1], x1 = out[3 * i + 2];
+            int j = i;
+            for (; j > start && out[3 * j - 2] > x0; j--) {
+                out[3 * j + 1] = out[3 * j - 2];
+                out[3 * j + 2] = out[3 * j - 1];
+            }
+            out[3 * j + 1] = x0;
+            out[3 * j + 2] = x1;
+        }
+        for (i = start; i < end; i++) {
+            if (k > row_start && out[3 * i + 1] <= out[3 * k - 1] + 1) {
+                if (out[3 * i + 2] > out[3 * k - 1]) {
+                    out[3 * k - 1] = out[3 * i + 2];
+                }
+                continue;
+            }
+            out[3 * k] = out[3 * i];
+            out[3 * k + 1] = out[3 * i + 1];
+            out[3 * k + 2] = out[3 * i + 2];
+            k++;
+        }
+        m->first[r] = row_start;
+    }
+    m->first[m->rows] = k;
+    m->n = k;
+    return 0;
+}
+
+/* The masked hline: the pixels of x0..x1 in the row's spans, which the
+   image's hline fills unmasked, each once. */
+static void
+hline_spans(Imaging im, int x0, int y0, int x1, int ink, Imaging mask) {
+    const SpanMask *m = (const SpanMask *)mask;
+    const int r = y0 - m->y0;
+    int k;
+    if (r < 0 || r >= m->rows) {
+        return;
+    }
+    for (k = m->first[r]; k < m->first[r + 1]; k++) {
+        const int a = m->spans[3 * k + 1] > x0 ? m->spans[3 * k + 1] : x0;
+        const int b = m->spans[3 * k + 2] < x1 ? m->spans[3 * k + 2] : x1;
+        if (a <= b) {
+            m->hline(im, a, y0, b, ink, NULL);
+        }
+    }
+}
+
 /* The outline of a polygon, width wide around its edges and kept inside
    it: wide lines masked by the polygon's fill, as ImageDraw.polygon() drew
-   them with an image-sized mask. Here the mask covers only the polygon's
-   bounding box, widened by the lines' reach, and is addressed with the
-   image's coordinates, so the pixels are the same; allocating and clearing
-   a whole image per polygon took most of the time. mask_ink is the ink the
-   mask is filled with (only whether its byte is 0 matters). */
+   them with an image-sized mask. The fill is recorded as spans per row by
+   the same scan as the mask's, so the pixels are the same; allocating and
+   clearing a mask per polygon took most of the time. mask_ink is the ink
+   the mask is filled with (only whether its byte is 0 matters). */
 int
 ImagingDrawPolygonInside(
     Imaging im,
     int count,
     int *xy,
-    const void *ink,
+    const void *ink_,
     const void *mask_ink,
     int width,
     int op
 ) {
-    struct ImagingMemoryInstance mask;
-    UINT8 *buf, *zero, **rows;
-    int i, y, x0, y0, x1, y1, margin, rw, result;
+    SpanMask m;
+    DRAW *draw;
+    INT32 ink;
+    int i, result = 0;
 
     if (count <= 0) {
         return 0;
     }
-    x0 = x1 = xy[0];
-    y0 = y1 = xy[1];
-    for (i = 1; i < count; i++) {
-        x0 = xy[i * 2] < x0 ? xy[i * 2] : x0;
-        x1 = xy[i * 2] > x1 ? xy[i * 2] : x1;
-        y0 = xy[i * 2 + 1] < y0 ? xy[i * 2 + 1] : y0;
-        y1 = xy[i * 2 + 1] > y1 ? xy[i * 2 + 1] : y1;
+    DRAWINIT();
+    memset(&m, 0, sizeof(m));
+    m.hline = draw->hline;
+    if (INK8(mask_ink)) {
+        /* malloc check ok, using calloc */
+        Edge *e = calloc(count, sizeof(Edge));
+        if (!e) {
+            (void)ImagingError_MemoryError();
+            return -1;
+        }
+        result = polygon_generic(
+            im, polygon_edges(count, xy, e), e, 1, 0, hline_record, (Imaging)&m
+        );
+        free(e);
     }
-    /* A wide line reaches about width / 2 + 1 pixels from its segment. */
-    margin = width + 2;
-    x0 = x0 - margin > 0 ? x0 - margin : 0;
-    y0 = y0 - margin > 0 ? y0 - margin : 0;
-    x1 = x1 + margin + 1 < im->xsize ? x1 + margin + 1 : im->xsize;
-    y1 = y1 + margin + 1 < im->ysize ? y1 + margin + 1 : im->ysize;
-    if (x0 >= x1 || y0 >= y1) {
-        /* nothing it draws can reach the image */
-        return 0;
-    }
-
-    rw = x1 - x0;
-    buf = calloc((size_t)(y1 - y0), rw);
-    zero = calloc(1, rw);
-    rows = malloc(sizeof(*rows) * (im->ysize > 0 ? im->ysize : 1));
-    if (!buf || !zero || !rows) {
-        free(buf);
-        free(zero);
-        free(rows);
-        (void)ImagingError_MemoryError();
-        return -1;
-    }
-    /* Row y of the mask holds pixels x0 to x1 - 1 at their image x;
-       the rows outside the box, which nothing reaches, read as zero. */
-    for (y = 0; y < im->ysize; y++) {
-        UINT8 *row = y >= y0 && y < y1 ? buf + (size_t)(y - y0) * rw : zero;
-        rows[y] = (UINT8 *)((uintptr_t)row - (uintptr_t)x0);
-    }
-    memset(&mask, 0, sizeof(mask));
-    mask.mode = IMAGING_MODE_L;
-    mask.type = IMAGING_TYPE_UINT8;
-    mask.bands = 1;
-    mask.pixelsize = 1;
-    mask.xsize = im->xsize;
-    mask.ysize = im->ysize;
-    mask.linesize = rw;
-    mask.image8 = rows;
-    mask.image = (char **)rows;
-
-    result = ImagingDrawPolygon(&mask, count, xy, mask_ink, 1, 1, 0, NULL);
     if (result == 0) {
-        result = ImagingDrawPolygon(im, count, xy, ink, 0, width, op, &mask);
+        result = span_mask_build(&m);
     }
-
-    free(rows);
-    free(zero);
-    free(buf);
+    for (i = 0; result == 0 && i < count; i++) {
+        const int j = i + 1 < count ? i + 1 : 0;
+        result = wide_line(
+            im,
+            draw,
+            ink,
+            xy[i * 2],
+            xy[i * 2 + 1],
+            xy[j * 2],
+            xy[j * 2 + 1],
+            width,
+            hline_spans,
+            (Imaging)&m
+        );
+    }
+    free(m.spans);
+    free(m.first);
+    if (result < 0) {
+        (void)ImagingError_MemoryError();
+    }
     return result;
 }
 

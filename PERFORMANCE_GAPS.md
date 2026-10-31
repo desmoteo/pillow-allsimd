@@ -210,10 +210,14 @@ polygons of 12 points, 2 px; pillow-simd-perf `analysis/` and
   Mpx of bounding boxes, for 89 kpx of perimeter), where OpenCV's centred
   stroke needs no inside test. Since 7238975d1 the mask covers the
   polygon's bounding box only, not the image (17.2 -> 2.6 ms for the case).
-- **Next, exact:** keep the mask as each row's inside spans, which the fill
-  computes anyway, and test the wide lines' runs against those spans: no
-  clearing and no filling of the bounding box, the same inside/outside
-  decision per pixel. That removes about 1 ms of the 1.86, below OpenCV.
+- **Spans, exact (2026-10-31):** the mask is now each row's inside spans,
+  recorded from the same scan as the fill (the same clipped hline calls),
+  sorted by row and merged, and the wide lines' runs are cut to them and
+  filled unmasked: no clearing and no filling of the bounding box, the same
+  pixels (hashes over random polygons, modes and inks). The case went from
+  2.0 to 1.8 ms, less than the 1 ms hoped: the scan itself and the twelve
+  wide lines remain. Larger polygons gain more, the work now growing with
+  rows instead of area: 20 polygons of radius 700 px 2.24 -> 1.34 ms.
 
 ### Where OpenCV is now behind (x86)
 

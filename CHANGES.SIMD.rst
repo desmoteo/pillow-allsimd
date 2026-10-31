@@ -102,6 +102,10 @@ Based on Pillow 13.0.0
   reducing_gap uses 3.0, so downscales of 6x and more shrink with reduce()
   first: within 2 levels at photo sizes, 1/8 Lanczos 1.9x (x86) and 2.5x
   (arm64)
+- ImageDraw polygon outlines wider than 1 px keep the polygon's inside as
+  spans per row, from the same scan as its fill, instead of a mask of its
+  bounding box: the same pixels, 1.1x for the benchmark's ROI polygons and
+  1.7x for polygons 1400 px across
 - arm64: RGBa -> RGBA (and so RGBA resize and transforms) divides once per
   pixel instead of once per channel, with the same result for every colour
   and alpha (1.12x)
