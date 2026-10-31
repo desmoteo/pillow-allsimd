@@ -91,14 +91,14 @@ The following image operations are currently SIMD-accelerated:
 
 - Resize (convolution-based resampling), including L images: SSE4, AVX2, AVX-VNNI, NEON;
   F, I and I;16 images in vectors of doubles: SSE4, AVX2, NEON
-- Reduce: SSE4 (any factor), NEON (horizontal factors up to 512); 2x2 and 4x4 for L images on both
+- Reduce: SSE4 (any factor), NEON (horizontal factors up to 512, and 4x4); 2x2 and 4x4 for L images on both
 - Gaussian and box blur: running sums in SSE4, AVX2 (two rows at a time) and
   NEON for the horizontal pass, SSE4 and AVX2 for the vertical pass (L images
   four rows at a time on SSE4, eight on AVX2); radii below 2 and integer radii
   up to 4 without running sums: SSE4, AVX2, NEON. The vertical passes of a
   Gaussian blur run in one sweep down the image
 - Unsharp mask: SSE4, NEON
-- Alpha composition: SSE4, AVX2
+- Alpha composition: SSE4, AVX2, NEON
 - RGBA → RGBa (alpha premultiplication): SSE4, AVX2, NEON
 - RGBa → RGBA (division by alpha): SSE4, AVX2, NEON
 - RGB → L, LA and I, RGBA → LA (grayscale): SSE4, NEON
@@ -111,7 +111,7 @@ The following image operations are currently SIMD-accelerated:
 - 3x3 and 5x5 kernel filters with float kernels (large coefficients): SSE4,
   AVX2 (3x3 only), NEON on 4-byte images; SSE4, AVX2 (3x3 only) on L images
 - Rotate and transforms with bilinear and bicubic filters, 3- and 4-band
-  images: SSE4, AVX2; every architecture transforms in cache-friendly tiles
+  images: SSE4, AVX2, NEON; every architecture transforms in cache-friendly tiles
 - Transposes, 90 and 270 degree rotations, flips and 180 degree rotation:
   SSE4, NEON
 - 3D color lookup tables: SSE4, AVX2, NEON

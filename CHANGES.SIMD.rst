@@ -160,6 +160,17 @@ Based on Pillow 13.0.0
 - ImageDraw.polygon() with an outline wider than 1 px: the mask that keeps
   the outline inside the polygon covers only the polygon, not the whole
   image (100 ROI polygons on 2560x1600: 6.6x). Same pixels
+- arm64: rotate() and the affine, perspective and quad transforms with the
+  bilinear and bicubic filters on RGB and RGBA images in NEON doubles: the
+  scalar filters' integer differences for the 4 bands of two rows in
+  16-bit lanes, converted exactly, then the same fused multiply-adds; two
+  pixels at a time where their source pixels are inside the image. The
+  same pixels; rotate bicubic RGBA 1.59x, RGB 1.32x, bilinear RGB 1.47x,
+  RGBA 1.54x, perspective 1.25x to 1.30x, quad 1.37x (Cortex-A78AE)
+- arm64: alpha_composite() looks the scalar code's per-pixel division up in
+  a table of every source and destination alpha (128 KB, built on first
+  use), with NEON for the rest: the same pixels, 1.25x; reduce() by 4x4 of
+  4-byte images in NEON pairwise sums (1.15x)
 
 Build
 

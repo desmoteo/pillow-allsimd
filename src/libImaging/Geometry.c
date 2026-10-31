@@ -767,12 +767,8 @@ nearest_filter32(void *out, Imaging im, double xin, double yin) {
 #define XCLIP(x) (((x) < 0) ? 0 : ((x) < xsize) ? (x) : xsize - 1)
 #define YCLIP(y) (((y) < 0) ? 0 : ((y) < ysize) ? (y) : ysize - 1)
 
-/* Vector filters for 3- and 4-band 8-bit images, below. Not on arm64: a
-   NEON version (two float64x2_t, contracted to FMA like the scalar code)
-   was 4% faster for bilinear but 12% slower for bicubic and 9% slower for
-   perspective transforms than GCC's code for the scalar filters on a
-   Cortex-A78AE. */
-#if defined(IMAGING_SIMD_SSE4)
+/* Vector filters for 3- and 4-band 8-bit images, below. */
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
 #define TRANSFORM_SIMD
 #endif
 
@@ -1026,6 +1022,7 @@ tv_store_bands(UINT8 *out, INT32 pixel, int bands) {
     }
 }
 
+#if defined(IMAGING_SIMD_SSE4)
 #if defined(IMAGING_SIMD_AVX2)
 typedef __m256d transform_vec;
 
@@ -1218,6 +1215,347 @@ bicubic_filter32RGB_simd(void *out, Imaging im, double xin, double yin) {
     tv_store(out, tv_bicubic(v1, v2, v3, v4, tv_set1(dy)), im->bands);
     return 1;
 }
+#else
+/* NEON. BILINEAR and BICUBIC get bytes in the scalar filters, so b - a and
+   p1 to p4 are integers there, converted to double; the rest is double, with
+   the fused multiply-adds that GCC and clang make of those expressions on
+   arm64. Here the integers are computed for the 4 bands of two rows at
+   once, in 16-bit lanes, and converted through float, which holds them
+   exactly. Converting each byte to double instead, as above, was slower
+   than the scalar filters on a Cortex-A78AE. */
+
+/* Eight 16-bit lanes to four pairs of doubles. */
+static inline void
+tn_double(int16x8_t v, float64x2_t out[4]) {
+    float32x4_t lo = vcvtq_f32_s32(vmovl_s16(vget_low_s16(v)));
+    float32x4_t hi = vcvtq_f32_s32(vmovl_high_s16(v));
+    out[0] = vcvt_f64_f32(vget_low_f32(lo));
+    out[1] = vcvt_high_f64_f32(lo);
+    out[2] = vcvt_f64_f32(vget_low_f32(hi));
+    out[3] = vcvt_high_f64_f32(hi);
+}
+
+/* The pixels at byte offsets x0 and x1, or x0 to x3, of a row. */
+static inline uint8x8_t
+tn_load2(const UINT8 *in, int x0, int x1) {
+    UINT32 p[2];
+    if (x1 == x0 + 4) {
+        return vld1_u8(in + x0);
+    }
+    memcpy(&p[0], in + x0, 4);
+    memcpy(&p[1], in + x1, 4);
+    return vreinterpret_u8_u32(vld1_u32(p));
+}
+
+static inline uint8x16_t
+tn_load4(const UINT8 *in, int x0, int x1, int x2, int x3) {
+    UINT32 p[4];
+    if (x3 == x0 + 12) {
+        return vld1q_u8(in + x0);
+    }
+    memcpy(&p[0], in + x0, 4);
+    memcpy(&p[1], in + x1, 4);
+    memcpy(&p[2], in + x2, 4);
+    memcpy(&p[3], in + x3, 4);
+    return vreinterpretq_u8_u32(vld1q_u32(p));
+}
+
+/* 3 or 4 bands of the pixel in bytes 0-3 of b, or of two pixels, in bytes
+   0-3 and 4-7, stored from the vector register: 3 bytes copied from a
+   general register went through the stack, which stalled. */
+static inline void
+tn_store_bytes(UINT8 *out, uint8x8_t b, int bands, int pixels) {
+    if (bands == 4) {
+        if (pixels == 2) {
+            vst1_u8(out, b);
+        } else {
+            vst1_lane_u32((uint32_t *)out, vreinterpret_u32_u8(b), 0);
+        }
+        return;
+    }
+    vst1_lane_u16((uint16_t *)out, vreinterpret_u16_u8(b), 0);
+    vst1_lane_u8(out + 2, b, 2);
+    if (pixels == 2) {
+        vst1_lane_u16((uint16_t *)(out + 4), vreinterpret_u16_u8(b), 2);
+        vst1_lane_u8(out + 6, b, 6);
+    }
+}
+
+/* Bands 0-1 and 2-3 of a pixel, in 0..255, truncated as (UINT8) does, as
+   32-bit lanes. */
+static inline uint32x4_t
+tn_bands(float64x2_t lo, float64x2_t hi) {
+    return vuzp1q_u32(
+        vreinterpretq_u32_u64(vcvtq_u64_f64(lo)),
+        vreinterpretq_u32_u64(vcvtq_u64_f64(hi))
+    );
+}
+
+static inline void
+tn_store(UINT8 *out, float64x2_t lo, float64x2_t hi, int bands) {
+    uint16x8_t h = vreinterpretq_u16_u32(tn_bands(lo, hi));
+    tn_store_bytes(out, vmovn_u16(vuzp1q_u16(h, h)), bands, 1);
+}
+
+/* The same for two pixels: a table lookup, faster here than narrowing
+   as tn_store does. */
+static inline void
+tn_store2(
+    UINT8 *out,
+    float64x2_t lo0,
+    float64x2_t hi0,
+    float64x2_t lo1,
+    float64x2_t hi1,
+    int bands
+) {
+    uint8x16x4_t t = {
+        {vreinterpretq_u8_u64(vcvtq_u64_f64(lo0)),
+         vreinterpretq_u8_u64(vcvtq_u64_f64(hi0)),
+         vreinterpretq_u8_u64(vcvtq_u64_f64(lo1)),
+         vreinterpretq_u8_u64(vcvtq_u64_f64(hi1))}
+    };
+    tn_store_bytes(out, vqtbl4_u8(t, vcreate_u8(0x3830282018100800)), bands, 2);
+}
+
+/* BILINEAR across two pixels of rows a and b: r[0] and r[1] for bands 0-1
+   and 2-3 of a, r[2] and r[3] of b. */
+static inline void
+tn_bilinear2(uint8x8_t a, uint8x8_t b, float64x2_t d, float64x2_t r[4]) {
+    uint32x2_t ua = vreinterpret_u32_u8(a), ub = vreinterpret_u32_u8(b);
+    /* the first pixels of both rows, then the second ones */
+    uint8x8_t v1 = vreinterpret_u8_u32(vtrn1_u32(ua, ub));
+    uint8x8_t v2 = vreinterpret_u8_u32(vtrn2_u32(ua, ub));
+    float64x2_t f1[4], f2[4];
+    int i;
+    tn_double(vreinterpretq_s16_u16(vmovl_u8(v1)), f1);
+    tn_double(vreinterpretq_s16_u16(vsubl_u8(v2, v1)), f2);
+    for (i = 0; i < 4; i++) {
+        r[i] = vfmaq_f64(f1[i], f2[i], d);
+    }
+}
+
+/* BICUBIC across four pixels of rows a and b, as tn_bilinear2. */
+static inline void
+tn_bicubic2(uint8x16_t a, uint8x16_t b, float64x2_t d, float64x2_t r[4]) {
+    uint32x4_t ua = vreinterpretq_u32_u8(a), ub = vreinterpretq_u32_u8(b);
+    /* pixels 0 and 2 of both rows, then pixels 1 and 3 */
+    uint8x16_t e = vreinterpretq_u8_u32(vtrn1q_u32(ua, ub));
+    uint8x16_t o = vreinterpretq_u8_u32(vtrn2q_u32(ua, ub));
+    int16x8_t v1 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(e)));
+    int16x8_t v2 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(o)));
+    int16x8_t v3 = vreinterpretq_s16_u16(vmovl_high_u8(e));
+    int16x8_t v4 = vreinterpretq_s16_u16(vmovl_high_u8(o));
+    float64x2_t p1[4], p2[4], p3[4], p4[4];
+    int i;
+    tn_double(v2, p1);
+    tn_double(vsubq_s16(v3, v1), p2);
+    tn_double(vsubq_s16(vaddq_s16(vshlq_n_s16(vsubq_s16(v1, v2), 1), v3), v4), p3);
+    tn_double(vaddq_s16(vsubq_s16(vsubq_s16(v2, v1), v3), v4), p4);
+    for (i = 0; i < 4; i++) {
+        r[i] = vfmaq_f64(p1[i], d, vfmaq_f64(p2[i], d, vfmaq_f64(p3[i], d, p4[i])));
+    }
+}
+
+/* The vertical BICUBIC, of doubles; -a + b is b - a, which rounds the same,
+   and 2 (a - b) + c is the same fused or not. */
+static inline float64x2_t
+tn_bicubic_v(
+    float64x2_t v1, float64x2_t v2, float64x2_t v3, float64x2_t v4, float64x2_t d
+) {
+    float64x2_t p2 = vsubq_f64(v3, v1);
+    float64x2_t p3 = vsubq_f64(vaddq_f64(vmulq_n_f64(vsubq_f64(v1, v2), 2.0), v3), v4);
+    float64x2_t p4 = vaddq_f64(vsubq_f64(vsubq_f64(v2, v1), v3), v4);
+    float64x2_t v = vfmaq_f64(v2, d, vfmaq_f64(p2, d, vfmaq_f64(p3, d, p4)));
+    return vminq_f64(vmaxq_f64(v, vdupq_n_f64(0.0)), vdupq_n_f64(255.0));
+}
+
+static int
+bilinear_filter32RGB_simd(void *out, Imaging im, double xin, double yin) {
+    int xsize = im->xsize, ysize = im->ysize;
+    int x, y, x0, x1;
+    double dx, dy;
+    const UINT8 *in0, *in1;
+    float64x2_t r[4], d;
+    if (xin < 0.0 || xin >= xsize || yin < 0.0 || yin >= ysize) {
+        return 0;
+    }
+    xin -= 0.5;
+    yin -= 0.5;
+    x = FLOOR(xin);
+    y = FLOOR(yin);
+    dx = xin - x;
+    dy = yin - y;
+    x0 = XCLIP(x + 0) * 4;
+    x1 = XCLIP(x + 1) * 4;
+    /* a missing second row gives the first row's values, as in the scalar
+       filter */
+    in0 = (UINT8 *)im->image[YCLIP(y)];
+    in1 = y + 1 >= 0 && y + 1 < ysize ? (UINT8 *)im->image[y + 1] : in0;
+    tn_bilinear2(tn_load2(in0, x0, x1), tn_load2(in1, x0, x1), vdupq_n_f64(dx), r);
+    d = vdupq_n_f64(dy);
+    tn_store(
+        out,
+        vfmaq_f64(r[0], vsubq_f64(r[2], r[0]), d),
+        vfmaq_f64(r[1], vsubq_f64(r[3], r[1]), d),
+        im->bands
+    );
+    return 1;
+}
+
+static int
+bicubic_filter32RGB_simd(void *out, Imaging im, double xin, double yin) {
+    int xsize = im->xsize, ysize = im->ysize;
+    int x, y, x0, x1, x2, x3, k;
+    double dx, dy;
+    const UINT8 *in[4];
+    float64x2_t ra[4], rb[4], d;
+    if (xin < 0.0 || xin >= xsize || yin < 0.0 || yin >= ysize) {
+        return 0;
+    }
+    xin -= 0.5;
+    yin -= 0.5;
+    x = FLOOR(xin);
+    y = FLOOR(yin);
+    dx = xin - x;
+    dy = yin - y;
+    x--;
+    y--;
+    x0 = XCLIP(x + 0) * 4;
+    x1 = XCLIP(x + 1) * 4;
+    x2 = XCLIP(x + 2) * 4;
+    x3 = XCLIP(x + 3) * 4;
+    /* a missing row gives the values of the row before, as in the scalar
+       filter */
+    in[0] = (UINT8 *)im->image[YCLIP(y)];
+    for (k = 1; k < 4; k++) {
+        in[k] = y + k >= 0 && y + k < ysize ? (UINT8 *)im->image[y + k] : in[k - 1];
+    }
+    d = vdupq_n_f64(dx);
+    tn_bicubic2(
+        tn_load4(in[0], x0, x1, x2, x3), tn_load4(in[1], x0, x1, x2, x3), d, ra
+    );
+    tn_bicubic2(
+        tn_load4(in[2], x0, x1, x2, x3), tn_load4(in[3], x0, x1, x2, x3), d, rb
+    );
+    d = vdupq_n_f64(dy);
+    tn_store(
+        out,
+        tn_bicubic_v(ra[0], ra[2], rb[0], rb[2], d),
+        tn_bicubic_v(ra[1], ra[3], rb[1], rb[3], d),
+        im->bands
+    );
+    return 1;
+}
+
+/* Two pixels at once, so that their long chains of dependent operations
+   overlap, when both have all their source pixels inside the image: 1.3 to
+   1.6 times as fast as the filters above, one pixel at a time, on a
+   Cortex-A78AE. tn_coords gives the coordinates as those filters do, if
+   source pixels x to x + span - 1 and y to y + span - 1, x and y less
+   margin, are inside the image: compared in double first, so that the
+   conversions don't overflow and (int) floors. */
+static inline int
+tn_coords(
+    Imaging im,
+    double xin,
+    double yin,
+    int margin,
+    int span,
+    int *x,
+    int *y,
+    double *dx,
+    double *dy
+) {
+    xin -= 0.5;
+    yin -= 0.5;
+    if (!(xin >= margin && xin < im->xsize + margin - span + 1 && yin >= margin &&
+          yin < im->ysize + margin - span + 1)) {
+        return 0;
+    }
+    *x = (int)xin;
+    *y = (int)yin;
+    *dx = xin - *x;
+    *dy = yin - *y;
+    *x -= margin;
+    *y -= margin;
+    return 1;
+}
+
+static inline void
+tn_bilinear_rows(Imaging im, int x, int y, double dx, float64x2_t r[4]) {
+    const UINT8 *in0 = (UINT8 *)im->image[y] + x * 4;
+    const UINT8 *in1 = (UINT8 *)im->image[y + 1] + x * 4;
+    tn_bilinear2(vld1_u8(in0), vld1_u8(in1), vdupq_n_f64(dx), r);
+}
+
+static inline void
+tn_bicubic_rows(
+    Imaging im, int x, int y, double dx, float64x2_t ra[4], float64x2_t rb[4]
+) {
+    const UINT8 *in0 = (UINT8 *)im->image[y] + x * 4;
+    const UINT8 *in1 = (UINT8 *)im->image[y + 1] + x * 4;
+    const UINT8 *in2 = (UINT8 *)im->image[y + 2] + x * 4;
+    const UINT8 *in3 = (UINT8 *)im->image[y + 3] + x * 4;
+    float64x2_t d = vdupq_n_f64(dx);
+    tn_bicubic2(vld1q_u8(in0), vld1q_u8(in1), d, ra);
+    tn_bicubic2(vld1q_u8(in2), vld1q_u8(in3), d, rb);
+}
+
+/* The filters above for the pixels at out and out + 4, if both have all
+   their source pixels inside the image; otherwise returns 0, having
+   written nothing. Written with loops over the two pixels for bilinear and
+   without for bicubic, which GCC then interleaves better: 4% to 8% faster
+   each. */
+static inline int
+bilinear_filter32RGB_simd2(
+    UINT8 *out, Imaging im, const double *xin, const double *yin
+) {
+    int x[2], y[2], k;
+    double dx[2], dy[2];
+    float64x2_t r[2][4], v[2][2];
+    for (k = 0; k < 2; k++) {
+        if (!tn_coords(im, xin[k], yin[k], 0, 2, &x[k], &y[k], &dx[k], &dy[k])) {
+            return 0;
+        }
+    }
+    for (k = 0; k < 2; k++) {
+        tn_bilinear_rows(im, x[k], y[k], dx[k], r[k]);
+    }
+    for (k = 0; k < 2; k++) {
+        float64x2_t dv = vdupq_n_f64(dy[k]);
+        v[k][0] = vfmaq_f64(r[k][0], vsubq_f64(r[k][2], r[k][0]), dv);
+        v[k][1] = vfmaq_f64(r[k][1], vsubq_f64(r[k][3], r[k][1]), dv);
+    }
+    tn_store2(out, v[0][0], v[0][1], v[1][0], v[1][1], im->bands);
+    return 1;
+}
+
+static inline int
+bicubic_filter32RGB_simd2(
+    UINT8 *out, Imaging im, const double *xin, const double *yin
+) {
+    int xa, ya, xb, yb;
+    double dxa, dya, dxb, dyb;
+    float64x2_t ra[4], rb[4], sa[4], sb[4], da, db;
+    if (!tn_coords(im, xin[0], yin[0], 1, 4, &xa, &ya, &dxa, &dya) ||
+        !tn_coords(im, xin[1], yin[1], 1, 4, &xb, &yb, &dxb, &dyb)) {
+        return 0;
+    }
+    tn_bicubic_rows(im, xa, ya, dxa, ra, rb);
+    tn_bicubic_rows(im, xb, yb, dxb, sa, sb);
+    da = vdupq_n_f64(dya);
+    db = vdupq_n_f64(dyb);
+    tn_store2(
+        out,
+        tn_bicubic_v(ra[0], ra[2], rb[0], rb[2], da),
+        tn_bicubic_v(ra[1], ra[3], rb[1], rb[3], da),
+        tn_bicubic_v(sa[0], sa[2], sb[0], sb[2], db),
+        tn_bicubic_v(sa[1], sa[3], sb[1], sb[3], db),
+        im->bands
+    );
+    return 1;
+}
+#endif
 #endif
 
 static ImagingTransformFilter
@@ -1420,7 +1758,82 @@ ImagingGenericTransform(
         }                                                                     \
     }
 
-#if defined(TRANSFORM_SIMD)
+#if defined(IMAGING_SIMD_NEON)
+    /* Pairs of pixels through the filters for two when both are inside the
+       image, else one at a time. */
+#define FILTER_PAIR(filter, xs, ys, ok, n)                                           \
+    if ((n) < 2 || !(ok)[0] || !(ok)[1] || !filter##2((UINT8 *)out, imIn, xs, ys)) { \
+        int k;                                                                       \
+        for (k = 0; k < (n); k++) {                                                  \
+            char *p = out + k * imOut->pixelsize;                                    \
+            if ((!(ok)[k] || !filter(p, imIn, (xs)[k], (ys)[k])) && fill) {          \
+                memset(p, 0, imOut->pixelsize);                                      \
+            }                                                                        \
+        }                                                                            \
+    }
+
+#define TRANSFORM_PAIRS(transform, filter)                                     \
+    for (ty = y0; ty < y1; ty += TRANSFORM_TILE) {                             \
+        int ty1 = ty + TRANSFORM_TILE < y1 ? ty + TRANSFORM_TILE : y1;         \
+        for (tx = x0; tx < x1; tx += TRANSFORM_TILE) {                         \
+            int tx1 = tx + TRANSFORM_TILE < x1 ? tx + TRANSFORM_TILE : x1;     \
+            for (y = ty; y < ty1; y++) {                                       \
+                out = imOut->image[y] + tx * imOut->pixelsize;                 \
+                for (x = tx; x < tx1; x += 2) {                                \
+                    double xs[2], ys[2];                                       \
+                    int ok[2] = {1, 1}, i, n = x + 1 < tx1 ? 2 : 1;            \
+                    for (i = 0; i < n; i++) {                                  \
+                        ok[i] = transform(                                     \
+                            &xs[i], &ys[i], x + i - x0, y - y0, transform_data \
+                        );                                                     \
+                    }                                                          \
+                    FILTER_PAIR(filter, xs, ys, ok, n)                         \
+                    out += n * imOut->pixelsize;                               \
+                }                                                              \
+            }                                                                  \
+        }                                                                      \
+    }
+
+#define PERSPECTIVE_PAIRS(filter)                                             \
+    for (ty = y0; ty < y1; ty += TRANSFORM_TILE) {                            \
+        int ty1 = ty + TRANSFORM_TILE < y1 ? ty + TRANSFORM_TILE : y1;        \
+        for (tx = x0; tx < x1; tx += TRANSFORM_TILE) {                        \
+            int i, n = (tx + TRANSFORM_TILE < x1 ? TRANSFORM_TILE : x1 - tx); \
+            for (y = ty; y < ty1; y++) {                                      \
+                double xs[TRANSFORM_TILE], ys[TRANSFORM_TILE];                \
+                static const int ok[2] = {1, 1};                              \
+                perspective_row(xs, ys, transform_data, tx - x0, y - y0);     \
+                out = imOut->image[y] + tx * imOut->pixelsize;                \
+                for (i = 0; i < n; i += 2) {                                  \
+                    int m = i + 1 < n ? 2 : 1;                                \
+                    FILTER_PAIR(filter, xs + i, ys + i, ok, m)                \
+                    out += m * imOut->pixelsize;                              \
+                }                                                             \
+            }                                                                 \
+        }                                                                     \
+    }
+
+    if (transform == affine_transform && filter == bilinear_filter32RGB_simd) {
+        TRANSFORM_PAIRS(affine_transform, bilinear_filter32RGB_simd)
+    } else if (transform == affine_transform && filter == bicubic_filter32RGB_simd) {
+        TRANSFORM_PAIRS(affine_transform, bicubic_filter32RGB_simd)
+    } else if (transform == quad_transform && filter == bilinear_filter32RGB_simd) {
+        TRANSFORM_PAIRS(quad_transform, bilinear_filter32RGB_simd)
+    } else if (transform == quad_transform && filter == bicubic_filter32RGB_simd) {
+        TRANSFORM_PAIRS(quad_transform, bicubic_filter32RGB_simd)
+    } else if (
+        transform == perspective_transform && filter == bilinear_filter32RGB_simd
+    ) {
+        PERSPECTIVE_PAIRS(bilinear_filter32RGB_simd)
+    } else if (
+        transform == perspective_transform && filter == bicubic_filter32RGB_simd
+    ) {
+        PERSPECTIVE_PAIRS(bicubic_filter32RGB_simd)
+    } else
+#undef FILTER_PAIR
+#undef TRANSFORM_PAIRS
+#undef PERSPECTIVE_PAIRS
+#elif defined(TRANSFORM_SIMD)
     /* Direct calls, which the compiler inlines, for the common cases. */
     if (transform == affine_transform && filter == bilinear_filter32RGB_simd) {
         TRANSFORM_TILES(affine_transform, bilinear_filter32RGB_simd)
