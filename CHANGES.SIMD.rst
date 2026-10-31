@@ -71,6 +71,28 @@ Based on Pillow 13.0.0
 - ``checks/simd_test_remote.sh`` runs the test suite per SIMD build in a
   container, on a remote host or locally, so the host's Python version does
   not matter
+- Pixel conversions written so that they vectorize under Python's
+  ``-fno-strict-overflow`` (RGBA -> RGB 1.9x, RGB -> RGBA 1.9x, L -> RGB
+  2.1x with AVX2); NEON loops for L -> RGB, RGB <-> RGBA and CMYK
+- ImageChops ``add`` and ``subtract`` with scale 1 and offset 0 as saturating
+  vector additions (AVX2 1.8x, NEON 2.4x)
+- Rank filters: the 3x3 median in registers also at -O2 (Debian, Ubuntu and
+  conda Pythons: 1.75x), minimum and maximum in one pass (1.4x AVX2, 1.3x
+  NEON)
+- Box and Gaussian blur: radii below 2 and integer radii up to 4 without
+  running sums, in SSE4, AVX2 and NEON (Gaussian RGB radius 1 1.7x on
+  both; box radius 2 1.2x AVX2, 1.6x NEON; unsharp mask 1.2x AVX2, 1.5x
+  NEON)
+- RGB <-> YCbCr: AVX2, and 16 pixels per step on NEON (AVX2 2.0x and 1.9x);
+  RGB -> HSV on NEON (1.4x)
+- Kernel filters: kernels whose coefficients don't fit 16 bits at 13
+  fractional bits (FIND_EDGES, CONTOUR, EDGE_ENHANCE) use the integer
+  kernels at the highest precision that keeps them exact (2.2x AVX2, 2.0x
+  NEON), and EDGE_ENHANCE and other kernels with half-integer coefficients
+  now give the scalar build's result on x86; 3x3 kernels for L images keep
+  their coefficients in registers (1.1x AVX2)
+- Text: glyph advances cached for the basic layout (3.3x x86, 4.2x arm64);
+  polygons: scan-line intersections sorted without qsort (1.25x)
 
 Build
 
