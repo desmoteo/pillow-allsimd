@@ -1281,10 +1281,22 @@ _gaussian_blur_radius(float radius, int passes) {
     return l + a;
 }
 
+/* The extended box radius of each pass, for the fast kernel (GaussianFast.c),
+   which applies the same boxes convolved together. */
+float
+ImagingGaussianBlurBoxRadius(float radius, int passes) {
+    return _gaussian_blur_radius(radius, passes);
+}
+
 Imaging
 ImagingGaussianBlur(
     Imaging imOut, Imaging imIn, float xradius, float yradius, int passes
 ) {
+    /* fast mode, read once for the whole blur */
+    if (passes == 3 && (ImagingGetFast() & IMAGING_FAST_ALL) &&
+        ImagingGaussianBlurFastApplies(imOut, imIn, xradius, yradius)) {
+        return ImagingGaussianBlurFast(imOut, imIn, xradius, yradius);
+    }
     return ImagingBoxBlur(
         imOut,
         imIn,

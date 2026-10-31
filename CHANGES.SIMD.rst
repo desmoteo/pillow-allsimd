@@ -73,9 +73,12 @@ Based on Pillow 13.0.0
   not matter
 - Fast mode switch: ``PILLOW_SIMD_FAST=1``, ``Image.set_fast()``,
   ``Image.get_fast()``, ``Image.fast_mode()`` and the ``fast`` feature.
-  Off by default; it will let operations use kernels whose results may
-  differ from Pillow's by small, documented amounts. No operation has a fast
-  kernel yet (see ``APPROXIMATE_KERNELS_PLAN.md``)
+  Off by default; it lets operations use kernels whose results may differ
+  from Pillow's by small, documented amounts (``SIMD_FAST_KERNELS.md``)
+- Fast mode: GaussianBlur and UnsharpMask up to radius 6 apply Pillow's three
+  box passes as one kernel with 8-bit weights in one pass, with exact bands
+  near the edges: within 3 levels of the exact result, closer to a true
+  Gaussian, 3.3x (x86) and 3.2x (arm64) faster at radius 1
 - Pixel conversions written so that they vectorize under Python's
   ``-fno-strict-overflow`` (RGBA -> RGB 1.9x, RGB -> RGBA 1.9x, L -> RGB
   2.1x with AVX2); NEON loops for L -> RGB, RGB <-> RGBA and CMYK

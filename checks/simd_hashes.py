@@ -4,11 +4,12 @@
 Prints one MD5 per area (quantize, resample F/I/I;16, transposes, raw
 pack/unpack, YCbCr, PNG filters, masked paste, alpha_composite, point and
 ImageEnhance, ImageDraw, rank filters, transforms, blur and unsharp mask,
-8-bit resize and reduce, chops and conversions, unpremultiply), each over
-many sizes and modes. Builds whose kernels are exact give the same hashes:
-SIMD and scalar on one architecture, and x86 and arm64 except where arm64
-compilers fuse multiply-adds (resample F/I/I;16, transforms). The x86
-alpha_composite kernel is known to differ by 1 from the portable one.
+8-bit resize and reduce, chops and conversions, unpremultiply, and the
+fast-mode kernels), each over many sizes and modes. Builds whose kernels
+are exact give the same hashes: SIMD and scalar on one architecture, and
+x86 and arm64 except where arm64 compilers fuse multiply-adds (resample
+F/I/I;16, transforms). The x86 alpha_composite kernel is known to differ
+by 1 from the portable one.
 
 Inputs are made with frombytes only, since RGB to L conversions and RGB
 resizes differ between SIMD and scalar builds. Run from the repository root
@@ -55,6 +56,7 @@ BYTES = {
     "LA": 2,
     "RGB": 3,
     "RGBA": 4,
+    "CMYK": 4,
     "YCbCr": 3,
     "I": 4,
     "F": 4,
@@ -371,6 +373,28 @@ def _(upd: Update) -> None:
             if mode in ("L", "RGB"):
                 for args in ((2, 150, 3), (1, 300, 0), (5, 80, 10)):
                     upd(im.filter(ImageFilter.UnsharpMask(*args)).tobytes())
+
+
+@section("fast: gaussian")
+def _(upd: Update) -> None:
+    # Fast mode (Image.set_fast): its kernels are exact integer arithmetic
+    # too, so every build gives the same hash.
+    if not hasattr(Image, "set_fast"):
+        return
+    previous = Image.get_fast()
+    Image.set_fast(True)
+    try:
+        for mode in ("L", "LA", "RGB", "RGBA", "CMYK"):
+            for size in ((1, 1), (2, 31), (5, 9), (67, 23), (203, 71)):
+                im = noise(mode, size, size[0] + size[1])
+                for r in (0.2, 0.5, 1, 1.5, 2.2, 3, 4.7, 6):
+                    upd(im.filter(ImageFilter.GaussianBlur(r)).tobytes())
+                    upd(im.filter(ImageFilter.GaussianBlur((r, 0))).tobytes())
+                    upd(im.filter(ImageFilter.GaussianBlur((0.7, r))).tobytes())
+                if mode in ("L", "RGB"):
+                    upd(im.filter(ImageFilter.UnsharpMask(2, 150, 3)).tobytes())
+    finally:
+        Image.set_fast(previous)
 
 
 @section("resize 8-bit")

@@ -1,6 +1,9 @@
 # Plan: fast approximate kernels beside the bit-exact ones
 
-Status: decided 2026-10-31 (names, scope, phase 1); phase 0 in progress. Evidence and measurements are in
+Status: decided 2026-10-31 (names, scope, phase 1). Phase 0 (the switch)
+done; phase 1: the Gaussian blur done (see
+[SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md)), YCbCr, HSV and the transforms
+next. Evidence and measurements are in
 [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md).
 
 ## Goal
@@ -81,7 +84,7 @@ same measurements. "Ref." is the error against the float reference: maximum
 
 | # | Operation | Fast kernel | Today (x86 / Jetson ms) | Target | Ref. today | Ref. fast | Notes |
 |---|---|---|---|---|---|---|---|
-| 1 | GaussianBlur, small σ | a true separable Gaussian, ksize 2⌈3σ⌉+1, 8-bit weights summing to 256, vertical then horizontal through one 8-bit row (KleidiCV's scheme), one sweep | 17.9 / 51.5 (σ 1) | 7.8 / 11.2 | 2 / 49% | 1 / 12.5% | Direct taps grow with σ while box passes don't: use it below a measured crossover σ (about 2 to 3), the box passes above. A variant in 8.8 fixed point (OpenCV's) is closer to the reference (0.4%) and 2.3x faster on x86, but only 1.2x on NEON. Unsharp mask inherits it. |
+| 1 | GaussianBlur, small σ | a true separable Gaussian, ksize 2⌈3σ⌉+1, 8-bit weights summing to 256, vertical then horizontal through one 8-bit row (KleidiCV's scheme), one sweep | 17.9 / 51.5 (σ 1) | 7.8 / 11.2 | 2 / 49% | 1 / 12.5% | Direct taps grow with σ while box passes don't: use it below a measured crossover σ (6, measured), the box passes above. **As built**, the kernel is Pillow's three boxes convolved, not a sampled Gaussian (which under-blurs at small σ and differs by up to 25 levels at sharp edges), and the bands near the edges come from the exact blur; within 3 levels of the exact result, see SIMD_FAST_KERNELS.md. A variant in 8.8 fixed point (OpenCV's) is closer to the reference (0.4%) and 2.3x faster on x86, but only 1.2x on NEON. Unsharp mask inherits it. |
 | 2 | RGB↔YCbCr | 14-bit coefficients, one rounding (BT.601 full range) | 3.2 / 17.4 to YCbCr, 2.0 / 12.2 back | 2.6 / 10.4, ~2.0 / 5.7 | 1 / 47% | 1 / 3% to 11% | 16-bit multiplies (pmaddwd, `vmull`/`vqdmulh`). Image.convert only; the JPEG codec uses libjpeg's own conversion. |
 | 3 | RGB→HSV | reciprocal tables (255·2^12/v, 255·2^12/(6·diff)) and integer arithmetic, rounded | 9.0 / 35.6 | 3.6 / 13.6 | 1 / 50% hue, 24% s, v | 1 / 49% hue, 0.4% s, v | Gathers on AVX2 (vpgatherdd) or byte-table lookups; NEON `vqtbl4q` over split tables. |
 | 4 | Affine, perspective, quad transforms (bilinear, bicubic) | float32 coordinates and weights, 8 (AVX2) or 4 (NEON) output pixels per step, all-inside fast path, rounding at the end | 36 / 110 (rotate bilinear), 91 / 266 (bicubic) | 24 / 40, 62 / 80 | 1 / 41% | 1 / 0% (OpenCV accurate) | Float32 is reproducible in portable C if the operations and their order are fixed and FMA contraction is disabled (`-ffp-contract=off` for these files, or explicit `fmaf` everywhere). |
