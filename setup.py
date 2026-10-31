@@ -133,6 +133,7 @@ _LIB_IMAGING = (
     "SunRleDecode",
     "TgaRleDecode",
     "TgaRleEncode",
+    "TransformFast",
     "Unpack",
     "UnpackYCC",
     "UnsharpMask",

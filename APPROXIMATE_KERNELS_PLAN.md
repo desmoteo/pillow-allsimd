@@ -1,8 +1,8 @@
 # Plan: fast approximate kernels beside the bit-exact ones
 
 Status: decided 2026-10-31 (names, scope, phase 1). Phase 0 (the switch)
-done; phase 1: the Gaussian blur, YCbCr and HSV done (see
-[SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md)), the transforms next. Evidence and measurements are in
+and phase 1 (the Gaussian blur, YCbCr, HSV and the transforms) done; see
+[SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md). Evidence and measurements are in
 [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md).
 
 ## Goal
@@ -182,6 +182,11 @@ the portable C version on x86 and arm64 compared in CI. If that can't be
 pinned on every supported compiler, they use fixed point instead (OpenCV's
 5-bit sub-pixel tables).
 
+Done that way, in fixed point (2026-10-31): positions in exact integers
+rounded to 1/256 pixel, the perspective's integer sums exact in doubles
+with one IEEE division and product, so contraction can't change them;
+integer filters. The float32 design in the catalogue row was not needed.
+
 ### Phase 2: resize precision, unpremultiply, blend (items 5 to 7)
 
 The resize item starts after the class-A fusion has landed in the default
@@ -244,9 +249,9 @@ What gets written, where, and when.
   measured gain of about 1.5x or more on at least one architecture.
 - **Users who compare pixels** (golden images, caches keyed by content)
   must leave the flag off; the reference page says so first.
-- **Float reproducibility** for the transforms (phase 2): if contraction
-  and operation order can't be pinned on every supported compiler, use
-  fixed point (OpenCV's 5-bit sub-pixel tables) instead of float32.
+- **Float reproducibility** for the transforms: settled by fixed point
+  (phase 1, above); the only float operations left, the perspective's
+  division and product, are correctly rounded everywhere.
 - **Free-threaded Python**: the flag is read atomically and once per call;
   the threaded test covers toggling while operations run.
 

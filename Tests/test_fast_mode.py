@@ -15,7 +15,7 @@ from .helper import hopper
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
 
 @pytest.fixture(autouse=True)
@@ -412,3 +412,186 @@ def test_hsv_close_to_exact() -> None:
     # saturation and value are the same; some hues are 1 above
     for k in (1, 2):
         assert fast.getchannel(k).tobytes() == exact.getchannel(k).tobytes()
+
+
+# Affine, perspective and quad transforms (TransformFast.c): fixed-point
+# positions in 1/256 pixel, integer filters with one rounding.
+
+TRANSFORM_MODES = ("L", "RGB", "RGBa", "RGBX", "CMYK")
+
+
+def _transforms(w: int, h: int) -> list[tuple[str, Callable[..., Image.Image]]]:
+    T = Image.Transform
+    return [
+        ("rotate", lambda im, r: im.rotate(30, r)),
+        ("rotate expand", lambda im, r: im.rotate(211.7, r, expand=True)),
+        (
+            "scale",
+            lambda im, r: im.transform(
+                (w * 2, h * 2), T.AFFINE, (0.5, 0, 0, 0, 0.5, 0), r
+            ),
+        ),
+        (
+            "affine",
+            lambda im, r: im.transform(
+                (w + 7, h + 3), T.AFFINE, (0.7, 0.2, -1.5, -0.1, 1.3, 2.25), r
+            ),
+        ),
+        (
+            "perspective",
+            lambda im, r: im.transform(
+                (w, h),
+                T.PERSPECTIVE,
+                (1.1, 0.1, -0.1 * w, 0, 1.05, 0, 0.002, 0.003),
+                r,
+            ),
+        ),
+        (
+            "quad",
+            lambda im, r: im.transform(
+                (w, h), T.QUAD, (0, 0, 0, h, w * 1.1, h * 0.9, w * 0.8, 0), r
+            ),
+        ),
+    ]
+
+
+@pytest.mark.parametrize("mode", TRANSFORM_MODES)
+@pytest.mark.parametrize(
+    "resample", (Image.Resampling.BILINEAR, Image.Resampling.BICUBIC)
+)
+def test_transform_close_to_exact(mode: str, resample: Image.Resampling) -> None:
+    w, h = 64, 48
+    for im in (_noise(mode, (w, h)), hopper(mode).resize((w, h))):
+        for name, fn in _transforms(w, h):
+            exact = fn(im, resample)
+            with Image.fast_mode():
+                fast = fn(im, resample)
+            assert (fast.mode, fast.size) == (exact.mode, exact.size), name
+            largest, mean = _diff(fast, exact)
+            assert largest <= 2, name
+            assert mean < 0.6, name
+
+
+def test_transform_uses_the_fast_kernel() -> None:
+    im = _noise("RGB", (64, 48))
+    with Image.fast_mode():
+        fast = im.rotate(30, Image.Resampling.BILINEAR)
+    assert fast.tobytes() != im.rotate(30, Image.Resampling.BILINEAR).tobytes()
+
+
+def test_transform_accuracy() -> None:
+    # Against bilinear interpolation in floats at the exact positions, the
+    # fast result is off by 1 at most, and far less often than the exact
+    # path, which truncates: on hopper 16 times less often, on noise, whose
+    # steep gradients show the 1/256 pixel positions most, 5 times.
+    for im, ratio in (
+        (hopper("L").crop((40, 40, 88, 80)), 10),
+        (_noise("L", (48, 40), 4), 4),
+    ):
+        _check_bilinear_accuracy(im, ratio)
+
+
+def _check_bilinear_accuracy(im: Image.Image, ratio: int) -> None:
+    w, h = im.size
+    px = im.tobytes()
+    c, s = math.cos(math.radians(30)), math.sin(math.radians(30))
+    data = (c, s, w / 2 - c * w / 2 - s * h / 2, -s, c, h / 2 + s * w / 2 - c * h / 2)
+    exact = im.transform(
+        (w, h), Image.Transform.AFFINE, data, Image.Resampling.BILINEAR
+    ).tobytes()
+    with Image.fast_mode():
+        fast = im.transform(
+            (w, h), Image.Transform.AFFINE, data, Image.Resampling.BILINEAR
+        ).tobytes()
+    fast_off = []
+    exact_off = 0
+    for y in range(h):
+        for x in range(w):
+            xs = data[0] * (x + 0.5) + data[1] * (y + 0.5) + data[2] - 0.5
+            ys = data[3] * (x + 0.5) + data[4] * (y + 0.5) + data[5] - 0.5
+            if not (0 <= xs < w - 1 and 0 <= ys < h - 1):
+                continue
+            ix, iy = int(xs), int(ys)
+            fx, fy = xs - ix, ys - iy
+            p = [px[(iy + j) * w + ix + i] for j in (0, 1) for i in (0, 1)]
+            top = p[0] * (1 - fx) + p[1] * fx
+            bottom = p[2] * (1 - fx) + p[3] * fx
+            ref = math.floor(top * (1 - fy) + bottom * fy + 0.5)
+            fast_off.append(abs(fast[y * w + x] - ref))
+            exact_off += exact[y * w + x] != ref
+    assert max(fast_off) <= 1
+    assert sum(v != 0 for v in fast_off) * ratio < exact_off
+
+
+def test_transform_fill_exact() -> None:
+    # the pixels outside the source are the exact path's
+    im = _noise("RGB", (64, 48))
+    exact = im.rotate(30, Image.Resampling.BICUBIC, fillcolor=(255, 0, 128))
+    with Image.fast_mode():
+        fast = im.rotate(30, Image.Resampling.BICUBIC, fillcolor=(255, 0, 128))
+    for xy in ((0, 0), (63, 0), (0, 47), (63, 47)):
+        assert fast.getpixel(xy) == exact.getpixel(xy) == (255, 0, 128)
+
+
+@pytest.mark.parametrize("size", ((1, 1), (2, 5), (5, 2), (3, 3)))
+def test_transform_small_images(size: tuple[int, int]) -> None:
+    im = _noise("RGB", size)
+    for resample in (Image.Resampling.BILINEAR, Image.Resampling.BICUBIC):
+        for name, fn in _transforms(*size):
+            exact = fn(im, resample)
+            with Image.fast_mode():
+                fast = fn(im, resample)
+            assert _diff(fast, exact)[0] <= 2, name
+
+
+def test_transform_mesh_close_to_exact() -> None:
+    im = _noise("RGB", (64, 48))
+    mesh = [
+        ((0, 0, 32, 48), (0, 0, 0, 48, 40, 44, 30, 2)),
+        ((32, 0, 64, 48), (30, 2, 40, 44, 64, 48, 64, 0)),
+    ]
+    exact = im.transform(im.size, Image.Transform.MESH, mesh, Image.Resampling.BILINEAR)
+    with Image.fast_mode():
+        fast = im.transform(
+            im.size, Image.Transform.MESH, mesh, Image.Resampling.BILINEAR
+        )
+    assert _diff(fast, exact)[0] <= 2
+
+
+@pytest.mark.parametrize(
+    "method, data",
+    (
+        (Image.Transform.AFFINE, (1e12, 0, 0, 0, 1, 0)),
+        (Image.Transform.AFFINE, (1, 0, -1e15, 0, 1, 0)),
+        (Image.Transform.PERSPECTIVE, (1, 0, 0, 0, 1, 0, 1e9, 0)),
+        (Image.Transform.QUAD, (0, 0, 0, 1e12, 1e12, 1e12, 1e12, 0)),
+    ),
+)
+def test_transform_out_of_range_exact(
+    method: Image.Transform, data: tuple[float, ...]
+) -> None:
+    # positions the fixed point can't hold go to the exact path
+    im = _noise("RGB", (64, 48))
+    exact = im.transform(im.size, method, data, Image.Resampling.BILINEAR)
+    with Image.fast_mode():
+        fast = im.transform(im.size, method, data, Image.Resampling.BILINEAR)
+    assert fast.tobytes() == exact.tobytes()
+
+
+@pytest.mark.parametrize("mode", ("I", "F", "LA", "1", "P"))
+def test_transform_other_modes_exact(mode: str) -> None:
+    im = hopper(mode).resize((64, 48))
+    for resample in (Image.Resampling.BILINEAR, Image.Resampling.BICUBIC):
+        exact = im.rotate(30, resample)
+        with Image.fast_mode():
+            fast = im.rotate(30, resample)
+        assert fast.tobytes() == exact.tobytes()
+
+
+def test_transform_nearest_exact() -> None:
+    im = _noise("RGB", (64, 48))
+    for name, fn in _transforms(64, 48):
+        exact = fn(im, Image.Resampling.NEAREST)
+        with Image.fast_mode():
+            fast = fn(im, Image.Resampling.NEAREST)
+        assert fast.tobytes() == exact.tobytes(), name

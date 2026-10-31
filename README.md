@@ -103,7 +103,8 @@ Other architectures build the portable C code.
 By default every build gives Pillow's pixels. Fast mode, off unless you set
 `PILLOW_SIMD_FAST=1` or call `Image.set_fast()`, lets some operations use
 faster kernels whose results differ by a few levels at most (so far the
-Gaussian blur, 3.3x at radius 1, RGB ↔ YCbCr and RGB → HSV). See the
+Gaussian blur, 3.3x at radius 1, RGB ↔ YCbCr, RGB → HSV, and the affine,
+perspective and quad transforms and rotate(), 2x to 3.4x). See the
 [fast mode reference](docs/reference/fast_mode.rst) and
 [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md).
 

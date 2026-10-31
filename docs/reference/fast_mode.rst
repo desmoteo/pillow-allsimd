@@ -89,9 +89,19 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
      - 2.9x, 2.0x
      - hue 1 above the exact result for 0.3% of colours; saturation and value
        the same
+   * - :py:meth:`~PIL.Image.Image.transform` (affine, extent, perspective,
+       quad, mesh) and :py:meth:`~PIL.Image.Image.rotate`, bilinear and
+       bicubic, modes L, RGB, RGBA, RGBa, RGBX, CMYK
+     - positions in fixed point (1/256 pixel), integer filters with one
+       rounding
+     - rotate bilinear: 2.0x, 2.7x; bicubic: 2.9x, 3.4x; perspective: 1.7x,
+       2.0x
+     - at most 2 levels, 1 on photos (RGBA: more where alpha is low, from
+       the premultiplication); against float interpolation 0.6% of values
+       off by one, against 41% for the exact result
 
 Other operations, and other arguments of these, use the exact kernels in
-fast mode too. Fast affine, perspective and quad transforms are planned.
+fast mode too.
 
 Functions
 ---------

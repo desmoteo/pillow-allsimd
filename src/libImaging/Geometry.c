@@ -1341,6 +1341,23 @@ ImagingGenericTransform(
         return -1;
     }
 
+    /* fast mode, read once for the whole transform */
+    if (ImagingGetFast() & IMAGING_FAST_ALL) {
+        int method = transform == affine_transform ? IMAGING_TRANSFORM_AFFINE
+                     : transform == perspective_transform
+                         ? IMAGING_TRANSFORM_PERSPECTIVE
+                     : transform == quad_transform ? IMAGING_TRANSFORM_QUAD
+                                                   : -1;
+        if (method >= 0) {
+            int done = ImagingTransformFast(
+                imOut, imIn, method, x0, y0, x1, y1, transform_data, filterid, fill
+            );
+            if (done) {
+                return done < 0 ? -1 : 0;
+            }
+        }
+    }
+
     ImagingCopyPalette(imOut, imIn);
 
     ImagingSectionEnter(&cookie);
