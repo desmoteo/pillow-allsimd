@@ -139,7 +139,7 @@ ImageMagick and outperforms Skia, the high-speed graphics library used in Chromi
 Current results for this version, on x86-64 (SSE4, AVX2, AVX-VNNI) and arm64
 (NEON), against Pillow 13.0, the last Pillow-SIMD release, OpenCV, libvips
 and ImageMagick, are at [pillow-simd-perf][pillow-simd-perf-page]. They cover
-109 operations, each library single-threaded, and the benchmark runs in Docker
+111 operations, each library single-threaded, and the benchmark runs in Docker
 on any machine.
 
 [pillow-simd-perf-page]: https://desmoteo.github.io/pillow-simd-perf/

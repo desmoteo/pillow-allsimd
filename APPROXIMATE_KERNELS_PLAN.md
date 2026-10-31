@@ -117,6 +117,14 @@ accept as the same drawing. Exact-compatible work remains possible (an
 active edge table for polygons with the same intersection formula, fewer
 Python calls per text line) and belongs in the default path.
 
+The benchmark now also has unfilled outlines as overlays draw them
+(`draw/outline/rectangles`: 500 bounding boxes; `draw/outline/polygons`:
+100 ROI polygons of 12 points; both 2 px). Both had default-path problems,
+fixed with the same pixels: thin lines went through a function pointer
+per pixel since Pillow 13.0 (bounding boxes 4.03 -> 2.53 ms, AVX2;
+OpenCV 4.0), and a wide polygon outline allocated and cleared an
+image-sized mask per polygon (17.2 -> 2.6 ms; OpenCV 1.7).
+
 ## Implementation plan
 
 ### Phase 0: the switch, with no fast kernel yet
