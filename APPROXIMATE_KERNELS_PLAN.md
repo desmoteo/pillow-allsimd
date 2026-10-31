@@ -4,7 +4,7 @@ Status: decided 2026-10-31 (names, scope, phase 1). Phase 0 (the switch),
 phase 1 (the Gaussian blur, YCbCr, HSV and the transforms), blend and
 unpremultiply from phase 2, and phase 3 (large downscales) done; see
 [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md). The resize precision item
-(5) is open. Evidence and measurements are in
+(5) is open (below). Evidence and measurements are in
 [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md).
 
 ## Goal
@@ -208,6 +208,11 @@ Done (2026-10-31):
   reciprocal with an integer correction.
 - Blend (7): integer interpolation, alpha in 2^-15 units with
   `pmulhrsw`/`vqrdmulh` rounding, 1.7x (x86) and 4.1x (arm64).
+
+Open: the resize precision (5). Its arm64 downscale target (about 7 ms for
+1/8 Lanczos) is met by the large downscales of phase 3 (18.2 -> 7.4 ms);
+what remains, the 8.8 fixed-point intermediate, needs the two passes fused
+in the default path first, or it doubles the intermediate's traffic.
 
 ### Phase 3: large downscales (item 8)
 
