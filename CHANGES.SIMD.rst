@@ -91,8 +91,10 @@ Based on Pillow 13.0.0
   bilinear and bicubic filters (L and 4-byte modes) take positions in fixed
   point and integer filters with one rounding: within 2 levels of the exact
   result, 0.6% of values off by one against float interpolation (exact:
-  41%); rotate bilinear 2.0x (x86) and 2.7x (arm64), bicubic 2.9x and 3.4x,
-  perspective 1.7x and 2.0x
+  41%); rotate bilinear 2.7x (x86) and 2.6x (arm64), bicubic 2.9x and 3.4x,
+  perspective 2.1x and 1.9x, L rotate bilinear 2.8x and 1.9x (vertical
+  first in 16-bit lanes, four pixels per AVX2 step, eight L pixels per
+  step)
 - Fast mode: blend() with 0 < alpha < 1 interpolates in integers, alpha in
   2^-15 units, rounded (pmulhrsw, vqrdmulh): within 1 level of the exact
   result, 1.7x (x86) and 4.1x (arm64)

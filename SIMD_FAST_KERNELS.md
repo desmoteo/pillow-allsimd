@@ -208,11 +208,21 @@ multiply-adds differently on x86 and arm64.
   its position is (the exact path's test, at the fixed point's
   precision), and near an edge if a neighbour is out of the image, where
   the scalar function clamps it as the exact path does.
-- **Bilinear:** `top = p00 (256 - fx) + p01 fx`, likewise `bottom`, then
-  `(top (256 - fy) + bottom fy + 32768) >> 16`, one rounding. SSE4: two
-  pixels per step, `pshufb` making (p0, p1) word pairs for one `pmaddwd`
-  per row; NEON: two pixels, `p0 (256 - f)` as `(p0 << 8) - p0 f` so the
-  weights fit 8 bits (`vmlsl_u8`, `vmlal_u8`), `vrshrn` for the rounding.
+- **Bilinear**, vertical first: `v = p0 (256 - fy) + p1 fy` for the two
+  columns, at most 65280, so 16-bit lanes hold it, then
+  `((v0 >> 1) (256 - fx) + (v1 >> 1) fx + 2^14) >> 15`, one rounding (the
+  halving, 1/512 of a level, lets the horizontal step use a signed 16-bit
+  multiply-add). AVX2: four pixels per step, two per register, `pshufb`
+  making (p0, p1) byte pairs per channel, `pmullw` for the vertical step
+  and `pmaddwd` with the (256 - fx, fx) pairs; SSE4 two pixels. NEON: one
+  pixel per half register, `p0 (256 - fy)` as `(p0 << 8) - p0 fy` so the
+  weights fit 8 bits (`vshll`, `vmlsl_u8`, `vmlal_u8`), `vmull_n_u16`,
+  `vrshrn` by 15. L: eight pixels per step from one 16-bit load of (p0, p1)
+  per row and pixel, in 16-bit lanes (SSE4, NEON).
+- **Positions and kinds** for a row: AVX2 compares the affine and quad
+  positions in four 64-bit lanes (`vpcmpgtq`) and takes the 1/256 pixel
+  positions from the low halves of a logical shift, which equal the
+  arithmetic shift's there, and computes the kinds eight at a time.
 - **Bicubic:** Pillow's cubic (a = -1) as a table of 256 weight sets, 12
   fractional bits each, rounded with the remainder in the largest so they
   sum to 4096; each row's sum rounded to 8 bits, then the column sum,
@@ -239,21 +249,25 @@ brackets):
 
 | | x86 AVX2 | arm64 NEON |
 |---|---|---|
-| rotate 30° RGB bilinear | 35.6 → 17.9 (2.0x) [29.9] | 108.1 → 39.8 (2.7x) [35.5] |
-| rotate 30° RGB bicubic | 91.4 → 31.3 (2.9x) [62.7] | 266.3 → 78.9 (3.4x) [79.3] |
-| rotate 30° RGBA bicubic | 98.5 → 38.5 (2.6x) | 341.0 → 97.8 (3.5x) |
-| perspective RGB bilinear | 32.0 → 19.1 (1.7x) | 117.4 → 60.0 (2.0x) |
+| rotate 30° RGB bilinear | 39.6 → 14.8 (2.7x) [29.9] | 108.3 → 41.1 (2.6x) [35.4] |
+| rotate 30° RGB bicubic | 98.3 → 33.6 (2.9x) [62.7] | 263.7 → 78.6 (3.4x) [79.2] |
+| rotate 30° RGBA bicubic | 109.0 → 40.7 (2.7x) | 340.9 → 97.3 (3.5x) |
+| perspective RGB bilinear | 32.3 → 15.2 (2.1x) | 117.5 → 61.5 (1.9x) |
+| rotate 30° L bilinear | 35.1 → 12.5 (2.8x) | 60.8 → 31.7 (1.9x) |
+| perspective L bilinear | 27.1 → 14.1 (1.9x) | 67.5 → 48.7 (1.4x) |
+| rotate 30° L bicubic | 84.4 → 43.5 (1.9x) | 126.6 → 69.5 (1.8x) |
 
-The bilinear pixel loop is the next cost: two pixels per step with their
-weights broadcast from scalars; four or eight per step with the weights
-built in vectors would bring x86 nearer to the perspective coordinates'
-cost. On arm64 the perspective's two divisions per lane pair dominate.
+The x86 machine had a browser running for this table; OpenCV's numbers
+are from a quiet run. On arm64 the perspective's divisions dominate (fast
+affine positions 42 ms, perspective 55 ms for the same shift).
 
 **Code map.** `tf_map_init()` and `tf_region_ok()` set up and check the
 fixed point; `tf_row()` gives the positions and kinds of a row;
 `tf_bilinear_pixel()` and `tf_bicubic_pixel()` define the result, with
-`tf_bilinear2_sse()`, `tf_bicubic1_sse()`, `tf_bilinear2_neon()` and
-`tf_bicubic1_neon()` for pixels away from the edges;
+`tf_bilinear_l()`, `tf_bicubic_l()`, `tf_bilinear8_l_sse()`,
+`tf_bilinear8_l_neon()`, `tf_bilinear2_sse()`, `tf_bilinear4_avx2()`,
+`tf_bicubic1_sse()`, `tf_bilinear2_neon()` and `tf_bicubic1_neon()` for
+pixels away from the edges;
 `ImagingTransformFast()` decides and runs. Tests: `Tests/test_fast_mode.py`
 (difference from exact per mode, filter and transform, accuracy against
 float bilinear, fill colour, small images, mesh, out-of-range coefficients
