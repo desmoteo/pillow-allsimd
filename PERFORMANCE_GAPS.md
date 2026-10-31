@@ -181,6 +181,40 @@ mode planned in [APPROXIMATE_KERNELS_PLAN.md](APPROXIMATE_KERNELS_PLAN.md).
   passes; INTER_AREA against an antialiasing convolution for downscales;
   polygonal ellipses; Hershey text.
 
+### Drawing outlines: bounding boxes faster, ROI polygons slower
+
+Measured split (x86 AVX2, ms, the benchmark's 500 boxes and 100 ROI
+polygons of 12 points, 2 px; pillow-simd-perf `analysis/` and
+`drawprof`-style timing of each part):
+
+| | Pillow-SIMD | OpenCV |
+|---|---|---|
+| boxes, outline 2 px | 1.80 (C) | 3.62 (thickness 2) |
+| boxes, 1 px | | 1.36 |
+| ROI polygons, outline 2 px | 1.86 (C) | 1.25 (polylines, thickness 2) |
+| ROI polygons, 1 px | 0.32 | 0.30 |
+| the edges as wide lines, no mask | 0.91 | |
+| the polygons' fill (the mask's work) | 2.01 | 2.35 (fillPoly) |
+
+- **Boxes.** Pillow draws a rectangle outline as axis-aligned runs: `width`
+  horizontal spans top and bottom and vertical runs on the sides. OpenCV
+  turns a thick rectangle into a polyline: each side a filled convex quad,
+  each corner a round join filled as a small polygon, and centred on the
+  edges, so it sets about 1.5x the pixels. Its thickness-2 rectangle costs
+  2.7x its 1 px one.
+- **ROI polygons.** The stroke itself is cheaper in Pillow: the twelve wide
+  lines without a mask take 0.91 ms against OpenCV's 1.25 for its whole
+  polyline. The rest is Pillow's rule that a wide outline stays inside the
+  polygon: the outline is drawn through a mask holding the polygon's fill,
+  so the cost grows with the polygon's area (these ROIs cover 7.0 Mpx, 9.7
+  Mpx of bounding boxes, for 89 kpx of perimeter), where OpenCV's centred
+  stroke needs no inside test. Since 7238975d1 the mask covers the
+  polygon's bounding box only, not the image (17.2 -> 2.6 ms for the case).
+- **Next, exact:** keep the mask as each row's inside spans, which the fill
+  computes anyway, and test the wide lines' runs against those spans: no
+  clearing and no filling of the bounding box, the same inside/outside
+  decision per pixel. That removes about 1 ms of the 1.86, below OpenCV.
+
 ### Where OpenCV is now behind (x86)
 
 FIND_EDGES/EDGE_ENHANCE (4.4 vs 6.6 ms), YCbCr→RGB (2.0 vs 2.4), reduce by
