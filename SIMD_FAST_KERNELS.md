@@ -317,6 +317,66 @@ hash on SSE4, AVX2, NEON and scalar builds.
 (difference from exact per mode, distance from the float result, alphas
 outside the open interval exact). Hashes: `fast: blend`.
 
+## Resize (`ResampleFast.c`)
+
+**Operation.** `Image.resize()` of 8-bit images with 4-byte pixels (RGB,
+RGBA, RGBX, CMYK, LA and the like; RGBA and LA premultiplied, as in the
+exact path) with any filter but nearest, when the vertical pass follows the
+horizontal one (not for a resize of the width only, or a height reduced
+more than twice as much as the width). L, I, F and I;16 images keep the
+exact path.
+
+**Exact path.** A horizontal pass of 16-bit coefficients and 32-bit sums,
+each pixel rounded to 8 bits into a whole intermediate image, then a
+vertical pass the same way.
+
+**Fast kernel.** The two passes fused: each source row goes through the
+exact horizontal kernels into a ring of `ksize + 3` rows, which stays in
+the cache, and each output row is computed from the ring. The horizontal
+kernels are compiled a second time (`RESAMPLE_OUT16` in
+`ResampleSIMDHorizontalConv.c`): the same integer sums, rounded to 2^-6
+levels instead of whole ones, clipped to 0..255 as there, stored doubled
+in 16 bits. The vertical pass multiplies those by weights in 2^-14 units
+(edge weights can exceed 1), each product rounded, `(a w + 2^14) >> 15`:
+`pmulhrsw` on x86 and `vqrdmulh` on arm64, which give the portable loop's
+integers, so every build gives the same pixels. The sums can't overflow:
+the weights' absolute values add up to 1.98 at most (checked, else the
+exact path), with at most 128 taps. On arm64 the 16-bit products double
+the lanes of the exact vertical kernel's 32-bit ones; on x86 they are as
+fast as the exact `pmaddwd`, and the fusion saves the intermediate image.
+
+**Accuracy.** At most 1 level from the exact result (2 for RGBA and LA,
+compared premultiplied), 0.25 on average; against the same filter in
+floats (Pillow's F resize per channel), 0.4% to 1.5% of values off by one
+on a photo, against 8% to 25% for the exact result, whose 8-bit
+intermediate rounds every pixel. Both clip the intermediate at the
+filters' overshoots. The same hash on SSE4, AVX2, NEON and scalar builds.
+
+**Speed** (2560x1600, one core, ms, exact → fast):
+
+| | x86 AVX2 | arm64 NEON |
+|---|---|---|
+| RGB to 5478x3424 bilinear | 25.46 → 21.62 (1.18x) | 91.22 → 64.35 (1.42x) |
+| RGB to 5478x3424 bicubic | 35.63 → 27.65 (1.29x) | 128.60 → 87.82 (1.46x) |
+| RGB to 2048x1280 bicubic | 5.55 → 5.76 (0.96x) | 29.06 → 24.53 (1.18x) |
+| RGBA to 5478x3424 bilinear | 38.47 → 33.55 (1.15x) | 131.07 → 101.63 (1.29x) |
+
+On x86 moderate downscales are 2% to 4% slower: the 16-bit ring rows are
+twice the bytes of 8-bit ones, and the vertical pass has many taps there.
+
+Tried first and not kept: the horizontal pass in 16-bit products too
+(per output pixel, taps 2 or 4 per vector). On the Jetson it was faster
+than the exact kernel, but on x86 2.5 to 2.9 times slower than the exact
+AVX2 kernel, which puts two rows in a register and two taps in each
+`pmaddwd`; one result for both machines rules out a kernel per
+architecture.
+
+**Code map.** `resample_fast8()`, `rf_vrow()`, `rf_hrows()` and the
+`_16` horizontal kernels; the switch in `ImagingResampleInner()`. Tests:
+`Tests/test_fast_mode.py` (close to exact per mode and filter, accuracy
+against floats, other modes and one-pass resizes exact, RGBA and LA equal
+to resizing premultiplied). Hashes: `fast: resize`.
+
 ## Large downscales (`Image.py`, `resize()`)
 
 **Operation.** `Image.resize()` with the bicubic, Lanczos, MKS2013 or
@@ -341,9 +401,10 @@ bounded by measurement:
   exact kernels are already as fast as `reduce()` plus a shorter filter (at
   1/8: 0.75x, 0.96x, 1.0x on x86).
 
-Both steps are exact kernels, so the result is as reproducible as they
-are: the `fast: downscale` hash (L, RGB, RGBA and F) is the same on SSE4,
-AVX2, NEON and scalar builds.
+Both steps are reproducible (since the fast resize kernel, the second step
+of 4-byte images uses it), so the `fast: downscale` hash (L, RGB, RGBA and
+F) is the same on SSE4, AVX2, NEON and scalar builds. Since round 4, I and
+F images keep the exact path: `reduce()` sums 32-bit pixels in 32 bits.
 
 **Accuracy** (2560x1600 photo to 426x266, 320x200 and 160x100): at most 2
 levels from the exact result, 0.2 to 0.4 on average; against the same

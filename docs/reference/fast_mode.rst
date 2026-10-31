@@ -113,6 +113,18 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
      - 1.7x, 4.1x
      - at most 1 level; the float result rounded, but within 0.004 of a
        half; the exact result is truncated
+   * - :py:meth:`~PIL.Image.Image.resize` of 8-bit images with 4-byte
+       pixels (RGB, RGBA, RGBX, CMYK, LA), any filter but nearest, when the
+       vertical pass comes second
+     - the two passes fused through a ring of rows; the horizontal sums
+       kept to 2^-6 levels instead of whole ones; the vertical pass in
+       16-bit products
+     - upscale to 5478x3424: bilinear 1.18x, 1.42x; bicubic 1.29x, 1.46x;
+       RGBA bilinear 1.15x, 1.29x; downscale to 2048x1280 bicubic: 0.96x,
+       1.18x
+     - at most 1 level (RGBA and LA: 2, premultiplied); against a float
+       resize 0.4% to 1.5% of values off by one, against 8% to 25% for the
+       exact result
    * - :py:meth:`~PIL.Image.Image.resize` with the bicubic, Lanczos and MKS
        filters and no ``reducing_gap``, downscales of 6x and more, 8-bit
        modes
