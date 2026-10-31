@@ -198,10 +198,8 @@ tf_row(
             const double px = (nx0 + i * sx) * r, py = (ny0 + i * sy) * r;
             /* a zero denominator gives infinities or NaN: outside */
             in[i] = px >= 0 && px < xlim && py >= 0 && py < ylim;
-            if (in[i]) {
-                qx[i] = (((INT32)px + 1) >> 1) - 128;
-                qy[i] = (((INT32)py + 1) >> 1) - 128;
-            }
+            qx[i] = in[i] ? (((INT32)px + 1) >> 1) - 128 : 0;
+            qy[i] = in[i] ? (((INT32)py + 1) >> 1) - 128 : 0;
         }
     } else {
         const int64_t xlim = (int64_t)im->xsize << 32, ylim = (int64_t)im->ysize << 32;
@@ -219,7 +217,53 @@ tf_row(
             dx = 2 * cx;
             dy = 2 * cy;
         }
-        for (i = 0; i < n; i++) {
+        i = 0;
+#if defined(IMAGING_SIMD_AVX2)
+        {
+            /* the low 32 bits of a logical and an arithmetic shift agree */
+            const __m256i vdx = _mm256_set1_epi64x(4 * dx);
+            const __m256i vdy = _mm256_set1_epi64x(4 * dy);
+            const __m256i vxlim = _mm256_set1_epi64x(xlim);
+            const __m256i vylim = _mm256_set1_epi64x(ylim);
+            const __m256i voff = _mm256_set1_epi64x(off);
+            const __m256i neg = _mm256_set1_epi64x(-1);
+            const __m256i low = _mm256_setr_epi32(0, 2, 4, 6, 0, 2, 4, 6);
+            __m256i vx = _mm256_setr_epi64x(x, x + dx, x + 2 * dx, x + 3 * dx);
+            __m256i vy = _mm256_setr_epi64x(y, y + dy, y + 2 * dy, y + 3 * dy);
+            for (; i + 4 <= n; i += 4) {
+                const __m256i ok = _mm256_and_si256(
+                    _mm256_and_si256(
+                        _mm256_cmpgt_epi64(vx, neg), _mm256_cmpgt_epi64(vxlim, vx)
+                    ),
+                    _mm256_and_si256(
+                        _mm256_cmpgt_epi64(vy, neg), _mm256_cmpgt_epi64(vylim, vy)
+                    )
+                );
+                const int bits = _mm256_movemask_pd(_mm256_castsi256_pd(ok));
+                _mm_storeu_si128(
+                    (__m128i *)(qx + i),
+                    _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(
+                        _mm256_srli_epi64(_mm256_add_epi64(vx, voff), 24), low
+                    ))
+                );
+                _mm_storeu_si128(
+                    (__m128i *)(qy + i),
+                    _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(
+                        _mm256_srli_epi64(_mm256_add_epi64(vy, voff), 24), low
+                    ))
+                );
+                in[i] = bits & 1;
+                in[i + 1] = (bits >> 1) & 1;
+                in[i + 2] = (bits >> 2) & 1;
+                in[i + 3] = (bits >> 3) & 1;
+                vx = _mm256_add_epi64(vx, vdx);
+                vy = _mm256_add_epi64(vy, vdy);
+            }
+            x += i * dx;
+            y += i * dy;
+        }
+#endif
+        for (; i < n; i++) {
             in[i] = x >= 0 && x < xlim && y >= 0 && y < ylim;
             qx[i] = (INT32)((x + off) >> 24);
             qy[i] = (INT32)((y + off) >> 24);
@@ -227,7 +271,33 @@ tf_row(
             y += dy;
         }
     }
-    for (i = 0; i < n; i++) {
+    i = 0;
+#if defined(IMAGING_SIMD_AVX2)
+    for (; i + 8 <= n; i += 8) {
+        const __m256i ix =
+            _mm256_srai_epi32(_mm256_loadu_si256((__m256i *)(qx + i)), 8);
+        const __m256i iy =
+            _mm256_srai_epi32(_mm256_loadu_si256((__m256i *)(qy + i)), 8);
+        const __m256i inner = _mm256_and_si256(
+            _mm256_and_si256(
+                _mm256_cmpgt_epi32(ix, _mm256_set1_epi32(lo - 1)),
+                _mm256_cmpgt_epi32(_mm256_set1_epi32(im->xsize - hi), ix)
+            ),
+            _mm256_and_si256(
+                _mm256_cmpgt_epi32(iy, _mm256_set1_epi32(lo - 1)),
+                _mm256_cmpgt_epi32(_mm256_set1_epi32(im->ysize - hi), iy)
+            )
+        );
+        /* in is 0 or 1: kind = in + (in and inner) */
+        const __m256i inv = _mm256_cvtepi8_epi32(_mm_loadl_epi64((__m128i *)(in + i)));
+        const __m256i k32 = _mm256_add_epi32(inv, _mm256_and_si256(inv, inner));
+        const __m128i k16 = _mm_packs_epi32(
+            _mm256_castsi256_si128(k32), _mm256_extracti128_si256(k32, 1)
+        );
+        _mm_storel_epi64((__m128i *)(kind + i), _mm_packs_epi16(k16, k16));
+    }
+#endif
+    for (; i < n; i++) {
         const int ix = qx[i] >> 8, iy = qy[i] >> 8;
         kind[i] =
             !in[i] ? 0
@@ -304,7 +374,9 @@ tf_clip(int v, int hi) {
 }
 
 /* One pixel, any position inside the image: the reference. qx, qy are the
-   sample position minus half a pixel, in 1/256 pixel. */
+   sample position minus half a pixel, in 1/256 pixel. Vertical first:
+   v = p0 (256 - fy) + p1 fy fits 16 bits, and halved it fits a signed
+   16-bit multiply-add for the horizontal step, which rounds once. */
 static inline void
 tf_bilinear_pixel(UINT8 *out, Imaging im, int ps, INT32 qx, INT32 qy) {
     const int ix = (int)(qx >> 8), iy = (int)(qy >> 8);
@@ -314,9 +386,9 @@ tf_bilinear_pixel(UINT8 *out, Imaging im, int ps, INT32 qx, INT32 qy) {
     const UINT8 *r1 = (UINT8 *)im->image[tf_clip(iy + 1, im->ysize - 1)];
     int c;
     for (c = 0; c < ps; c++) {
-        const unsigned top = r0[x0 * ps + c] * (256 - fx) + r0[x1 * ps + c] * fx;
-        const unsigned bot = r1[x0 * ps + c] * (256 - fx) + r1[x1 * ps + c] * fx;
-        out[c] = (UINT8)((top * (256 - fy) + bot * fy + 32768) >> 16);
+        const unsigned v0 = r0[x0 * ps + c] * (256 - fy) + r1[x0 * ps + c] * fy;
+        const unsigned v1 = r0[x1 * ps + c] * (256 - fy) + r1[x1 * ps + c] * fy;
+        out[c] = (UINT8)(((v0 >> 1) * (256 - fx) + (v1 >> 1) * fx + 16384) >> 15);
     }
 }
 
@@ -342,42 +414,244 @@ tf_bicubic_pixel(UINT8 *out, Imaging im, int ps, INT32 qx, INT32 qy, INT16 (*w)[
     }
 }
 
+/* An L pixel away from the edges: the references without the clamps. */
+static inline UINT8
+tf_bilinear_l(Imaging im, INT32 qx, INT32 qy) {
+    const int fx = qx & 255, fy = qy & 255;
+    const UINT8 *r0 = im->image8[qy >> 8] + (qx >> 8);
+    const UINT8 *r1 = im->image8[(qy >> 8) + 1] + (qx >> 8);
+    const unsigned v0 = r0[0] * (256 - fy) + r1[0] * fy;
+    const unsigned v1 = r0[1] * (256 - fy) + r1[1] * fy;
+    return (UINT8)(((v0 >> 1) * (256 - fx) + (v1 >> 1) * fx + 16384) >> 15);
+}
+
+static inline UINT8
+tf_bicubic_l(Imaging im, INT32 qx, INT32 qy, INT16 (*w)[4]) {
+    const int ix = (qx >> 8) - 1, iy = (qy >> 8) - 1;
+    const INT16 *wx = w[qx & 255], *wy = w[qy & 255];
+    int acc = 0, j;
+    for (j = 0; j < 4; j++) {
+        const UINT8 *row = im->image8[iy + j] + ix;
+        const int h = wx[0] * row[0] + wx[1] * row[1] + wx[2] * row[2] + wx[3] * row[3];
+        acc += wy[j] * ((h + 128) >> 8);
+    }
+    return (UINT8)tf_clip((acc + 32768) >> 16, 255);
+}
+
 #if defined(IMAGING_SIMD_SSE4)
-/* Two pixels of 4 bytes away from the edges, bilinear. */
+/* The 8 bytes at (x, y) and (x + 1, y) of a pixel's row, its p0 and p1 as
+   (p0, p1) byte pairs per channel. */
+static inline __m128i
+tf_pair_bytes(const UINT8 *row, int ix) {
+    return _mm_shuffle_epi8(
+        _mm_loadl_epi64((const __m128i *)(row + ix * 4)),
+        _mm_setr_epi8(0, 4, 1, 5, 2, 6, 3, 7, -1, -1, -1, -1, -1, -1, -1, -1)
+    );
+}
+
+/* Two pixels of 4 bytes away from the edges, bilinear: the reference's
+   integers, with 16-bit multiplies for the vertical step. */
 static inline __m128i
 tf_bilinear2_sse(Imaging im, const INT32 *qx, const INT32 *qy) {
-    /* per channel, (p0, p1) as word pairs; weights (256 - f, f) */
-    const __m128i pairs =
-        _mm_setr_epi8(0, 4, 1, 5, 2, 6, 3, 7, 8, 12, 9, 13, 10, 14, 11, 15);
-    __m128i top, bot, res[2];
+    __m128i res[2];
     int k;
     for (k = 0; k < 2; k++) {
-        const int ix = (int)(qx[k] >> 8), iy = (int)(qy[k] >> 8);
-        const int fx = (int)(qx[k] & 255), fy = (int)(qy[k] & 255);
-        const __m128i wx = _mm_set1_epi32((fx << 16) | (256 - fx));
-        __m128i p = _mm_shuffle_epi8(
-            _mm_unpacklo_epi64(
-                _mm_loadl_epi64((const __m128i *)((UINT8 *)im->image[iy] + ix * 4)),
-                _mm_loadl_epi64((const __m128i *)((UINT8 *)im->image[iy + 1] + ix * 4))
+        const int ix = qx[k] >> 8, iy = qy[k] >> 8;
+        const int fx = qx[k] & 255, fy = qy[k] & 255;
+        const __m128i t = _mm_cvtepu8_epi16(tf_pair_bytes((UINT8 *)im->image[iy], ix));
+        const __m128i b =
+            _mm_cvtepu8_epi16(tf_pair_bytes((UINT8 *)im->image[iy + 1], ix));
+        const __m128i v = _mm_srli_epi16(
+            _mm_add_epi16(
+                _mm_mullo_epi16(t, _mm_set1_epi16((short)(256 - fy))),
+                _mm_mullo_epi16(b, _mm_set1_epi16((short)fy))
             ),
-            pairs
+            1
         );
-        top = _mm_madd_epi16(_mm_cvtepu8_epi16(p), wx);
-        bot = _mm_madd_epi16(_mm_cvtepu8_epi16(_mm_srli_si128(p, 8)), wx);
         res[k] = _mm_srli_epi32(
             _mm_add_epi32(
-                _mm_add_epi32(
-                    _mm_mullo_epi32(top, _mm_set1_epi32(256 - fy)),
-                    _mm_mullo_epi32(bot, _mm_set1_epi32(fy))
-                ),
-                _mm_set1_epi32(32768)
+                _mm_madd_epi16(v, _mm_set1_epi32((fx << 16) | (256 - fx))),
+                _mm_set1_epi32(16384)
             ),
-            16
+            15
         );
     }
-    /* two pixels' 4 channels, in 0..255 */
     return _mm_packus_epi16(_mm_packus_epi32(res[0], res[1]), _mm_setzero_si128());
 }
+
+/* Eight L pixels away from the edges, bilinear: each pixel's (p0, p1) as
+   one 16-bit word per row, then the reference's integers in 16-bit lanes. */
+static inline __m128i
+tf_bilinear8_l_sse(Imaging im, const INT32 *qx, const INT32 *qy) {
+    const __m128i m = _mm_set1_epi32(255);
+    const __m128i fx = _mm_packs_epi32(
+        _mm_and_si128(_mm_loadu_si128((const __m128i *)qx), m),
+        _mm_and_si128(_mm_loadu_si128((const __m128i *)(qx + 4)), m)
+    );
+    const __m128i fy = _mm_packs_epi32(
+        _mm_and_si128(_mm_loadu_si128((const __m128i *)qy), m),
+        _mm_and_si128(_mm_loadu_si128((const __m128i *)(qy + 4)), m)
+    );
+    const __m128i full = _mm_set1_epi16(256), low = _mm_set1_epi16(255);
+    __m128i t = _mm_setzero_si128(), b = _mm_setzero_si128(), v0, v1, h0, h1;
+    UINT16 pt[8], pb[8];
+    int k;
+    for (k = 0; k < 8; k++) {
+        const UINT8 *r0 = im->image8[qy[k] >> 8] + (qx[k] >> 8);
+        const UINT8 *r1 = im->image8[(qy[k] >> 8) + 1] + (qx[k] >> 8);
+        memcpy(pt + k, r0, 2);
+        memcpy(pb + k, r1, 2);
+    }
+    t = _mm_loadu_si128((const __m128i *)pt);
+    b = _mm_loadu_si128((const __m128i *)pb);
+    /* p0 is the low byte of each word, p1 the high one */
+    v0 = _mm_add_epi16(
+        _mm_mullo_epi16(_mm_and_si128(t, low), _mm_sub_epi16(full, fy)),
+        _mm_mullo_epi16(_mm_and_si128(b, low), fy)
+    );
+    v1 = _mm_add_epi16(
+        _mm_mullo_epi16(_mm_srli_epi16(t, 8), _mm_sub_epi16(full, fy)),
+        _mm_mullo_epi16(_mm_srli_epi16(b, 8), fy)
+    );
+    v0 = _mm_srli_epi16(v0, 1);
+    v1 = _mm_srli_epi16(v1, 1);
+    h0 = _mm_madd_epi16(
+        _mm_unpacklo_epi16(v0, v1), _mm_unpacklo_epi16(_mm_sub_epi16(full, fx), fx)
+    );
+    h1 = _mm_madd_epi16(
+        _mm_unpackhi_epi16(v0, v1), _mm_unpackhi_epi16(_mm_sub_epi16(full, fx), fx)
+    );
+    h0 = _mm_srli_epi32(_mm_add_epi32(h0, _mm_set1_epi32(16384)), 15);
+    h1 = _mm_srli_epi32(_mm_add_epi32(h1, _mm_set1_epi32(16384)), 15);
+    return _mm_packus_epi16(_mm_packus_epi32(h0, h1), _mm_setzero_si128());
+}
+
+#if defined(IMAGING_SIMD_AVX2)
+/* Four pixels of 4 bytes away from the edges, bilinear, the same integers:
+   pixels a and b in the lanes of one register, c and d in another. */
+static inline __m128i
+tf_bilinear4_avx2(Imaging im, const INT32 *qx, const INT32 *qy) {
+    const __m128i q = _mm_loadu_si128((const __m128i *)qx);
+    const __m128i r = _mm_loadu_si128((const __m128i *)qy);
+    const __m128i fx = _mm_and_si128(q, _mm_set1_epi32(255));
+    const __m128i fy = _mm_and_si128(r, _mm_set1_epi32(255));
+    /* words 256 - fy of a, b, c, d, then fy of a, b, c, d */
+    const __m256i wy = _mm256_broadcastsi128_si256(
+        _mm_packs_epi32(_mm_sub_epi32(_mm_set1_epi32(256), fy), fy)
+    );
+    /* (256 - fx, fx) word pairs of a, b, c, d */
+    const __m256i wx = _mm256_castsi128_si256(
+        _mm_or_si128(_mm_slli_epi32(fx, 16), _mm_sub_epi32(_mm_set1_epi32(256), fx))
+    );
+    __m256i out[2];
+    int k;
+    for (k = 0; k < 2; k++) {
+        const int a = 2 * k, b = 2 * k + 1;
+        const int ixa = qx[a] >> 8, iya = qy[a] >> 8;
+        const int ixb = qx[b] >> 8, iyb = qy[b] >> 8;
+        const __m256i t = _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(
+            tf_pair_bytes((UINT8 *)im->image[iya], ixa),
+            tf_pair_bytes((UINT8 *)im->image[iyb], ixb)
+        ));
+        const __m256i bt = _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(
+            tf_pair_bytes((UINT8 *)im->image[iya + 1], ixa),
+            tf_pair_bytes((UINT8 *)im->image[iyb + 1], ixb)
+        ));
+        /* each lane's pixel weight in all 8 words */
+        const __m256i w0 = _mm256_shuffle_epi8(
+            wy,
+            _mm256_setr_epi8(
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3
+            )
+        );
+        const __m256i w1 = _mm256_shuffle_epi8(
+            _mm256_srli_si256(wy, 8),
+            _mm256_setr_epi8(
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k,
+                4 * k + 1,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3,
+                4 * k + 2,
+                4 * k + 3
+            )
+        );
+        const __m256i v = _mm256_srli_epi16(
+            _mm256_add_epi16(_mm256_mullo_epi16(t, w0), _mm256_mullo_epi16(bt, w1)), 1
+        );
+        const __m256i h =
+            _mm256_permutevar8x32_epi32(wx, _mm256_setr_epi32(a, a, a, a, b, b, b, b));
+        out[k] = _mm256_srli_epi32(
+            _mm256_add_epi32(_mm256_madd_epi16(v, h), _mm256_set1_epi32(16384)), 15
+        );
+    }
+    {
+        /* lanes [a, c] and [b, d] after the packs: dwords 0, 4, 1, 5 */
+        const __m256i p = _mm256_packus_epi16(
+            _mm256_packus_epi32(out[0], out[1]), _mm256_setzero_si256()
+        );
+        return _mm256_castsi256_si128(
+            _mm256_permutevar8x32_epi32(p, _mm256_setr_epi32(0, 4, 1, 5, 0, 0, 0, 0))
+        );
+    }
+}
+#endif
 
 /* One pixel of 4 bytes away from the edges, bicubic. */
 static inline __m128i
@@ -409,39 +683,86 @@ tf_bicubic1_sse(Imaging im, INT32 qx, INT32 qy, INT16 (*w)[4]) {
 #endif
 
 #if defined(IMAGING_SIMD_NEON)
-/* Two pixels of 4 bytes away from the edges, bilinear: the same integers
-   (p0 (256 - f) as (p0 << 8) - p0 f, so the weights fit 8 bits). */
+/* One pixel of 4 bytes away from the edges, bilinear: the same integers,
+   p0 (256 - fy) as (p0 << 8) - p0 fy so the weights fit 8 bits; vrshrn
+   rounds as (v + 2^14) >> 15. */
+static inline uint16x4_t
+tf_bilinear1_neon(Imaging im, INT32 qx, INT32 qy) {
+    const int ix = qx >> 8, iy = qy >> 8;
+    const UINT16 fx = (UINT16)(qx & 255);
+    const uint8x8_t fy = vdup_n_u8((UINT8)(qy & 255));
+    /* [p0 p1] of the pixel's two rows */
+    const uint8x8_t t = vld1_u8((UINT8 *)im->image[iy] + ix * 4);
+    const uint8x8_t b = vld1_u8((UINT8 *)im->image[iy + 1] + ix * 4);
+    const uint16x8_t v =
+        vshrq_n_u16(vmlal_u8(vmlsl_u8(vshll_n_u8(t, 8), t, fy), b, fy), 1);
+    return vrshrn_n_u32(
+        vmlal_n_u16(vmull_n_u16(vget_low_u16(v), 256 - fx), vget_high_u16(v), fx), 15
+    );
+}
+
 static inline uint8x8_t
 tf_bilinear2_neon(Imaging im, const INT32 *qx, const INT32 *qy) {
-    const int ixa = (int)(qx[0] >> 8), iya = (int)(qy[0] >> 8);
-    const int ixb = (int)(qx[1] >> 8), iyb = (int)(qy[1] >> 8);
-    const unsigned fxa = (unsigned)(qx[0] & 255), fxb = (unsigned)(qx[1] & 255);
-    const UINT16 fya = (UINT16)(qy[0] & 255), fyb = (UINT16)(qy[1] & 255);
-    /* [p00 p01] of each pixel, then [p00 of a, p00 of b] and so on */
-    const uint32x2_t a0 =
-        vreinterpret_u32_u8(vld1_u8((UINT8 *)im->image[iya] + ixa * 4));
-    const uint32x2_t a1 =
-        vreinterpret_u32_u8(vld1_u8((UINT8 *)im->image[iya + 1] + ixa * 4));
-    const uint32x2_t b0 =
-        vreinterpret_u32_u8(vld1_u8((UINT8 *)im->image[iyb] + ixb * 4));
-    const uint32x2_t b1 =
-        vreinterpret_u32_u8(vld1_u8((UINT8 *)im->image[iyb + 1] + ixb * 4));
-    const uint8x8_t p00 = vreinterpret_u8_u32(vuzp1_u32(a0, b0));
-    const uint8x8_t p01 = vreinterpret_u8_u32(vuzp2_u32(a0, b0));
-    const uint8x8_t p10 = vreinterpret_u8_u32(vuzp1_u32(a1, b1));
-    const uint8x8_t p11 = vreinterpret_u8_u32(vuzp2_u32(a1, b1));
-    const uint8x8_t fx = vreinterpret_u8_u32(
-        vset_lane_u32(fxb * 0x01010101u, vdup_n_u32(fxa * 0x01010101u), 1)
+    return vmovn_u16(vcombine_u16(
+        tf_bilinear1_neon(im, qx[0], qy[0]), tf_bilinear1_neon(im, qx[1], qy[1])
+    ));
+}
+
+/* Eight L pixels away from the edges, bilinear, the same integers. */
+static inline uint8x8_t
+tf_bilinear8_l_neon(Imaging im, const INT32 *qx, const INT32 *qy) {
+    const uint32x4_t m = vdupq_n_u32(255);
+    const uint16x8_t fx = vcombine_u16(
+        vmovn_u32(vandq_u32(vreinterpretq_u32_s32(vld1q_s32(qx)), m)),
+        vmovn_u32(vandq_u32(vreinterpretq_u32_s32(vld1q_s32(qx + 4)), m))
     );
-    const uint16x8_t top = vmlal_u8(vmlsl_u8(vshll_n_u8(p00, 8), p00, fx), p01, fx);
-    const uint16x8_t bot = vmlal_u8(vmlsl_u8(vshll_n_u8(p10, 8), p10, fx), p11, fx);
-    const uint32x4_t va = vmlal_n_u16(
-        vmull_n_u16(vget_low_u16(top), (UINT16)(256 - fya)), vget_low_u16(bot), fya
+    const uint16x8_t fy = vcombine_u16(
+        vmovn_u32(vandq_u32(vreinterpretq_u32_s32(vld1q_s32(qy)), m)),
+        vmovn_u32(vandq_u32(vreinterpretq_u32_s32(vld1q_s32(qy + 4)), m))
     );
-    const uint32x4_t vb = vmlal_n_u16(
-        vmull_n_u16(vget_high_u16(top), (UINT16)(256 - fyb)), vget_high_u16(bot), fyb
+    const uint16x8_t gx = vsubq_u16(vdupq_n_u16(256), fx);
+    const uint16x8_t gy = vsubq_u16(vdupq_n_u16(256), fy);
+    UINT16 pt[8], pb[8];
+    uint16x8_t t, b, v0, v1;
+    int k;
+    for (k = 0; k < 8; k++) {
+        const UINT8 *r0 = im->image8[qy[k] >> 8] + (qx[k] >> 8);
+        const UINT8 *r1 = im->image8[(qy[k] >> 8) + 1] + (qx[k] >> 8);
+        memcpy(pt + k, r0, 2);
+        memcpy(pb + k, r1, 2);
+    }
+    t = vld1q_u16(pt);
+    b = vld1q_u16(pb);
+    /* p0 is the low byte of each word (little-endian), p1 the high one */
+    v0 = vshrq_n_u16(
+        vmlaq_u16(
+            vmulq_u16(vandq_u16(t, vdupq_n_u16(255)), gy),
+            vandq_u16(b, vdupq_n_u16(255)),
+            fy
+        ),
+        1
     );
-    return vmovn_u16(vcombine_u16(vrshrn_n_u32(va, 16), vrshrn_n_u32(vb, 16)));
+    v1 = vshrq_n_u16(
+        vmlaq_u16(vmulq_u16(vshrq_n_u16(t, 8), gy), vshrq_n_u16(b, 8), fy), 1
+    );
+    return vmovn_u16(vcombine_u16(
+        vrshrn_n_u32(
+            vmlal_u16(
+                vmull_u16(vget_low_u16(v0), vget_low_u16(gx)),
+                vget_low_u16(v1),
+                vget_low_u16(fx)
+            ),
+            15
+        ),
+        vrshrn_n_u32(
+            vmlal_u16(
+                vmull_u16(vget_high_u16(v0), vget_high_u16(gx)),
+                vget_high_u16(v1),
+                vget_high_u16(fx)
+            ),
+            15
+        )
+    ));
 }
 
 /* One pixel of 4 bytes away from the edges, bicubic: rounding shifts are the
@@ -557,6 +878,16 @@ ImagingTransformFast(
                         }
                         continue;
                     }
+#if defined(IMAGING_SIMD_AVX2)
+                    if (ps == 4 && !bicubic && i + 3 < n &&
+                        !memcmp(kind + i, "\2\2\2\2", 4)) {
+                        _mm_storeu_si128(
+                            (__m128i *)o, tf_bilinear4_avx2(imIn, qx + i, qy + i)
+                        );
+                        i += 3;
+                        continue;
+                    }
+#endif
 #if defined(IMAGING_SIMD_SSE4)
                     if (ps == 4 && kind[i] == 2) {
                         if (!bicubic && i + 1 < n && kind[i + 1] == 2) {
@@ -589,7 +920,24 @@ ImagingTransformFast(
                         }
                     }
 #endif
-                    if (bicubic) {
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+                    if (ps == 1 && !bicubic && i + 7 < n &&
+                        !memcmp(kind + i, "\2\2\2\2\2\2\2\2", 8)) {
+#if defined(IMAGING_SIMD_SSE4)
+                        _mm_storel_epi64(
+                            (__m128i *)o, tf_bilinear8_l_sse(imIn, qx + i, qy + i)
+                        );
+#else
+                        vst1_u8(o, tf_bilinear8_l_neon(imIn, qx + i, qy + i));
+#endif
+                        i += 7;
+                        continue;
+                    }
+#endif
+                    if (ps == 1 && kind[i] == 2) {
+                        *o = bicubic ? tf_bicubic_l(imIn, qx[i], qy[i], cubic)
+                                     : tf_bilinear_l(imIn, qx[i], qy[i]);
+                    } else if (bicubic) {
                         tf_bicubic_pixel(o, imIn, ps, qx[i], qy[i], cubic);
                     } else {
                         tf_bilinear_pixel(o, imIn, ps, qx[i], qy[i]);

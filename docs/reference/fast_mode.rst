@@ -94,8 +94,8 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
        bicubic, modes L, RGB, RGBA, RGBa, RGBX, CMYK
      - positions in fixed point (1/256 pixel), integer filters with one
        rounding
-     - rotate bilinear: 2.0x, 2.7x; bicubic: 2.9x, 3.4x; perspective: 1.7x,
-       2.0x
+     - rotate bilinear: 2.7x, 2.6x; bicubic: 2.9x, 3.4x; perspective: 2.1x,
+       1.9x; L rotate bilinear: 2.8x, 1.9x
      - at most 2 levels, 1 on photos (RGBA: more where alpha is low, from
        the premultiplication); against float interpolation 0.6% of values
        off by one, against 41% for the exact result
