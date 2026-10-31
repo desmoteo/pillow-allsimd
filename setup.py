@@ -1110,7 +1110,12 @@ class pil_build_ext(build_ext):
             else:
                 args = [] if msvc else ["-msse4.1"]
                 simd = "SSE4.1"
-            if not msvc and all(a in ("i386", "i686", "x86") for a in arches):
+            # (32-bit Python in a container on a 64-bit kernel reports
+            # linux-x86_64, but its pointers are 4 bytes)
+            if not msvc and (
+                all(a in ("i386", "i686", "x86") for a in arches)
+                or struct.calcsize("P") == 4
+            ):
                 # 32-bit x86 does double arithmetic on the x87 unit by default,
                 # with 80-bit intermediates, so results depend on register
                 # spills; with SSE4.1 required anyway, SSE arithmetic rounds as

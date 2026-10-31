@@ -195,7 +195,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libfreetype-dev liblcms2-dev libopenjp2-7-dev libharfbuzz-dev \
         libfribidi-dev libraqm-dev libimagequant-dev libavif-dev libxcb1-dev \
         libtk8.6 xvfb xauth libjpeg-turbo-progs imagemagick locales \
-        libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 libglib2.0-0 \
+        libgl1 libegl1 libxkbcommon0 libfontconfig1 libdbus-1-3 \
+        \$(apt-cache show libglib2.0-0t64 >/dev/null 2>&1 && echo libglib2.0-0t64 || echo libglib2.0-0) \
     && rm -rf /var/lib/apt/lists/* \
     && echo 'pl_PL ISO-8859-2' >> /etc/locale.gen && locale-gen \
     && pip install --no-cache-dir setuptools wheel pybind11 \
