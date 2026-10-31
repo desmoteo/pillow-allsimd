@@ -5,9 +5,12 @@ import colorsys
 import itertools
 import math
 
+import pytest
+
 from PIL import Image
 
 from .helper import assert_image_similar, hopper
+from .simd_shapes import X86_32
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
@@ -181,6 +184,9 @@ def _rgb2hsv_reference(r: int, g: int, b: int) -> tuple[int, int, int]:
     return int(h * 255.0), int(s * 255.0), maxc
 
 
+@pytest.mark.skipif(
+    X86_32, reason="x87 builds round Pillow's float steps differently from IEEE doubles"
+)
 def test_rgb_to_hsv_exact() -> None:
     # Every value of each channel against others nearby and far, so that
     # near-ties and all hue cases are covered, and a coarse grid. 79 pixels

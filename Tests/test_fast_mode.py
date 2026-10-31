@@ -12,7 +12,7 @@ import pytest
 from PIL import Image, ImageChops, ImageFilter, features
 
 from .helper import hopper
-from .simd_shapes import images, noise, photo, scaled, shapes
+from .simd_shapes import X86_32, images, noise, photo, scaled, shapes
 
 TYPE_CHECKING = False
 if TYPE_CHECKING:
@@ -551,7 +551,8 @@ def test_transform_close_to_exact(
             assert _diff(fast, exact)[1] < 0.6, name
             ins = _inside(fn, shape, False), _inside(fn, shape, True)
             flips = [i for i, (a, b) in enumerate(zip(*ins)) if (a == 0) != (b == 0)]
-            assert len(flips) <= 4, name
+            # x87 positions round differently on the edges more often
+            assert len(flips) <= (16 if X86_32 else 4), name
             f, e = fast.tobytes(), exact.tobytes()
             n = len(f) // len(ins[0])
             for i in set(range(len(ins[0]))) - set(flips):
