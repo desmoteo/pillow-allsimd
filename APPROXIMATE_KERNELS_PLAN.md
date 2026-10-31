@@ -169,7 +169,9 @@ For each kernel:
 5. Benchmarks: a `-fast` variant of each branch build in pillow-simd-perf
    (the same build run with `PILLOW_SIMD_FAST=1`), so the page shows
    exact and fast side by side; `analysis/accuracy.py` gains the Pillow fast
-   rows.
+   rows. Done for the main builds, AVX2 and NEON (`branch-avx2-fast`,
+   `branch-neon-fast`); the accuracy rows are in `analysis/gaussfast.py` and
+   the measurements quoted in SIMD_FAST_KERNELS.md.
 6. Docs: the kernel's entry in the user page's table and in
    `SIMD_FAST_KERNELS.md` (below).
 

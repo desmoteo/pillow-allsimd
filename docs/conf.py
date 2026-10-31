@@ -141,6 +141,13 @@ html_theme = "furo"
 html_theme_options = {
     "light_logo": "pillow-logo-dark-text.png",
     "dark_logo": "pillow-logo.png",
+    # Pillow-SIMD: these pages document the fork and its additions
+    "announcement": (
+        "Pillow-SIMD, a fork of Pillow with SIMD kernels "
+        '(<a href="https://github.com/desmoteo/pillow-simd">desmoteo/pillow-simd</a>, '
+        "branch simd/pillow-13). Pillow's own documentation is at "
+        '<a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>.'
+    ),
 }
 
 # Add any paths that contain custom themes here, relative to this directory.
@@ -148,7 +155,7 @@ html_theme_options = {
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-# html_title = None
+html_title = f"Pillow-SIMD {release} documentation"
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 # html_short_title = None
