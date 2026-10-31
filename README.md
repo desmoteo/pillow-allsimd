@@ -193,6 +193,8 @@ describe:
 - [OTHER_ARCHITECTURES.md](design/OTHER_ARCHITECTURES.md): RISC-V, POWER, s390x,
   32-bit ARM and x86: the upstream requests, the RISC-V vector pull request,
   and the portable builds tested on each.
+- [PLAN.md](design/PLAN.md): the plan for PyPI releases and issue
+  reports, and the open points, as a checklist.
 - [SIMD_EXPLAINER_PLAN.md](design/SIMD_EXPLAINER_PLAN.md): the outline of a detailed
   explanation of every optimization on both architectures.
 
