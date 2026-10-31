@@ -1080,10 +1080,21 @@ class pil_build_ext(build_ext):
             if requested == "native512" and not x86:
                 msg = "'-C simd=native512' requires an x86 target"
                 raise ValueError(msg)
+            if any(a.startswith("riscv") for a in arches):
+                msg = (
+                    "'-C simd=native' is not supported for RISC-V (GCC has no "
+                    "-march=native there); set CC instead, e.g. "
+                    "CC='cc -march=rv64gcv'"
+                )
+                raise ValueError(msg)
             # -march=native enables FMA, and GCC would then fuse float
             # multiplies and adds, which changes results.
             args = ["-march=native", "-ffp-contract=off"]
             simd = "native (-march=native)"
+            if any(a.startswith(("ppc", "powerpc")) for a in arches):
+                # GCC takes -mcpu, not -march, for POWER
+                args = ["-mcpu=native", "-ffp-contract=off"]
+                simd = "native (-mcpu=native)"
             if sys.platform == "darwin" and all(
                 a in ("arm64", "aarch64") for a in arches
             ):

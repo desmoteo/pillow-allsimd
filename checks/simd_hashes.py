@@ -31,6 +31,19 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 
 R = Image.Resampling
 T = Image.Transpose
+
+# tobytes() and frombytes() take I and F pixels in the machine's byte order;
+# hashed in little-endian bytes, big-endian builds give the same hashes
+_tobytes = Image.Image.tobytes
+
+
+def _tobytes_le(self: Image.Image, encoder_name: str = "raw", *args: object) -> bytes:
+    if encoder_name == "raw" and not args and self.mode in ("I", "F"):
+        return _tobytes(self, "raw", "I;32S" if self.mode == "I" else "F;32F")
+    return _tobytes(self, encoder_name, *args)
+
+
+Image.Image.tobytes = _tobytes_le  # type: ignore[method-assign]
 Update = Callable[[bytes], None]
 results: dict[str, str] = {}
 
@@ -79,7 +92,9 @@ def noise(mode: str, size: tuple[int, int], seed: int) -> Image.Image:
         return Image.frombytes(
             "F", size, struct.pack(f"{n}f", *(rnd.uniform(-9, 9) for _ in range(n)))
         )
-    return Image.frombytes(mode, size, rnd.randbytes(w * hh * BYTES[mode]))
+    # I pixels from little-endian bytes, the same values on every machine
+    raw = ("raw", "I;32S") if mode == "I" else ()
+    return Image.frombytes(mode, size, rnd.randbytes(w * hh * BYTES[mode]), *raw)
 
 
 def smooth(mode: str, size: tuple[int, int]) -> Image.Image:
