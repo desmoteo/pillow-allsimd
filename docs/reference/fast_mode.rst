@@ -119,9 +119,9 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
      - the two passes fused through a ring of rows; the horizontal sums
        kept to 2^-6 levels instead of whole ones; the vertical pass in
        16-bit products
-     - upscale to 5478x3424: bilinear 1.18x, 1.42x; bicubic 1.29x, 1.46x;
-       RGBA bilinear 1.15x, 1.29x; downscale to 2048x1280 bicubic: 0.96x,
-       1.18x
+     - upscale to 5478x3424: bilinear 1.17x, 1.43x; bicubic 1.28x, 1.47x;
+       RGBA bilinear 1.17x, 1.31x; downscale to 2048x1280 bicubic: 0.96x,
+       1.20x
      - at most 1 level (RGBA and LA: 2, premultiplied); against a float
        resize 0.4% to 1.5% of values off by one, against 8% to 25% for the
        exact result

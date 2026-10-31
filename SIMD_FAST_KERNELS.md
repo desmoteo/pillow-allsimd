@@ -352,14 +352,15 @@ on a photo, against 8% to 25% for the exact result, whose 8-bit
 intermediate rounds every pixel. Both clip the intermediate at the
 filters' overshoots. The same hash on SSE4, AVX2, NEON and scalar builds.
 
-**Speed** (2560x1600, one core, ms, exact → fast):
+**Speed** (2560x1600, one core, ms, exact → fast, the benchmark at
+9e061d4e6):
 
 | | x86 AVX2 | arm64 NEON |
 |---|---|---|
-| RGB to 5478x3424 bilinear | 25.46 → 21.62 (1.18x) | 91.22 → 64.35 (1.42x) |
-| RGB to 5478x3424 bicubic | 35.63 → 27.65 (1.29x) | 128.60 → 87.82 (1.46x) |
-| RGB to 2048x1280 bicubic | 5.55 → 5.76 (0.96x) | 29.06 → 24.53 (1.18x) |
-| RGBA to 5478x3424 bilinear | 38.47 → 33.55 (1.15x) | 131.07 → 101.63 (1.29x) |
+| RGB to 5478x3424 bilinear | 25.24 → 21.62 (1.17x) | 91.51 → 64.15 (1.43x) |
+| RGB to 5478x3424 bicubic | 35.42 → 27.69 (1.28x) | 128.56 → 87.31 (1.47x) |
+| RGB to 2048x1280 bicubic | 5.54 → 5.75 (0.96x) | 29.04 → 24.29 (1.20x) |
+| RGBA to 5478x3424 bilinear | 38.39 → 32.88 (1.17x) | 131.29 → 100.18 (1.31x) |
 
 On x86 moderate downscales are 2% to 4% slower: the 16-bit ring rows are
 twice the bytes of 8-bit ones, and the vertical pass has many taps there.
