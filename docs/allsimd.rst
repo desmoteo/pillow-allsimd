@@ -30,7 +30,7 @@ State
 -----
 
 * Version |release|, on Pillow 13.0.0 (the ``simd/pillow-13`` branch).
-* Beta, not on PyPI yet: install it from source (below).
+* Beta. On PyPI as a source package, compiled on installation (below).
 * Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson Orin):
   Pillow's test suite on every build, the SIMD consistency tests, and output
   hashes per kernel that compare the builds (``checks/simd_hashes.py``). The

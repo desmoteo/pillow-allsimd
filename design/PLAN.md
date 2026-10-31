@@ -77,6 +77,13 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       not contain `[ci skip]`**: GitHub then skips the tag push's workflows
       too (the first tag, on 0b0fa7ebc, started nothing).
 - [x] (2026-11-03) `CHANGES.SIMD.rst` entry for the first PyPI release.
+- [ ] 13.0.0.post1, the same code with a fuller PyPI description: the
+      benchmark chart (`docs/resources/allsimd-speedups.svg`, drawn by
+      `checks/simd_speedups_svg.py` from the perf repository's
+      `docs/data`), a table of selected operations, the `simd` options and
+      exact mode. PyPI shows a release's description as uploaded, so a
+      new description needs a new version. The chart's URL names the tag
+      `allsimd-13.0.0.post1`, so it shows once the tag is pushed.
 
 ### Step 2: arm64 wheels
 
