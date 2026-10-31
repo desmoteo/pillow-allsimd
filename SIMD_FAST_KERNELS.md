@@ -176,3 +176,85 @@ estimate with an exact integer correction step would remove them.
 **Code map.** `rgb2hsv_fast()`, with `rgb2hsv_fast_pixel()` defining the
 result. Tests: `Tests/test_fast_mode.py` (the floors over a lattice of every
 third value, saturation and value equal to exact). Hashes: `fast: hsv`.
+
+## Affine, perspective and quad transforms (`TransformFast.c`)
+
+**Operation.** `Image.transform()` with `AFFINE` (and `EXTENT`, which
+becomes affine), `PERSPECTIVE`, `QUAD` and `MESH` (a quad per tile), and
+`Image.rotate()` at angles other than multiples of 90 degrees, with the
+bilinear or bicubic filter, for L and the 4-byte modes RGB, RGBA (which
+`transform()` premultiplies to RGBa first), RGBa, RGBX and CMYK: in
+`ImagingGenericTransform()`, after the filter lookup.
+
+**Exact path.** Each output pixel's source position in doubles, then the
+filter in doubles, truncated to 8 bits; the vectorized perspective
+coordinates divide twice per pixel. Truncation puts 41% of bilinear values
+one below the rounded interpolation, and the compilers fuse the
+multiply-adds differently on x86 and arm64.
+
+**Fast kernel.**
+
+- **Positions** in exact arithmetic, a 64x64 tile at a time, one row of the
+  tile per call. Affine and quad: the coefficients times 2^31 or 2^32,
+  rounded once, then integer sums along the row (2^-32 pixel). Perspective:
+  the numerators and the denominator as exact integers (coefficients times
+  2^36, below 2^53, so in doubles a fused or separate multiply-add gives
+  the same sums), then `p = n * (512 / d)`, one IEEE division and one
+  product, which every unit computes alike, truncated to 1/512 pixel: two
+  lanes per step on SSE4 (`divpd`), four on AVX2 (`vdivpd`), two on NEON
+  (`fdiv`), truncated by `cvttpd2dq` or `fcvtzs`.
+- Each position, minus half a pixel, is rounded to 1/256 pixel; the integer
+  part picks the pixels, the fraction the weights. A pixel is outside if
+  its position is (the exact path's test, at the fixed point's
+  precision), and near an edge if a neighbour is out of the image, where
+  the scalar function clamps it as the exact path does.
+- **Bilinear:** `top = p00 (256 - fx) + p01 fx`, likewise `bottom`, then
+  `(top (256 - fy) + bottom fy + 32768) >> 16`, one rounding. SSE4: two
+  pixels per step, `pshufb` making (p0, p1) word pairs for one `pmaddwd`
+  per row; NEON: two pixels, `p0 (256 - f)` as `(p0 << 8) - p0 f` so the
+  weights fit 8 bits (`vmlsl_u8`, `vmlal_u8`), `vrshrn` for the rounding.
+- **Bicubic:** Pillow's cubic (a = -1) as a table of 256 weight sets, 12
+  fractional bits each, rounded with the remainder in the largest so they
+  sum to 4096; each row's sum rounded to 8 bits, then the column sum,
+  rounded and clipped. One pixel per step: `pmaddwd` on two pixel pairs
+  per row (SSE4), `vmlal_n_s16` per pixel (NEON).
+- Positions the fixed point can't hold (a corner of the region beyond 2^30
+  pixels, perspective sums beyond 2^52, images of 2^22 pixels or more on a
+  side) keep the exact path, as do the nearest filter, other modes (LA and
+  La included: their exact filters copy the first channel into the second
+  and third bytes) and the other transforms.
+
+**Accuracy.** At most 2 levels from the exact result (noise, hopper; every
+transform, mode and filter of the tests); 1 on the benchmark photo, mean
+0.4, about 40% of values differ, nearly all by the exact path's truncation.
+Against bilinear interpolation in doubles at the exact positions (photo,
+rotation by 30 degrees): exact 41.4% of values off by one, fast 0.6%. RGBA
+differs more where alpha is low (up to 37 levels on the photo's alpha):
+`transform()` premultiplies, and a premultiplied value 1 apart is up to
+255 / alpha apart once divided by alpha again. The same hash on SSE4, AVX2,
+NEON and scalar builds, x86 and arm64.
+
+**Speed** (2560x1600, one core, ms, exact → fast; OpenCV `warpAffine` in
+brackets):
+
+| | x86 AVX2 | arm64 NEON |
+|---|---|---|
+| rotate 30° RGB bilinear | 35.6 → 17.9 (2.0x) [29.9] | 108.1 → 39.8 (2.7x) [35.5] |
+| rotate 30° RGB bicubic | 91.4 → 31.3 (2.9x) [62.7] | 266.3 → 78.9 (3.4x) [79.3] |
+| rotate 30° RGBA bicubic | 98.5 → 38.5 (2.6x) | 341.0 → 97.8 (3.5x) |
+| perspective RGB bilinear | 32.0 → 19.1 (1.7x) | 117.4 → 60.0 (2.0x) |
+
+The bilinear pixel loop is the next cost: two pixels per step with their
+weights broadcast from scalars; four or eight per step with the weights
+built in vectors would bring x86 nearer to the perspective coordinates'
+cost. On arm64 the perspective's two divisions per lane pair dominate.
+
+**Code map.** `tf_map_init()` and `tf_region_ok()` set up and check the
+fixed point; `tf_row()` gives the positions and kinds of a row;
+`tf_bilinear_pixel()` and `tf_bicubic_pixel()` define the result, with
+`tf_bilinear2_sse()`, `tf_bicubic1_sse()`, `tf_bilinear2_neon()` and
+`tf_bicubic1_neon()` for pixels away from the edges;
+`ImagingTransformFast()` decides and runs. Tests: `Tests/test_fast_mode.py`
+(difference from exact per mode, filter and transform, accuracy against
+float bilinear, fill colour, small images, mesh, out-of-range coefficients
+and other modes on the exact path). Hashes: `fast: transform`.

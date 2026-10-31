@@ -430,6 +430,39 @@ def _(upd: Update) -> None:
         Image.set_fast(previous)
 
 
+@section("fast: transform")
+def _(upd: Update) -> None:
+    if not hasattr(Image, "set_fast"):
+        return
+    T = Image.Transform
+    previous = Image.get_fast()
+    Image.set_fast(True)
+    try:
+        for mode in ("L", "RGB", "RGBA", "CMYK"):
+            for w, h in ((1, 1), (2, 5), (37, 23), (160, 97)):
+                im = noise(mode, (w, h), w * 7 + h)
+                for r in (Image.Resampling.BILINEAR, Image.Resampling.BICUBIC):
+                    for angle in (0.5, 30, 90, 211.7):
+                        upd(im.rotate(angle, r, expand=angle > 100).tobytes())
+                    for size, method, data in (
+                        ((w + 7, h + 3), T.AFFINE, (0.7, 0.2, -1.5, -0.1, 1.3, 2.25)),
+                        ((w * 2 + 1, h * 2), T.AFFINE, (0.5, 0, 0, 0, 0.5, 0)),
+                        (
+                            (w, h),
+                            T.PERSPECTIVE,
+                            (1.1, 0.1, -0.1 * w, 0, 1.05, 0, 0.002, 0.003),
+                        ),
+                        (
+                            (w, h),
+                            T.QUAD,
+                            (0, 0, 0, h, w * 1.1, h * 0.9, w * 0.8, 0),
+                        ),
+                    ):
+                        upd(im.transform(size, method, data, r).tobytes())
+    finally:
+        Image.set_fast(previous)
+
+
 @section("resize 8-bit")
 def _(upd: Update) -> None:
     for mode in ("L", "LA", "RGB"):

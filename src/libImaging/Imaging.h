@@ -207,6 +207,19 @@ ImagingGaussianBlurFastApplies(
 );
 extern Imaging
 ImagingGaussianBlurFast(Imaging imOut, Imaging imIn, float xradius, float yradius);
+extern int
+ImagingTransformFast(
+    Imaging imOut,
+    Imaging imIn,
+    int method,
+    int x0,
+    int y0,
+    int x1,
+    int y1,
+    const double *a,
+    int filterid,
+    int fill
+);
 
 extern Imaging
 ImagingNew(ModeID mode, int xsize, int ysize);
