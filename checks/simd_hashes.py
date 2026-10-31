@@ -463,6 +463,40 @@ def _(upd: Update) -> None:
         Image.set_fast(previous)
 
 
+@section("fast: blend")
+def _(upd: Update) -> None:
+    if not hasattr(Image, "set_fast"):
+        return
+    previous = Image.get_fast()
+    Image.set_fast(True)
+    try:
+        for mode in ("L", "LA", "RGB", "RGBA", "CMYK"):
+            for size in ((1, 1), (17, 3), (67, 23), (203, 71)):
+                a = noise(mode, size, size[0])
+                b = noise(mode, size, size[1] + 100)
+                for alpha in (0.001, 0.3, 0.5, 0.77, 0.99999):
+                    upd(Image.blend(a, b, alpha).tobytes())
+    finally:
+        Image.set_fast(previous)
+
+
+@section("fast: downscale")
+def _(upd: Update) -> None:
+    # reducing_gap 3.0 by default: the exact reduce() and resize kernels
+    if not hasattr(Image, "set_fast"):
+        return
+    previous = Image.get_fast()
+    Image.set_fast(True)
+    try:
+        for mode in ("L", "RGB", "RGBA", "F"):
+            im = noise(mode, (397, 211), 7)
+            for size in ((60, 30), (33, 35), (13, 7)):
+                for r in (Image.Resampling.BICUBIC, Image.Resampling.LANCZOS):
+                    upd(im.resize(size, r).tobytes())
+    finally:
+        Image.set_fast(previous)
+
+
 @section("resize 8-bit")
 def _(upd: Update) -> None:
     for mode in ("L", "LA", "RGB"):

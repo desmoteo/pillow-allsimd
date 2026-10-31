@@ -93,6 +93,16 @@ Based on Pillow 13.0.0
   result, 0.6% of values off by one against float interpolation (exact:
   41%); rotate bilinear 2.0x (x86) and 2.7x (arm64), bicubic 2.9x and 3.4x,
   perspective 1.7x and 2.0x
+- Fast mode: blend() with 0 < alpha < 1 interpolates in integers, alpha in
+  2^-15 units, rounded (pmulhrsw, vqrdmulh): within 1 level of the exact
+  result, 1.7x (x86) and 4.1x (arm64)
+- Fast mode: resize() with the bicubic, Lanczos and MKS filters and no
+  reducing_gap uses 3.0, so downscales of 6x and more shrink with reduce()
+  first: within 2 levels at photo sizes, 1/8 Lanczos 1.9x (x86) and 2.5x
+  (arm64)
+- arm64: RGBa -> RGBA (and so RGBA resize and transforms) divides once per
+  pixel instead of once per channel, with the same result for every colour
+  and alpha (1.12x)
 - Pixel conversions written so that they vectorize under Python's
   ``-fno-strict-overflow`` (RGBA -> RGB 1.9x, RGB -> RGBA 1.9x, L -> RGB
   2.1x with AVX2); NEON loops for L -> RGB, RGB <-> RGBA and CMYK

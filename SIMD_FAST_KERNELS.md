@@ -258,3 +258,78 @@ fixed point; `tf_row()` gives the positions and kinds of a row;
 (difference from exact per mode, filter and transform, accuracy against
 float bilinear, fill colour, small images, mesh, out-of-range coefficients
 and other modes on the exact path). Hashes: `fast: transform`.
+
+## Blend (`Blend.c`)
+
+**Operation.** `Image.blend(im1, im2, alpha)` for 0 < alpha < 1, on every
+mode it takes (8-bit bands); alpha 0 and 1 copy an image, and alphas
+outside 0..1, which extrapolate and clip, keep the exact path.
+
+**Exact path.** `in1 + alpha (in2 - in1)` in floats, truncated, so half of
+the values are one below the rounded result; the compiler vectorizes it.
+
+**Fast kernel.** alpha in units of 2^-15, `a = round(alpha 2^15)` (at most
+32767), then `in1 + ((in2 - in1) a + 2^14) >> 15`: the rounding of
+`pmulhrsw` (SSE4, AVX2) and of `vqrdmulh` (NEON), which compute the same
+integer, 16 or 32 bytes per step. The result lies between the two inputs,
+so nothing needs clipping.
+
+**Accuracy.** At most 1 level from the exact result. It is the float result
+rounded to the nearest integer, except where that is within 0.004 of a
+half (alpha's rounding moves the product by at most 255 · 2^-16). The same
+hash on SSE4, AVX2, NEON and scalar builds.
+
+**Speed** (2560x1600 RGB, alpha 0.3, one core, ms): x86 AVX2 3.32 → 1.93
+(1.7x); arm64 NEON 12.97 → 3.13 (4.1x). OpenCV's `addWeighted` (float):
+1.8 and 11.9.
+
+**Code map.** `blend_fast_row()`. Tests: `Tests/test_fast_mode.py`
+(difference from exact per mode, distance from the float result, alphas
+outside the open interval exact). Hashes: `fast: blend`.
+
+## Large downscales (`Image.py`, `resize()`)
+
+**Operation.** `Image.resize()` with the bicubic, Lanczos, MKS2013 or
+MKS2021 filter and no `reducing_gap`, on every mode but I;16 (which
+`reduce()` doesn't take). Thumbnails already use `reducing_gap=2.0`.
+
+**Exact path.** One convolution with the filter stretched over the whole
+scale: 1/8 Lanczos reads 48 source pixels per output pixel and axis.
+
+**Fast kernel.** `reducing_gap=3.0`: for a downscale of 6x or more the
+image is first shrunk by an integer factor with `reduce()` (box averages,
+exact integer arithmetic) so that the convolution does the last 3x to 6x.
+The libvips-style step is a different algorithm, not a rounding, so it is
+bounded by measurement:
+
+- 3.0 rather than thumbnail's 2.0: at 2.0 the 16x results were up to 6
+  levels from the exact result on hopper scaled to 2048x1536, and 4x
+  downscales changed too; at 3.0 they stay within 2 levels on photos,
+  which Pillow's documentation calls indistinguishable from fair
+  resampling in most cases.
+- Only the filters it makes faster: with box, bilinear and Hamming the
+  exact kernels are already as fast as `reduce()` plus a shorter filter (at
+  1/8: 0.75x, 0.96x, 1.0x on x86).
+
+Both steps are exact kernels, so the hash is the same on every build.
+
+**Accuracy** (2560x1600 photo to 426x266, 320x200 and 160x100): at most 2
+levels from the exact result, 0.2 to 0.4 on average; against the same
+filter in floats (Pillow's F resize per channel) PSNR 52 to 56 dB, the
+exact result 59 to 61 dB. Tiny results differ more at their edges, where
+`reduce()` averages partial boxes (512x384 to 32x24: up to 9 levels on the
+border, 4 inside).
+
+**Speed** (2560x1600 RGB, one core, ms, exact → fast):
+
+| | x86 AVX2 | arm64 NEON |
+|---|---|---|
+| 1/6 bicubic | 2.64 → 1.58 (1.7x) | 13.23 → 5.83 (2.3x) |
+| 1/8 Lanczos | 3.52 → 1.88 (1.9x) | 18.21 → 7.39 (2.5x) |
+| 1/16 Lanczos | 3.06 → 1.56 (2.0x) | 16.48 → 3.67 (4.5x) |
+| 1/8 MKS2021 | 4.44 → 2.24 (2.0x) | 25.90 → 9.15 (2.8x) |
+
+**Code map.** `Image.resize()`, the `reducing_gap` default. Tests:
+`Tests/test_fast_mode.py` (equal to `reducing_gap=3.0`, close to exact at
+photo sizes, below 6x and with other filters, an explicit gap or I;16
+exact). Hashes: `fast: downscale`.

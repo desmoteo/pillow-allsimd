@@ -462,33 +462,43 @@ neon_muldiv255(uint8x16_t v, uint8x16_t a) {
     );
 }
 
-/* CLIP8(255 * v / a), truncated, for four lanes. The float quotient is
-   exact enough that truncating it equals the integer division. */
-static inline uint16x4_t
-neon_div_alpha(uint16x4_t v, float32x4_t a) {
-    float32x4_t q = vdivq_f32(vmulq_n_f32(vcvtq_f32_u32(vmovl_u16(v)), 255.0f), a);
-    return vqmovn_u32(vcvtq_u32_f32(q));
-}
-
-static inline uint8x16_t
-neon_unpremultiply(uint8x16_t v, uint8x16_t a) {
-    uint16x8_t a_lo = vmovl_u8(vget_low_u8(a));
-    uint16x8_t a_hi = vmovl_u8(vget_high_u8(a));
-    uint16x8_t v_lo = vmovl_u8(vget_low_u8(v));
-    uint16x8_t v_hi = vmovl_u8(vget_high_u8(v));
-    float32x4_t a0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_lo)));
-    float32x4_t a1 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(a_lo)));
-    float32x4_t a2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(a_hi)));
-    float32x4_t a3 = vcvtq_f32_u32(vmovl_u16(vget_high_u16(a_hi)));
-    uint16x8_t r_lo = vcombine_u16(
-        neon_div_alpha(vget_low_u16(v_lo), a0), neon_div_alpha(vget_high_u16(v_lo), a1)
-    );
-    uint16x8_t r_hi = vcombine_u16(
-        neon_div_alpha(vget_low_u16(v_hi), a2), neon_div_alpha(vget_high_u16(v_hi), a3)
-    );
-    uint8x16_t r = vcombine_u8(vqmovn_u16(r_lo), vqmovn_u16(r_hi));
-    // Alpha 0 keeps the colour.
-    return vbslq_u8(vceqzq_u8(a), v, r);
+/* Removes premultiplication from 16 pixels: CLIP8(255 * c / alpha),
+   truncated, and c where alpha is 0, with one division per pixel. c is
+   clipped to alpha (giving 255, as the clip would), then multiplied by
+   (255 + 2^-12) / alpha in floats: the two roundings stay within 2^-22 of
+   the product, so it is above 255 c / alpha when that is an integer and
+   below the next integer otherwise (at least 1 / alpha away). Checked for
+   every c and alpha. */
+static inline void
+neon_unpremultiply_16(uint8x16x4_t *px) {
+    const uint8x16_t a = px->val[3];
+    const uint16x8_t alo = vmovl_u8(vget_low_u8(a)), ahi = vmovl_u8(vget_high_u8(a));
+    const float32x4_t k = vdupq_n_f32(255.0f + 1.0f / 4096);
+    const float32x4_t r[4] = {
+        vdivq_f32(k, vcvtq_f32_u32(vmovl_u16(vget_low_u16(alo)))),
+        vdivq_f32(k, vcvtq_f32_u32(vmovl_u16(vget_high_u16(alo)))),
+        vdivq_f32(k, vcvtq_f32_u32(vmovl_u16(vget_low_u16(ahi)))),
+        vdivq_f32(k, vcvtq_f32_u32(vmovl_u16(vget_high_u16(ahi))))
+    };
+    int b;
+    for (b = 0; b < 3; b++) {
+        const uint8x16_t c = vminq_u8(px->val[b], a);
+        const uint16x8_t lo = vmovl_u8(vget_low_u8(c)), hi = vmovl_u8(vget_high_u8(c));
+        /* alpha 0: 0 times infinity, NaN, converts to 0 and is replaced */
+        const uint32x4_t q0 =
+            vcvtq_u32_f32(vmulq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo))), r[0]));
+        const uint32x4_t q1 =
+            vcvtq_u32_f32(vmulq_f32(vcvtq_f32_u32(vmovl_u16(vget_high_u16(lo))), r[1]));
+        const uint32x4_t q2 =
+            vcvtq_u32_f32(vmulq_f32(vcvtq_f32_u32(vmovl_u16(vget_low_u16(hi))), r[2]));
+        const uint32x4_t q3 =
+            vcvtq_u32_f32(vmulq_f32(vcvtq_f32_u32(vmovl_u16(vget_high_u16(hi))), r[3]));
+        const uint8x16_t res = vcombine_u8(
+            vmovn_u16(vcombine_u16(vmovn_u32(q0), vmovn_u32(q1))),
+            vmovn_u16(vcombine_u16(vmovn_u32(q2), vmovn_u32(q3)))
+        );
+        px->val[b] = vbslq_u8(vceqzq_u8(a), px->val[b], res);
+    }
 }
 #endif
 
@@ -1303,9 +1313,7 @@ rgba2rgbA(UINT8 *out, const UINT8 *in, int xsize) {
     // The NEON kernel is exact, so the scalar code below can finish the row.
     for (; x < xsize - 15; x += 16) {
         uint8x16x4_t px = vld4q_u8(in + x * 4);
-        px.val[0] = neon_unpremultiply(px.val[0], px.val[3]);
-        px.val[1] = neon_unpremultiply(px.val[1], px.val[3]);
-        px.val[2] = neon_unpremultiply(px.val[2], px.val[3]);
+        neon_unpremultiply_16(&px);
         vst4q_u8(out + x * 4, px);
     }
     in += x * 4;

@@ -43,6 +43,23 @@ def test_convert(width: int, mode_in: str, mode_out: str) -> None:
         _assert_flat(im.convert(mode_out))
 
 
+def test_unpremultiply_every_value() -> None:
+    # Every colour value with every alpha: the vector kernels (a reciprocal
+    # and a correction on x86, one division per pixel on arm64) give the
+    # scalar code's 255 * c / alpha, truncated and clipped
+    data = bytes(
+        v for a in range(256) for c in range(256) for v in (c, 255 - c, c ^ 85, a)
+    )
+    out = Image.frombytes("RGBa", (256, 256), data).convert("RGBA").tobytes()
+    expected = bytes(
+        v
+        if i % 4 == 3 or data[i - i % 4 + 3] in (0, 255)
+        else min(255, 255 * v // data[i - i % 4 + 3])
+        for i, v in enumerate(data)
+    )
+    assert out == expected
+
+
 @pytest.mark.parametrize("width", WIDTHS)
 @pytest.mark.parametrize("mode", ("RGBA", "LA"))
 def test_alpha_composite(width: int, mode: str) -> None:

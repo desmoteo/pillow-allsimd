@@ -1,8 +1,10 @@
 # Plan: fast approximate kernels beside the bit-exact ones
 
-Status: decided 2026-10-31 (names, scope, phase 1). Phase 0 (the switch)
-and phase 1 (the Gaussian blur, YCbCr, HSV and the transforms) done; see
-[SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md). Evidence and measurements are in
+Status: decided 2026-10-31 (names, scope, phase 1). Phase 0 (the switch),
+phase 1 (the Gaussian blur, YCbCr, HSV and the transforms), blend and
+unpremultiply from phase 2, and phase 3 (large downscales) done; see
+[SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md). The resize precision item
+(5) is open. Evidence and measurements are in
 [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md).
 
 ## Goal
@@ -193,10 +195,28 @@ The resize item starts after the class-A fusion has landed in the default
 path, so the fast change is only the intermediate's precision and the
 arm64 `SDOT` kernel.
 
+Done (2026-10-31):
+
+- Unpremultiply (6) needed no fast mode: one float division per pixel,
+  `(255 + 2^-12) / alpha`, times each channel clipped to alpha and
+  truncated, is the exact integer quotient for every colour and alpha
+  (checked exhaustively), so the arm64 default path now divides once per
+  pixel instead of three times (1.12x; the widening and narrowing around
+  the float arithmetic cost as much as the divisions). x86 already used a
+  reciprocal with an integer correction.
+- Blend (7): integer interpolation, alpha in 2^-15 units with
+  `pmulhrsw`/`vqrdmulh` rounding, 1.7x (x86) and 4.1x (arm64).
+
 ### Phase 3: large downscales (item 8)
 
 Under the same flag, as decided: in fast mode, `resize` and `thumbnail`
 without an explicit `reducing_gap` use 2.0 for downscales of 4x and more.
+
+Done (2026-10-31) with 3.0 instead, for the bicubic, Lanczos and MKS
+filters only: 2.0 moved 16x results by up to 6 levels and changed 4x
+downscales; 3.0 stays within 2 levels at photo sizes. Box, bilinear and
+Hamming gain nothing from the extra step. `thumbnail()` already passes 2.0
+itself.
 
 ### Parallel track: class-A changes in the default path
 
