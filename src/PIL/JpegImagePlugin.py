@@ -395,6 +395,9 @@ class JpegImageFile(ImageFile.ImageFile):
                     rawmode = self.mode
                     if self.mode == "CMYK":
                         rawmode = "CMYK;I"  # assume adobe conventions
+                    elif self.mode == "RGB" and _EXT_RGBX:
+                        # libjpeg-turbo writes Pillow's 4-byte pixels itself
+                        rawmode = "RGBX"
                     self.tile = [
                         ImageFile._Tile("jpeg", (0, 0, *self.size), 0, (rawmode, ""))
                     ]
@@ -451,7 +454,7 @@ class JpegImageFile(ImageFile.ImageFile):
         original_size = self.size
 
         assert isinstance(a, tuple)
-        if a[0] == "RGB" and mode in ["L", "YCbCr"]:
+        if a[0] in ("RGB", "RGBX") and mode in ["L", "YCbCr"]:
             self._mode = mode
             a = mode, ""
 
@@ -634,6 +637,12 @@ def _getmp(self: JpegImageFile) -> dict[int, Any] | None:
 
 # --------------------------------------------------------------------
 # stuff to save JPEG files
+
+# Pillow-AllSIMD: with libjpeg-turbo, RGB images are read as 4-byte pixels
+# (JCS_EXT_RGBX), the colour conversion writing Pillow's layout itself (5%
+# faster to decode). Writing them that way was slower than packing them to
+# 3 bytes first, so saving keeps RGB.
+_EXT_RGBX = getattr(Image.core, "HAVE_LIBJPEGTURBO", False)
 
 RAWMODE = {
     "1": "L",

@@ -109,6 +109,12 @@ Based on Pillow 13.0.0
   reducing_gap uses 3.0, so downscales of 6x and more shrink with reduce()
   first: within 2 levels at photo sizes, 1/8 Lanczos 1.9x (x86) and 2.5x
   (arm64)
+- WebP: one-frame files decode straight into the image with libwebp's
+  simple API, without the animation decoder's canvas and two copies (the
+  same pixels; 1.38x, 2560x1600 RGB, now ahead of OpenCV)
+- JPEG: RGB images decode to 4-byte pixels in libjpeg-turbo's colour
+  conversion (JCS_EXT_RGBX) instead of being expanded row by row (1.05x);
+  PNG: the "up" filter undone 16 bytes at a time (1.1x on such rows)
 - ImageDraw polygon outlines wider than 1 px keep the polygon's inside as
   spans per row, from the same scan as its fill, instead of a mask of its
   bounding box: the same pixels, 1.1x for the benchmark's ROI polygons and

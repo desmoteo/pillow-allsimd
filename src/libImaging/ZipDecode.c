@@ -27,6 +27,35 @@ static const int STARTING_ROW[] = {0, 0, 4, 0, 2, 0, 1};
 static const int COL_INCREMENT[] = {8, 8, 4, 4, 2, 2, 1};
 static const int ROW_INCREMENT[] = {8, 8, 8, 4, 4, 2, 2};
 
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+/* Undoes the PNG "up" filter 16 bytes at a time. The other filters depend
+   on the pixel to the left: one pixel per vector step (libpng's way) was
+   slower than the scalar loops, whose 3 or 4 byte positions run as
+   independent chains (2560x1600 RGB, Paeth 80 -> 152 ms), so they stay. */
+static void
+png_unfilter_up(UINT8 *row, const UINT8 *prev, int len) {
+    int i = 0;
+#if defined(IMAGING_SIMD_SSE4)
+    for (; i + 16 <= len; i += 16) {
+        _mm_storeu_si128(
+            (__m128i *)(row + i),
+            _mm_add_epi8(
+                _mm_loadu_si128((const __m128i *)(row + i)),
+                _mm_loadu_si128((const __m128i *)(prev + i))
+            )
+        );
+    }
+#else
+    for (; i + 16 <= len; i += 16) {
+        vst1q_u8(row + i, vaddq_u8(vld1q_u8(row + i), vld1q_u8(prev + i)));
+    }
+#endif
+    for (; i < len; i++) {
+        row[i] += prev[i];
+    }
+}
+#endif
+
 /* Get the length in bytes of a scanline in the pass specified,
  * for interlaced images */
 static int
@@ -151,9 +180,15 @@ ImagingZipDecode(Imaging im, ImagingCodecState state, UINT8 *buf, Py_ssize_t byt
                         break;
                     case 2:
                         /* up */
+#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
+                        png_unfilter_up(
+                            state->buffer + 1, context->previous + 1, row_len
+                        );
+#else
                         for (i = 1; i <= row_len; i++) {
                             state->buffer[i] += context->previous[i];
                         }
+#endif
                         break;
                     case 3:
                         /* average */
