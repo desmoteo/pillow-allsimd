@@ -116,7 +116,7 @@ Registering plugins
 Fast mode
 ^^^^^^^^^
 
-Pillow-SIMD only; see :ref:`fast-mode`.
+Pillow-AllSIMD only; see :ref:`fast-mode`.
 
 .. autofunction:: set_fast
 .. autofunction:: get_fast

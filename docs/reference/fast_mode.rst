@@ -1,27 +1,28 @@
 .. _fast-mode:
 
-Fast mode (Pillow-SIMD)
-=======================
+Fast mode (Pillow-AllSIMD)
+==========================
 
-By default Pillow-SIMD computes each operation with Pillow's arithmetic,
+By default Pillow-AllSIMD computes each operation with Pillow's arithmetic,
 or an integer form of it that rounds differently by one level at most in a
 few places (resize with 16-bit coefficients, RGB to L with 15-bit ones).
 Fast mode lets operations use kernels that are faster and whose results may
 differ from Pillow's by small, documented amounts. It is off unless you turn
 it on.
 
-This is a Pillow-SIMD feature: upstream Pillow has no fast mode. Check for it
-with ``features.check_feature("fast")``.
+This is a Pillow-AllSIMD feature: neither Pillow nor Pillow-SIMD has a fast
+mode. Check for it with ``features.check_feature("fast")``.
 
 Turning it on
 -------------
 
-Set the ``PILLOW_SIMD_FAST`` environment variable before :py:mod:`PIL.Image`
-is imported. ``1``, ``true``, ``on`` and ``yes`` turn fast mode on; ``0``,
+Set the ``PILLOW_ALLSIMD_FAST`` environment variable before
+:py:mod:`PIL.Image` is imported (``PILLOW_SIMD_FAST``, its former name, is
+read when ``PILLOW_ALLSIMD_FAST`` isn't set). ``1``, ``true``, ``on`` and ``yes`` turn fast mode on; ``0``,
 ``false``, ``off``, ``no`` and an empty value turn it off. Any other value
 gives a warning and leaves the setting unchanged::
 
-    PILLOW_SIMD_FAST=1 python3 app.py
+    PILLOW_ALLSIMD_FAST=1 python3 app.py
 
 Or call :py:func:`~PIL.Image.set_fast`, or use the
 :py:class:`~PIL.Image.fast_mode` context manager::
@@ -45,7 +46,7 @@ What it guarantees
   run the kernels they run without fast mode.
 * **Deterministic.** A fast kernel's result depends only on its input and
   arguments, and is the same on every build and architecture of a given
-  Pillow-SIMD version. (Large downscales use the exact resize and reduce
+  Pillow-AllSIMD version. (Large downscales use the exact resize and reduce
   kernels in another order, so they are as reproducible as those.)
 * **Bounded.** For each fast kernel, the largest difference from the exact
   result and its error against a float reference of the operation are

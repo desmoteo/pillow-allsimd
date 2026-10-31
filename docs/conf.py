@@ -1,5 +1,5 @@
 #
-# Pillow (PIL Fork) documentation build configuration file, created by
+# Pillow-AllSIMD documentation build configuration file (Pillow's, adapted), created by
 # sphinx-quickstart on Sat Apr  4 07:54:11 2015.
 #
 # This file is execfile()d with the current directory set to its
@@ -52,12 +52,19 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = "Pillow (PIL Fork)"
+# Pillow-AllSIMD, a fork of Pillow-SIMD, itself a fork of Pillow: these
+# pages are Pillow's documentation with the fork's additions, and credit all
+project = "Pillow-AllSIMD"
 copyright = (
-    "1995-2011 Fredrik Lundh and contributors, "
-    "2010 Jeffrey 'Alex' Clark and contributors."
+    "1995-2011 Fredrik Lundh and contributors (PIL), "
+    "2010 Jeffrey 'Alex' Clark and contributors (Pillow), "
+    "Alexander Karpinsky and contributors (Pillow-SIMD), "
+    "2026 Matteo Ferrabone and contributors (Pillow-AllSIMD)"
 )
-author = "Fredrik Lundh (PIL), Jeffrey 'Alex' Clark (Pillow)"
+author = (
+    "Fredrik Lundh (PIL), Jeffrey 'Alex' Clark (Pillow), "
+    "Alexander Karpinsky (Pillow-SIMD), Matteo Ferrabone (Pillow-AllSIMD)"
+)
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -139,13 +146,13 @@ html_theme = "furo"
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
-    "light_logo": "pillow-logo-dark-text.png",
-    "dark_logo": "pillow-logo.png",
-    # Pillow-SIMD: these pages document the fork and its additions
+    # Pillow-AllSIMD: no Pillow logo, so the sidebar shows the project's
+    # name; every page says whose documentation this is
     "announcement": (
-        "Pillow-SIMD, a fork of Pillow with SIMD kernels "
-        '(<a href="https://github.com/desmoteo/pillow-simd">desmoteo/pillow-simd</a>, '
-        "branch simd/pillow-13). Pillow's own documentation is at "
+        "Pillow-AllSIMD: Pillow with SIMD kernels for x86 and arm64, a fork of "
+        '<a href="https://github.com/uploadcare/pillow-simd">Pillow-SIMD</a> and '
+        '<a href="https://github.com/python-pillow/Pillow">Pillow</a>, whose '
+        "documentation this is, with Pillow-AllSIMD's additions. Pillow's own: "
         '<a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>.'
     ),
 }
@@ -155,7 +162,7 @@ html_theme_options = {
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = f"Pillow-SIMD {release} documentation"
+html_title = f"Pillow-AllSIMD {release} documentation"
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 # html_short_title = None
@@ -167,7 +174,8 @@ html_title = f"Pillow-SIMD {release} documentation"
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-html_favicon = "resources/favicon.ico"
+# Pillow's favicon is Pillow's brand; Pillow-AllSIMD uses none
+html_favicon = None
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -265,8 +273,5 @@ extlinks = {
 }
 
 # sphinxext.opengraph
-ogp_image = (
-    "https://raw.githubusercontent.com/python-pillow/pillow-logo/main/"
-    "pillow-logo-dark-text-1280x640.png"
-)
-ogp_image_alt = "Pillow"
+ogp_site_url = "https://desmoteo.github.io/pillow-allsimd/"
+ogp_site_name = "Pillow-AllSIMD"

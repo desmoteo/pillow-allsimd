@@ -7,7 +7,16 @@ Pillow is the friendly PIL fork. It is
 
     Copyright © 2010 by Jeffrey 'Alex' Clark and contributors
 
-Like PIL, Pillow is licensed under the open source MIT-CMU License:
+Pillow-SIMD (https://github.com/uploadcare/pillow-simd) is the SIMD fork of
+Pillow by Alexander Karpinsky and contributors, supported by Uploadcare.
+
+Pillow-AllSIMD (https://github.com/desmoteo/pillow-allsimd) is a fork of
+Pillow-SIMD. Its own changes are
+
+    Copyright © 2026 by Matteo Ferrabone and contributors
+
+Like PIL, Pillow, Pillow-SIMD and Pillow-AllSIMD are licensed under the
+open source MIT-CMU License:
 
 By obtaining, using, and/or copying this software and/or its associated
 documentation, you agree that you have read, understood, and will comply

@@ -1,5 +1,8 @@
 # Callgrind profile of pillow-simd on x86
 
+> Written before this fork was named Pillow-AllSIMD: "Pillow-SIMD" here
+> means this code base, the fork of uploadcare/pillow-simd.
+
 Companion to [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md). Goal: find what is left to optimise after step 2 (`e08321aae`), using instruction counts, cache misses and per-line costs instead of only wall time.
 
 ## Method

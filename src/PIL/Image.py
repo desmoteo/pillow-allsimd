@@ -2393,7 +2393,7 @@ class Image:
            The smaller ``reducing_gap``, the faster resizing.
            With ``reducing_gap`` greater or equal to 3.0, the result is
            indistinguishable from fair resampling in most cases.
-           The default value is None (no optimization). In Pillow-SIMD's
+           The default value is None (no optimization). In Pillow-AllSIMD's
            :ref:`fast mode <fast-mode>`, None means 3.0 for the bicubic,
            Lanczos and MKS filters, except on I;16 images.
         :returns: An :py:class:`~PIL.Image.Image` object.
@@ -2455,7 +2455,7 @@ class Image:
             and not self.mode.startswith("I;16")
             and get_fast()
         ):
-            # Pillow-SIMD fast mode: downscales of 6x and more first shrink by
+            # Pillow-AllSIMD fast mode: downscales of 6x and more first shrink by
             # an integer factor with reduce(); the shorter filters gain nothing
             reducing_gap = 3.0
 
@@ -4088,26 +4088,31 @@ def _apply_env_variables(env: dict[str, str] | None = None) -> None:
         except ValueError as e:
             warnings.warn(f"{var_name}: {e}")
 
-    if "PILLOW_SIMD_FAST" in env_dict:
-        value = env_dict["PILLOW_SIMD_FAST"].strip().lower()
-        if value in ("1", "true", "on", "yes"):
-            set_fast(True)
-        elif value in ("", "0", "false", "off", "no"):
-            set_fast(False)
-        else:
-            warnings.warn("PILLOW_SIMD_FAST is not a boolean")
+    # Pillow-AllSIMD fast mode; PILLOW_SIMD_FAST is the former name, read
+    # when the current one isn't set
+    for var_name in ("PILLOW_ALLSIMD_FAST", "PILLOW_SIMD_FAST"):
+        if var_name in env_dict:
+            value = env_dict[var_name].strip().lower()
+            if value in ("1", "true", "on", "yes"):
+                set_fast(True)
+            elif value in ("", "0", "false", "off", "no"):
+                set_fast(False)
+            else:
+                warnings.warn(f"{var_name} is not a boolean")
+            break
 
 
 # --------------------------------------------------------------------
-# Fast mode (Pillow-SIMD)
+# Fast mode (Pillow-AllSIMD)
 
 
 def set_fast(enabled: bool = True) -> None:
     """
     Lets operations use faster kernels whose results may differ from
     Pillow's by small, documented amounts, or goes back to the exact kernels.
-    Off by default; the ``PILLOW_SIMD_FAST`` environment variable sets it
-    when :py:mod:`PIL.Image` is imported. The setting is process-wide, and
+    Off by default; the ``PILLOW_ALLSIMD_FAST`` environment variable (or
+    ``PILLOW_SIMD_FAST``, its former name) sets it when :py:mod:`PIL.Image`
+    is imported. The setting is process-wide, and
     each operation reads it once when it starts. The operations with a fast
     kernel, and how far their results may differ, are listed in
     :ref:`fast-mode`.

@@ -1,20 +1,70 @@
-# Pillow-SIMD
+# Pillow-AllSIMD
 
-Pillow-SIMD is highly optimized version of [Pillow library][original-docs]
-for x86 (mainly Intel and AMD CPUs) and arm64.
+Pillow-AllSIMD is a fork of [Pillow-SIMD][simd-repo], the SIMD build of
+[Pillow][original-homepage], the friendly fork of the Python Imaging Library.
+Like Pillow-SIMD it is a drop-in replacement for the Pillow version it
+follows, now Pillow 13.0.0: it installs the same `PIL` package, with the
+same API, built with SIMD kernels.
 
-Pillow-SIMD is "following" Pillow which means it is
-drop-in replacements for Pillow of the same version.
-For example, `Pillow-SIMD 3.2.0.post3` is a drop-in replacement for
-`Pillow 3.2.0`, and  `Pillow-SIMD 3.3.3.post0` — for `Pillow 3.3.3`.
+For Pillow itself, please refer to its
+[documentation][original-docs],
+[changelog][original-changelog] and
+[contribution guide][original-contribute].
 
-For more information on the original Pillow, please refer to:
-[read the documentation][original-docs],
-[check the changelog][original-changelog] and
-[find out how to contribute][original-contribute].
+
+## Aim
+
+- **SIMD on every common CPU.** Pillow-SIMD targets x86; Pillow-AllSIMD
+  carries its kernels further on x86-64 (SSE4, AVX2, AVX-VNNI) and ports
+  them to arm64 (NEON), with portable C that compilers vectorize elsewhere.
+- **Pillow's results by default.** The operations follow Pillow's
+  arithmetic, or an integer form of it that rounds differently by one level
+  at most in a few places, and every SIMD kernel is checked against the
+  scalar code on every build.
+- **Faster still, when asked.** An opt-in fast mode uses kernels whose
+  results differ by a few documented levels at most, the same on every
+  build and architecture.
+- **Following Pillow.** Each Pillow release is merged, and changes that
+  suit Pillow-SIMD are offered to it.
+
+
+## State
+
+- Version 13.0.0.post0, on Pillow 13.0.0 (the `simd/pillow-13` branch).
+- Beta. Not on PyPI yet: install it from source (below).
+- Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson
+  Orin): Pillow's test suite on every build (scalar, SSE4, AVX2, NEON),
+  the SIMD consistency tests and per-kernel output hashes that compare the
+  builds (`checks/simd_hashes.py`).
+- [API documentation][allsimd-docs] (Pillow's, with this fork's additions)
+  and [benchmarks][allsimd-perf-page] against Pillow, Pillow-SIMD, OpenCV,
+  libvips and ImageMagick.
+
+
+## Credits
+
+Pillow-AllSIMD stands on the work of others, and keeps their copyright
+notices ([LICENSE](LICENSE)):
+
+- **PIL**, the Python Imaging Library, by Fredrik Lundh and contributors
+  (Secret Labs AB, 1995-2011).
+- **[Pillow][original-repo]**, the friendly PIL fork, by Jeffrey 'Alex'
+  Clark and contributors (2010-): the library as a whole, its tests and its
+  documentation, from which this fork's documentation is built.
+- **[Pillow-SIMD][simd-repo]**, by Alexander Karpinsky and contributors,
+  supported by [Uploadcare][uploadcare.com], which has run it in production
+  since 2015: the SIMD resampling, blur, filter, conversion and composition
+  kernels for x86 that this fork starts from, and the idea of a drop-in
+  SIMD build.
+
+Pillow-AllSIMD's own changes are by Matteo Ferrabone and contributors.
+To cite it, see [CITATION.cff](CITATION.cff), which also cites Pillow and
+Pillow-SIMD.
 
 
 ## Why SIMD
+
+(From Pillow-SIMD's readme, like the "why" sections further down.)
 
 There are multiple ways to tweak image processing performance.
 To name a few, such ways can be: utilizing better algorithms, optimizing existing implementations,
@@ -32,17 +82,10 @@ in performing the same operation on multiple data points simultaneously
 by using multiple processing elements.
 Common CPU SIMD instruction sets are MMX, SSE-SSE4, AVX, AVX2, AVX512, NEON.
 
-Currently, Pillow-SIMD can be [compiled](#installation) with SSE4 (default on x86), AVX2, AVX-VNNI or NEON (default on arm64) support, or for the build machine's own CPU.
+Pillow-AllSIMD can be [compiled](#installation) with SSE4 (default on x86), AVX2, AVX-VNNI or NEON (default on arm64) support, or for the build machine's own CPU.
 
 
-## Status
-
-Pillow-SIMD project is production-ready.
-The project is supported by Uploadcare, a SAAS for cloud-based image storing and processing.
-
-[![Uploadcare][uploadcare.logo]][uploadcare.com]
-
-In fact, Uploadcare has been running Pillow-SIMD since 2015.
+## What is accelerated
 
 The following image operations are currently SIMD-accelerated:
 
@@ -102,16 +145,16 @@ Other architectures build the portable C code.
 
 By default the operations follow Pillow's arithmetic, or an integer form
 of it that rounds differently by one level at most in a few places (resize,
-RGB → L). Fast mode, off unless you set `PILLOW_SIMD_FAST=1` or call
+RGB → L). Fast mode, off unless you set `PILLOW_ALLSIMD_FAST=1` or call
 `Image.set_fast()`, lets some operations use faster kernels whose results
 differ by a few levels at most and are the same on every build and
 architecture (so far the Gaussian blur, 3.3x at radius 1, RGB ↔ YCbCr,
 RGB → HSV, the affine, perspective and quad transforms and rotate(),
 blend() and large downscales). The
-[benchmark page](https://desmoteo.github.io/pillow-simd-perf/) shows the
+[benchmark page][allsimd-perf-page] shows the
 AVX2 and NEON builds in fast mode beside the exact ones. See the
-[fast mode reference](https://desmoteo.github.io/pillow-simd/reference/fast_mode.html)
-in the [API documentation](https://desmoteo.github.io/pillow-simd/) of this
+[fast mode reference](https://desmoteo.github.io/pillow-allsimd/reference/fast_mode.html)
+in the [API documentation][allsimd-docs] of this
 branch, and [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md).
 
 
@@ -146,22 +189,16 @@ Notes on the SIMD work, kept with the code they describe:
 
 ## Benchmarks
 
-Tons of tests can be found on the [Pillow Performance][pillow-perf-page] page.
-There are benchmarks against different versions of Pillow and Pillow-SIMD
-as well as ImageMagick, Skia, OpenCV and IPP.
+Results for this version are on the [benchmark page][allsimd-perf-page]:
+x86-64 (SSE4, AVX2, AVX-VNNI) and arm64 (NEON), exact and fast mode,
+against Pillow 13.0, the last Pillow-SIMD release, OpenCV, libvips and
+ImageMagick, over 111 operations, each library single-threaded. The
+benchmark ([pillow-allsimd-perf][allsimd-perf-repo]) runs in Docker on any
+machine.
 
-The results show that for resizing Pillow is always faster than ImageMagick,
-Pillow-SIMD, in turn, is even faster than the original Pillow by the factor of 4-6.
-In general, Pillow-SIMD with AVX2 is always **16 to 40 times faster** than
-ImageMagick and outperforms Skia, the high-speed graphics library used in Chromium.
-
-Current results for this version, on x86-64 (SSE4, AVX2, AVX-VNNI) and arm64
-(NEON), against Pillow 13.0, the last Pillow-SIMD release, OpenCV, libvips
-and ImageMagick, are at [pillow-simd-perf][pillow-simd-perf-page]. They cover
-111 operations, each library single-threaded, and the benchmark runs in Docker
-on any machine.
-
-[pillow-simd-perf-page]: https://desmoteo.github.io/pillow-simd-perf/
+Pillow-SIMD's own comparisons, against Pillow, ImageMagick, Skia, OpenCV and
+IPP, are on the [Pillow Performance][pillow-perf-page] page: there
+Pillow-SIMD with AVX2 resized 16 to 40 times faster than ImageMagick.
 
 
 ## Why Pillow itself is so fast
@@ -171,13 +208,13 @@ Outcomes produced by different libraries are in almost pixel-perfect agreement.
 The difference in measured rates is only provided with the performance of every involved algorithm.
 
 
-## Why Pillow-SIMD is even faster
+## Why Pillow-SIMD and Pillow-AllSIMD are even faster
 
 Because of the SIMD computing, of course. But there's more to it:
 heavy loops unrolling, specific instructions, which aren't available for scalar data types.
 
 
-## Why do not contribute SIMD to the original Pillow
+## Why the SIMD code isn't in the original Pillow
 
 Well, it's not that simple. First of all, the original Pillow supports
 a large number of architectures, not just x86.
@@ -192,18 +229,18 @@ So there is no easy way to compile such library, especially with setuptools.
 
 ## Installation
 
-If there's a copy of the original Pillow installed, it has to be removed first
-with `$ pip uninstall -y pillow`.
-Please install [prerequisites](https://pillow.readthedocs.io/en/stable/installation.html#building-from-source) for your platform.
-The installation itself is simple just as running `$ pip install pillow-simd`,
-and if you're using SSE4-capable CPU everything should run smoothly.
-If you'd like to install the AVX2-enabled version,
-pass the `simd` build option:
+Pillow-AllSIMD isn't on PyPI yet; it builds from source. It installs the
+`PIL` package, so remove Pillow (or Pillow-SIMD) first, and install the
+[build prerequisites][allsimd-build-deps] for your platform (those of
+Pillow). Then, with the instruction set chosen by the `simd` option:
 
 ```bash
-$ pip uninstall pillow
-$ pip install -U --force-reinstall --no-binary pillow-simd -C simd=avx2 pillow-simd
+python3 -m pip uninstall -y pillow pillow-simd
+python3 -m pip install -C simd=avx2 \
+    "pillow-allsimd @ git+https://github.com/desmoteo/pillow-allsimd@simd/pillow-13"
 ```
+
+Without `-C simd=...` the build takes SSE4.1 on x86 and NEON on arm64.
 
 The `simd` option accepts:
 
@@ -223,14 +260,28 @@ Don't use `CFLAGS` for this: setting it replaces Python's default
 compiler flags, including the optimization level.
 
 
-## Contributing to Pillow-SIMD
+## Contributing
 
-Please be aware that Pillow-SIMD and Pillow are two separate projects.
-Please submit bugs and improvements not related to SIMD to the [original Pillow][original-issues].
-All bugfixes to the original Pillow will then be transferred to the next Pillow-SIMD version automatically.
+Pillow-AllSIMD and Pillow are separate projects. Please report bugs and
+improvements that aren't about the SIMD code or fast mode to
+[Pillow][original-issues]; Pillow's fixes reach Pillow-AllSIMD with each
+merged release. Issues with the SIMD kernels, the builds or fast mode belong
+in this project's [issues][allsimd-issues].
+
+
+## License
+
+The MIT-CMU License, like PIL, Pillow and Pillow-SIMD: see [LICENSE](LICENSE).
 
 
   [original-homepage]: https://python-pillow.org/
+  [original-repo]: https://github.com/python-pillow/Pillow
+  [simd-repo]: https://github.com/uploadcare/pillow-simd
+  [allsimd-docs]: https://desmoteo.github.io/pillow-allsimd/
+  [allsimd-build-deps]: https://desmoteo.github.io/pillow-allsimd/installation/building-from-source.html
+  [allsimd-issues]: https://github.com/desmoteo/pillow-allsimd/issues
+  [allsimd-perf-page]: https://desmoteo.github.io/pillow-allsimd-perf/
+  [allsimd-perf-repo]: https://github.com/desmoteo/pillow-allsimd-perf
   [original-docs]: https://pillow.readthedocs.io/
   [original-issues]: https://github.com/python-pillow/Pillow/issues/new
   [original-changelog]: https://github.com/python-pillow/Pillow/blob/master/CHANGES.rst
@@ -239,4 +290,3 @@ All bugfixes to the original Pillow will then be transferred to the next Pillow-
   [pillow-perf-page]: https://python-pillow.github.io/pillow-perf/
   [pillow-perf-repo]: https://github.com/python-pillow/pillow-perf
   [uploadcare.com]: https://uploadcare.com/?utm_source=github&utm_medium=description&utm_campaign=pillow-simd
-  [uploadcare.logo]: https://ucarecdn.com/8eca784b-bbe5-4f7e-8cdf-98d75aab8cec/logotransparent.svg

@@ -1,5 +1,8 @@
 # Other acceleration options for pillow-simd (beyond SSE4/AVX2 and NEON)
 
+> Written before this fork was named Pillow-AllSIMD: "Pillow-SIMD" here
+> means this code base, the fork of uploadcare/pillow-simd.
+
 Companion to [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/master` (HEAD `788bf910f`).
 
 Scope: wider x86 instruction sets, Intel/AMD integrated GPUs and NPUs, NVIDIA GPUs, and non-SIMD wins (threading, codecs, memory).

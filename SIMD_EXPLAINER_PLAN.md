@@ -1,4 +1,4 @@
-# Plan: a detailed explanation of the Pillow-SIMD optimizations (x86-64 and arm64)
+# Plan: a detailed explanation of the Pillow-AllSIMD optimizations (x86-64 and arm64)
 
 Status: proposal. The reader and the location below are proposed, to be
 confirmed before writing.

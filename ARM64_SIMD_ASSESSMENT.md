@@ -1,5 +1,8 @@
 # Extending pillow-simd to arm64: feasibility assessment
 
+> Written before this fork was named Pillow-AllSIMD: "Pillow-SIMD" here
+> means this code base, the fork of uploadcare/pillow-simd.
+
 Branch assessed: `simd/master` (HEAD `788bf910f`). Assessment is from static code review on x86_64; nothing was built or run on arm64.
 
 ## Verdict

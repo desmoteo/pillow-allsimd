@@ -60,7 +60,7 @@ Support for the following features can be checked:
 * ``raqm``: Raqm library, required for ``ImageFont.Layout.RAQM`` in :py:func:`PIL.ImageFont.truetype`. Run-time version number is available for Raqm 0.7.0 or newer.
 * ``libimagequant``: (compile time) ImageQuant quantization support in :py:func:`PIL.Image.Image.quantize`. Run-time version number is available.
 * ``xcb``: (compile time) Support for X11 in :py:func:`PIL.ImageGrab.grab` via the XCB library.
-* ``fast``: (Pillow-SIMD) The fast mode switch, :py:func:`PIL.Image.set_fast`; see :ref:`fast-mode`.
+* ``fast``: (Pillow-AllSIMD) The fast mode switch, :py:func:`PIL.Image.set_fast`; see :ref:`fast-mode`.
 
 .. autofunction:: PIL.features.check_feature
 .. autofunction:: PIL.features.version_feature

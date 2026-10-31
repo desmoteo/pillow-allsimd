@@ -13,6 +13,11 @@ Basic installation
 
 .. note::
 
+    This is how to install Pillow. To install Pillow-AllSIMD, which builds
+    from source, see :ref:`allsimd-install`.
+
+.. note::
+
     The following instructions will install Pillow with support for
     most common image formats. See :ref:`external-libraries` for a
     full list of external libraries supported.

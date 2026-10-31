@@ -1,6 +1,21 @@
+Pillow-AllSIMD
+==============
 
-`Pillow-SIMD repo and readme <https://github.com/uploadcare/pillow-simd>`_
+Pillow-AllSIMD is a fork of `Pillow-SIMD <https://github.com/uploadcare/pillow-simd>`_,
+the SIMD build of `Pillow <https://python-pillow.org>`_, the friendly PIL fork.
+It is a drop-in replacement for the Pillow version it follows (now 13.0.0):
+the same ``PIL`` package and API, with SIMD kernels for x86-64 (SSE4, AVX2,
+AVX-VNNI) and arm64 (NEON). By default the results follow Pillow's
+arithmetic; an opt-in fast mode trades a few levels of precision for speed.
 
-`Pillow-SIMD changelog <https://github.com/uploadcare/pillow-simd/blob/simd/master/CHANGES.SIMD.rst>`_
+Status: beta, built from source; see the repository for what is
+accelerated, how it is tested and the benchmarks.
 
-`Pillow documentation <https://pillow.readthedocs.io/>`_
+- `Pillow-AllSIMD repository and readme <https://github.com/desmoteo/pillow-allsimd>`_
+- `Documentation <https://desmoteo.github.io/pillow-allsimd/>`_
+- `Changelog <https://github.com/desmoteo/pillow-allsimd/blob/simd/pillow-13/CHANGES.SIMD.rst>`_
+- `Benchmarks <https://desmoteo.github.io/pillow-allsimd-perf/>`_
+
+Pillow is by Jeffrey 'Alex' Clark and contributors, on PIL by Fredrik Lundh
+and Secret Labs AB; Pillow-SIMD by Alexander Karpinsky and contributors,
+supported by Uploadcare. Licensed under the MIT-CMU License, like them.

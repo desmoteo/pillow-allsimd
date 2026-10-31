@@ -31,7 +31,11 @@ def test_feature() -> None:
 
 
 def test_off_by_default() -> None:
-    env = {k: v for k, v in os.environ.items() if k != "PILLOW_SIMD_FAST"}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("PILLOW_ALLSIMD_FAST", "PILLOW_SIMD_FAST")
+    }
     out = subprocess.check_output(
         [sys.executable, "-c", "from PIL import Image; print(Image.get_fast())"],
         env=env,
@@ -62,17 +66,28 @@ def test_set_get() -> None:
         ("", False),
     ),
 )
-def test_env(value: str, expected: bool) -> None:
+@pytest.mark.parametrize("name", ("PILLOW_ALLSIMD_FAST", "PILLOW_SIMD_FAST"))
+def test_env(value: str, expected: bool, name: str) -> None:
+    # PILLOW_SIMD_FAST, the former name, works too
     Image.set_fast(not expected)
-    Image._apply_env_variables({"PILLOW_SIMD_FAST": value})
+    Image._apply_env_variables({name: value})
     assert Image.get_fast() is expected
 
 
-def test_env_invalid() -> None:
+@pytest.mark.parametrize("name", ("PILLOW_ALLSIMD_FAST", "PILLOW_SIMD_FAST"))
+def test_env_invalid(name: str) -> None:
     Image.set_fast(True)
-    with pytest.warns(UserWarning, match="PILLOW_SIMD_FAST"):
-        Image._apply_env_variables({"PILLOW_SIMD_FAST": "maybe"})
+    with pytest.warns(UserWarning, match=name):
+        Image._apply_env_variables({name: "maybe"})
     assert Image.get_fast() is True
+
+
+@pytest.mark.parametrize("current, former", (("1", "0"), ("0", "1")))
+def test_env_current_name_first(current: str, former: str) -> None:
+    Image._apply_env_variables(
+        {"PILLOW_ALLSIMD_FAST": current, "PILLOW_SIMD_FAST": former}
+    )
+    assert Image.get_fast() is (current == "1")
 
 
 def test_env_unset() -> None:
@@ -82,7 +97,7 @@ def test_env_unset() -> None:
 
 
 def test_env_at_import() -> None:
-    env = dict(os.environ, PILLOW_SIMD_FAST="1")
+    env = dict(os.environ, PILLOW_ALLSIMD_FAST="1")
     out = subprocess.check_output(
         [sys.executable, "-c", "from PIL import Image; print(Image.get_fast())"],
         env=env,

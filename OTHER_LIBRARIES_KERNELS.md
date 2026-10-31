@@ -1,7 +1,7 @@
 # High-performance kernels in OpenCV, KleidiCV, Carotene and libvips
 
 How the fastest image libraries implement the operations where they beat
-Pillow-SIMD, including the approximate kernels, measured for speed and for
+Pillow-AllSIMD, including the approximate kernels, measured for speed and for
 accuracy on the same inputs. It is the groundwork for
 [APPROXIMATE_KERNELS_PLAN.md](APPROXIMATE_KERNELS_PLAN.md) (an opt-in fast
 mode beside the bit-exact kernels) and extends
@@ -20,7 +20,7 @@ in the benchmark cases.
 - Measurements on the two benchmark machines: Intel Core Ultra 9 285H
   (performance profile, turbo off, one core) and NVIDIA Jetson Orin
   (Cortex-A78AE, one core), with the scripts in pillow-simd-perf's
-  `analysis/` (raw outputs in `analysis/results-2026-10-31/`). Pillow-SIMD is
+  `analysis/` (raw outputs in `analysis/results-2026-10-31/`). Pillow-AllSIMD is
   the AVX2 and NEON build of `simd/pillow-13` at 28b55224b.
 - Accuracy is measured against float64 references of the same mathematical
   operation, in 8-bit levels against the reference rounded to the nearest
@@ -64,7 +64,7 @@ an *algorithm hint*:
 ### The pipeline
 
 The largest structural difference is how the passes of a separable filter
-meet. Pillow-SIMD writes the horizontal result for the whole image, then
+meet. Pillow-AllSIMD writes the horizontal result for the whole image, then
 reads it back for the vertical passes (one temporary image of 16 MB at
 2560x1600 RGB, and 800 to 1300 page faults per call for it). The other three
 never materialise it:
@@ -81,7 +81,7 @@ never materialise it:
   (a strip or tile), so the vertical pass pulls a few rows of the horizontal
   pass's output. The intermediate exists only for the rows in flight.
 
-Measured cost of the temporary in Pillow-SIMD (ms, 2560x1600 RGB):
+Measured cost of the temporary in Pillow-AllSIMD (ms, 2560x1600 RGB):
 
 | | horizontal only | vertical only | both | the temporary | OpenCV |
 |---|---|---|---|---|---|
@@ -107,14 +107,14 @@ Measured (σ = 1 unless noted; error against a true Gaussian of radius 4σ):
 
 | | x86 ms | Jetson ms | max | mean | differ |
 |---|---|---|---|---|---|
-| Pillow-SIMD | 17.94 | 51.52 | 2 | 0.501 | 49.0% |
+| Pillow-AllSIMD | 17.94 | 51.52 | 2 | 0.501 | 49.0% |
 | OpenCV accurate | 7.86 | 44.08 | 1 | 0.004 | 0.4% |
 | OpenCV approx (KleidiCV on arm64) | 7.82 | **11.15** | 1 | 0.125 | 12.5% |
 | libvips default (vector) | 7.38 | | 3 | 0.393 | 38.6% |
 | libvips default, `VIPS_NOVECTOR` | 76.05 | | 3 | 0.393 | 38.6% |
 | libvips `min_ampl` 0.01 (vector) | 8.29 | | 5 | 1.982 | 93.2% |
 | libvips `min_ampl` 0.01, no vector | 95.96 | | 1 | 0.130 | 13.0% |
-| σ 2: Pillow-SIMD / OpenCV accurate | 21.02 / 14.58 | 57.21 / 82.12 | 2 / 1 | 0.196 / 0.011 | 19.6% / 1.1% |
+| σ 2: Pillow-AllSIMD / OpenCV accurate | 21.02 / 14.58 | 57.21 / 82.12 | 2 / 1 | 0.196 / 0.011 | 19.6% / 1.1% |
 
 What it shows:
 
@@ -128,7 +128,7 @@ What it shows:
 - libvips' vector path is 10x faster than its C path; its 8-bit mantissa
   masks cost accuracy as the kernel grows (max 5 with a long kernel), which
   libvips documents and lets users turn off (`VIPS_NOVECTOR`).
-- OpenCV's accurate NEON Gaussian is slower than Pillow-SIMD's for σ 2
+- OpenCV's accurate NEON Gaussian is slower than Pillow-AllSIMD's for σ 2
   (82 vs 57 ms): the three box passes cost the same for any σ.
 
 ### Box blur
@@ -141,14 +141,14 @@ What it shows:
   `SUM -= old row`, O(1) per pixel. The division by the area is
   `(SUM + d/2) · m >> 23` with `m` rounded to the nearest, which is exact for
   the 25 of a 5x5 box (0 values differ from the true mean).
-- **Pillow-SIMD**: 24-bit weights `ww = 2^24 / (2r+1)` with rounding at
+- **Pillow-AllSIMD**: 24-bit weights `ww = 2^24 / (2r+1)` with rounding at
   bit 23, so 9.1% of values are one off the true mean for r = 2; the integer
   radii 1 to 4 use a 16-bit `mulhi` form proven equal to that 24-bit result.
   The vertical pass sums 2r+1 rows for small radii instead of a running sum.
 
 | box 5x5 | x86 ms | Jetson ms | max | mean | differ |
 |---|---|---|---|---|---|
-| Pillow-SIMD | 9.52 | 20.31 | 1 | 0.091 | 9.1% |
+| Pillow-AllSIMD | 9.52 | 20.31 | 1 | 0.091 | 9.1% |
 | OpenCV | 2.87 | 10.56 | 0 | 0 | 0% |
 
 A 16-bit running column sum with the existing exact division is
@@ -162,7 +162,7 @@ more accurate, but not Pillow's).
 - **libvips** `conv` with integer precision: on the vector path the mask is
   turned into 8-bit mantissas with a shared exponent ("can produce slightly
   different results"), Highway multiply-accumulate in 32 bits.
-- **Pillow-SIMD**: 16-bit coefficients at Q13, or at the highest exact lower
+- **Pillow-AllSIMD**: 16-bit coefficients at Q13, or at the highest exact lower
   precision, 32-bit sums; the fastest of the three now (FIND_EDGES 4.4 ms
   against OpenCV 6.6 and libvips 6.2 on x86; 26.6 against 39.8 on the Jetson).
 
@@ -170,7 +170,7 @@ more accurate, but not Pillow's).
 
 | | method | arithmetic | structure |
 |---|---|---|---|
-| Pillow-SIMD | convolution with the filter scaled by the downscale factor (antialiased) | 16-bit coefficients (precision chosen per call), 32-bit sums; **8-bit intermediate** between the passes | horizontal pass for the whole image, then vertical; RGBA premultiplied before and divided after |
+| Pillow-AllSIMD | convolution with the filter scaled by the downscale factor (antialiased) | 16-bit coefficients (precision chosen per call), 32-bit sums; **8-bit intermediate** between the passes | horizontal pass for the whole image, then vertical; RGBA premultiplied before and divided after |
 | OpenCV bilinear (8U) | bilinear, no antialiasing when shrinking | `ufixedpoint16` (8.8) horizontal results, vertical blend, rounded once | per output row: horizontal resize of the needed source rows into a small cache (reused across output rows), then vertical |
 | OpenCV INTER_AREA | box average (the benchmark's choice for downscales) | integer sums for integer factors (`resizeAreaFast_`), float weights otherwise | one pass |
 | OpenCV cubic, Lanczos | 4 / 8 taps, no antialiasing | 11-bit (`INTER_RESIZE_COEF_BITS`) integer coefficients for 8U | fused like bilinear |
@@ -183,15 +183,15 @@ bilinear sampling with the same pixel-centre convention):
 
 | | x86 ms | Jetson ms | max | mean | differ |
 |---|---|---|---|---|---|
-| Pillow-SIMD RGB | 25.65 | 93.65 | 1 | 0.179 | 17.9% |
+| Pillow-AllSIMD RGB | 25.65 | 93.65 | 1 | 0.179 | 17.9% |
 | OpenCV RGB (own code) | 26.74 | 69.81 | 1 | 0.127 | 12.7% |
-| Pillow-SIMD RGBA (opaque) | 39.37 | 149.79 | 1 | 0.134 | 13.4% |
+| Pillow-AllSIMD RGBA (opaque) | 39.37 | 149.79 | 1 | 0.134 | 13.4% |
 | OpenCV RGBA (Carotene on arm64) | 31.91 | 43.87 | 1 | 0.137 | 13.7% |
 
 - Pillow's 8-bit intermediate costs accuracy (17.9% against OpenCV's 12.7%
   with an 8.8 intermediate) as well as the temporary image.
-- Carotene's 7-bit weights in a fused pass are 3.4x faster than Pillow-SIMD
-  on the RGBA upscale for the same accuracy. Pillow-SIMD's RGBA time is the
+- Carotene's 7-bit weights in a fused pass are 3.4x faster than Pillow-AllSIMD
+  on the RGBA upscale for the same accuracy. Pillow-AllSIMD's RGBA time is the
   RGB resize plus the premultiply of the input (3.0 ms) and the unpremultiply
   of the 75 MB output (about 50 ms on the Jetson, where it divides).
 - On the Jetson the NEON resample kernel is relatively weak: an 8x Lanczos
@@ -206,7 +206,7 @@ bilinear sampling with the same pixel-centre convention):
 
 | | coordinates | interpolation | vectorization |
 |---|---|---|---|
-| Pillow-SIMD | double, per pixel, through a filter function pointer | double weights; the result **truncated** (`(UINT8)v`) | within one pixel: 4 channels in doubles (`__m256d`, or 2 x `float64x2_t`) |
+| Pillow-AllSIMD | double, per pixel, through a filter function pointer | double weights; the result **truncated** (`(UINT8)v`) | within one pixel: 4 channels in doubles (`__m256d`, or 2 x `float64x2_t`) |
 | OpenCV 5 accurate (`warp_kernels.simd.hpp`) | float32, 8 (NEON) or 16 output pixels per step, incremental | float32 bilinear, rounded | across pixels; an "all inside" fast path; NEON byte shuffles (`vtbl`) to gather the 4 corners of 8 pixels |
 | OpenCV 5 approx | as above | FP16 arithmetic where available (arm64) | 8 lanes of FP16 |
 | OpenCV `remap` with 16-bit maps | 5-bit sub-pixel fractions (`INTER_TAB_SIZE` 32) | 15-bit integer weights from a 32x32 table | |
@@ -218,7 +218,7 @@ bilinear sampling of the same map, inside the source only):
 
 | | x86 ms | Jetson ms | max | mean | differ |
 |---|---|---|---|---|---|
-| Pillow-SIMD | 36.12 | 109.83 | 1 | 0.414 | 41.4% |
+| Pillow-AllSIMD | 36.12 | 109.83 | 1 | 0.414 | 41.4% |
 | OpenCV accurate | 23.53 | 39.57 | 1 | 0.000 | 0.0% |
 | OpenCV approx (FP16 on arm64) | 23.76 | 36.34 | 1 | 0.036 | 3.6% |
 
@@ -239,7 +239,7 @@ gains little on NEON; float32 coordinates and weights are not.
   (Perreault) for large ones.
 - **KleidiCV median**: sorting networks for 3x3, 5x5 and 7x7, histograms
   above.
-- **Pillow-SIMD**: sorting networks and register medians for 3x3 and 5x5,
+- **Pillow-AllSIMD**: sorting networks and register medians for 3x3 and 5x5,
   separable min/max with a ring, all exact (a rank filter has no rounding).
   Remaining gap: the 4 bytes per RGB pixel, the row-pair sharing, and a
   per-row edge-padding copy (min3 RGB 2.06 vs 1.40 ms x86, 5.12 vs 3.13
@@ -247,7 +247,7 @@ gains little on NEON; float32 coordinates and weights are not.
 
 ## 5. Colour conversions
 
-| | Pillow-SIMD | OpenCV | KleidiCV / Carotene |
+| | Pillow-AllSIMD | OpenCV | KleidiCV / Carotene |
 |---|---|---|---|
 | RGB→YCbCr | per-term INT16 tables (6-bit fraction), summed then shifted (**floor**) | 14-bit coefficients, one rounding (`yuv_shift` 14), `v_dotprod` | KleidiCV 14-bit (`kRYWeight` 4899 = 0.299·2^14), declines the CbCr order |
 | YCbCr→RGB | tables, floor; reproduced exactly in float32 lanes on NEON | 14-bit, `v_mul_expand`, one rounding | not hooked |
@@ -255,11 +255,11 @@ gains little on NEON; float32 coordinates and weights are not.
 
 | | x86 ms | Jetson ms | max | mean | differ |
 |---|---|---|---|---|---|
-| RGB→YCbCr Pillow-SIMD | 3.15 | 17.39 | 1 | 0.472 | 47.2% |
+| RGB→YCbCr Pillow-AllSIMD | 3.15 | 17.39 | 1 | 0.472 | 47.2% |
 | RGB→YCbCr OpenCV | 2.56 | 10.38 | 1 | 0.107 | 10.7% |
-| YCbCr→RGB Pillow-SIMD | 1.99 | 12.21 | 1 | 0.475 | 47.5% |
+| YCbCr→RGB Pillow-AllSIMD | 1.99 | 12.21 | 1 | 0.475 | 47.5% |
 | YCbCr→RGB OpenCV | 2.46 | 5.70 | 1 | 0.031 | 3.1% |
-| RGB→HSV Pillow-SIMD (hue / sat, val) | 8.96 | 35.56 | 1 / 1 | 0.500 / 0.242 | 50.0% / 24.2% |
+| RGB→HSV Pillow-AllSIMD (hue / sat, val) | 8.96 | 35.56 | 1 / 1 | 0.500 / 0.242 | 50.0% / 24.2% |
 | RGB→HSV OpenCV (hue / sat, val) | 3.56 | 13.60 | 1 / 1 | 0.491 / 0.004 | 49.1% / 0.4% |
 
 Pillow's tables and truncations put about half of all values one level
@@ -271,7 +271,7 @@ both land on about half the values off by one.)
 ## 6. Arithmetic, tables and memory
 
 - **Bandwidth-bound operations** (add, difference, lighter, invert, flips,
-  RGBA↔RGB, L→RGB) run at the same bytes per second in Pillow-SIMD and
+  RGBA↔RGB, L→RGB) run at the same bytes per second in Pillow-AllSIMD and
   OpenCV (x86: 25 to 27 GB/s for both; Jetson: 15.4 vs 15.8 GB/s). The time
   ratio is Pillow's 4 bytes per RGB pixel against 3. Structural.
 - **LUT**: OpenCV's `LUT` for 8U is a plain scalar loop over the image as
@@ -282,7 +282,7 @@ both land on about half the values off by one.)
   temporaries; numpy places large OpenCV outputs on huge pages (about 450
   faults for 56 MB against 3400 to 5700 for Pillow).
 - **blend / addWeighted**: OpenCV computes in float32 and rounds once;
-  Pillow-SIMD in its float semantics (3.12 vs 1.74 ms x86).
+  Pillow-AllSIMD in its float semantics (3.12 vs 1.74 ms x86).
 
 ## 7. Drawing and text
 
@@ -302,7 +302,7 @@ one.
 | KleidiCV | none; documents each function that is "not bit exact with OpenCV" (Gaussian, resize, remap, warpPerspective, convertTo) | | |
 | Pillow | `reducing_gap` argument of `resize` and `thumbnail`, `draft()` for JPEG | resize | off (thumbnail: 2.0) |
 
-## 9. What this means for Pillow-SIMD
+## 9. What this means for Pillow-AllSIMD
 
 The techniques fall into three classes.
 

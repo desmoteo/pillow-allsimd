@@ -1,8 +1,20 @@
 About
 =====
 
-Goals
------
+Pillow-AllSIMD
+--------------
+
+Pillow-AllSIMD is a fork of `Pillow-SIMD <https://github.com/uploadcare/pillow-simd>`_
+(Alexander Karpinsky and contributors, supported by Uploadcare), which forks
+Pillow; its aim, state and credits are in :doc:`allsimd`. Like PIL, Pillow
+and Pillow-SIMD it is licensed under the MIT-CMU License, and its
+`LICENSE <https://github.com/desmoteo/pillow-allsimd/blob/simd/pillow-13/LICENSE>`_
+keeps their copyright notices.
+
+The rest of this page is Pillow's.
+
+Pillow's goals
+--------------
 
 The fork author's goal is to foster and support active development of PIL through:
 
