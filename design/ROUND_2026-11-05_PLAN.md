@@ -316,3 +316,39 @@ polygons on 2560x1600).
 - The same pixels throughout: the random-shape hash (9,000 shapes,
   three modes) is the same in all builds measured.
 
+### 5. arm64 kernels on the multiplier pipe (2026-11-05)
+
+The Jetson was at a load average of 15 under other people's containers,
+so everything here is user-mode cycles per run, read with
+`perf_event_open` (`bench-results/arm-round/armcyc.py`), which repeat to
+0.1% there; wall-clock times follow them (2 GHz).
+
+- **This round on arm64 first** (`jetson-ab.run.sh 832065f37 HEAD`):
+  NEON and scalar hashes identical before and after; fast octree 42.4 to
+  13.4 ms (3.2x), mask composite 11.1 to 6.2 ms (1.8x), PNG decoding
+  100.9 to 79.3 ms (1.27x); 111 cases 1.02x.
+- **3D LUT:** `neon_lut_pair()`, two pixels in 16-bit lanes with
+  `sqdmulh`, where the whole table is within -16384..16383 (one pass
+  over the table per call, checked with min and max): 103.4 to 63.5
+  million cycles (1.63x), instructions per cycle 2.7 to 3.3; 4-channel
+  tables 100.0 to 63.2. The same hash as HEAD and as the scalar build
+  over table sizes, channels, ranges on both sides of the limit and odd
+  and even widths (`lutcheck.py`). Tried on top and dropped: tables of
+  each channel's offset and weight (62.2 against 63.5 million cycles,
+  with more instructions).
+- **Box blur:** the far weight `fw` is 0 for the radii whose box leaves
+  0 or 1 of 2^24, the benchmark's 10 among them, and its product was
+  half of the multiplies: skipped in both running sums, 57.1 to 42.3
+  million cycles at radius 10 (1.35x), and on x86 7.5 to 5.5 ms (AVX2),
+  13.8 to 9.8 ms (SSE4.1). Taking `add - subtract` first, so that the
+  sum's chain is one addition, changed nothing by itself (57.17 against
+  57.21 at radius 5): the pass waits for the multiplier, not the chain.
+  Radii with a far weight are unchanged; a 16-bit product for it, two
+  pixels a vector, would save a quarter of their multiplies and was not
+  tried.
+- **Fast YCbCr: not done, and not evaluated.** The conversion is 16.0
+  and 9.3 million cycles (8 and 4.7 ms) at 1.5 instructions per cycle.
+  The five-multiply form would change the fast kernels' output on every
+  build; its accuracy against the float reference, the condition this
+  plan set, was not measured. A candidate still.
+

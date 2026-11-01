@@ -506,6 +506,14 @@ ImagingBoxBlurColumns(
     /* the active tier's kernel does the bytes it can (BoxBlurSIMD.c) */
     int b = IMAGING_SIMD_CALL(blur->columns, out, acc, add, sub, far_row, size, ww, fw);
 
+    if (fw == 0) {
+        /* no second product to compute: as BOX_STEP_WHOLE (BoxBlur.h) */
+        for (; b < size; b++) {
+            acc[b] += add[b] - sub[b];
+            out[b] = (UINT8)((acc[b] * ww + (1 << 23)) >> 24);
+        }
+        return;
+    }
     for (; b < size; b++) {
         acc[b] += add[b] - sub[b];
         UINT32 bulk = acc[b] * ww + (sub[b] + far_row[b]) * fw;

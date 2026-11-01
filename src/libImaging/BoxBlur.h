@@ -9,54 +9,73 @@
 /* The running-sum box blur of a row of 4-byte pixels, for any vector
    type: the caller defines V (the type), V_LOAD(i) (pixel i as four
    32-bit channels), V_SET1, V_ADD, V_SUB, V_MUL and V_SAVE(x, bulk). */
-#define BOX_LINE_BLUR                                                                 \
-    {                                                                                 \
-        int x;                                                                        \
-        V acc, bulk;                                                                  \
-        V wws = V_SET1(ww);                                                           \
-        V fws = V_SET1(fw);                                                           \
-        /* Compute acc for -1 pixel (outside of image): from "-radius-1" to */        \
-        /* "-1" get first pixel, then from "0" to "radius-1". */                      \
-        acc = V_MUL(V_LOAD(0), V_SET1(radius + 1));                                   \
-        /* As radius can be bigger than xsize, iterate to edgeA -1. */                \
-        for (x = 0; x < edgeA - 1; x++) {                                             \
-            acc = V_ADD(acc, V_LOAD(x));                                              \
-        }                                                                             \
-        /* Then multiply remainder to last x. */                                      \
-        acc = V_ADD(acc, V_MUL(V_LOAD(x), V_SET1(radius - edgeA + 1)));               \
-        if (edgeA <= edgeB) {                                                         \
-            /* Subtract pixel from left ("0"). Add pixels from radius. */             \
-            for (x = 0; x < edgeA; x++) {                                             \
-                BOX_STEP(0, x + radius, 0, x + radius + 1);                           \
-            }                                                                         \
-            /* Subtract previous pixel from "-radius". Add from radius. */            \
-            for (x = edgeA; x < edgeB; x++) {                                         \
-                BOX_STEP(x - radius - 1, x + radius, x - radius - 1, x + radius + 1); \
-            }                                                                         \
-            /* Subtract previous pixel from "-radius". Add last pixel. */             \
-            for (x = edgeB; x <= lastx; x++) {                                        \
-                BOX_STEP(x - radius - 1, lastx, x - radius - 1, lastx);               \
-            }                                                                         \
-        } else {                                                                      \
-            for (x = 0; x < edgeB; x++) {                                             \
-                BOX_STEP(0, x + radius, 0, x + radius + 1);                           \
-            }                                                                         \
-            for (x = edgeB; x < edgeA; x++) {                                         \
-                BOX_STEP(0, lastx, 0, lastx);                                         \
-            }                                                                         \
-            for (x = edgeA; x <= lastx; x++) {                                        \
-                BOX_STEP(x - radius - 1, lastx, x - radius - 1, lastx);               \
-            }                                                                         \
-        }                                                                             \
+#define BOX_LINE_BLUR_LOOPS(STEP)                                                 \
+    {                                                                             \
+        int x;                                                                    \
+        V acc, bulk;                                                              \
+        V wws = V_SET1(ww);                                                       \
+        V fws = V_SET1(fw);                                                       \
+        (void)fws;                                                                \
+        /* Compute acc for -1 pixel (outside of image): from "-radius-1" to */    \
+        /* "-1" get first pixel, then from "0" to "radius-1". */                  \
+        acc = V_MUL(V_LOAD(0), V_SET1(radius + 1));                               \
+        /* As radius can be bigger than xsize, iterate to edgeA -1. */            \
+        for (x = 0; x < edgeA - 1; x++) {                                         \
+            acc = V_ADD(acc, V_LOAD(x));                                          \
+        }                                                                         \
+        /* Then multiply remainder to last x. */                                  \
+        acc = V_ADD(acc, V_MUL(V_LOAD(x), V_SET1(radius - edgeA + 1)));           \
+        if (edgeA <= edgeB) {                                                     \
+            /* Subtract pixel from left ("0"). Add pixels from radius. */         \
+            for (x = 0; x < edgeA; x++) {                                         \
+                STEP(0, x + radius, 0, x + radius + 1);                           \
+            }                                                                     \
+            /* Subtract previous pixel from "-radius". Add from radius. */        \
+            for (x = edgeA; x < edgeB; x++) {                                     \
+                STEP(x - radius - 1, x + radius, x - radius - 1, x + radius + 1); \
+            }                                                                     \
+            /* Subtract previous pixel from "-radius". Add last pixel. */         \
+            for (x = edgeB; x <= lastx; x++) {                                    \
+                STEP(x - radius - 1, lastx, x - radius - 1, lastx);               \
+            }                                                                     \
+        } else {                                                                  \
+            for (x = 0; x < edgeB; x++) {                                         \
+                STEP(0, x + radius, 0, x + radius + 1);                           \
+            }                                                                     \
+            for (x = edgeB; x < edgeA; x++) {                                     \
+                STEP(0, lastx, 0, lastx);                                         \
+            }                                                                     \
+            for (x = edgeA; x <= lastx; x++) {                                    \
+                STEP(x - radius - 1, lastx, x - radius - 1, lastx);               \
+            }                                                                     \
+        }                                                                         \
     }
 
 /* acc[0] += lineIn[add][0] - lineIn[subtract][0];
    bulk[0] = (acc[0] * ww) + (lineIn[left][0] + lineIn[right][0]) * fw;
-   lineOut[x][0] = (UINT8)((bulk[0] + (1 << 23)) >> 24); */
+   lineOut[x][0] = (UINT8)((bulk[0] + (1 << 23)) >> 24);
+   The difference of the two pixels is taken first, so that from one pixel
+   to the next the sum waits for one addition, not two: the sums are modulo
+   2^32 either way. */
 #define BOX_STEP(subtract, add, left, right)                                       \
-    acc = V_SUB(V_ADD(acc, V_LOAD(add)), V_LOAD(subtract));                        \
+    acc = V_ADD(acc, V_SUB(V_LOAD(add), V_LOAD(subtract)));                        \
     bulk = V_ADD(V_MUL(V_ADD(V_LOAD(left), V_LOAD(right)), fws), V_MUL(acc, wws)); \
     V_SAVE(x, bulk);
+
+/* The same when fw is 0, as it is for the integer radii whose box divides
+   2^24 with a remainder of 0 or 1 (1 to 4, 7, 10, ...): the second product
+   is 0, and a multiply is what a vector unit has least of. */
+#define BOX_STEP_WHOLE(subtract, add, left, right)          \
+    acc = V_ADD(acc, V_SUB(V_LOAD(add), V_LOAD(subtract))); \
+    bulk = V_MUL(acc, wws);                                 \
+    V_SAVE(x, bulk);
+
+#define BOX_LINE_BLUR                       \
+    if (fw == 0) {                          \
+        BOX_LINE_BLUR_LOOPS(BOX_STEP_WHOLE) \
+    } else {                                \
+        BOX_LINE_BLUR_LOOPS(BOX_STEP)       \
+    }
 
 /* The running-sum blur of a row of 4-byte pixels, a pixel at a time, with
    px4: the portable lanes in BoxBlur.c, the SIMD ones in BoxBlurSIMD.c. */

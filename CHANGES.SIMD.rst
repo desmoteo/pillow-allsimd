@@ -27,6 +27,15 @@ Based on Pillow 13.0.0
   cache: 7.9 ms on a 2560x1600 photo, from 15.6 ms in a build for AVX2
   and 25.1 ms in the x86-64 wheel and in Pillow 13. The same palette
   and indices
+- ``ImageFilter.BoxBlur`` with a radius whose box divides 2^24 with a
+  remainder of 0 or 1 (1 to 4, 6, 7, 8, 10, 17, ...) skips the product
+  with the far weight, which is zero there: 1.35x at radius 10 on
+  x86-64 with AVX2 (7.5 to 5.5 ms on 2560x1600 RGB) and on arm64, 1.4x
+  with SSE4.1. The same pixels
+- arm64: 3D colour LUTs whose values stay within about twice the 0..1
+  range are interpolated two pixels at a time in 16-bit lanes
+  (``sqdmulh``), with the scalar code's pixels: 1.63x (52 to 32 ms on a
+  2560x1600 image on a Cortex-A78)
 - Pasting through a mask has vector kernels on x86-64 and arm64:
   ``paste(im, box, mask)`` with an L mask, ``Image.composite()``, and
   an RGBA image pasted through its own alpha. On a 2560x1600 RGB image

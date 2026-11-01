@@ -355,9 +355,11 @@ box_deinterleave4(
 #endif
 
 #if defined(IMAGING_SIMD_SSE4)
-/* The vertical pass's running sums (BoxBlur.c, ImagingBoxBlurColumns). */
-static int
-box_columns_simd(
+/* The vertical pass's running sums (BoxBlur.c, ImagingBoxBlurColumns).
+   whole is a constant at each call below: 1 when fw is 0, and the product
+   with it, half of the multiplies, is then not computed. */
+SIMD_FORCE_INLINE int
+box_columns_body(
     UINT8 *out,
     UINT32 *acc,
     const UINT8 *add,
@@ -365,7 +367,8 @@ box_columns_simd(
     const UINT8 *far_row,
     int size,
     UINT32 ww,
-    UINT32 fw
+    UINT32 fw,
+    const int whole
 ) {
     int b = 0;
 #if defined(IMAGING_SIMD_AVX2)
@@ -378,19 +381,19 @@ box_columns_simd(
         __m256i order = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
         for (; b < size - 31; b += 32) {
             __m256i r[4];
-#define COLUMNS_8(k)                                                \
-    {                                                               \
-        __m256i a = mm256_cvtepu8_epi32(&add[b + k * 8]);           \
-        __m256i s = mm256_cvtepu8_epi32(&sub[b + k * 8]);           \
-        __m256i f = mm256_cvtepu8_epi32(&far_row[b + k * 8]);       \
-        __m256i c = _mm256_loadu_si256((__m256i *)&acc[b + k * 8]); \
-        c = _mm256_sub_epi32(_mm256_add_epi32(c, a), s);            \
-        _mm256_storeu_si256((__m256i *)&acc[b + k * 8], c);         \
-        c = _mm256_add_epi32(                                       \
-            _mm256_mullo_epi32(c, wws),                             \
-            _mm256_mullo_epi32(_mm256_add_epi32(s, f), fws)         \
-        );                                                          \
-        r[k] = _mm256_srli_epi32(_mm256_add_epi32(c, b23), 24);     \
+#define COLUMNS_8(k)                                                                  \
+    {                                                                                 \
+        __m256i a = mm256_cvtepu8_epi32(&add[b + k * 8]);                             \
+        __m256i s = mm256_cvtepu8_epi32(&sub[b + k * 8]);                             \
+        __m256i f = mm256_cvtepu8_epi32(&far_row[b + k * 8]);                         \
+        __m256i c = _mm256_loadu_si256((__m256i *)&acc[b + k * 8]);                   \
+        c = _mm256_sub_epi32(_mm256_add_epi32(c, a), s);                              \
+        _mm256_storeu_si256((__m256i *)&acc[b + k * 8], c);                           \
+        c = _mm256_mullo_epi32(c, wws);                                               \
+        if (!whole) {                                                                 \
+            c = _mm256_add_epi32(c, _mm256_mullo_epi32(_mm256_add_epi32(s, f), fws)); \
+        }                                                                             \
+        r[k] = _mm256_srli_epi32(_mm256_add_epi32(c, b23), 24);                       \
     }
             COLUMNS_8(0);
             COLUMNS_8(1);
@@ -415,18 +418,19 @@ box_columns_simd(
         __m128i sub8 = _mm_loadu_si128((__m128i *)&sub[b]);
         __m128i far8 = _mm_loadu_si128((__m128i *)&far_row[b]);
         __m128i r[4];
-#define COLUMNS_4(k)                                                           \
-    {                                                                          \
-        __m128i a = _mm_cvtepu8_epi32(_mm_srli_si128(add8, k * 4));            \
-        __m128i s = _mm_cvtepu8_epi32(_mm_srli_si128(sub8, k * 4));            \
-        __m128i f = _mm_cvtepu8_epi32(_mm_srli_si128(far8, k * 4));            \
-        __m128i c = _mm_loadu_si128((__m128i *)&acc[b + k * 4]);               \
-        c = _mm_sub_epi32(_mm_add_epi32(c, a), s);                             \
-        _mm_storeu_si128((__m128i *)&acc[b + k * 4], c);                       \
-        c = _mm_add_epi32(                                                     \
-            _mm_mullo_epi32(c, wws), _mm_mullo_epi32(_mm_add_epi32(s, f), fws) \
-        );                                                                     \
-        r[k] = _mm_srli_epi32(_mm_add_epi32(c, b23), 24);                      \
+#define COLUMNS_4(k)                                                         \
+    {                                                                        \
+        __m128i a = _mm_cvtepu8_epi32(_mm_srli_si128(add8, k * 4));          \
+        __m128i s = _mm_cvtepu8_epi32(_mm_srli_si128(sub8, k * 4));          \
+        __m128i f = _mm_cvtepu8_epi32(_mm_srli_si128(far8, k * 4));          \
+        __m128i c = _mm_loadu_si128((__m128i *)&acc[b + k * 4]);             \
+        c = _mm_sub_epi32(_mm_add_epi32(c, a), s);                           \
+        _mm_storeu_si128((__m128i *)&acc[b + k * 4], c);                     \
+        c = _mm_mullo_epi32(c, wws);                                         \
+        if (!whole) {                                                        \
+            c = _mm_add_epi32(c, _mm_mullo_epi32(_mm_add_epi32(s, f), fws)); \
+        }                                                                    \
+        r[k] = _mm_srli_epi32(_mm_add_epi32(c, b23), 24);                    \
     }
         COLUMNS_4(0);
         COLUMNS_4(1);
@@ -440,6 +444,23 @@ box_columns_simd(
     }
 #endif
     return b;
+}
+
+static int
+box_columns_simd(
+    UINT8 *out,
+    UINT32 *acc,
+    const UINT8 *add,
+    const UINT8 *sub,
+    const UINT8 *far_row,
+    int size,
+    UINT32 ww,
+    UINT32 fw
+) {
+    if (fw == 0) {
+        return box_columns_body(out, acc, add, sub, far_row, size, ww, fw, 1);
+    }
+    return box_columns_body(out, acc, add, sub, far_row, size, ww, fw, 0);
 }
 #endif
 

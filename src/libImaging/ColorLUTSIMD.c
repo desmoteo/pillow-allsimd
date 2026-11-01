@@ -617,8 +617,69 @@ neon_lut_pixel(
     return vqmovn_u16(vcombine_u16(vqmovun_s32(result), vdup_n_u16(0)));
 }
 
-/* The lookup of the portable code, a pixel at a time, with the NEON pixel
-   kernel. */
+/* Two pixels' lookups in 16-bit lanes, the first pixel's four channels in
+   the low half. interpolate3/4 as above, with the product by sqdmulh:
+   (2 * (b - a) * s) >> 16 is ((b - a) * s) >> 15, exactly, when b - a fits
+   16 bits, which the caller has checked for the whole table. Seven 16-bit
+   multiplies for two pixels where neon_lut_pixel() has seven 32-bit ones
+   for each, on a core with one multiplier pipe (the Cortex-A78). The
+   rounding, the shift and the clipping to 0..255 are one narrowing shift. */
+static inline uint8x8_t
+neon_lut_pair(
+    const INT16 *ta,
+    const INT16 *tb,
+    int step1D,
+    int step2D,
+    int step3D,
+    int16x8_t shift1D,
+    int16x8_t shift2D,
+    int16x8_t shift3D
+) {
+#define NEON_LUT_LOAD(o) vcombine_s16(vld1_s16(ta + (o)), vld1_s16(tb + (o)))
+#define NEON_LUT_MIX(a, b, s) vaddq_s16(a, vqdmulhq_s16(vsubq_s16(b, a), s))
+    int16x8_t a = NEON_LUT_LOAD(0);
+    int16x8_t b = NEON_LUT_LOAD(step1D);
+    int16x8_t c = NEON_LUT_LOAD(step2D);
+    int16x8_t d = NEON_LUT_LOAD(step2D + step1D);
+    int16x8_t left =
+        NEON_LUT_MIX(NEON_LUT_MIX(a, b, shift1D), NEON_LUT_MIX(c, d, shift1D), shift2D);
+    int16x8_t right;
+    a = NEON_LUT_LOAD(step3D);
+    b = NEON_LUT_LOAD(step3D + step1D);
+    c = NEON_LUT_LOAD(step3D + step2D);
+    d = NEON_LUT_LOAD(step3D + step2D + step1D);
+    right =
+        NEON_LUT_MIX(NEON_LUT_MIX(a, b, shift1D), NEON_LUT_MIX(c, d, shift1D), shift2D);
+    // clip8: (result + LUT_PRECISION_ROUNDING) >> LUT_PRECISION_BITS, then 0..255
+    return vqrshrun_n_s16(NEON_LUT_MIX(left, right, shift3D), LUT_PRECISION_BITS);
+#undef NEON_LUT_LOAD
+#undef NEON_LUT_MIX
+}
+
+/* Whether the difference of any two of the table's count values fits 16
+   bits: all of them within -16384..16383, which holds for every table
+   whose colours are within about twice the 0..1 range (0..16320 is 0..1).
+   One pass over the table, a small part of converting it from Python. */
+static int
+neon_lut_fits_pairs(const INT16 *table, int count) {
+    int16x8_t lo = vdupq_n_s16(0), hi = vdupq_n_s16(0);
+    int i = 0, min, max;
+    for (; i + 8 <= count; i += 8) {
+        int16x8_t v = vld1q_s16(table + i);
+        lo = vminq_s16(lo, v);
+        hi = vmaxq_s16(hi, v);
+    }
+    min = vminvq_s16(lo);
+    max = vmaxvq_s16(hi);
+    for (; i < count; i++) {
+        min = table[i] < min ? table[i] : min;
+        max = table[i] > max ? table[i] : max;
+    }
+    return min >= -16384 && max <= 16383;
+}
+
+/* The lookup of the portable code with the NEON kernels: two pixels at a
+   time where the table allows, else and for a last odd pixel one. */
 static int
 colorlut_linear3d_neon(
     Imaging imOut,
@@ -644,13 +705,58 @@ colorlut_linear3d_neon(
     UINT32 scale3D = (size3D - 1) / 255.0 * (1 << LUT_SCALE_BITS);
     int size1D_2D = size1D * size2D;
     int x, y;
+    int pairs;
+    /* the table's fourth lane holds the input's alpha for a 3-channel table */
+    const uint8x8_t keep =
+        vreinterpret_u8_u32(vdup_n_u32(table_channels == 3 ? 0x00ffffff : 0xffffffff));
     ImagingSectionCookie cookie;
 
     ImagingSectionEnter(&cookie);
+    pairs = neon_lut_fits_pairs(table, size1D_2D * size3D * table_channels);
     for (y = 0; y < imOut->ysize; y++) {
         UINT8 *rowIn = (UINT8 *)imIn->image[y];
         char *rowOut = (char *)imOut->image[y];
-        for (x = 0; x < imOut->xsize; x++) {
+        x = 0;
+        for (; pairs && x + 2 <= imOut->xsize; x += 2) {
+            const INT16 *t[2];
+            INT16 shift[2][3];
+            int k;
+            for (k = 0; k < 2; k++) {
+                const UINT8 *in = rowIn + (x + k) * 4;
+                UINT32 index1D = in[0] * scale1D;
+                UINT32 index2D = in[1] * scale2D;
+                UINT32 index3D = in[2] * scale3D;
+                shift[k][0] =
+                    (LUT_SCALE_MASK & index1D) >> (LUT_SCALE_BITS - LUT_SHIFT_BITS);
+                shift[k][1] =
+                    (LUT_SCALE_MASK & index2D) >> (LUT_SCALE_BITS - LUT_SHIFT_BITS);
+                shift[k][2] =
+                    (LUT_SCALE_MASK & index3D) >> (LUT_SCALE_BITS - LUT_SHIFT_BITS);
+                t[k] = table + table_channels * table_index3D(
+                                                    index1D >> LUT_SCALE_BITS,
+                                                    index2D >> LUT_SCALE_BITS,
+                                                    index3D >> LUT_SCALE_BITS,
+                                                    size1D,
+                                                    size1D_2D
+                                                );
+            }
+            {
+                uint8x8_t px = neon_lut_pair(
+                    t[0],
+                    t[1],
+                    table_channels,
+                    size1D * table_channels,
+                    size1D_2D * table_channels,
+                    vcombine_s16(vdup_n_s16(shift[0][0]), vdup_n_s16(shift[1][0])),
+                    vcombine_s16(vdup_n_s16(shift[0][1]), vdup_n_s16(shift[1][1])),
+                    vcombine_s16(vdup_n_s16(shift[0][2]), vdup_n_s16(shift[1][2]))
+                );
+                vst1_u8(
+                    (UINT8 *)rowOut + x * 4, vbsl_u8(keep, px, vld1_u8(rowIn + x * 4))
+                );
+            }
+        }
+        for (; x < imOut->xsize; x++) {
             UINT32 index1D = rowIn[x * 4 + 0] * scale1D;
             UINT32 index2D = rowIn[x * 4 + 1] * scale2D;
             UINT32 index3D = rowIn[x * 4 + 2] * scale3D;
