@@ -37,8 +37,41 @@
 #include <math.h>
 #include <stdint.h>
 
-#define CEIL(v) (int)ceil(v)
-#define FLOOR(v) ((v) >= 0.0 ? (int)(v) : (int)floor(v))
+/* floor and ceil of a value in int range. Where the compiler has no
+   instruction for them, x86 without SSE4.1, which is how the dispatch
+   build compiles this file, they are library calls, and the polygon code
+   rounds once or twice per span: there the truncation, corrected, gives
+   the same integers without the call (5% of the lines and outlines).
+   Elsewhere the instruction is faster than the correction: on arm64 the
+   wide lines were 15% slower with it. */
+#if (                                                                               \
+    defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86) \
+) && !defined(__SSE4_1__)
+static inline int
+draw_floor(double v) {
+    int i = (int)v;
+    return i - (i > v);
+}
+
+static inline int
+draw_ceil(double v) {
+    int i = (int)v;
+    return i + (i < v);
+}
+#else
+static inline int
+draw_floor(double v) {
+    return (int)floor(v);
+}
+
+static inline int
+draw_ceil(double v) {
+    return (int)ceil(v);
+}
+#endif
+
+#define CEIL(v) draw_ceil(v)
+#define FLOOR(v) draw_floor(v)
 
 #define INK8(ink) (*(UINT8 *)ink)
 
@@ -69,8 +102,8 @@ ink16(Imaging im, const void *ink_) {
  * Rounds around zero (up=away from zero, down=towards zero)
  * This guarantees that ROUND_UP|DOWN(f) == -ROUND_UP|DOWN(-f)
  */
-#define ROUND_UP(f) ((int)((f) >= 0.0 ? floor((f) + 0.5F) : -floor(fabs(f) + 0.5F)))
-#define ROUND_DOWN(f) ((int)((f) >= 0.0 ? ceil((f) - 0.5F) : -ceil(fabs(f) - 0.5F)))
+#define ROUND_UP(f) ((f) >= 0.0 ? draw_floor((f) + 0.5F) : -draw_floor(fabs(f) + 0.5F))
+#define ROUND_DOWN(f) ((f) >= 0.0 ? draw_ceil((f) - 0.5F) : -draw_ceil(fabs(f) - 0.5F))
 
 /* -------------------------------------------------------------------- */
 /* Primitives                                                           */
@@ -183,12 +216,22 @@ hline16(Imaging im, int x0, int y0, int x1, int ink, Imaging mask) {
     }
 }
 
-/* Stores ink into n 4-byte pixels. Compilers don't vectorise the plain
-   loop at -O2, since its length is unknown. */
+/* Stores ink into n 4-byte pixels, four at a time: compilers don't
+   vectorise the plain loop at -O2, since its length is unknown, but they
+   merge the four stores of a fixed chunk into one 16-byte store. Inline
+   and not a kernel of the table: a span is often a few pixels, and the
+   call per span cost 12 to 30% of the drawing on arm64 and 20% of the
+   lines on x86-64, for a loop that is bound by the stores either way
+   (design/NEON_ROUND_2026-11-04.md). */
 static inline void
 fill32(INT32 *p, int n, INT32 ink) {
-    /* the active tier's kernel does the pixels it can (DrawSIMD.c) */
-    int x = IMAGING_SIMD_CALL(draw->fill32, p, n, ink);
+    int x = 0;
+    for (; x + 4 <= n; x += 4) {
+        p[x] = ink;
+        p[x + 1] = ink;
+        p[x + 2] = ink;
+        p[x + 3] = ink;
+    }
     for (; x < n; x++) {
         p[x] = ink;
     }

@@ -1,29 +1,7 @@
-/* Drawing (Draw.c), compiled into SIMDKernels.c: the fill of 4-byte pixels
-   with an ink, and the blend of an RGBA ink into a row of pixels; each does
-   the pixels its vector loop can and returns how many. */
-
-static int
-draw_fill32_simd(INT32 *p, int n, INT32 ink) {
-    int x = 0;
-#if defined(IMAGING_SIMD_AVX2)
-    __m256i v8 = _mm256_set1_epi32(ink);
-    for (; x < n - 7; x += 8) {
-        _mm256_storeu_si256((__m256i *)(p + x), v8);
-    }
-#endif
-#if defined(IMAGING_SIMD_SSE4)
-    __m128i v4 = _mm_set1_epi32(ink);
-    for (; x < n - 3; x += 4) {
-        _mm_storeu_si128((__m128i *)(p + x), v4);
-    }
-#elif defined(IMAGING_SIMD_NEON)
-    int32x4_t v4 = vdupq_n_s32(ink);
-    for (; x < n - 3; x += 4) {
-        vst1q_s32(p + x, v4);
-    }
-#endif
-    return x;
-}
+/* Drawing (Draw.c), compiled into SIMDKernels.c: the blend of an RGBA ink
+   into a row of pixels, for the pixels its vector loop can; returns how
+   many. (The plain fill of a span is a loop in Draw.c: a kernel call per
+   span cost more than it gave.) */
 
 static int
 draw_hline_rgba_simd(UINT8 *out, int n, const UINT8 *in) {
@@ -76,6 +54,5 @@ draw_hline_rgba_simd(UINT8 *out, int n, const UINT8 *in) {
 }
 
 static const ImagingSIMDDrawKernels draw_simd_kernels = {
-    .fill32 = draw_fill32_simd,
     .hline_rgba = draw_hline_rgba_simd,
 };
