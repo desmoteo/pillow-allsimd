@@ -6,6 +6,7 @@ same indices."""
 from __future__ import annotations
 
 import hashlib
+import platform
 import random
 
 import pytest
@@ -77,8 +78,14 @@ def test_transparent_pixels_take_the_first_one_s_colour(
         assert len({indices[i] for i, a in enumerate(alpha) if a == 0}) == 1
 
 
+@pytest.mark.skipif(
+    platform.libc_ver()[0] != "glibc",
+    reason="buckets of equal count are in the order of the C library's qsort",
+)
 def test_known_results() -> None:
-    # The palettes and indices of Pillow 13.0.0's fast octree.
+    # The palettes and indices of Pillow 13.0.0's fast octree, as built with
+    # glibc: the quantizer sorts its buckets by count with qsort(), whose
+    # order among equal counts differs between C libraries, for Pillow too.
     rgb = hopper("RGB")
     rgba = hopper("RGBA")
     rgba.putalpha(hopper("L").point(lambda v: 0 if v < 40 else v))
