@@ -179,6 +179,20 @@ typedef struct {
     ImagingSIMDRowFn ycbcr2rgb_fast;
 } ImagingSIMDConvertKernels;
 
+/* 3D colour lookup tables (ColorLUTSIMD.c): the whole image, with the
+   arguments checked by the caller; returns 1. */
+typedef struct {
+    int (*linear3d)(
+        Imaging imOut,
+        Imaging imIn,
+        int table_channels,
+        int size1D,
+        int size2D,
+        int size3D,
+        INT16 *table
+    );
+} ImagingSIMDColorLUTKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -188,6 +202,7 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDReduceKernels *reduce;
     const ImagingSIMDResampleKernels *resample;
     const ImagingSIMDConvertKernels *convert;
+    const ImagingSIMDColorLUTKernels *colorlut;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */
