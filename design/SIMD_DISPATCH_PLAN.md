@@ -346,6 +346,14 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
       expected count of a Linux release is 29 files (the source package
       and 4 x 7 wheels). The install docs (README, `PyPI.rst`,
       `docs/allsimd.rst`) say Linux x86-64 and arm64 get wheels.
+      Checked before CI with cibuildwheel 4.3.1 on this machine, from a
+      clean clone (`cibuildwheel --only cp312-manylinux_x86_64`; the
+      working tree has ignored test-image directories that break the
+      wheel test's `mv`, and needs `wheels/multibuild` checked out):
+      the wheel builds with `dispatch (SSE4.1, AVX2, AVX-VNNI)`, 9.2 MB
+      after auditwheel, and in it the self-test, `check_wheel.py` (the
+      four tiers) and the full suite pass (8,124 passed, 106 skipped)
+      under the AVX-VNNI tier.
 - [ ] C2. Release 13.0.0.post3 as `allsimd-13.0.0.post3-linux`; verify
       on PyPI; the perf page gets a `wheel` variant run (the dispatch
       build's AVX2 tier) next to `branch-avx2`.
