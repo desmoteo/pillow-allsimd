@@ -2,7 +2,8 @@
 
 Status: being written as `docs/allsimd-kernels.rst`, a page of the API
 documentation ("How the kernels work"), section by section in the order
-below (ground rules and resampling 2026-11-03, the blurs 2026-11-04). The reader is as
+below (ground rules and resampling 2026-11-03, the blurs and the kernel
+filters 2026-11-04). The reader is as
 proposed; the location is the documentation site rather than a Markdown
 file, so that it is published with the API reference.
 
