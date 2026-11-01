@@ -328,6 +328,34 @@ typedef struct {
     );
 } ImagingSIMDChopsKernels;
 
+/* PNG (ZipEncodeSIMD.c): the encoder's row filters do the bytes their
+   vector loops can, from byte i on for average and Paeth, add their cost
+   to *s and return how many they did; unfilter_up undoes the "up" filter
+   on a whole row. Packing (PackSIMD.c, UnpackSIMD.c): RGB and BGR
+   triplets from or into 4-byte pixels, the pixels the vector loop can,
+   their count back. */
+typedef struct {
+    int (*cost_none)(const UINT8 *cur, int n, int *s);
+    int (*filter_diff)(UINT8 *out, const UINT8 *cur, const UINT8 *ref, int n, int *s);
+    int (*filter_average)(
+        UINT8 *out, const UINT8 *cur, const UINT8 *prev, int n, int bpp, int i, int *s
+    );
+    int (*filter_paeth)(
+        UINT8 *out, const UINT8 *cur, const UINT8 *prev, int n, int bpp, int i, int *s
+    );
+    void (*unfilter_up)(UINT8 *row, const UINT8 *prev, int len);
+} ImagingSIMDZipKernels;
+
+typedef struct {
+    int (*rgb)(UINT8 *out, const UINT8 *in, int pixels);
+    int (*bgr)(UINT8 *out, const UINT8 *in, int pixels);
+} ImagingSIMDPackKernels;
+
+typedef struct {
+    int (*rgb)(UINT8 *out, const UINT8 *in, int pixels);
+    int (*bgr)(UINT8 *out, const UINT8 *in, int pixels);
+} ImagingSIMDUnpackKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -346,6 +374,9 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDCompositeKernels *composite;
     const ImagingSIMDBlendKernels *blend;
     const ImagingSIMDChopsKernels *chops;
+    const ImagingSIMDZipKernels *zip;
+    const ImagingSIMDPackKernels *pack;
+    const ImagingSIMDUnpackKernels *unpack;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */

@@ -25,6 +25,9 @@
 #include "AlphaCompositeSIMD.c"
 #include "BlendSIMD.c"
 #include "ChopsSIMD.c"
+#include "ZipEncodeSIMD.c"
+#include "PackSIMD.c"
+#include "UnpackSIMD.c"
 
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
@@ -41,6 +44,9 @@ const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .composite = &composite_simd_kernels,
     .blend = &blend_simd_kernels,
     .chops = &chops_simd_kernels,
+    .zip = &zip_simd_kernels,
+    .pack = &pack_simd_kernels,
+    .unpack = &unpack_simd_kernels,
 };
 
 #endif
