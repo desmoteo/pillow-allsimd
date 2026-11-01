@@ -5316,6 +5316,26 @@ setup_module(PyObject *m) {
         return -1;
     }
 
+    /* Pillow-AllSIMD: libdeflate compresses the PNG encoder's output */
+    PyObject *have_libdeflate;
+#ifdef HAVE_LIBDEFLATE
+    have_libdeflate = Py_True;
+    {
+        extern const char *ImagingZipLibdeflateVersion(void);
+        PyObject *v = PyUnicode_FromString(ImagingZipLibdeflateVersion());
+        if (!v) {
+            return -1;
+        }
+        PyDict_SetItemString(d, "libdeflate_version", v);
+        Py_DECREF(v);
+    }
+#else
+    have_libdeflate = Py_False;
+#endif
+    if (PyModule_AddObjectRef(m, "HAVE_LIBDEFLATE", have_libdeflate) < 0) {
+        return -1;
+    }
+
 #ifdef HAVE_LIBTIFF
     {
         extern const char *ImagingTiffVersion(void);

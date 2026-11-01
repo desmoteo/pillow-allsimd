@@ -130,6 +130,7 @@ features: dict[str, tuple[str, str, str | None]] = {
     "libjpeg_turbo": ("PIL._imaging", "HAVE_LIBJPEGTURBO", "libjpeg_turbo_version"),
     "mozjpeg": ("PIL._imaging", "HAVE_MOZJPEG", "libjpeg_turbo_version"),
     "zlib_ng": ("PIL._imaging", "HAVE_ZLIBNG", "zlib_ng_version"),
+    "libdeflate": ("PIL._imaging", "HAVE_LIBDEFLATE", "libdeflate_version"),
     "libimagequant": ("PIL._imaging", "HAVE_LIBIMAGEQUANT", "imagequant_version"),
     "xcb": ("PIL._imaging", "HAVE_XCB", None),
     "fast": ("PIL._imaging", "HAVE_FAST", None),

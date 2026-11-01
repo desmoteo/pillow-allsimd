@@ -42,6 +42,11 @@ Many of Pillow's features require external libraries:
   * Starting with Pillow 3.0.0, zlib is required by default. It can be
     disabled with the ``-C zlib=disable`` flag.
 
+* **libdeflate** (Pillow-AllSIMD) compresses the PNGs Pillow saves,
+  several times faster than zlib at every compression level and a little
+  smaller. Optional: without it, PNGs are compressed with zlib as in
+  Pillow. It can be disabled with the ``-C libdeflate=disable`` flag.
+
 * **libtiff** provides compressed TIFF functionality
 
   * Pillow has been tested with libtiff versions **4.0-4.7.1**
@@ -278,7 +283,8 @@ Build options
   sets the number of CPUs to use to ``n``, or can disable parallel building by
   using a setting of 1. By default, it uses as many CPUs as are present.
 
-* Config settings: ``-C zlib=disable``, ``-C jpeg=disable``,
+* Config settings: ``-C zlib=disable``, ``-C libdeflate=disable``,
+  ``-C jpeg=disable``,
   ``-C tiff=disable``, ``-C freetype=disable``, ``-C raqm=disable``,
   ``-C lcms=disable``, ``-C webp=disable``,
   ``-C jpeg2000=disable``, ``-C imagequant=disable``, ``-C xcb=disable``,
@@ -286,7 +292,8 @@ Build options
   Disable building the corresponding feature even if the development
   libraries are present on the building machine.
 
-* Config settings: ``-C zlib=enable``, ``-C jpeg=enable``,
+* Config settings: ``-C zlib=enable``, ``-C libdeflate=enable``,
+  ``-C jpeg=enable``,
   ``-C tiff=enable``, ``-C freetype=enable``, ``-C raqm=enable``,
   ``-C lcms=enable``, ``-C webp=enable``,
   ``-C jpeg2000=enable``, ``-C imagequant=enable``, ``-C xcb=enable``,

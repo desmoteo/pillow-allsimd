@@ -317,6 +317,7 @@ class pil_build_ext(build_ext):
     class ext_feature:
         features = [
             "zlib",
+            "libdeflate",
             "jpeg",
             "tiff",
             "freetype",
@@ -743,6 +744,16 @@ class pil_build_ext(build_ext):
                 elif sys.platform == "win32" and _find_library_file(self, "zdll"):
                     feature.set("zlib", "zdll")  # dll import library
 
+        if feature.want("libdeflate"):
+            # Pillow-AllSIMD: compresses PNG output several times faster
+            # than zlib; optional, zlib's stream is used without it
+            _dbg("Looking for libdeflate")
+            if _find_include_file(self, "libdeflate.h"):
+                if _find_library_file(self, "deflate"):
+                    feature.set("libdeflate", "deflate")
+                elif sys.platform == "win32" and _find_library_file(self, "libdeflate"):
+                    feature.set("libdeflate", "libdeflate")
+
         if feature.want("jpeg"):
             _dbg("Looking for jpeg")
             if _find_include_file(self, "jpeglib.h"):
@@ -935,6 +946,9 @@ class pil_build_ext(build_ext):
         if feature.get("zlib"):
             libs.append(feature.get("zlib"))
             defs.append(("HAVE_LIBZ", None))
+            if feature.get("libdeflate"):
+                libs.append(feature.get("libdeflate"))
+                defs.append(("HAVE_LIBDEFLATE", None))
         if feature.get("imagequant"):
             libs.append(feature.get("imagequant"))
             defs.append(("HAVE_LIBIMAGEQUANT", None))
@@ -1245,6 +1259,7 @@ class pil_build_ext(build_ext):
                 feature.get("openjpeg_version"),
             ),
             (feature.get("zlib"), "ZLIB (PNG/ZIP)"),
+            (feature.get("libdeflate"), "LIBDEFLATE (PNG encoding)"),
             (feature.get("imagequant"), "LIBIMAGEQUANT"),
             (feature.get("tiff"), "LIBTIFF"),
             (feature.get("freetype"), "FREETYPE2"),
