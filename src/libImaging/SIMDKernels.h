@@ -349,6 +349,10 @@ typedef struct {
 typedef struct {
     int (*rgb)(UINT8 *out, const UINT8 *in, int pixels);
     int (*bgr)(UINT8 *out, const UINT8 *in, int pixels);
+    /* out[i * 4 + k] = in[i * 4 + pk], or 0 (PERMUTE_00) or 255 (PERMUTE_FF) */
+    int (*permute4)(
+        UINT8 *out, const UINT8 *in, int pixels, int p0, int p1, int p2, int p3
+    );
 } ImagingSIMDPackKernels;
 
 typedef struct {

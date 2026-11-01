@@ -274,7 +274,7 @@ ImagingPackRGB(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingPackXRGB(UINT8 *out, const UINT8 *in, int pixels) {
-    int i = permute4(out, in, pixels, PERMUTE_00, R, G, B);
+    int i = IMAGING_SIMD_CALL(pack->permute4, out, in, pixels, PERMUTE_00, R, G, B);
     /* XRGB, triplets with left padding */
     for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = 0;
@@ -302,7 +302,7 @@ ImagingPackBGR(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingPackBGRX(UINT8 *out, const UINT8 *in, int pixels) {
-    int i = permute4(out, in, pixels, B, G, R, PERMUTE_00);
+    int i = IMAGING_SIMD_CALL(pack->permute4, out, in, pixels, B, G, R, PERMUTE_00);
     /* BGRX, reversed bytes with right padding */
     for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = in[B];
@@ -316,7 +316,7 @@ ImagingPackBGRX(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingPackXBGR(UINT8 *out, const UINT8 *in, int pixels) {
-    int i = permute4(out, in, pixels, PERMUTE_00, B, G, R);
+    int i = IMAGING_SIMD_CALL(pack->permute4, out, in, pixels, PERMUTE_00, B, G, R);
     /* XBGR, reversed bytes with left padding */
     for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = 0;
@@ -343,7 +343,7 @@ ImagingPackCMYK2RGB(UINT8 *out, const UINT8 *in, int xsize) {
 
 void
 ImagingPackBGRA(UINT8 *out, const UINT8 *in, int pixels) {
-    int i = permute4(out, in, pixels, B, G, R, A);
+    int i = IMAGING_SIMD_CALL(pack->permute4, out, in, pixels, B, G, R, A);
     /* BGRA, reversed bytes with right alpha */
     for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = in[B];
@@ -357,7 +357,7 @@ ImagingPackBGRA(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingPackABGR(UINT8 *out, const UINT8 *in, int pixels) {
-    int i = permute4(out, in, pixels, A, B, G, R);
+    int i = IMAGING_SIMD_CALL(pack->permute4, out, in, pixels, A, B, G, R);
     /* ABGR, reversed bytes with left alpha */
     for (in += i * 4, out += i * 4; i < pixels; i++) {
         out[0] = in[A];

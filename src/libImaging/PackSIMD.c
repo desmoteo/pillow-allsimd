@@ -49,7 +49,50 @@ pack_bgr_simd(UINT8 *out, const UINT8 *in, int pixels) {
     return i;
 }
 
+/* For pixels of 4 bytes: out[i * 4 + k] = in[i * 4 + pk], or 0 for
+   PERMUTE_00 and 255 for PERMUTE_FF. Does the pixels it can in vectors and
+   returns how many. The indices are constants at Pack.c's and Unpack.c's
+   call sites; the shuffle is built per row here. */
+static int
+pack_permute4_simd(
+    UINT8 *out, const UINT8 *in, int pixels, int p0, int p1, int p2, int p3
+) {
+    int i = 0;
+#if defined(IMAGING_SIMD_SSE4)
+    int p[4] = {p0, p1, p2, p3}, k;
+    char shuffle[16], fill[16];
+    __m128i vshuffle, vfill;
+    for (k = 0; k < 16; k++) {
+        shuffle[k] = p[k % 4] < 0 ? -1 : (char)(p[k % 4] + k / 4 * 4);
+        fill[k] = p[k % 4] == PERMUTE_FF ? -1 : 0;
+    }
+    vshuffle = _mm_loadu_si128((const __m128i *)shuffle);
+    vfill = _mm_loadu_si128((const __m128i *)fill);
+    for (; i < pixels - 3; i += 4) {
+        __m128i v = _mm_loadu_si128((const __m128i *)(in + i * 4));
+        v = _mm_or_si128(_mm_shuffle_epi8(v, vshuffle), vfill);
+        _mm_storeu_si128((__m128i *)(out + i * 4), v);
+    }
+#elif defined(IMAGING_SIMD_NEON)
+    for (; i < pixels - 15; i += 16) {
+        uint8x16x4_t v = vld4q_u8(in + i * 4);
+        uint8x16_t c[6] = {
+            v.val[0], v.val[1], v.val[2], v.val[3], vdupq_n_u8(0), vdupq_n_u8(255)
+        };
+        uint8x16x4_t o = {
+            {c[p0 >= 0 ? p0 : 3 - p0],
+             c[p1 >= 0 ? p1 : 3 - p1],
+             c[p2 >= 0 ? p2 : 3 - p2],
+             c[p3 >= 0 ? p3 : 3 - p3]}
+        };
+        vst4q_u8(out + i * 4, o);
+    }
+#endif
+    return i;
+}
+
 static const ImagingSIMDPackKernels pack_simd_kernels = {
+    .permute4 = pack_permute4_simd,
     .rgb = pack_rgb_simd,
     .bgr = pack_bgr_simd,
 };

@@ -801,7 +801,7 @@ ImagingUnpackRGBA4B(UINT8 *out, const UINT8 *in, int pixels) {
 
 static void
 ImagingUnpackBGRX(UINT8 *_out, const UINT8 *in, int pixels) {
-    int i = permute4(_out, in, pixels, 2, 1, 0, PERMUTE_FF);
+    int i = IMAGING_SIMD_CALL(pack->permute4, _out, in, pixels, 2, 1, 0, PERMUTE_FF);
     /* RGB, reversed bytes with padding */
     for (in += i * 4, _out += i * 4; i < pixels; i++) {
         UINT32 iv = MAKE_UINT32(in[2], in[1], in[0], 255);
@@ -813,7 +813,7 @@ ImagingUnpackBGRX(UINT8 *_out, const UINT8 *in, int pixels) {
 
 static void
 ImagingUnpackBGXR(UINT8 *_out, const UINT8 *in, int pixels) {
-    int i = permute4(_out, in, pixels, 3, 1, 0, PERMUTE_FF);
+    int i = IMAGING_SIMD_CALL(pack->permute4, _out, in, pixels, 3, 1, 0, PERMUTE_FF);
     for (in += i * 4, _out += i * 4; i < pixels; i++) {
         UINT32 iv = MAKE_UINT32(in[3], in[1], in[0], 255);
         memcpy(_out, &iv, sizeof(iv));
@@ -824,7 +824,7 @@ ImagingUnpackBGXR(UINT8 *_out, const UINT8 *in, int pixels) {
 
 static void
 ImagingUnpackXRGB(UINT8 *_out, const UINT8 *in, int pixels) {
-    int i = permute4(_out, in, pixels, 1, 2, 3, PERMUTE_FF);
+    int i = IMAGING_SIMD_CALL(pack->permute4, _out, in, pixels, 1, 2, 3, PERMUTE_FF);
     /* RGB, leading pad */
     for (in += i * 4, _out += i * 4; i < pixels; i++) {
         UINT32 iv = MAKE_UINT32(in[1], in[2], in[3], 255);
@@ -836,7 +836,7 @@ ImagingUnpackXRGB(UINT8 *_out, const UINT8 *in, int pixels) {
 
 static void
 ImagingUnpackXBGR(UINT8 *_out, const UINT8 *in, int pixels) {
-    int i = permute4(_out, in, pixels, 3, 2, 1, PERMUTE_FF);
+    int i = IMAGING_SIMD_CALL(pack->permute4, _out, in, pixels, 3, 2, 1, PERMUTE_FF);
     /* RGB, reversed bytes, leading pad */
     for (in += i * 4, _out += i * 4; i < pixels; i++) {
         UINT32 iv = MAKE_UINT32(in[3], in[2], in[1], 255);
@@ -1071,7 +1071,7 @@ unpackRGBA16B(UINT8 *_out, const UINT8 *in, int pixels) {
 
 static void
 unpackARGB(UINT8 *_out, const UINT8 *in, int pixels) {
-    int i = permute4(_out, in, pixels, 1, 2, 3, 0);
+    int i = IMAGING_SIMD_CALL(pack->permute4, _out, in, pixels, 1, 2, 3, 0);
     /* RGBA, leading pad */
     for (in += i * 4, _out += i * 4; i < pixels; i++) {
         UINT32 iv = MAKE_UINT32(in[1], in[2], in[3], in[0]);
@@ -1083,7 +1083,7 @@ unpackARGB(UINT8 *_out, const UINT8 *in, int pixels) {
 
 static void
 unpackABGR(UINT8 *_out, const UINT8 *in, int pixels) {
-    int i = permute4(_out, in, pixels, 3, 2, 1, 0);
+    int i = IMAGING_SIMD_CALL(pack->permute4, _out, in, pixels, 3, 2, 1, 0);
     /* RGBA, reversed bytes */
     for (in += i * 4, _out += i * 4; i < pixels; i++) {
         UINT32 iv = MAKE_UINT32(in[3], in[2], in[1], in[0]);
@@ -1095,7 +1095,7 @@ unpackABGR(UINT8 *_out, const UINT8 *in, int pixels) {
 
 static void
 unpackBGRA(UINT8 *_out, const UINT8 *in, int pixels) {
-    int i = permute4(_out, in, pixels, 2, 1, 0, 3);
+    int i = IMAGING_SIMD_CALL(pack->permute4, _out, in, pixels, 2, 1, 0, 3);
     /* RGBA, rearranged channels */
     for (in += i * 4, _out += i * 4; i < pixels; i++) {
         UINT32 iv = MAKE_UINT32(in[2], in[1], in[0], in[3]);
@@ -1131,7 +1131,7 @@ unpackBGRA16B(UINT8 *_out, const UINT8 *in, int pixels) {
 
 static void
 unpackBGAR(UINT8 *_out, const UINT8 *in, int pixels) {
-    int i = permute4(_out, in, pixels, 3, 1, 0, 2);
+    int i = IMAGING_SIMD_CALL(pack->permute4, _out, in, pixels, 3, 1, 0, 2);
     for (in += i * 4, _out += i * 4; i < pixels; i++) {
         UINT32 iv = MAKE_UINT32(in[3], in[1], in[0], in[2]);
         memcpy(_out, &iv, sizeof(iv));
