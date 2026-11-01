@@ -396,6 +396,22 @@ typedef struct {
     int (*hline_rgba)(UINT8 *out, int n, const UINT8 *ink);
 } ImagingSIMDDrawKernels;
 
+/* The quantizer (QuantSIMD.c): the palette entry nearest to a pixel, from
+   the padded palette Quant.c builds. Rank filters (RankFilterSIMD.c): the
+   3x3 and 5x5 medians of whole 8-bit images (margin and ps as
+   RankFilter.c's network takes them), and the minimum or maximum over
+   count source rows for the bytes the vector loop can, their count back. */
+struct ImagingNearestPalette;
+typedef struct {
+    UINT32 (*nearest_entry)(const struct ImagingNearestPalette *np, UINT32 pixel);
+} ImagingSIMDQuantKernels;
+
+typedef struct {
+    void (*median3)(Imaging imOut, Imaging im, int margin, int ps);
+    void (*median5)(Imaging imOut, Imaging im, int margin, int ps);
+    int (*minmax_line)(UINT8 *out, const UINT8 **src, int count, int n, int is_max);
+} ImagingSIMDRankKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -421,6 +437,8 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDBandsKernels *bands;
     const ImagingSIMDPasteKernels *paste;
     const ImagingSIMDDrawKernels *draw;
+    const ImagingSIMDQuantKernels *quant;
+    const ImagingSIMDRankKernels *rank;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */
