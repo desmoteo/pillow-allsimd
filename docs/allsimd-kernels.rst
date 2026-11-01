@@ -21,8 +21,8 @@ exact mode, Pillow's arithmetic.
 
 The page is written section by section. Written so far: the ground rules,
 resampling, the blurs, the kernel filters, the rank filters, the colour
-conversions, compositing and the channel operations, and geometry. To
-come: drawing and text, codecs and packing, what was tried and dropped, where OpenCV and
+conversions, compositing and the channel operations, geometry, and
+drawing and text. To come: codecs and packing, what was tried and dropped, where OpenCV and
 libvips are still faster, and the fast-mode kernels (meanwhile,
 ``design/SIMD_FAST_KERNELS.md`` in the repository describes those).
 
@@ -1999,3 +1999,216 @@ byte to double on arm64, as x86 does, was slower than the scalar
 filters; and three bytes of an RGB result copied from a general
 register went through the stack and stalled, so they are stored from
 the vector register (``vst1_lane``).
+
+Drawing and text
+----------------
+
+``ImageDraw``'s shapes, outlines, flood fill and text (``Draw.c``,
+``Fill.c``, ``Paste.c``, ``_imagingft.c``, ``ImageDraw.py``,
+``ImageFont.py``). Pillow-SIMD never touched these, and a profile of the
+whole API (``design/PROFILE_ASSESSMENT.md``) found most of their time
+outside any pixel loop: in allocations, in calls through function
+pointers, in FreeType. The vector code here is small, the span fill and
+two blends; the rest is where the time was.
+
+What Pillow computes
+~~~~~~~~~~~~~~~~~~~~
+
+Shapes are rasterized by scan lines: a polygon's edges are intersected
+with each row, the intersections sorted, and the runs between them
+filled with a horizontal-line primitive chosen for the pixel type
+(``DRAW`` holds a ``point``, an ``hline`` and a ``line`` per type). An
+RGBA ink on an RGB image blends each channel, ``BLEND(a, out, in) = (out
+* (255 - a) + in * a + 128) / 255``. A polygon outline wider than one
+pixel must stay inside the polygon, so ``ImageDraw.polygon()`` filled an
+image-sized ``1`` mask with the polygon and drew the wide edges through
+it. ``text()`` renders each glyph with FreeType and blends it through its
+8-bit bitmap as a mask (``ImagingFill2``, the masked fill of the
+compositing section). ``floodfill()`` searched from the seed in Python,
+pixel by pixel.
+
+The idea
+~~~~~~~~
+
+* **Span fill.** ``hline32`` stored one pixel at a time behind a per-pixel
+  mask test, which GCC doesn't vectorize at ``-O2`` even without the test
+  (the length is unknown). Unmasked spans go through ``fill32()``: 8
+  pixels per AVX2 store, 4 per SSE4 or NEON store, and a counted loop
+  elsewhere. Filled rectangles 6.45 to 2.85 ms at 1280×800.
+* **RGBA ink in lanes.** ``hline32rgba`` computes the ink's terms once
+  (``in * a`` per channel) and blends four pixels per step in 16-bit
+  lanes, ``out * (255 - a) + c + 128`` then the ``/ 255`` as two shifts
+  and an add, the alpha byte kept; the scalar loop finishes the row and
+  takes the masked case (``test_rgba_ink_blend_exact`` checks every
+  alpha at several widths). AVX2 builds use the SSE4 kernel. Text and
+  ``bitmap()`` got the same treatment in ``fill_mask_L_simd()``.
+* **Lines through direct calls.** Pillow 13 merged ``line8``, ``line32``
+  and ``line32rgba`` into one ``line()`` that calls ``point`` and
+  ``hline`` through pointers, an indirect call per pixel of every thin
+  line and of a rectangle outline's sides. ``line_generic()`` is
+  force-inlined back into one function per pixel type, dispatched like
+  the others: 500 bounding boxes with 2-pixel outlines 4.03 to 2.53 ms.
+* **Scan lines sorted in place.** The few intersections of a scan line
+  went through ``qsort``, a call and a comparison through a pointer each,
+  a large part of filling a polygon beyond writing its pixels. An
+  insertion sort with the same comparison takes up to 32 values (equal
+  values are interchangeable, so the order is the same): 200 polygons
+  32.7 to 27.1 ms, against 19.2 to write the same area as rectangles.
+* **Wide outlines without the image-sized mask.** The mask was 14 of the
+  16.5 ms of drawing 100 ROI polygons on 2560×1600: allocated and cleared
+  for each. ``ImagingDrawPolygonInside()`` records the polygon's fill as
+  spans per row from the *same* scan (``hline_record`` in place of the
+  mask's ``hline``), sorts them by row with a counting sort and by *x*
+  with an insertion sort, merges them, and cuts the wide lines' runs to
+  them, filled unmasked (``hline_spans``): the same pixels (checked
+  against Pillow's mask on random polygons in nine modes, partly outside
+  the image, degenerate and self-intersecting, widths 2 to 15), 17.2 to
+  1.8 ms, and the work grows with the rows rather than the area, 1.7x
+  more for polygons 1,400 pixels across.
+* **Arcs, chords and pie slices without allocating.** Each row went
+  through the clipping tree as linked lists of segment ends, two
+  ``malloc``\ s per segment at every node, about 500 per shape; a tree
+  has at most 7 nodes, so a row has at most 16 ends, which now sit in
+  fixed arrays merged by the same comparisons in the same order: 1.23 to
+  1.29x.
+* **Flood fill in C.** The result of ``floodfill()`` is the 4-connected
+  region of pixels that match (within ``thresh`` of the seed's colour,
+  or neither the fill nor the border value), and a filled pixel never
+  matches again, so the order of the search doesn't change the pixels.
+  ``ImagingFloodFill()`` is a scan-line fill in C for 8-bit modes, run
+  only where it compares exactly as the Python search did (the seed
+  reads back as the value, the arguments have a pixel's shape, the seed
+  isn't negative), the search kept otherwise: 86 to 1.4 ms for a
+  320×200 region.
+* **Glyphs cached.** ``font_render()`` loaded and rendered every glyph
+  twice per call, and every call did it again; ``getbbox()`` and the
+  layout loaded each glyph for its box and its advance. What FreeType
+  gives for a glyph index and load flags depends on nothing else (the
+  size is fixed, no transform is set, glyphs sit on whole pixels), so
+  each font keeps the rendered bitmaps as 8-bit grey, their offsets,
+  the boxes and the advances in an open-addressing hash table, cleared
+  when the variation changes or at 8 MB. 100 lines at 1280×800: 87.8 to
+  14.9 ms from the bitmaps and boxes, then 11.0 to 3.3 from the
+  advances. Not SIMD at all, and the largest single gain in this
+  section.
+
+Why the builds agree
+~~~~~~~~~~~~~~~~~~~~
+
+Nothing here changes an algorithm's output: the fills store the same
+ink, the blends keep ``BLEND``'s rounding in 16-bit lanes where every
+term fits, and the structural changes (the span mask, the fixed arrays,
+the C flood fill, the glyph cache) are checked against the code they
+replace: ``test_polygon_outline_matches_full_mask``,
+``test_floodfill_c_matches_search`` (seven modes, and 1,500 random
+cases when it was written), ``test_rgba_ink_blend_exact`` and
+``test_bitmap_mask_blend_exact``, ``test_glyph_cache_variation``, and
+renders and boxes compared for every font in ``Tests/fonts`` at three
+sizes, stroked and not. The ``draw`` area of ``checks/simd_hashes.py``
+(rectangles, ellipses, pie slices, arcs, rounded rectangles and polygons
+in three modes, RGBA ink, flood fill) agrees on every build.
+
+Numbers
+~~~~~~~
+
+2560×1600, times faster than Pillow 13.0.0, which took the milliseconds
+shown. The "portable" column is the build without SIMD: most of these
+gains are algorithmic.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Drawing
+     - Pillow 13 (x86, ms)
+     - Portable
+     - SSE4
+     - AVX2
+     - Pillow 13 (arm64, ms)
+     - NEON
+   * - 200 filled polygons
+     - 61.7
+     - 2.3x
+     - 2.4x
+     - 2.5x
+     - 86.6
+     - 1.5x
+   * - 200 filled ellipses
+     - 3.3
+     - 1.5x
+     - 1.4x
+     - 1.5x
+     - 5.9
+     - 1.0x
+   * - 500 filled rectangles
+     - 5.6
+     - 1.7x
+     - 1.7x
+     - 1.7x
+     - 11.2
+     - 1.2x
+   * - 500 lines, 5 px wide
+     - 3.1
+     - 1.3x
+     - 1.6x
+     - 1.5x
+     - 5.5
+     - 1.6x
+   * - 500 boxes, 2 px outline
+     - 4.2
+     - 1.7x
+     - 1.7x
+     - 1.7x
+     - 3.7
+     - 1.0x
+   * - 100 ROI polygons, 2 px outline
+     - 19.2
+     - 7.2x
+     - 7.9x
+     - 7.9x
+     - 21.7
+     - 6.0x
+   * - 100 lines of text
+     - 56.5
+     - 7.5x
+     - 17.5x
+     - 17.5x
+     - 112.6
+     - 19.6x
+
+Pillow-SIMD is 1.0x on all of these. The ellipses and the boxes gain
+nothing on arm64, where Pillow 13's loops were already as fast as the
+new ones for their short spans. Against OpenCV, Pillow's filled shapes
+are 1.1 to 1.7x faster on x86 (ellipses 1.25x: OpenCV fills them as
+polygons of up to 72 vertices) and the ROI outlines 1.4x slower, from
+the rule that keeps a wide outline inside the polygon, which OpenCV's
+centred stroke doesn't have; on arm64 the lines and boxes are 1.8x and
+2.4x faster, the ellipses 1.4x and the ROI outlines 1.2x slower. Text
+isn't comparable: OpenCV's is Hershey vector strokes, not glyphs.
+
+Code map
+~~~~~~~~
+
+* ``Draw.c``: ``fill32()``, ``hline32()`` and ``hline32rgba()``;
+  ``line_generic()`` and ``line8``/``line16``/``line32``/``line32rgba``;
+  ``sort_intersections()`` and ``polygon_generic()``; ``SpanMask``,
+  ``hline_record()``, ``span_mask_build()``, ``hline_spans()`` and
+  ``ImagingDrawPolygonInside()``; the clipping tree's fixed arrays
+  (``event_list``, ``clip_tree_do_clip()``); ``ImagingFloodFill()``.
+* ``Paste.c``: ``fill_blend16()`` and ``fill_mask_L_simd()`` (text and
+  ``bitmap()``).
+* ``_imagingft.c``: ``GlyphCacheEntry``, ``glyph_cache_slot()``,
+  ``glyph_advance()``, ``glyph_cache_clear()``.
+* ``src/PIL/ImageDraw.py``: ``polygon()``'s call to
+  ``draw_polygon_inside``, ``floodfill()``'s conditions for the C fill.
+* Tests: ``Tests/test_imagedraw_simd.py``; ``test_rgba_ink_blend_exact``,
+  ``test_bitmap_mask_blend_exact`` and ``test_floodfill_c_matches_search``
+  in ``Tests/test_imagedraw.py``; ``test_glyph_cache_variation`` in
+  ``Tests/test_imagefont.py``.
+
+Pitfalls met on the way: a refactoring upstream (one ``line()`` through
+pointers) cost 1.5x on thin lines without anyone noticing, and the
+benchmark found it; the span mask gained less than hoped on the
+benchmark's small ROIs (2.0 to 1.8 ms), because the scan and the twelve
+wide lines remain, and more on large polygons; and the glyph cache had
+to keep FreeType's unsupported pixel modes as such, so that they still
+raise where they did.
