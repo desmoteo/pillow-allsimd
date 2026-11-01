@@ -48,13 +48,15 @@
 
 #if defined(IMAGING_SIMD_SSE4)
 /* Unaligned 32-bit load. */
-static INT32 inline mm_load_si32(const void *ptr) {
+static inline INT32
+mm_load_si32(const void *ptr) {
     INT32 v;
     memcpy(&v, ptr, sizeof(v));
     return v;
 }
 
-static __m128i inline mm_cvtepu8_epi32(const void *ptr) {
+static inline __m128i
+mm_cvtepu8_epi32(const void *ptr) {
     INT32 v;
     memcpy(&v, ptr, sizeof(v));
     return _mm_cvtepu8_epi32(_mm_cvtsi32_si128(v));
@@ -78,15 +80,18 @@ static __m128i inline mm_cvtepu8_epi32(const void *ptr) {
 #endif
 
 #if defined(IMAGING_SIMD_SSE4)
-static __m128i inline mm_cvtepu8_epi16(const void *ptr) {
+static inline __m128i
+mm_cvtepu8_epi16(const void *ptr) {
     return _mm_cvtepu8_epi16(_mm_loadl_epi64((const __m128i *)ptr));
 }
 #endif
 #if defined(IMAGING_SIMD_AVX2)
-static __m256i inline mm256_cvtepu8_epi32(const void *ptr) {
+static inline __m256i
+mm256_cvtepu8_epi32(const void *ptr) {
     return _mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)ptr));
 }
-static __m256i inline mm256_cvtepu8_epi16(const void *ptr) {
+static inline __m256i
+mm256_cvtepu8_epi16(const void *ptr) {
     return _mm256_cvtepu8_epi16(_mm_loadu_si128((const __m128i *)ptr));
 }
 #endif
