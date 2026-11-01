@@ -39,6 +39,16 @@ typedef struct {
     void (*f5x5_u8)(Imaging imOut, Imaging im, const float *kernel, float offset);
     void (*f3x3_4u8)(Imaging imOut, Imaging im, const float *kernel, float offset);
     void (*f5x5_4u8)(Imaging imOut, Imaging im, const float *kernel, float offset);
+    /* integer coefficients small enough for 16-bit sums, as Filter.c's
+       filter_small_kernel() reduces them; size is 3 or 5, any pixel size */
+    void (*ismall)(
+        Imaging imOut,
+        Imaging im,
+        const INT16 *kernel,
+        INT32 offset,
+        int precision,
+        int size
+    );
 } ImagingSIMDFilterKernels;
 
 /* Integer box downscale (ReduceSIMD.c), 8-bit images with 4-byte (u8x4)
@@ -367,7 +377,7 @@ typedef struct {
    of a 4-byte row, the split of a row into planes (NULL skips a band),
    the merge of planes into pixels (NULL is a band of zeros); pixels done
    back. Paste (PasteSIMD.c): ink blended through an L mask. Drawing
-   (DrawSIMD.c): a fill with an ink, and an RGBA ink blended into a row. */
+   (DrawSIMD.c): an RGBA ink blended into a row. */
 typedef struct {
     int (*lut_8_8)(Imaging imOut, Imaging imIn, const UINT8 *table);
     int (*lut_nx8)(Imaging imOut, Imaging imIn, const UINT8 *table, int bands);
@@ -396,7 +406,6 @@ typedef struct {
 } ImagingSIMDPasteKernels;
 
 typedef struct {
-    int (*fill32)(INT32 *p, int n, INT32 ink);
     int (*hline_rgba)(UINT8 *out, int n, const UINT8 *ink);
 } ImagingSIMDDrawKernels;
 

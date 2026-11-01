@@ -52,5 +52,6 @@ static const ImagingSIMDFilterKernels filter_simd_kernels = {
     .i5x5_4u8 = ImagingFilter5x5i_4u8_simd,
     .f3x3_4u8 = filter_3x3f_4u8_neon,
     .f5x5_4u8 = filter_5x5f_4u8_neon,
+    .ismall = ImagingFilterSmall_simd,
 #endif
 };

@@ -146,6 +146,52 @@ def test_mode_filter_3(width: int, height: int) -> None:
     assert im.filter(ImageFilter.ModeFilter(3)).tobytes() == _mode3_reference(im)
 
 
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA"))
+@pytest.mark.parametrize("width", (3, 4, 7, 8, 9, 19, 20, 21, 22, 37, 66))
+def test_integer_kernels_with_power_of_two_scale(mode: str, width: int) -> None:
+    # Kernels with a power-of-two scale are exact in floats, so the
+    # definition, sum(k * p) / scale + offset rounded half up and clipped,
+    # can be computed here; arm64 runs them with small coefficients in
+    # 16-bit sums (filter_small_kernel() in Filter.c).
+    rnd = random.Random(width)
+    bands = len(mode)
+    height = 9
+    data = bytes(
+        rnd.choice((0, 255, rnd.randrange(256))) for _ in range(width * height * bands)
+    )
+    im = Image.frombytes(mode, (width, height), data)
+    kernels: list[ImageFilter.BuiltinFilter] = [
+        ImageFilter.SHARPEN(),
+        ImageFilter.FIND_EDGES(),
+        ImageFilter.EDGE_ENHANCE(),
+        ImageFilter.EDGE_ENHANCE_MORE(),
+        ImageFilter.EMBOSS(),
+        ImageFilter.CONTOUR(),
+        ImageFilter.BLUR(),
+        ImageFilter.Kernel((3, 3), [1, -2, 1, -2, 8, -2, 1, -2, 1], 4, 7),
+        ImageFilter.Kernel((3, 3), [0, 1, 0, 1, -4, 1, 0, 1, 0], 1, -3),
+        ImageFilter.Kernel((5, 5), [1] * 25, 32, 0),
+    ]
+    for flt in kernels:
+        (kw, kh), scale, offset, kernel = flt.filterargs
+        r = kw // 2
+        out = im.filter(flt).tobytes()
+        for y in range(r, height - r):
+            for x in range(r, width - r):
+                for b in range(bands):
+                    # kernel row 0 is the bottom row of the window, as in Filter.c
+                    s = sum(
+                        kernel[j * kw + i]
+                        * data[((y + r - j) * width + x - r + i) * bands + b]
+                        for j in range(kh)
+                        for i in range(kw)
+                    )
+                    expected = min(
+                        255, max(0, (2 * s + 2 * offset * scale + scale) // (2 * scale))
+                    )
+                    assert out[(y * width + x) * bands + b] == expected, (flt, x, y, b)
+
+
 @pytest.mark.parametrize(
     "width", (5, 6, 7, 9, 17, 21, 23, *(w for w, _ in SHAPES.values()))
 )
