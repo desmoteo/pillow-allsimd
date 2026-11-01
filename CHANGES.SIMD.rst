@@ -36,6 +36,11 @@ Based on Pillow 13.0.0
   range are interpolated two pixels at a time in 16-bit lanes
   (``sqdmulh``), with the scalar code's pixels: 1.63x (52 to 32 ms on a
   2560x1600 image on a Cortex-A78)
+- arm64: resizing RGB and RGBA images takes 8 to 15% fewer cycles (15%
+  when enlarging with Lanczos): the horizontal kernel's tap loop went
+  from 17 to 10 instructions per four taps, and fast mode's vertical
+  kernel keeps its row pointers and weights in registers for up to 16
+  taps. The same pixels
 - Pasting through a mask has vector kernels on x86-64 and arm64:
   ``paste(im, box, mask)`` with an L mask, ``Image.composite()``, and
   an RGBA image pasted through its own alpha. On a 2560x1600 RGB image

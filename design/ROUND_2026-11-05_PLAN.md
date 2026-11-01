@@ -352,3 +352,34 @@ so everything here is user-mode cycles per run, read with
   build; its accuracy against the float reference, the condition this
   plan set, was not measured. A candidate still.
 
+### 6. arm64 resampling (2026-11-05)
+
+Started from the disassembly of the horizontal kernel, as planned, and it
+was not the four-row structure that cost.
+
+- **Horizontal** (`neon_resample_horiz_px`, 72% of a 1/4 bicubic): with
+  an `int` index GCC computed four sign-extended addresses per step and
+  loaded each 16-bit coefficient by itself: 17 instructions for four
+  taps. With pointers that advance and one load of the four
+  coefficients, multiplied by lane (`smlal` by element): 10. Instructions
+  of the whole resize 108.6 to 80.0 million, cycles 27.0 to 25.3: the
+  loop went from instruction-bound (4.0 a cycle) to the multiplier (3.2),
+  one `smlal` per tap and pixel on the A78's one pipe, which is where it
+  stays without another definition of the arithmetic.
+- **Vertical, fast mode** (`resample_fast_vrow_simd`, a third of an
+  enlargement): the loop over the taps loaded a row pointer and a weight
+  for every tap of every 16 bytes. For 2 to 16 taps the loop is now
+  compiled with the count as a constant, pointers and weights in
+  registers: 11 instructions per tap and step to 6. Lanczos x1.5: 116.8
+  to 104.3 million cycles.
+- Together, cycles on 2560x1600 (HEAD to now): RGB 1/4 bicubic 26.97 to
+  24.43 (1.10x), RGBA 34.18 to 31.74 (1.08x), RGB 1/2 bilinear 22.73 to
+  21.09 (1.08x), RGB x1.5 Lanczos 120.47 to 105.22 (1.15x). L is another
+  kernel and unchanged.
+- The same pixels: `resizecheck.py` (nine modes, five filters, sizes,
+  boxes) gives one hash for HEAD, the change and the scalar build, in
+  fast and in exact mode.
+- The earlier four-row kernel that "measured no gain" shared the
+  coefficients between rows; the coefficients' loads were a small part
+  of what this found.
+

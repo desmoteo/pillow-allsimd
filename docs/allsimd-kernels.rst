@@ -295,19 +295,32 @@ NEON has no pair-summing multiply, so the horizontal kernel takes one tap
 per instruction and four channels per lane group:
 ``neon_resample_horiz_px()`` loads 16 bytes, widens them to two vectors of
 eight 16-bit values (``vmovl_u8``), and multiply-accumulates each pixel's
-four channels by its weight as a scalar (``vmlal_n_s16``), alternating
-between two accumulators so that the two chains of dependent adds run in
-parallel:
+four channels by its weight, a lane of the four weights loaded together
+(``vmlal_lane_s16``), alternating between two accumulators so that the
+two chains of dependent adds run in parallel:
 
 .. code-block:: c
 
-    uint8x16_t source = vld1q_u8(in + x * 4);
-    int16x8_t lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(source)));
-    int16x8_t hi = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(source)));
-    sss = vmlal_n_s16(sss, vget_low_s16(lo), k[x]);
-    sss1 = vmlal_n_s16(sss1, vget_high_s16(lo), k[x + 1]);
-    sss = vmlal_n_s16(sss, vget_low_s16(hi), k[x + 2]);
-    sss1 = vmlal_n_s16(sss1, vget_high_s16(hi), k[x + 3]);
+    for (; end - k >= 4; k += 4, in += 16) {
+        uint8x16_t source = vld1q_u8(in);
+        int16x4_t kv = vld1_s16(k);
+        int16x8_t lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(source)));
+        int16x8_t hi = vreinterpretq_s16_u16(vmovl_high_u8(source));
+        sss = vmlal_lane_s16(sss, vget_low_s16(lo), kv, 0);
+        sss1 = vmlal_high_lane_s16(sss1, lo, kv, 1);
+        sss = vmlal_lane_s16(sss, vget_low_s16(hi), kv, 2);
+        sss1 = vmlal_high_lane_s16(sss1, hi, kv, 3);
+    }
+
+The pointers that advance are the point (2026-11-05). The loop had an
+``int`` index and a weight per multiply (``vmlal_n_s16(sss, …, k[x])``),
+and GCC made of it four sign-extended address computations and four
+scalar loads beside the pixels' one: 17 instructions for four taps, in a
+loop that ran at four instructions per cycle. As above it is 10. A 1/4
+bicubic resize of 2560x1600 RGB went from 108.6 to 80.0 million
+instructions and from 27.0 to 25.3 million cycles on the Cortex-A78:
+less than the instructions, because the loop now waits for the one
+vector multiplier, a ``smlal`` per tap and pixel.
 
 The sums are added at the end, shifted (``vshlq_s32`` by a negative
 count) and narrowed with saturation to 16 bits and to bytes
@@ -316,6 +329,16 @@ count) and narrowed with saturation to 16 bits and to bytes
 kernel widens 32 bytes of each source row and accumulates them in eight
 vectors, 32 bytes of output per step, with a 16-byte and a 4-byte tail.
 Rows are read in order, as on x86.
+
+Fast mode's vertical kernel (``resample_fast_vrow_simd()``, 16-bit rows
+and weights, ``sqrdmulh``) is compiled for each tap count from 2 to 16
+as a constant (``resample_fast_vrow_taps()``): the general loop loaded a
+row pointer and a weight for every tap of every 16 bytes, 11
+instructions per tap and step, and with the count known both stay in
+registers, 6. Enlarging by 1.5 with Lanczos, where the vertical pass is
+a third of the time: 116.8 to 104.3 million cycles. With the horizontal
+change, RGB and RGBA resizes take 8 to 15% fewer cycles, the same
+pixels.
 
 The portable vertical kernel is written to be vectorized at ``-O2``: it
 sums chunks of 64 bytes into a fixed array of 32-bit sums, and GCC turns

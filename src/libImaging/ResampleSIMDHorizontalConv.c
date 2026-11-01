@@ -894,33 +894,41 @@ RH(neon_resample_pack)(int32x4_t sss, int coefs_precision) {
 
 #if !defined(RESAMPLE_OUT16)
 
-/* Adds sum(pixel[x] * k[x]) for one output pixel of a 4-byte row to sss. */
+/* Adds sum(pixel[x] * k[x]) for one output pixel of a 4-byte row to sss.
+   The pointers advance and the four coefficients of a step are one load,
+   multiplied by lane: with an int index GCC computed four sign-extended
+   addresses and loaded each coefficient by itself, 17 instructions for
+   four taps where this is 10, in a loop that runs at four instructions
+   per cycle on a Cortex-A78. The same products into the same two sums. */
 static inline int32x4_t
 neon_resample_horiz_px(const UINT8 *in, const INT16 *k, int xmax, int32x4_t sss) {
-    int x = 0;
     int32x4_t sss1 = vdupq_n_s32(0);
+    const INT16 *end = k + xmax;
 
-    for (; x < xmax - 3; x += 4) {
-        uint8x16_t source = vld1q_u8(in + x * 4);
+    for (; end - k >= 4; k += 4, in += 16) {
+        uint8x16_t source = vld1q_u8(in);
+        int16x4_t kv = vld1_s16(k);
         int16x8_t lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(source)));
-        int16x8_t hi = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(source)));
-        sss = vmlal_n_s16(sss, vget_low_s16(lo), k[x]);
-        sss1 = vmlal_n_s16(sss1, vget_high_s16(lo), k[x + 1]);
-        sss = vmlal_n_s16(sss, vget_low_s16(hi), k[x + 2]);
-        sss1 = vmlal_n_s16(sss1, vget_high_s16(hi), k[x + 3]);
+        int16x8_t hi = vreinterpretq_s16_u16(vmovl_high_u8(source));
+        sss = vmlal_lane_s16(sss, vget_low_s16(lo), kv, 0);
+        sss1 = vmlal_high_lane_s16(sss1, lo, kv, 1);
+        sss = vmlal_lane_s16(sss, vget_low_s16(hi), kv, 2);
+        sss1 = vmlal_high_lane_s16(sss1, hi, kv, 3);
     }
-    for (; x < xmax - 1; x += 2) {
-        int16x8_t pix = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(in + x * 4)));
-        sss = vmlal_n_s16(sss, vget_low_s16(pix), k[x]);
-        sss1 = vmlal_n_s16(sss1, vget_high_s16(pix), k[x + 1]);
+    if (end - k >= 2) {
+        int16x8_t pix = vreinterpretq_s16_u16(vmovl_u8(vld1_u8(in)));
+        sss = vmlal_n_s16(sss, vget_low_s16(pix), k[0]);
+        sss1 = vmlal_high_n_s16(sss1, pix, k[1]);
+        k += 2;
+        in += 8;
     }
-    for (; x < xmax; x++) {
+    if (end - k >= 1) {
         UINT32 v;
-        memcpy(&v, in + x * 4, sizeof(v));
+        memcpy(&v, in, sizeof(v));
         int16x4_t pix = vreinterpret_s16_u16(
             vget_low_u16(vmovl_u8(vreinterpret_u8_u32(vdup_n_u32(v))))
         );
-        sss = vmlal_n_s16(sss, pix, k[x]);
+        sss = vmlal_n_s16(sss, pix, k[0]);
     }
     return vaddq_s32(sss, sss1);
 }
