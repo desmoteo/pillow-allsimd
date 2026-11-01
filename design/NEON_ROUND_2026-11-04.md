@@ -228,3 +228,15 @@ and the fast YCbCr kernels (1.5 instructions per cycle, multiplies of
 pipe as the filters were; for YCbCr a 16-bit form would change the fast
 kernels' defined result on every build, which fast mode allows but a
 release note must say. The alpha composite's division stays.
+
+## The test suite on the Jetson
+
+`checks/simd_test_remote.sh` at dbf572caf (2026-11-05), Python 3.13 in
+the test container: the scalar build 8,464 passed, 35 skipped, 3 expected
+failures; the NEON build 8,466 passed, 33 skipped, 3 expected failures,
+the new reference tests for the small-coefficient kernels and the 3x3
+mode filter among them. The comparison of the two builds' outputs lists
+the same seven operations, with the same counts, as the run of
+2026-10-31 at 9e061d4e6: the two filters with rounded coefficients
+(`SMOOTH_MORE` on RGB and L, `DETAIL`) and the four that go through RGB
+to L. None of the filters the new kernel takes is among them.
