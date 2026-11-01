@@ -37,6 +37,21 @@ Based on Pillow 13.0.0
   (``ModeFilterSIMD.c``): the nine window bytes counted against each
   other and the winner picked by a packed maximum, the same pixels as the
   histogram code; 14x on a 2560x1600 L image on AVX2
+- arm64: kernel filters with a power-of-two scale (``SHARPEN``,
+  ``FIND_EDGES``, ``EDGE_ENHANCE``, ``EMBOSS``, ``CONTOUR``, ``BLUR`` and
+  kernels of one's own like them) are computed with their small integer
+  coefficients in 16-bit sums, adds for coefficients of one, where the
+  general kernel pays four multiplies per tap on a core with one
+  multiplier pipe: 1.8x on RGB, 1.5x on L on a Jetson Orin, the same
+  pixels
+- Drawing: the fill of a span is a loop in ``Draw.c`` again, four pixels
+  per step, instead of a kernel called through the table once per span,
+  which the arm64 measurement of this release found to cost 30% of the
+  filled rectangles and 12% of the wide lines there (and 7% of the lines
+  on x86-64); the same pixels. The polygon code's rounding no longer
+  calls ``floor`` and ``ceil``, which are library calls where the file is
+  compiled without SSE4.1, as in the x86-64 wheels: another 5% on lines
+  and outlines there, the same pixels
 - The dithered conversions (``convert("1")`` and ``convert("P")`` with
   Floyd-Steinberg dithering) do two rows at a time, the second two
   pixels behind the first, so that the two rows' chains of error terms

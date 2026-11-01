@@ -247,3 +247,8 @@ the outputs; raw results in `bench-results/baseline-2026-11-04/` and
   36.0 ms (1.62x), the benchmark's `logical_and` on mode 1 (two
   dithered conversions and the and) 1.47x. Four rows would overlap more,
   at the cost of readability; left here.
+- **arm64 (2026-11-04, later the same day).** The Jetson A/B of HEAD
+  against the pre-refactor commit: the NEON and scalar builds hash every
+  area identically except the PNG bytes (libdeflate), and the 111 cases
+  average 1.01x with quantize mediancut 2.06x and PNG encode 3.12x
+  ([NEON_ROUND_2026-11-04.md](NEON_ROUND_2026-11-04.md)).
