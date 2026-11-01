@@ -31,7 +31,7 @@ Main finding: the largest cheap wins are not new instruction sets. They are ship
 ## 1. Gaps in the current CPU path
 
 ### 1.1 No runtime dispatch (highest value)
-- [setup.py:1082](setup.py#L1082) compiles `PIL._imaging` with `-msse4` only.
+- [setup.py:1082](../setup.py#L1082) compiles `PIL._imaging` with `-msse4` only.
 - AVX2 code is guarded by `#if defined(__AVX2__)` (AlphaComposite, ColorLUT, Convert, Resample, Filter-int), but the flag is never passed, so **shipped wheels never contain the AVX2 paths**.
 - Building the whole module with `-mavx2` instead would crash on pre-Haswell CPUs.
 - Fix: compile the hot kernels in separate translation units with per-file flags, then pick at import or first call.

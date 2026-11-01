@@ -37,7 +37,7 @@ For Pillow itself, please refer to its
   the SIMD consistency tests and per-kernel output hashes that compare the
   builds (`checks/simd_hashes.py`). The portable build also passes the
   suite on riscv64, ppc64le, s390x, armv7 and 32-bit x86, under QEMU
-  ([OTHER_ARCHITECTURES.md](OTHER_ARCHITECTURES.md)).
+  ([OTHER_ARCHITECTURES.md](design/OTHER_ARCHITECTURES.md)).
 - [API documentation][allsimd-docs] (Pillow's, with this fork's additions)
   and [benchmarks][allsimd-perf-page] against Pillow, Pillow-SIMD, OpenCV,
   libvips and ImageMagick.
@@ -141,7 +141,7 @@ The mode filter, histograms, `ImageChops.offset`, floodfill, polygon fills
 and text rendering (per-font caches of glyphs and advances) have faster
 portable C code on every architecture.
 Other architectures build the portable C code (tested on riscv64, ppc64le,
-s390x, armv7 and 32-bit x86: [OTHER_ARCHITECTURES.md](OTHER_ARCHITECTURES.md)).
+s390x, armv7 and 32-bit x86: [OTHER_ARCHITECTURES.md](design/OTHER_ARCHITECTURES.md)).
 
 
 ## Exact and fast modes
@@ -161,38 +161,39 @@ cache images by their content across versions. The
 AVX2 and NEON builds in both modes. See the
 [fast mode reference](https://desmoteo.github.io/pillow-allsimd/reference/fast_mode.html)
 in the [API documentation][allsimd-docs] of this
-branch, and [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md).
+branch, and [SIMD_FAST_KERNELS.md](design/SIMD_FAST_KERNELS.md).
 
 
 ## Design documents
 
-Notes on the SIMD work, kept with the code they describe:
+Notes on the SIMD work, in [design/](design/), kept with the code they
+describe:
 
-- [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md),
-  [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md) and
-  [ACCELERATION_OPTIONS_ASSESSMENT.md](ACCELERATION_OPTIONS_ASSESSMENT.md):
+- [X86_SIMD_ASSESSMENT.md](design/X86_SIMD_ASSESSMENT.md),
+  [ARM64_SIMD_ASSESSMENT.md](design/ARM64_SIMD_ASSESSMENT.md) and
+  [ACCELERATION_OPTIONS_ASSESSMENT.md](design/ACCELERATION_OPTIONS_ASSESSMENT.md):
   the starting assessments of the x86 kernels, the arm64 port and other
   acceleration options.
-- [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md): Pillow 12.3 and 13.0 as a
+- [UPSTREAM_13_REVIEW.md](design/UPSTREAM_13_REVIEW.md): Pillow 12.3 and 13.0 as a
   source of fixes and optimizations.
-- [CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md),
-  [PROFILE_ASSESSMENT.md](PROFILE_ASSESSMENT.md) and
-  [PROFILE_TABLES.md](PROFILE_TABLES.md): where the time goes, from
+- [CALLGRIND_PROFILE.md](design/CALLGRIND_PROFILE.md),
+  [PROFILE_ASSESSMENT.md](design/PROFILE_ASSESSMENT.md) and
+  [PROFILE_TABLES.md](design/PROFILE_TABLES.md): where the time goes, from
   instruction counts, cache misses and timings over the whole API.
-- [PERFORMANCE_GAPS.md](PERFORMANCE_GAPS.md): where OpenCV and libvips are
+- [PERFORMANCE_GAPS.md](design/PERFORMANCE_GAPS.md): where OpenCV and libvips are
   still faster, and why.
-- [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md): how OpenCV,
+- [OTHER_LIBRARIES_KERNELS.md](design/OTHER_LIBRARIES_KERNELS.md): how OpenCV,
   KleidiCV, Carotene and libvips implement those kernels, approximate ones
   included, measured for speed and accuracy.
-- [APPROXIMATE_KERNELS_PLAN.md](APPROXIMATE_KERNELS_PLAN.md): the plan of
+- [APPROXIMATE_KERNELS_PLAN.md](design/APPROXIMATE_KERNELS_PLAN.md): the plan of
   fast mode, approximate kernels beside the exact ones, chosen at run time
   (opt-in in the plan, on by default now).
-- [SIMD_FAST_KERNELS.md](SIMD_FAST_KERNELS.md): the fast-mode kernels, how
+- [SIMD_FAST_KERNELS.md](design/SIMD_FAST_KERNELS.md): the fast-mode kernels, how
   each keeps its results the same on every build, their accuracy and speed.
-- [OTHER_ARCHITECTURES.md](OTHER_ARCHITECTURES.md): RISC-V, POWER, s390x,
+- [OTHER_ARCHITECTURES.md](design/OTHER_ARCHITECTURES.md): RISC-V, POWER, s390x,
   32-bit ARM and x86: the upstream requests, the RISC-V vector pull request,
   and the portable builds tested on each.
-- [SIMD_EXPLAINER_PLAN.md](SIMD_EXPLAINER_PLAN.md): the outline of a detailed
+- [SIMD_EXPLAINER_PLAN.md](design/SIMD_EXPLAINER_PLAN.md): the outline of a detailed
   explanation of every optimization on both architectures.
 
 

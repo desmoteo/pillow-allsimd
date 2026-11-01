@@ -18,8 +18,8 @@ Branch assessed: `simd/master` (HEAD `788bf910f`). Assessment is from static cod
 ## Current state
 
 ### Build and dispatch
-- [setup.py:1082](setup.py#L1082) hard-codes `extra_compile_args=["-msse4"]` for `PIL._imaging`. GCC/Clang on arm64 reject this flag (`unrecognized command-line option`), so the build fails before any code is compiled.
-- [ImagingSIMD.h](src/libImaging/ImagingSIMD.h) is the only intrinsics gate.
+- [setup.py:1082](../setup.py#L1082) hard-codes `extra_compile_args=["-msse4"]` for `PIL._imaging`. GCC/Clang on arm64 reject this flag (`unrecognized command-line option`), so the build fails before any code is compiled.
+- [ImagingSIMD.h](../src/libImaging/ImagingSIMD.h) is the only intrinsics gate.
   - It defines `__SSE4_2__` for MSVC (`_M_X64`) and includes `emmintrin.h`, `smmintrin.h` and, if `__AVX2__`, `immintrin.h`.
   - It has no arm branch, and no `arm_neon.h`.
 - There is **no runtime CPU dispatch**.

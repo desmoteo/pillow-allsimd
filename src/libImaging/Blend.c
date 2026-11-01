@@ -17,7 +17,7 @@
 
 #include "Imaging.h"
 
-/* Fast mode (SIMD_FAST_KERNELS.md): in1 + (in2 - in1) a for a = a15 / 2^15,
+/* Fast mode (design/SIMD_FAST_KERNELS.md): in1 + (in2 - in1) a for a = a15 / 2^15,
    rounded half up, (d a15 + 2^14) >> 15: what pmulhrsw and vqrdmulh compute,
    so every build gives the same bytes. The result lies between in1 and in2. */
 static void

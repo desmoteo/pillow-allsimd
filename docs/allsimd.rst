@@ -35,7 +35,7 @@ State
   Pillow's test suite on every build, the SIMD consistency tests, and output
   hashes per kernel that compare the builds (``checks/simd_hashes.py``). The
   portable build also passes the suite on riscv64, ppc64le, s390x, armv7 and
-  32-bit x86, under QEMU (``OTHER_ARCHITECTURES.md`` in the repository).
+  32-bit x86, under QEMU (``design/OTHER_ARCHITECTURES.md`` in the repository).
 * `Benchmarks <https://desmoteo.github.io/pillow-allsimd-perf/>`_ against
   Pillow, Pillow-SIMD, OpenCV, libvips and ImageMagick, exact and fast mode.
 
