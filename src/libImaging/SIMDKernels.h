@@ -193,6 +193,32 @@ typedef struct {
     );
 } ImagingSIMDColorLUTKernels;
 
+/* Geometry (GeometrySIMD.c): the transposes (rotate 90 and 270, transpose,
+   transverse) and row flips (flip left-right, rotate 180) of 8-bit and
+   32-bit images, returning 0 for other pixel sizes; the bilinear and
+   bicubic transform filters for 8-bit images with 3 or 4 bands; and
+   ImagingGenericTransform's tile loops with those filters, returning 0
+   for the images, filters and transforms they don't take. */
+typedef struct {
+    int (*transpose)(Imaging imOut, Imaging imIn, int flipx, int flipy);
+    int (*flip_rows)(Imaging imOut, Imaging imIn, int flipy);
+    /* ImagingTransformFilter, declared later in Imaging.h */
+    int (*bilinear_rgb)(void *out, Imaging im, double x, double y);
+    int (*bicubic_rgb)(void *out, Imaging im, double x, double y);
+    int (*transform)(
+        Imaging imOut,
+        Imaging imIn,
+        int x0,
+        int y0,
+        int x1,
+        int y1,
+        int method,
+        void *transform_data,
+        int filterid,
+        int fill
+    );
+} ImagingSIMDGeometryKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -203,6 +229,7 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDResampleKernels *resample;
     const ImagingSIMDConvertKernels *convert;
     const ImagingSIMDColorLUTKernels *colorlut;
+    const ImagingSIMDGeometryKernels *geometry;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */
