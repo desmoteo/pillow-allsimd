@@ -2880,6 +2880,12 @@ Appendix C: the tools
   libraries, for other platforms too (QEMU);
   ``checks/simd_bench_remote.sh``: builds and benchmarks a git ref on a
   remote x86 or arm64 machine.
+* ``checks/simd_dbench.sh``: builds the working tree in the benchmark
+  image, at the ``-O3`` of the published wheels, and runs a script with
+  it on one core; ``checks/simd_counters.py``: user-mode cycles,
+  instructions, cache and branch misses per run of sixty cases, read
+  with ``perf_event_open`` around each run, so they hold on a loaded
+  machine; its ``--table`` compares builds or tiers.
 * ``checks/simd_bench.py``: times operations across several builds, each
   in its own process; ``checks/simd_callgrind.py`` and
   ``checks/simd_allocs.py``: instructions, cache misses and allocations

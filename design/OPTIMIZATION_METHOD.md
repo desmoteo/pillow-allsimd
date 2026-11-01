@@ -158,7 +158,8 @@ settle.
 [ACCELERATION_OPTIONS_ASSESSMENT.md](ACCELERATION_OPTIONS_ASSESSMENT.md)
 as a free 5 to 15% on the scalar parts and never measured. A local
 `-fprofile-generate` build trained on the benchmark, then
-`-fprofile-use`, against the plain `-O3` build in `dbench.sh`, would
+`-fprofile-use`, against the plain `-O3` build of `checks/simd_dbench.sh`,
+would
 settle whether it is worth the complexity in the wheel build. The kernels
 are hand-written and branch-light, so the gain, if any, is in the codecs,
 drawing and the Python-facing C.
@@ -211,8 +212,8 @@ What the fork already does, and keeps doing:
   and turbo off on the laptop; best of several interleaved rounds (`perf.py --rounds`), old and new builds in
   the same run, never two separate runs compared (they drift 5 to 10%).
 - `-O3` builds in the benchmark image for every A/B
-  (`bench-results/dbench.sh`, `round4/x86ab.sh`, `jetson-ab.sh`,
-  `neon/variants-jetson.sh`).
+  (`checks/simd_dbench.sh`; the local A/B scripts in `bench-results/`
+  do the same on the Jetson).
 - `rm -rf build` before rebuilding a kept source tree: setuptools checks
   only the including file's timestamp, so an edited kernel file is not
   rebuilt otherwise.
@@ -220,13 +221,14 @@ What the fork already does, and keeps doing:
   and the HSV and filter checks in the A/B scripts), so a faster kernel
   that changed a pixel is caught in the same run.
 
-Added on 2026-11-04, for a machine that is not idle: user-mode cycle and
-instruction counts per run, read with `perf_event_open` around each call
-(`bench-results/neon/prof/cyc.py`, run for two builds interleaved by
-`bench-results/jetson-cycles.sh`, compared by `jetson-cycles-cmp.py`).
-They count only while the process runs, so other load on the machine
-reaches them only through cache and predictor pollution, and the minimum
-over many runs removes most of that. Instruction counts are near
+Added on 2026-11-04, for a machine that is not idle: user-mode cycles,
+instructions, last-level cache misses and branch misses per run, read
+with `perf_event_open` around each call (`checks/simd_counters.py`; its
+`--table` compares tiers or an old and a new build, and the per-run
+instructions per cycle and misses per instruction are the stage-2
+evidence). They count only while the process runs, so other load on the
+machine reaches them only through cache and predictor pollution, and the
+minimum over many runs removes most of that. Instruction counts are near
 deterministic; cycles are the real cost. Check the machine first all the
 same (`uptime`, `tegrastats` on the Orin): on 2026-11-04 the Orin was at
 2% idle under other people's containers, and wall-clock A/Bs were not
