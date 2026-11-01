@@ -24,6 +24,7 @@
  * FIXME: Implement image processing gradient filters
  */
 
+#include <math.h>
 #include <stdint.h>
 #include "Imaging.h"
 
@@ -53,28 +54,6 @@ clip32(float in) {
     // to avoid incorrect overflow to INT_MIN.
     return in >= INT32_MAX_F ? INT32_MAX : (INT32)in;
 }
-
-/* 5 is number of bits enought to account all kernel coefficients (1<<5 > 25).
-   8 is number of bits in result.
-   Any coefficients delta smaller than this precision will have no effect. */
-#define PRECISION_BITS (8 + 5)
-
-#if defined(IMAGING_SIMD_SSE4)
-#include "FilterSIMD_3x3f_u8.c"
-#include "FilterSIMD_3x3f_4u8.c"
-#include "FilterSIMD_3x3i_4u8.c"
-#include "FilterSIMD_5x5f_u8.c"
-#include "FilterSIMD_5x5f_4u8.c"
-#include "FilterSIMD_5x5i_4u8.c"
-#endif
-#if defined(IMAGING_SIMD_NEON)
-#include <math.h>
-#include "FilterSIMD_NxNf.c"
-#endif
-#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
-#include "FilterSIMD_NxNi.c"
-#define FILTER_SIMD
-#endif
 
 Imaging
 ImagingExpand(Imaging imIn, int margin) {
@@ -529,7 +508,6 @@ ImagingFilter5x5(Imaging imOut, Imaging im, const float *kernel, float offset) {
     memcpy(imOut->image[y + 1], im->image[y + 1], im->linesize);
 }
 
-#if defined(FILTER_SIMD)
 /* The n coefficients and the offset scaled by 1 << precision for the
    integer kernels. Returns 0 if a coefficient doesn't fit 16 bits, or with
    exact, if one of them or the offset isn't an integer once scaled. */
@@ -571,11 +549,11 @@ filter_int_kernel(
     return 1;
 }
 
-/* 8-bit images: integer kernels when the coefficients fit 16 bits,
-   float kernels otherwise. Returns 0 if the image has to
-   go to the generic code. */
+/* 8-bit images through the SIMD kernels of the active tier (FilterSIMD.c):
+   integer kernels when the coefficients fit 16 bits, float kernels
+   otherwise. Returns 0 if the image has to go to the generic code. */
 static int
-ImagingFilterSIMD(
+filter_simd(
     Imaging imOut,
     Imaging im,
     int xsize,
@@ -583,13 +561,27 @@ ImagingFilterSIMD(
     const FLOAT32 *kernel,
     FLOAT32 offset
 ) {
+    const ImagingSIMDFilterKernels *simd = ImagingSIMD->filter;
+    void (*ikernel)(Imaging, Imaging, const INT16 *, INT32, int);
+    void (*fkernel)(Imaging, Imaging, const float *, float);
     int fast_path = 1;
-    int precision = PRECISION_BITS;
+    int precision = IMAGING_FILTER_PRECISION_BITS;
     INT16 norm_kernel[25];
     INT32 norm_offset;
 
-    /* The coefficients in 16 bits, scaled by 1 << PRECISION_BITS and
-       rounded. If one doesn't fit, as coefficients of 4 and more don't
+    if (xsize == 3) {
+        ikernel = im->image8 ? simd->i3x3_u8 : simd->i3x3_4u8;
+        fkernel = im->image8 ? simd->f3x3_u8 : simd->f3x3_4u8;
+    } else {
+        ikernel = im->image8 ? simd->i5x5_u8 : simd->i5x5_4u8;
+        fkernel = im->image8 ? simd->f5x5_u8 : simd->f5x5_4u8;
+    }
+    if (!ikernel && !fkernel) {
+        return 0;
+    }
+
+    /* The coefficients in 16 bits, scaled by 1 << IMAGING_FILTER_PRECISION_BITS
+       and rounded. If one doesn't fit, as coefficients of 4 and more don't
        (FIND_EDGES, CONTOUR, EDGE_ENHANCE), the largest precision at which
        all of them and the offset are exact: the sums are then exact, and
        rounded half up as by the code without SIMD, so the result is the
@@ -597,7 +589,8 @@ ImagingFilterSIMD(
     if (!filter_int_kernel(
             kernel, xsize * ysize, offset, precision, 0, norm_kernel, &norm_offset
         )) {
-        for (precision = PRECISION_BITS - 1; precision >= 1; precision--) {
+        for (precision = IMAGING_FILTER_PRECISION_BITS - 1; precision >= 1;
+             precision--) {
             if (filter_int_kernel(
                     kernel,
                     xsize * ysize,
@@ -613,56 +606,19 @@ ImagingFilterSIMD(
         fast_path = precision >= 1;
     }
 
-#if defined(IMAGING_SIMD_SSE4)
-    if (xsize == 3) {
-        if (im->image8 && fast_path) {
-            ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset, precision);
-        } else if (im->image8) {
-            ImagingFilter3x3f_u8(imOut, im, kernel, offset);
-        } else if (fast_path) {
-            ImagingFilter3x3i_4u8(imOut, im, norm_kernel, norm_offset, precision);
-        } else {
-            ImagingFilter3x3f_4u8(imOut, im, kernel, offset);
-        }
-    } else {
-        if (im->image8 && fast_path) {
-            ImagingFilter5x5i_u8_simd(imOut, im, norm_kernel, norm_offset, precision);
-        } else if (im->image8) {
-            ImagingFilter5x5f_u8(imOut, im, kernel, offset);
-        } else if (fast_path) {
-            ImagingFilter5x5i_4u8(imOut, im, norm_kernel, norm_offset, precision);
-        } else {
-            ImagingFilter5x5f_4u8(imOut, im, kernel, offset);
-        }
-    }
-#else
-    if (!fast_path) {
-        /* 1-byte images keep the generic code, which GCC vectorises well:
-           on the Jetson Orin it was 1.5x faster than the NEON float kernel
-           (CONTOUR on L: 15.5 vs 22.9 ms). 4-byte images gain 1.7x. */
-        if (im->image8) {
+    if (fast_path) {
+        if (!ikernel) {
             return 0;
         }
-        ImagingFilterNxNf_neon(imOut, im, kernel, offset, xsize, 4);
-        return 1;
-    }
-    if (xsize == 3) {
-        if (im->image8) {
-            ImagingFilter3x3i_u8_simd(imOut, im, norm_kernel, norm_offset, precision);
-        } else {
-            ImagingFilter3x3i_4u8_simd(imOut, im, norm_kernel, norm_offset, precision);
-        }
+        ikernel(imOut, im, norm_kernel, norm_offset, precision);
     } else {
-        if (im->image8) {
-            ImagingFilter5x5i_u8_simd(imOut, im, norm_kernel, norm_offset, precision);
-        } else {
-            ImagingFilter5x5i_4u8_simd(imOut, im, norm_kernel, norm_offset, precision);
+        if (!fkernel) {
+            return 0;
         }
+        fkernel(imOut, im, kernel, offset);
     }
-#endif
     return 1;
 }
-#endif
 
 Imaging
 ImagingFilter(Imaging im, int xsize, int ysize, const FLOAT32 *kernel, FLOAT32 offset) {
@@ -690,11 +646,9 @@ ImagingFilter(Imaging im, int xsize, int ysize, const FLOAT32 *kernel, FLOAT32 o
     MUTEX_LOCK(&im->mutex);
 
     int done = 0;
-#if defined(FILTER_SIMD)
     if (im->type == IMAGING_TYPE_UINT8) {
-        done = ImagingFilterSIMD(imOut, im, xsize, ysize, kernel, offset);
+        done = filter_simd(imOut, im, xsize, ysize, kernel, offset);
     }
-#endif
     if (!done) {
         if (xsize == 3) {
             ImagingFilter3x3(imOut, im, kernel, offset);

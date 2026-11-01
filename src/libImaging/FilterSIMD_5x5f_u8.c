@@ -1,4 +1,4 @@
-void
+static void
 ImagingFilter5x5f_u8(Imaging imOut, Imaging im, const float *kernel, float offset) {
 #define MM_KERNEL1x5_LOAD(row, x)                            \
     pix0##row = _mm_cvtepi32_ps(mm_cvtepu8_epi32(&in2[x]));  \

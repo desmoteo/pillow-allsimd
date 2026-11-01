@@ -213,13 +213,15 @@ ImagingFilterNxN_simd(
 #undef FILTER_STORE16
 
 /* Separate entry points so the compiler unrolls each size fully, and
-   with PRECISION_BITS as a constant where it is the precision: NEON
+   with IMAGING_FILTER_PRECISION_BITS as a constant where it is the precision: NEON
    then shifts and narrows in one instruction (6% faster on the Jetson). */
-#define FILTER_NxN(size, bpp)                                                        \
-    if (precision == PRECISION_BITS) {                                               \
-        ImagingFilterNxN_simd(imOut, im, kernel, offset, PRECISION_BITS, size, bpp); \
-    } else {                                                                         \
-        ImagingFilterNxN_simd(imOut, im, kernel, offset, precision, size, bpp);      \
+#define FILTER_NxN(size, bpp)                                                   \
+    if (precision == IMAGING_FILTER_PRECISION_BITS) {                           \
+        ImagingFilterNxN_simd(                                                  \
+            imOut, im, kernel, offset, IMAGING_FILTER_PRECISION_BITS, size, bpp \
+        );                                                                      \
+    } else {                                                                    \
+        ImagingFilterNxN_simd(imOut, im, kernel, offset, precision, size, bpp); \
     }
 
 static void

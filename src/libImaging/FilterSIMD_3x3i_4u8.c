@@ -282,15 +282,17 @@ ImagingFilter3x3i_4u8_p(
     memcpy(imOut->image32[y], im->image32[y], im->linesize);
 }
 
-/* With PRECISION_BITS as a constant where it is the precision, so the
+/* With IMAGING_FILTER_PRECISION_BITS as a constant where it is the precision, so the
    shifts take an immediate count (a count in a register costs an extra
    uop per shift: SHARPEN was 12% slower with AVX-VNNI). */
 static void
 ImagingFilter3x3i_4u8(
     Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset, int precision
 ) {
-    if (precision == PRECISION_BITS) {
-        ImagingFilter3x3i_4u8_p(imOut, im, kernel, offset, PRECISION_BITS);
+    if (precision == IMAGING_FILTER_PRECISION_BITS) {
+        ImagingFilter3x3i_4u8_p(
+            imOut, im, kernel, offset, IMAGING_FILTER_PRECISION_BITS
+        );
     } else {
         ImagingFilter3x3i_4u8_p(imOut, im, kernel, offset, precision);
     }
