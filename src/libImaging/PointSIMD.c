@@ -10,7 +10,7 @@
    registers: tbl for indices 0-63 (others give 0), tbx for the next
    groups (indices out of a group's range keep the byte). */
 static inline uint8x16_t
-neon_lut16(const uint8x16x4_t *t, uint8x16_t idx) {
+point_lut16(const uint8x16x4_t *t, uint8x16_t idx) {
     uint8x16_t r = vqtbl4q_u8(t[0], idx);
     r = vqtbx4q_u8(r, t[1], vsubq_u8(idx, vdupq_n_u8(64)));
     r = vqtbx4q_u8(r, t[2], vsubq_u8(idx, vdupq_n_u8(128)));
@@ -18,7 +18,7 @@ neon_lut16(const uint8x16x4_t *t, uint8x16_t idx) {
 }
 
 static inline void
-neon_lut_load(uint8x16x4_t *t, const UINT8 *table) {
+point_lut_load(uint8x16x4_t *t, const UINT8 *table) {
     int k;
     for (k = 0; k < 4; k++) {
         t[k] = vld1q_u8_x4(table + 64 * k);
@@ -30,7 +30,7 @@ neon_lut_load(uint8x16x4_t *t, const UINT8 *table) {
    table loaded once, then interleaved back; a fourth band beyond bands is
    0. Returns the pixels done. */
 static int
-neon_lut_row(
+point_lut_row(
     UINT8 *out, const UINT8 *in, int xsize, int bands, const UINT8 *table, UINT8 *planes
 ) {
     const int n = xsize & ~15;
@@ -44,9 +44,9 @@ neon_lut_row(
     }
     for (b = 0; b < bands; b++) {
         UINT8 *plane = planes + b * xsize;
-        neon_lut_load(t, table + 256 * b);
+        point_lut_load(t, table + 256 * b);
         for (x = 0; x < n; x += 16) {
-            vst1q_u8(plane + x, neon_lut16(t, vld1q_u8(plane + x)));
+            vst1q_u8(plane + x, point_lut16(t, vld1q_u8(plane + x)));
         }
     }
     for (x = 0; x < n; x += 16) {
@@ -64,13 +64,13 @@ static int
 point_8_8_neon(Imaging imOut, Imaging imIn, const UINT8 *table) {
     int x, y;
     uint8x16x4_t t[4];
-    neon_lut_load(t, table);
+    point_lut_load(t, table);
     for (y = 0; y < imIn->ysize; y++) {
         UINT8 *in = imIn->image8[y];
         UINT8 *out = imOut->image8[y];
         x = 0;
         for (; x + 16 <= imIn->xsize; x += 16) {
-            vst1q_u8(out + x, neon_lut16(t, vld1q_u8(in + x)));
+            vst1q_u8(out + x, point_lut16(t, vld1q_u8(in + x)));
         }
         for (; x < imIn->xsize; x++) {
             out[x] = table[in[x]];
@@ -91,7 +91,7 @@ point_nx8_neon(Imaging imOut, Imaging imIn, const UINT8 *table, int bands) {
     for (y = 0; y < imIn->ysize; y++) {
         UINT8 *in = (UINT8 *)imIn->image[y];
         UINT8 *out = (UINT8 *)imOut->image[y];
-        x = neon_lut_row(out, in, imIn->xsize, bands, table, planes);
+        x = point_lut_row(out, in, imIn->xsize, bands, table, planes);
         in += 4 * x;
         out += 4 * x;
         for (; x < imIn->xsize; x++) {

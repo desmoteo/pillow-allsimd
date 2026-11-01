@@ -452,10 +452,23 @@ extern const ImagingSIMDKernels *ImagingSIMD;
 #define IMAGING_SIMD_CALL(kernel, ...) \
     (ImagingSIMD->kernel ? ImagingSIMD->kernel(__VA_ARGS__) : 0)
 
-/* Chooses the tier for this CPU. Returns 0, or -1 with a message in
- *error when the build's instruction set isn't supported by the CPU. */
+/* Chooses the tier for this CPU, the highest built that it supports, or
+   lower if the PILLOW_ALLSIMD_ISA environment variable names one. Returns
+   0, or -1 with a message in the error pointer when the build's one
+   instruction set isn't supported by the CPU. */
 extern int
 ImagingSIMDInit(const char **error);
+
+/* Makes the tier called name ("scalar", "sse4", "avx2", "avxvnni", "neon")
+   the active one: 0, or -1 if it isn't built, -2 if the CPU lacks it. For
+   tests and benchmarks; an operation under way on another thread keeps
+   the entries it loaded. */
+extern int
+ImagingSIMDSelect(const char *name);
+
+/* The names of the tiers built, the scalar one first; returns how many. */
+extern int
+ImagingSIMDTiers(const char **names, int max);
 
 extern const ImagingSIMDKernels ImagingSIMDKernels_scalar;
 
