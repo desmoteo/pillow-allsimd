@@ -190,6 +190,8 @@ ImagingMemorySetBlocksMax(ImagingMemoryArena arena, int blocks_max);
 extern void
 ImagingMemoryClearCache(ImagingMemoryArena arena, int new_size);
 extern void
+ImagingMemoryAdviseHugePages(void *ptr, size_t size);
+extern void
 ImagingMemorySetBlockAllocator(ImagingMemoryArena arena, int use_block_allocator);
 
 /* The SIMD kernels of the tier chosen at run time (SIMDDispatch.c). */

@@ -31,6 +31,10 @@
 #include "ImagingUtils.h"
 #include "QuantOctree.h"
 
+/* Storage.c: huge pages for a large array not yet touched */
+extern void
+ImagingMemoryAdviseHugePages(void *ptr, size_t size);
+
 typedef struct _ColorBucket {
     /* contains palette index when used for look up cube */
     uint32_t count;
@@ -512,6 +516,7 @@ quantize_octree(
     if (!qp) {
         goto error;
     }
+    ImagingMemoryAdviseHugePages(qp, (size_t)nPixels * sizeof(Pixel));
     map_image_pixels(pixelData, nPixels, lookupCube, qp);
 
     /* convert palette buckets to RGB pixel palette */

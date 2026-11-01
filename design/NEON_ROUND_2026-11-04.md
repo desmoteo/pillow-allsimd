@@ -240,3 +240,35 @@ the same seven operations, with the same counts, as the run of
 2026-10-31 at 9e061d4e6: the two filters with rounded coefficients
 (`SMOOTH_MORE` on RGB and L, `DETAIL`) and the four that go through RGB
 to L. None of the filters the new kernel takes is among them.
+
+## Found while re-running the benchmark for the pages (2026-11-05)
+
+The full x86 run at 1dc75d4d1 had `quantize/fastoctree` at 30 ms for
+the AVX2 build and 15.7 ms for the AVX-VNNI build of the same source,
+where the published run had 15.8 for both. Not a regression: the AVX2
+build of the published commit itself measures 30 ms or 15.6 ms
+depending on the process. The quantizers zero-allocate two per-pixel
+arrays per call (16 MB each here); when glibc maps them afresh and
+returns them to the system at every call, which its dynamic mmap and
+trim thresholds decide from the process's earlier allocations, the page
+faults and the kernel's zeroing are half of the call, and with
+`MALLOC_TRIM_THRESHOLD_` and `MALLOC_MMAP_THRESHOLD_` raised the same
+build always takes 16.2 ms. `ImagingMemoryAdviseHugePages()` (Storage.c,
+the advice the image blocks already have) on those arrays: 30.3 to 19.6
+ms in the faulting state for the AVX2 build, 38.9 to 29.0 for the
+dispatch build, the recycling state unchanged; outputs identical for
+the three quantizers.
+
+Two more things this showed. The dispatch build runs 40% more
+instructions in the octree code than an AVX2 build (25 against 15.6 ms
+in the recycling state): `color_bucket_offset()` shifts by amounts read
+from the cube, which AVX2 vectorizes with per-lane shifts. Per-cube
+offset tables were tried: 11% better for the dispatch build, 30% worse
+for the AVX2 build, dropped. And the benchmark generates its inputs
+with the first variant in its list, so an A/B that puts a branch build
+first measures other inputs than the published runs: comparisons of the
+quantize cases need Pillow 13 first, as `run.sh` has it.
+
+The transposes moved 6 to 12% between the published run and this one
+for every library, Pillow 13 and OpenCV included (the kernel was
+updated in between): the machine, not the code.
