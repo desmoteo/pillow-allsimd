@@ -8,6 +8,15 @@ Unreleased
 
 Based on Pillow 13.0.0
 
+- Cygwin, and MinGW with an unpatched GCC: the AVX2 and AVX-VNNI kernels
+  no longer crash. GCC for 64-bit Windows keeps 256-bit values in stack
+  slots that it takes to be 32-byte aligned on a stack the ABI aligns to
+  16 (GCC bug 54412), so since the build chooses its kernels at run time
+  (13.0.0.post3), about every other call of an AVX2 kernel on a CPU with
+  AVX2 ended in a segmentation fault there. The build now asks the
+  assembler to encode aligned vector moves as unaligned ones
+  (``-Wa,-muse-unaligned-vector-move``, binutils 2.38 or later), which
+  cost the same. MSVC builds and MSYS2's patched GCC were not affected
 - PNG loading inflates the image data with libdeflate where Pillow was
   built with it: the plugin walks the headers of the ``IDAT`` chunks for
   the length of the compressed stream, the decoder gathers the stream
