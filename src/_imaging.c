@@ -5314,6 +5314,18 @@ setup_module(PyObject *m) {
         return -1;
     }
 
+    /* Pillow-AllSIMD: the SIMD kernels for this CPU (SIMDDispatch.c) */
+    {
+        const char *error;
+        if (ImagingSIMDInit(&error) < 0) {
+            PyErr_SetString(PyExc_ImportError, error);
+            return -1;
+        }
+        if (PyModule_AddStringConstant(m, "simd_kernels", ImagingSIMD->name) < 0) {
+            return -1;
+        }
+    }
+
     PyObject *pillow_version = PyUnicode_FromString(version);
     if (!pillow_version) {
         return -1;
