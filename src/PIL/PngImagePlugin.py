@@ -841,6 +841,7 @@ class PngImageFile(ImageFile.ImageFile):
             self.__prepare_idat = length - 4
         else:
             self.__prepare_idat = length  # used by load_prepare()
+        self.__idat_first = cid == b"IDAT"
 
         if self.png.im_n_frames is not None:
             self._close_exclusive_fp_after_loading = False
@@ -1003,11 +1004,59 @@ class PngImageFile(ImageFile.ImageFile):
     def load_prepare(self) -> None:
         """internal: prepare to read PNG file"""
 
-        if self.info.get("interlace"):
-            self.decoderconfig = self.decoderconfig + (1,)
+        # Pillow-AllSIMD: the decoder is told the length of the compressed
+        # stream when it can be known, and then inflates it in one piece.
+        # Set, not appended: every frame of an animation comes through here.
+        self.decoderconfig = (
+            1 if self.info.get("interlace") else 0,
+            self._idat_stream_size(),
+        )
 
         self.__idat = self.__prepare_idat  # used by load_read()
         ImageFile.ImageFile.load_prepare(self)
+
+    def _idat_stream_size(self) -> int:
+        """internal: the total length of the image's consecutive IDAT chunks,
+        found by walking their headers, or 0 when it is not to be used: a
+        frame of an animation, a file that cannot be walked or ends early,
+        and LOAD_TRUNCATED_IMAGES, which decodes what there is."""
+
+        if (
+            ImageFile.LOAD_TRUNCATED_IMAGES
+            or not self.__idat_first
+            or self.__frame != 0
+            or len(self.tile) != 1
+            or self.fp is None
+        ):
+            return 0
+        fp = self.fp
+        try:
+            start = fp.tell()
+        except (AttributeError, OSError, ValueError):
+            return 0
+        total = 0
+        try:
+            pos = self.tile[0].offset
+            length = self.__prepare_idat
+            while True:
+                total += length
+                fp.seek(pos + length + 4)  # the data and its CRC
+                head = fp.read(8)
+                if len(head) < 8:
+                    total = 0  # truncated: the stream decoder reports it
+                    break
+                if head[4:] != b"IDAT":
+                    break
+                length = i32(head)
+                pos = fp.tell()
+        except (AttributeError, OSError, ValueError):
+            total = 0
+        finally:
+            try:
+                fp.seek(start)
+            except (AttributeError, OSError, ValueError):
+                total = 0
+        return total
 
     def load_read(self, read_bytes: int) -> bytes:
         """internal: read more image data"""
