@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - "**"
+      # simd/master mirrors simd/pillow-13 (the same commits): one run per push
+      - "!simd/master"
     paths-ignore:
       - ".github/workflows/docs.yml"
       - ".github/workflows/wheels*"

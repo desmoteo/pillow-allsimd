@@ -29,7 +29,8 @@ SIMD to Pillow on x86.
   times as fast on x86-64 and 2.5 times on arm64.
 - **arm64 too**: NEON kernels for resizes, blurs, filters, conversions,
   transforms and more, tested on an NVIDIA Jetson Orin, in wheels for Linux
-  and macOS. Other CPUs build portable C that compilers vectorize.
+  (and macOS, as they are added to this release). Other CPUs build portable
+  C that compilers vectorize.
 
 Benchmarks
 ----------
@@ -71,10 +72,13 @@ differs.
 Installing
 ----------
 
-On arm64 Linux (glibc 2.28 or later, or musl) and macOS 11 or later, pip
-installs a wheel with the NEON kernels and the image libraries bundled, as
-Pillow's wheels have them. Elsewhere, x86 included, Pillow-AllSIMD is a
-source package, so pip compiles it on installation: install the libraries
+On arm64 Linux (glibc 2.28 or later, or musl), pip installs a wheel with
+the NEON kernels and the image libraries bundled, as Pillow's wheels have
+them; wheels for macOS 11 or later on Apple silicon are added to this
+release as GitHub's macOS runners build them, and until then macOS builds
+from source, with the NEON kernels too. Elsewhere, x86 included,
+Pillow-AllSIMD is a source package, so pip compiles it on installation:
+install the libraries
 that `building Pillow from source
 <https://desmoteo.github.io/pillow-allsimd/installation/building-from-source.html>`_
 needs first. It installs the ``PIL`` package, as Pillow does. Install your

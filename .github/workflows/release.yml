@@ -5,12 +5,27 @@ name: Release
 # manual run to TestPyPI. No x86 wheels: pip would choose one over the
 # source package, and x86 users would get SSE4.1 instead of building AVX2
 # (design/PLAN.md).
+#
+# The platforms built, and so the files uploaded, come from the tag's
+# suffix or the manual run's input: allsimd-<version> builds everything;
+# allsimd-<version>-linux the source package and the Linux wheels;
+# allsimd-<version>-macos the macOS wheels only. PyPI accepts more files
+# for a version it already has, so when GitHub has no macOS runners the
+# Linux files ship first and the macOS wheels follow under their own tag
+# (design/REVIEW_2026-11.md, finding 9). Every file of a version has the
+# same SBOM, Pillow's renamed for this package (.github/allsimd_sbom.py).
 
 on:
   push:
     tags:
       - "allsimd-*"
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: "all, linux (source package and Linux wheels) or macos (macOS wheels)"
+        type: choice
+        options: [all, linux, macos]
+        default: all
 
 permissions:
   contents: read
@@ -20,13 +35,61 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # the source package and 7 CPython wheels for each of the 3 arm64 platforms
-  EXPECTED_DISTS: 22
+  # CPython 3.11 to 3.15 and 3.14t, 3.15t: pyproject.toml's [tool.cibuildwheel]
+  WHEELS_PER_PLATFORM: 7
   FORCE_COLOR: 1
 
 jobs:
-  sdist:
+  plan:
     if: github.repository == 'desmoteo/pillow-allsimd'
+    runs-on: ubuntu-latest
+    name: Plan
+    outputs:
+      sdist: ${{ steps.plan.outputs.sdist }}
+      wheels: ${{ steps.plan.outputs.wheels }}
+      expected: ${{ steps.plan.outputs.expected }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Choose the platforms and check the version against the tag
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          TAG: ${{ github.ref_name }}
+          PLATFORMS: ${{ inputs.platforms }}
+        run: python3 .github/release_plan.py >> "$GITHUB_OUTPUT"
+
+  sbom:
+    needs: plan
+    runs-on: ubuntu-latest
+    name: Generate SBOM
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+
+      - name: Generate CycloneDX SBOM
+        run: python3 .github/allsimd_sbom.py
+
+      - name: Validate SBOM
+        run: |
+          python3 -m pip install -r .ci/requirements-sbom.txt
+          check-jsonschema --schemafile "https://raw.githubusercontent.com/CycloneDX/specification/1.7/schema/bom-1.7.schema.json" pillow_allsimd-*.cdx.json
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: "pillow_allsimd-*.cdx.json"
+
+  sdist:
+    needs: plan
+    if: needs.plan.outputs.sdist == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,42 +108,19 @@ jobs:
           python3 -m twine check --strict dist/*
           python3 -m check_manifest
 
-      - name: Check the version against the tag
-        if: github.event_name == 'push'
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          version=$(python3 -c "exec(open('src/PIL/_version.py').read()); print(__version__)")
-          [ "$TAG" = "allsimd-$version" ] || { echo "tag $TAG, version $version"; exit 1; }
-
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: dist-sdist
           path: dist/*.tar.gz
 
   wheels:
-    if: github.repository == 'desmoteo/pillow-allsimd'
+    needs: [plan, sbom]
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: "manylinux_2_28 aarch64"
-            platform: linux
-            os: ubuntu-24.04-arm
-            cibw_arch: aarch64
-            build: "*manylinux*"
-          - name: "musllinux aarch64"
-            platform: linux
-            os: ubuntu-24.04-arm
-            cibw_arch: aarch64
-            build: "*musllinux*"
-          - name: "macOS arm64"
-            platform: macos
-            os: macos-latest
-            cibw_arch: arm64
-            macosx_deployment_target: "11.0"
+        include: ${{ fromJSON(needs.plan.outputs.wheels) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -112,9 +152,18 @@ jobs:
         run: |
           wheels=$(ls wheelhouse/*.whl | wc -l)
           neon=$(grep -c -- "--- SIMD kernels: NEON$" build.log || true)
-          echo "$wheels wheels, $neon NEON builds"
-          [ "$wheels" -gt 0 ] && [ "$neon" -eq "$wheels" ]
+          echo "$wheels wheels, $neon NEON builds, $WHEELS_PER_PLATFORM expected"
+          [ "$wheels" -eq "$WHEELS_PER_PLATFORM" ] && [ "$neon" -eq "$wheels" ]
         shell: bash
+
+      - name: Download SBOM
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sbom
+          path: sbom
+
+      - name: Embed SBOM in wheels
+        run: python3 .github/embed-sbom.py wheelhouse sbom
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -122,9 +171,15 @@ jobs:
           path: ./wheelhouse/*.whl
 
   count-dists:
-    needs: [sdist, wheels]
+    # The source package job is skipped for a macOS-only release
+    needs: [plan, sdist, wheels]
+    if: >-
+      !cancelled() && needs.wheels.result == 'success'
+      && (needs.sdist.result == 'success' || needs.sdist.result == 'skipped')
     runs-on: ubuntu-latest
     name: Count dists
+    env:
+      EXPECTED_DISTS: ${{ needs.plan.outputs.expected }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

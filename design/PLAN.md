@@ -116,8 +116,18 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       `docs/allsimd.rst`): arm64 gets a wheel, x86 builds from source; `-C
       simd=` applies to source builds, and `--no-binary pillow-allsimd`
       builds from source on arm64.
-- [ ] 13.0.0.post2, the same code with the arm64 wheels: push the tag
-      `allsimd-13.0.0.post2`, then approve the upload.
+- [ ] 13.0.0.post2, the same code with the arm64 wheels. The tag
+      `allsimd-13.0.0.post2` (on ddc6c6800) failed three times on
+      2026-11-03: GitHub had no macOS arm64 runner, and the release needed
+      all 22 files. `release.yml` now builds what the tag names
+      (`-linux`, `-macos`, or all), counts that, and embeds the SBOM
+      (`.github/allsimd_sbom.py`, finding 10 of `REVIEW_2026-11.md`).
+      Push the tag `allsimd-13.0.0.post2-linux` on the release commit,
+      approve the upload (the source package and 14 Linux wheels), then,
+      when macOS runners are back, `allsimd-13.0.0.post2-macos` on the
+      same commit (the code must be post2's), and approve again. The
+      chart in `PyPI.rst` points at the tag `allsimd-13.0.0.post2`, which
+      stays.
 - [ ] The ongoing duty: wheels bundle libjpeg, libwebp, libtiff, FreeType
       and others. When one of them has a security fix, rebuild and
       release. In practice, release after merging each Pillow release,
