@@ -16,6 +16,7 @@
  */
 
 #include "Imaging.h"
+#include "PlainLoops.h"
 
 /* Fast mode (design/SIMD_FAST_KERNELS.md): in1 + (in2 - in1) a for a = a15 / 2^15,
    rounded half up, (d a15 + 2^14) >> 15: what pmulhrsw and vqrdmulh compute,
@@ -41,7 +42,7 @@ blend_fast_row(
 Imaging
 ImagingBlend(Imaging imIn1, Imaging imIn2, float alpha) {
     Imaging imOut;
-    int x, y;
+    int y;
 
     /* Check arguments */
     if (!imIn1 || !imIn2 || imIn1->type != IMAGING_TYPE_UINT8 || imIn1->palette ||
@@ -91,31 +92,28 @@ ImagingBlend(Imaging imIn1, Imaging imIn2, float alpha) {
         }
     } else if (alpha >= 0 && alpha <= 1.0) {
         /* Interpolate between bands */
+        /* float arithmetic a byte at a time: the active tier's kernel is
+           the loop of PlainLoops.h compiled for it (BlendSIMD.c) */
         for (y = 0; y < ysize; y++) {
-            // restrict safe: imIn1 and imIn2 are read-only; imOut is a new allocation
-            UINT8 *restrict in1 = (UINT8 *)imIn1->image[y];
-            UINT8 *restrict in2 = (UINT8 *)imIn2->image[y];
-            UINT8 *restrict out = (UINT8 *)imOut->image[y];
-            for (x = 0; x < linesize; x++) {
-                out[x] = (UINT8)((int)in1[x] + alpha * ((int)in2[x] - (int)in1[x]));
+            const UINT8 *in1 = (UINT8 *)imIn1->image[y];
+            const UINT8 *in2 = (UINT8 *)imIn2->image[y];
+            UINT8 *out = (UINT8 *)imOut->image[y];
+            if (!IMAGING_SIMD_CALL(
+                    blend->interpolate_row, out, in1, in2, linesize, alpha
+                )) {
+                plain_blend_interpolate_row(out, in1, in2, linesize, alpha);
             }
         }
     } else {
         /* Extrapolation; must make sure to clip resulting values */
         for (y = 0; y < ysize; y++) {
-            // restrict safe: imIn1 and imIn2 are read-only; imOut is a new allocation
-            UINT8 *restrict in1 = (UINT8 *)imIn1->image[y];
-            UINT8 *restrict in2 = (UINT8 *)imIn2->image[y];
-            UINT8 *restrict out = (UINT8 *)imOut->image[y];
-            for (x = 0; x < linesize; x++) {
-                float temp = (float)((int)in1[x] + alpha * ((int)in2[x] - (int)in1[x]));
-                if (temp <= 0.0) {
-                    out[x] = 0;
-                } else if (temp >= 255.0) {
-                    out[x] = 255;
-                } else {
-                    out[x] = (UINT8)temp;
-                }
+            const UINT8 *in1 = (UINT8 *)imIn1->image[y];
+            const UINT8 *in2 = (UINT8 *)imIn2->image[y];
+            UINT8 *out = (UINT8 *)imOut->image[y];
+            if (!IMAGING_SIMD_CALL(
+                    blend->extrapolate_row, out, in1, in2, linesize, alpha
+                )) {
+                plain_blend_extrapolate_row(out, in1, in2, linesize, alpha);
             }
         }
     }

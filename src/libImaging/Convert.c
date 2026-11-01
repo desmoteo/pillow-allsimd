@@ -33,6 +33,7 @@
  */
 
 #include "Imaging.h"
+#include "PlainLoops.h"
 
 /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
 #define L(rgb) ((INT32)(rgb)[0] * 299 + (INT32)(rgb)[1] * 587 + (INT32)(rgb)[2] * 114)
@@ -661,20 +662,16 @@ bit2i(UINT8 *out_, const UINT8 *in, int xsize) {
 
 static void
 l2i(UINT8 *out_, const UINT8 *in, int xsize) {
-    int x;
-    for (x = 0; x < xsize; x++, out_ += 4) {
-        INT32 v = *in++;
-        memcpy(out_, &v, sizeof(v));
+    /* the active tier's kernel is the loop of PlainLoops.h compiled for it */
+    if (!IMAGING_SIMD_CALL(convert->l2i, out_, in, xsize)) {
+        plain_l2i_row(out_, in, xsize);
     }
 }
 
 static void
 i2l(UINT8 *out, const UINT8 *in_, int xsize) {
-    for (int x = 0; x < xsize; x++, out++, in_ += 4) {
-        INT32 v;
-        memcpy(&v, in_, sizeof(v));
-        // Branchless saturation
-        *out = (UINT8)(v <= 0 ? 0 : (v >= 255 ? 255 : v));
+    if (!IMAGING_SIMD_CALL(convert->i2l, out, in_, xsize)) {
+        plain_i2l_row(out, in_, xsize);
     }
 }
 

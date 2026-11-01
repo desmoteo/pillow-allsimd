@@ -17,6 +17,7 @@
  */
 
 #include "Imaging.h"
+#include "PlainLoops.h"
 
 // restrict safety: imIn1/imIn2 are read-only, and imOut is always freshly allocated
 #define CHOP(operation)                                 \
@@ -332,6 +333,45 @@ ImagingChopSubtractModulo(Imaging imIn1, Imaging imIn2) {
     CHOP2(in1[x] - in2[x], IMAGING_MODE_UNKNOWN);
 }
 
+/* Soft light (kind 0), hard light (1) and overlay (2), a row at a time:
+   int arithmetic with three divisions, which the active tier's kernel has
+   compiled for its instruction set (PlainLoops.h, ChopsSIMD.c); the scalar
+   table runs the same loop as compiled here. The output is a new image. */
+static Imaging
+chop_light(Imaging imIn1, Imaging imIn2, int kind) {
+    int y;
+    Imaging imOut = create(imIn1, imIn2, IMAGING_MODE_UNKNOWN);
+    if (!imOut) {
+        return NULL;
+    }
+    int ysize = imOut->ysize;
+    int linesize = imOut->linesize;
+    ImagingSectionCookie cookie;
+    ImagingSectionEnter(&cookie);
+    for (y = 0; y < ysize; y++) {
+        UINT8 *out = (UINT8 *)imOut->image[y];
+        const UINT8 *in1 = (UINT8 *)imIn1->image[y];
+        const UINT8 *in2 = (UINT8 *)imIn2->image[y];
+        if (kind == 0) {
+            if (!IMAGING_SIMD_CALL(chops->soft_light_row, out, in1, in2, linesize)) {
+                plain_soft_light_row(out, in1, in2, linesize);
+            }
+        } else {
+            if (kind == 2) {
+                /* overlay is hard light with the operands exchanged */
+                const UINT8 *tmp = in1;
+                in1 = in2;
+                in2 = tmp;
+            }
+            if (!IMAGING_SIMD_CALL(chops->hard_light_row, out, in1, in2, linesize)) {
+                plain_hard_light_row(out, in1, in2, linesize);
+            }
+        }
+    }
+    ImagingSectionLeave(&cookie);
+    return imOut;
+}
+
 /**
  * Return a newly allocated image containing the soft-light blend of the two images.
  *
@@ -339,11 +379,7 @@ ImagingChopSubtractModulo(Imaging imIn1, Imaging imIn2) {
  */
 Imaging
 ImagingChopSoftLight(Imaging imIn1, Imaging imIn2) {
-    CHOP2(
-        (((255 - in1[x]) * (in1[x] * in2[x])) / 65536) +
-            (in1[x] * (255 - ((255 - in1[x]) * (255 - in2[x]) / 255))) / 255,
-        IMAGING_MODE_UNKNOWN
-    );
+    return chop_light(imIn1, imIn2, 0);
 }
 
 /**
@@ -353,11 +389,7 @@ ImagingChopSoftLight(Imaging imIn1, Imaging imIn2) {
  */
 Imaging
 ImagingChopHardLight(Imaging imIn1, Imaging imIn2) {
-    CHOP2(
-        (in2[x] < 128) ? ((in1[x] * in2[x]) / 127)
-                       : 255 - (((255 - in2[x]) * (255 - in1[x])) / 127),
-        IMAGING_MODE_UNKNOWN
-    );
+    return chop_light(imIn1, imIn2, 1);
 }
 
 /**
@@ -367,9 +399,5 @@ ImagingChopHardLight(Imaging imIn1, Imaging imIn2) {
  */
 Imaging
 ImagingOverlay(Imaging imIn1, Imaging imIn2) {
-    CHOP2(
-        (in1[x] < 128) ? ((in1[x] * in2[x]) / 127)
-                       : 255 - (((255 - in1[x]) * (255 - in2[x])) / 127),
-        IMAGING_MODE_UNKNOWN
-    );
+    return chop_light(imIn1, imIn2, 2);
 }

@@ -966,6 +966,32 @@ convert_unpremultiply_simd(UINT8 *out, const UINT8 *in, int xsize) {
 
 #include "ConvertYCbCrSIMD.c"
 
+/* L to I and back, and the colour matrix's rows (Matrix.c): the loops of
+   PlainLoops.h as this tier's compiler makes them. */
+static int
+convert_l2i_simd(UINT8 *out, const UINT8 *in, int xsize) {
+    plain_l2i_row(out, in, xsize);
+    return xsize;
+}
+
+static int
+convert_i2l_simd(UINT8 *out, const UINT8 *in, int xsize) {
+    plain_i2l_row(out, in, xsize);
+    return xsize;
+}
+
+static int
+convert_matrix_l_row_simd(UINT8 *out, const UINT8 *in, int n, const float *m) {
+    plain_matrix_l_row(out, in, n, m);
+    return n;
+}
+
+static int
+convert_matrix_rgb_row_simd(UINT8 *out, const UINT8 *in, int n, const float *m) {
+    plain_matrix_rgb_row(out, in, n, m);
+    return n;
+}
+
 static const ImagingSIMDConvertKernels convert_simd_kernels = {
 #if defined(IMAGING_SIMD_NEON)
     .l2rgb = convert_l2rgb_neon,
@@ -984,4 +1010,8 @@ static const ImagingSIMDConvertKernels convert_simd_kernels = {
     .ycbcr2rgb = ycc_ycbcr2rgb_simd,
     .rgb2ycbcr_fast = ycc_rgb2ycbcr_fast_simd,
     .ycbcr2rgb_fast = ycc_ycbcr2rgb_fast_simd,
+    .l2i = convert_l2i_simd,
+    .i2l = convert_i2l_simd,
+    .matrix_l_row = convert_matrix_l_row_simd,
+    .matrix_rgb_row = convert_matrix_rgb_row_simd,
 };

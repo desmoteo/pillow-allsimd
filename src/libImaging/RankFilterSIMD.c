@@ -216,8 +216,16 @@ rank_minmax_line_simd(
     return x;
 }
 
+/* The general rank filter's sorting network over a chunk: the loop of
+   PlainLoops.h as this tier's compiler makes it. */
+static void
+rank_network_simd(UINT8 *v, const UINT8 (*network)[2], int count) {
+    plain_rank_network(v, network, count);
+}
+
 static const ImagingSIMDRankKernels rank_simd_kernels = {
     .median3 = RankFilterMedian3_u8,
     .median5 = RankFilterMedian5_u8,
     .minmax_line = rank_minmax_line_simd,
+    .network = rank_network_simd,
 };

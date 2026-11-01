@@ -100,6 +100,27 @@ build is the common files' portable code compiled for x86-64. On arm64,
 NEON is part of the baseline, so the wheels have it and the build has
 one tier.
 
+**Plain loops compiled per tier (2026-11-05).** A dispatch build compiles
+the common files for baseline x86-64, and some of their loops, with no
+kernel of their own, were fast in a build for AVX2 only because the
+compiler vectorized them there: timing all 216 operations of
+``checks/simd_bench.py`` in the wheel against the AVX-VNNI build found
+them, 1.6 to 3.4 times slower in the wheel. Those loops are now in
+``PlainLoops.h``, in plain C, and compiled several times: by the file
+that owns the operation, for the scalar table, and by ``SIMDKernels.c``
+for each tier, whose companions put them in the kernel table, called
+once per row. They are soft light, hard light and overlay (three integer
+divisions per byte: 24.5 to 7.0 ms and 26.5 to 7.7 ms on a 2560x1600 RGB
+image in the wheel), the exact and the extrapolating blend (float per
+byte; ``ImageEnhance.Color`` 13.1 to 7.7 ms, ``Sharpness`` 13.8 to
+8.4 ms), the colour matrix's rows (4.4 to 2.3 ms to L), L to I and I to
+L (2.4 to 1.6 ms), and the sorting network of the general rank filter,
+whose minima and maxima are twice as wide in AVX2 (a 7x7 rank on L:
+53.6 to 31.1 ms). The wheel now runs each at the AVX2 build's speed. It
+is the same C in every tier and no tier is compiled with FMA, so the
+results are the same, which ``Tests/test_simd_tiers.py`` checks for
+each.
+
 ``ImagingSIMD.h`` also holds the helpers the kernels share:
 ``SIMD_FORCE_INLINE`` for kernels that must see a shift count as a
 constant; ``mm_dpwssd`` and ``mm256_dpwssd``, one ``vpdpwssd`` with
@@ -1715,6 +1736,18 @@ The idea
   colour channels of transparent pixels taking a mask of 255 as the
   scalar expression gives; the SSE4 and NEON kernels exist, AVX2 uses
   SSE4's. The drawing section returns to it.
+* **Pasting through a mask (2026-11-05).** ``paste(im, box, mask)`` with
+  an L mask, which is also ``Image.composite()``, and with an RGBA mask,
+  which is how an RGBA image is pasted over another through its own
+  alpha, blended a byte at a time; a compiler given AVX2 made vectors of
+  the loop, and the wheel's baseline did not. ``paste_mask_L_simd()``
+  and ``paste_mask_RGBA_simd()`` are the masked fill's blend with the
+  source row in place of the ink, 32 bytes or eight pixels at a time in
+  AVX2, the mask byte spread to its pixel's four bytes with one shuffle.
+  Mask composite on 2560x1600 RGB: 11.7 ms in the wheel and 6.3 ms in
+  the AVX2 build before, 3.0 ms in both now; RGBA over RGB 12.0 and
+  5.8 ms before, 2.9 ms now. The rows of an image pasted into itself
+  overlap, and those go to the scalar loop.
 * **The 3D colour LUT.** Pillow-SIMD's kernel on x86: the index and the
   interpolation weight of each axis in one 16-bit value (6 bits of
   index, 9 of weight), the eight entries interpolated with ``pmaddwd``
@@ -1866,8 +1899,9 @@ Code map
 * ``Chops.c``: ``chop_multiply_row()``, ``chop_saturate_row()``,
   ``chop_add_subtract()``, with ``ChopsSIMD.c`` (the ``chops`` group);
   ``Blend.c``: ``blend_fast_row()`` and Pillow's loops, with
-  ``BlendSIMD.c``; ``Paste.c`` with ``PasteSIMD.c``: ``fill_blend16()``
-  and ``fill_mask_L_simd()``.
+  ``BlendSIMD.c``; ``Paste.c`` with ``PasteSIMD.c``: ``fill_blend16()``,
+  ``fill_blend32()``, ``fill_mask_L_simd()``, ``paste_mask_L_simd()``
+  and ``paste_mask_RGBA_simd()``.
 * ``Point.c``: ``point_byte_op()`` and ``point_byte_row()``;
   ``PointSIMD.c`` (the ``point`` group): the byte operations' loops,
   ``neon_lut16()``, ``neon_lut_row()`` and NEON's whole-image lookups;
@@ -2956,7 +2990,11 @@ has all three of SSE4, AVX2 and NEON.
   detection, ``ImagingSIMDInit()`` and ``ImagingSIMDSelect()``;
   ``ImagingSIMD.h``: the tier and ISA macros, ``SIMD_FORCE_INLINE``,
   ``mm_dpwssd`` and ``mm256_dpwssd``, ``mm_madd_add``, the widening loads;
-  ``ImagingPx4.h``: one pixel as four 32-bit lanes.
+  ``ImagingPx4.h``: one pixel as four 32-bit lanes; ``PlainLoops.h``:
+  the loops in plain C that every tier compiles for itself (soft and
+  hard light, the exact and extrapolating blend, the colour matrix, L
+  and I, the rank filter's network), with a wrapper in the area's
+  companion.
 * Resampling: ``Resample.c`` (the drivers) and ``ResampleHorizontal.c``
   (the portable horizontal kernels); ``ResampleSIMD.c``, which includes
   ``ResampleSIMDHorizontalConv.c``, ``ResampleSIMDVerticalConv.c``,

@@ -153,6 +153,41 @@ with the largest gain for the most users (2, 3), then the rest.
 
 ## Done
 
+### 1 (first half) and 3. The wheel against a single-tier build, and the loops that differed (2026-11-05)
+
+- The 111 cases of the benchmark page, wheel (`-C simd=dispatch`) against
+  the AVX-VNNI build, five rounds: geometric mean 1.011; four cases apart
+  by more than 5%: mask composite 1.85x, fast octree 1.59x, lines 1.09x,
+  polygon outlines 1.06x (`bench-results/followup/x/wheel-vs-single.txt`).
+- The 216 operations of `checks/simd_bench.py --set full`: geometric mean
+  1.060, 33 operations slower by more than 5%, the worst soft light,
+  hard light and overlay (3.3 to 3.4x), the pastes through a mask (1.7
+  to 2.1x), I to L, the colour matrix, rank 7, `ImageEnhance.Color` and
+  `Sharpness` (1.6 to 1.9x) and the octree (1.63x)
+  (`wheel-vs-single-full.txt`). The page's cases alone would have
+  missed most of them.
+- Pasting through a mask got vector kernels (`paste_mask_L_simd`,
+  `paste_mask_RGBA_simd`: the masked fill's blend with a source row),
+  which beat the compiler's own vectors too: 6.3 to 3.0 ms in the AVX2
+  build, 11.7 to 3.0 ms in the wheel.
+- The others are plain C in `PlainLoops.h`, compiled by the owning file
+  for the scalar table and by `SIMDKernels.c` for each tier, called once
+  per row through the table: the two blend-mode loops, the two float
+  blends, the two matrix rows, L to I and I to L, the rank network. The
+  wheel is level with the single-tier build on all of them after the
+  change (soft light 24.5 to 7.0 ms, rank 7 53.6 to 31.1 ms, and so on),
+  and the single-tier build is unchanged.
+- Exactness: `bench-results/followup/pastecheck.py` and `plaincheck.py`
+  give one hash in the build before, and in the SSE4, AVX2 and AVX-VNNI
+  tiers after; the scalar tier gives its own hash before and after (its
+  `convert("L")` and smoothing kernel differ by design, and
+  `ImageEnhance` uses both). `Tests/test_simd_tiers.py` has every one of
+  these operations; `Tests/test_simd_consistency.py` checks the mask
+  paste against the formula.
+- Left for item 4: the octree's two loops, rewritten there. Left for
+  item 8: lines and polygons. Below 1.25x and not touched: `getextrema`,
+  `point` on I, flood fill, `ImageMath`, L to I;16.
+
 ### 2. PNG decoding with libdeflate (2026-11-05)
 
 Done as planned, with two changes found by measuring.

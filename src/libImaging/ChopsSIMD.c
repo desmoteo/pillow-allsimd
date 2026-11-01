@@ -136,7 +136,23 @@ chop_saturate_row_simd(
     return x;
 }
 
+/* Soft light and hard light (overlay with the operands exchanged): the
+   loops of PlainLoops.h as this tier's compiler makes them. */
+static int
+chop_soft_light_row_simd(UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n) {
+    plain_soft_light_row(out, in1, in2, n);
+    return n;
+}
+
+static int
+chop_hard_light_row_simd(UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n) {
+    plain_hard_light_row(out, in1, in2, n);
+    return n;
+}
+
 static const ImagingSIMDChopsKernels chops_simd_kernels = {
     .multiply_row = chop_multiply_row_simd,
     .saturate_row = chop_saturate_row_simd,
+    .soft_light_row = chop_soft_light_row_simd,
+    .hard_light_row = chop_hard_light_row_simd,
 };

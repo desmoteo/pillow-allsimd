@@ -20,6 +20,21 @@ Based on Pillow 13.0.0
   cap of the encoder (``PILLOW_LIBDEFLATE_MAX``), and any stream that
   libdeflate refuses or that does not hold exactly the image's rows, so
   that damaged and truncated files raise the errors they raised
+- Pasting through a mask has vector kernels on x86-64 and arm64:
+  ``paste(im, box, mask)`` with an L mask, ``Image.composite()``, and
+  an RGBA image pasted through its own alpha. On a 2560x1600 RGB image
+  the mask composite takes 3.0 ms, from 11.7 ms in the x86-64 wheel and
+  6.3 ms in a build for AVX2, and RGBA over RGB 2.9 ms, from 12.0 and
+  5.8 ms; the same pixels
+- x86-64 wheels: the loops that only a build for AVX2 ran fast, because
+  the compiler vectorized them there, are compiled once per instruction
+  set (``PlainLoops.h``) and reached through the kernel table, so the
+  wheel runs them as that build does: ``ImageChops.soft_light``,
+  ``hard_light`` and ``overlay`` 3.4x faster, ``ImageEnhance.Color`` and
+  ``Sharpness`` (and every ``Image.blend`` outside 0..1, or in exact
+  mode) 1.7x, ``convert()`` with a colour matrix 1.9x, I to L 1.5x, the
+  rank filters of sizes 7 to 11 and non-median ranks 1.7x. The same
+  pixels in every tier
 - The quantizers' two per-pixel work arrays (16 MB each for a 2560x1600
   image, allocated and freed on every call) get the huge-page advice the
   image blocks have, on Linux where transparent huge pages are in

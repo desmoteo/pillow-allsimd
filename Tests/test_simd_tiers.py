@@ -183,6 +183,31 @@ def _operations(
     )
     yield "paste mask", lambda: _paste(rgb, L)
     yield "paste mask RGBA", lambda: _paste(rgba, L)
+    yield "paste mask L", lambda: _paste(L, L.rotate(90))
+    yield "paste through alpha", lambda: _paste(rgb, rgba)
+    yield "paste RGBA through alpha", lambda: _paste(rgba, rgba.rotate(180))
+    yield "composite", lambda: Image.composite(rgb, rgb.rotate(180), L)
+    # the loops of PlainLoops.h, compiled once per tier
+    turned = rgb.rotate(180)
+    yield "soft light", lambda: ImageChops.soft_light(rgb, turned)
+    yield "hard light", lambda: ImageChops.hard_light(rgb, turned)
+    yield "overlay", lambda: ImageChops.overlay(rgb, turned)
+    yield "overlay L", lambda: ImageChops.overlay(L, L.rotate(180))
+    yield "blend beyond", lambda: Image.blend(rgb, turned, 1.7)
+    yield "blend before", lambda: Image.blend(rgba, rgba.rotate(180), -0.4)
+    yield "matrix L", lambda: rgb.convert("L", (0.4, 0.5, 0.1, 3))
+    yield "matrix RGB", lambda: _bands(
+        rgb.convert(
+            "RGB", (1.9, -0.6, -0.4, 3.5, -0.3, 1.7, -0.5, -12, 0.2, -1.1, 2.2, 0)
+        )
+    )
+    yield "convert L I", lambda: L.convert("I")
+    yield "convert I L", lambda: L.convert("I").point(lambda v: v * 3 - 200).convert(
+        "L"
+    )
+    yield "rank 20 of 49", lambda: L.filter(ImageFilter.RankFilter(7, 20))
+    yield "rank 3 of 25 RGB", lambda: rgb.filter(ImageFilter.RankFilter(5, 3))
+    yield "median 9 L", lambda: L.filter(ImageFilter.MedianFilter(9))
     yield "draw", lambda: _draw(rgba)
     yield "png", lambda: _png(rgb)
     yield "tobytes BGR", lambda: Image.frombytes(
@@ -192,6 +217,11 @@ def _operations(
         "RGB", rgb.size, rgb.tobytes("raw", "RGBX"), "raw", "RGBX"
     )
     yield "quantize", lambda: rgb.quantize(64).convert("RGB")
+
+
+def _bands(im: Image.Image) -> Image.Image:
+    # without the fourth byte of an RGB pixel, which a matrix leaves unset
+    return Image.merge("RGB", im.split())
 
 
 def _paste(im: Image.Image, mask: Image.Image) -> Image.Image:
