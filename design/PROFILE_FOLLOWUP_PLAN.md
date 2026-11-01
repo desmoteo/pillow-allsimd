@@ -227,3 +227,19 @@ the outputs; raw results in `bench-results/baseline-2026-11-04/` and
   (sizes 3 and 5, noise and a flat-region image) and agrees across the
   old build, the new build and the scalar tier; the NEON tier unit
   compiles with zig for aarch64 (not run: the Jetson is loaded).
+- **P5, the dithers (2026-11-04).** Not the arithmetic, which is already
+  about ten dependent operations per pixel: the rows. `tobilevel()` and
+  `topalette()`'s Floyd-Steinberg loops do two rows at a time, the
+  second two pixels behind the first, so that two chains of error terms
+  overlap; a pixel needs the errors of the row above at x + 1, which the
+  first row has written by then, and the rows alternate between two
+  error buffers. The per-pixel body is Pillow's, as a macro, so the
+  pixels are the same (one hash over L and RGB noise and gradients at
+  fourteen widths and eight heights, to mode 1 and to the web palette
+  with and without dither, equal old against new; the palette dither's
+  closing write of the blue terms into the three slots past the row's
+  end is kept as it was). At -O3 on 2560x1600: convert L to 1 dither 21.3
+  to 12.2 ms (1.74x), RGB to 1 dither 1.60x, RGB to P web dither 58.5 to
+  36.0 ms (1.62x), the benchmark's `logical_and` on mode 1 (two
+  dithered conversions and the and) 1.47x. Four rows would overlap more,
+  at the cost of readability; left here.

@@ -37,6 +37,10 @@ Based on Pillow 13.0.0
   (``ModeFilterSIMD.c``): the nine window bytes counted against each
   other and the winner picked by a packed maximum, the same pixels as the
   histogram code; 14x on a 2560x1600 L image on AVX2
+- The dithered conversions (``convert("1")`` and ``convert("P")`` with
+  Floyd-Steinberg dithering) do two rows at a time, the second two
+  pixels behind the first, so that the two rows' chains of error terms
+  overlap; the same pixels, 1.6 to 1.7x
 - Wheels for x86-64 Linux (manylinux_2_28 and musllinux_1_2 x86_64), built
   and tested as the arm64 ones are. Each holds the SSE4.1, AVX2 and
   AVX-VNNI kernels and picks the set the CPU has when Pillow loads (the
