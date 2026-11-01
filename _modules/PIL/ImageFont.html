@@ -1,0 +1,1842 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="author" title="About these documents" href="../../about.html"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
+
+    <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
+        <title>PIL.ImageFont - Pillow-AllSIMD 13.0.0.post0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/dark.css?v=1a645143" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     Pillow-AllSIMD: Pillow with SIMD kernels for x86 and arm64, a fork of <a href="https://github.com/uploadcare/pillow-simd">Pillow-SIMD</a> and <a href="https://github.com/python-pillow/Pillow">Pillow</a>, whose documentation this is, with Pillow-AllSIMD's additions. Pillow's own: <a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../allsimd.html">About Pillow-AllSIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../installation/index.html">Installation</a><input aria-label="Toggle navigation of Installation" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/basic-installation.html">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/python-support.html">Python support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/platform-support.html">Platform support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/building-from-source.html">Building from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/building-from-source.html#old-versions">Old versions</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../handbook/index.html">Handbook</a><input aria-label="Toggle navigation of Handbook" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/tutorial.html">Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/concepts.html">Concepts</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../handbook/appendices.html">Appendices</a><input aria-label="Toggle navigation of Appendices" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/image-file-formats.html">Image file formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/text-anchors.html">Text anchors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/third-party-plugins.html">Third-party plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html">Writing your own image plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html#decoders">Decoders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-c">Writing your own file codec in C</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-python">Writing your own file codec in Python</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/security.html">Security</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/Image.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Image</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageChops.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageChops</span></code> (“channel operations”) module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageCms.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageCms</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageColor.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageColor</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageEnhance.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageEnhance</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageFile.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFile</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageFilter.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageFont.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageGrab.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageGrab</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageMath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageMorph.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMorph</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageOps.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageOps</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImagePalette.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePalette</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImagePath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageQt.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageQt</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageSequence.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageSequence</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageShow.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageShow</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageStat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageStat</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageText.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageText</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageTk.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTk</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageTransform.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTransform</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageWin.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageWin</span></code> module (Windows-only)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ExifTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ExifTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/TiffTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">TiffTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/JpegPresets.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">JpegPresets</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/PSDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PSDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/PixelAccess.html"><code class="xref py py-class docutils literal notranslate"><span class="pre">PixelAccess</span></code> class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/features.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">features</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/fast_mode.html">Fast mode (Pillow-AllSIMD)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../PIL.html">PIL package (autodoc of remaining modules)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/plugins.html">Plugin reference</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../reference/internal_design.html">Internal reference</a><input aria-label="Toggle navigation of Internal reference" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/open_files.html">File handling in Pillow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/limits.html">Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/block_allocator.html">Block allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/internal_modules.html">Internal modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/c_extension_debugging.html">C extension debugging on Linux, with GDB/Valgrind</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/arrow_support.html">Arrow support</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../porting.html">Porting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../allsimd-changelog.html">Changelog (Pillow-AllSIMD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../allsimd-changelog.html#pillow-simd">Pillow-SIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../releasenotes/index.html">Release notes</a><input aria-label="Toggle navigation of Release notes" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/versioning.html">Versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/13.0.0.html">13.0.0 (2026-10-16)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.3.0.html">12.3.0 (2026-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.2.0.html">12.2.0 (2026-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.1.1.html">12.1.1 (2026-02-11)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.1.0.html">12.1.0 (2026-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.0.0.html">12.0.0 (2025-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.3.0.html">11.3.0 (2025-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.2.1.html">11.2.1 (2025-04-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.1.0.html">11.1.0 (2025-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.0.0.html">11.0.0 (2024-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.4.0.html">10.4.0 (2024-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.3.0.html">10.3.0 (2024-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.2.0.html">10.2.0 (2024-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.1.0.html">10.1.0 (2023-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.0.1.html">10.0.1 (2023-09-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.0.0.html">10.0.0 (2023-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.5.0.html">9.5.0 (2023-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.4.0.html">9.4.0 (2023-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.3.0.html">9.3.0 (2022-10-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.2.0.html">9.2.0 (2022-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.1.1.html">9.1.1 (2022-05-17)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.1.0.html">9.1.0 (2022-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.0.1.html">9.0.1 (2022-02-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.0.0.html">9.0.0 (2022-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.4.0.html">8.4.0 (2021-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.3.2.html">8.3.2 (2021-09-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.3.1.html">8.3.1 (2021-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.3.0.html">8.3.0 (2021-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.2.0.html">8.2.0 (2021-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.1.2.html">8.1.2 (2021-03-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.1.1.html">8.1.1 (2021-03-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.1.0.html">8.1.0 (2021-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.0.1.html">8.0.1 (2020-10-22)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.0.0.html">8.0.0 (2020-10-14)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.2.0.html">7.2.0 (2020-06-30)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.1.2.html">7.1.2 (2020-04-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.1.1.html">7.1.1 (2020-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.1.0.html">7.1.0 (2020-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.0.0.html">7.0.0 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.2.2.html">6.2.2 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.2.1.html">6.2.1 (2019-10-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.2.0.html">6.2.0 (2019-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.1.0.html">6.1.0 (2019-07-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.0.0.html">6.0.0 (2019-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.4.1.html">5.4.1 (2019-01-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.4.0.html">5.4.0 (2019-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.3.0.html">5.3.0 (2018-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.2.0.html">5.2.0 (2018-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.1.0.html">5.1.0 (2018-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.0.0.html">5.0.0 (2018-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.3.0.html">4.3.0 (2017-10-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.2.1.html">4.2.1 (2017-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.2.0.html">4.2.0 (2017-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.1.1.html">4.1.1 (2017-04-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.1.0.html">4.1.0 (2017-04-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.0.0.html">4.0.0 (2017-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.4.0.html">3.4.0 (2016-10-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.3.2.html">3.3.2 (2016-09-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.3.0.html">3.3.0 (2016-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.2.0.html">3.2.0 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.1.2.html">3.1.2 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.1.1.html">3.1.1 (2016-02-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.1.0.html">3.1.0 (2016-01-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.0.0.html">3.0.0 (2015-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.8.0.html">2.8.0 (2015-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.7.0.html">2.7.0 (2014-12-31)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.6.0.html">2.6.0 (2014-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.5.2.html">2.5.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.3.2.html">2.3.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.3.1.html">2.3.1 (2014-03-14)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../deprecations.html">Deprecations and removals</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for PIL.ImageFont</h1><div class="highlight"><pre>
+<span></span><span class="c1">#</span>
+<span class="c1"># The Python Imaging Library.</span>
+<span class="c1"># $Id$</span>
+<span class="c1">#</span>
+<span class="c1"># PIL raster font management</span>
+<span class="c1">#</span>
+<span class="c1"># History:</span>
+<span class="c1"># 1996-08-07 fl   created (experimental)</span>
+<span class="c1"># 1997-08-25 fl   minor adjustments to handle fonts from pilfont 0.3</span>
+<span class="c1"># 1999-02-06 fl   rewrote most font management stuff in C</span>
+<span class="c1"># 1999-03-17 fl   take pth files into account in load_path (from Richard Jones)</span>
+<span class="c1"># 2001-02-17 fl   added freetype support</span>
+<span class="c1"># 2001-05-09 fl   added TransposedFont wrapper class</span>
+<span class="c1"># 2002-03-04 fl   make sure we have a &quot;L&quot; or &quot;1&quot; font</span>
+<span class="c1"># 2002-12-04 fl   skip non-directory entries in the system path</span>
+<span class="c1"># 2003-04-29 fl   add embedded default font</span>
+<span class="c1"># 2003-09-27 fl   added support for truetype charmap encodings</span>
+<span class="c1">#</span>
+<span class="c1"># Todo:</span>
+<span class="c1"># Adapt to PILFONT2 format (16-bit fonts, compressed, single file)</span>
+<span class="c1">#</span>
+<span class="c1"># Copyright (c) 1997-2003 by Secret Labs AB</span>
+<span class="c1"># Copyright (c) 1996-2003 by Fredrik Lundh</span>
+<span class="c1">#</span>
+<span class="c1"># See the README file for information on usage and redistribution.</span>
+<span class="c1">#</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="n">__lazy_modules__</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;base64&quot;</span><span class="p">,</span> <span class="s2">&quot;io&quot;</span><span class="p">,</span> <span class="s2">&quot;types&quot;</span><span class="p">,</span> <span class="s2">&quot;warnings&quot;</span><span class="p">}</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">abc</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">IntEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">io</span><span class="w"> </span><span class="kn">import</span> <span class="n">BytesIO</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">types</span><span class="w"> </span><span class="kn">import</span> <span class="n">ModuleType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypedDict</span><span class="p">,</span> <span class="n">cast</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._util</span><span class="w"> </span><span class="kn">import</span> <span class="n">DeferredError</span><span class="p">,</span> <span class="n">is_path</span>
+
+<span class="n">TYPE_CHECKING</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">IO</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">BinaryIO</span><span class="p">,</span> <span class="n">NotRequired</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">ImageFile</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">._imaging</span><span class="w"> </span><span class="kn">import</span> <span class="n">ImagingFont</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">._imagingft</span><span class="w"> </span><span class="kn">import</span> <span class="n">Font</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">._typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">StrOrBytesPath</span>
+
+
+<div class="viewcode-block" id="Axis">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.Axis">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Axis</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">):</span>
+    <span class="n">minimum</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">default</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">maximum</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">NotRequired</span><span class="p">[</span><span class="nb">bytes</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="Layout">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.Layout">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Layout</span><span class="p">(</span><span class="n">IntEnum</span><span class="p">):</span>
+    <span class="n">BASIC</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">RAQM</span> <span class="o">=</span> <span class="mi">1</span></div>
+
+
+
+<span class="n">MAX_STRING_LENGTH</span> <span class="o">=</span> <span class="mi">1_000_000</span>
+
+
+<span class="n">core</span><span class="p">:</span> <span class="n">ModuleType</span> <span class="o">|</span> <span class="n">DeferredError</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">_imagingft</span> <span class="k">as</span> <span class="n">core</span>
+<span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">ex</span><span class="p">:</span>
+    <span class="n">core</span> <span class="o">=</span> <span class="n">DeferredError</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_string_length_check</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="nb">bytearray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">MAX_STRING_LENGTH</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">MAX_STRING_LENGTH</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;too many characters in string&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+
+<span class="c1"># FIXME: add support for pilfont2 format (see FontFile.py)</span>
+
+<span class="c1"># --------------------------------------------------------------------</span>
+<span class="c1"># Font metrics format:</span>
+<span class="c1">#       &quot;PILfont&quot; LF</span>
+<span class="c1">#       fontdescriptor LF</span>
+<span class="c1">#       (optional) key=value... LF</span>
+<span class="c1">#       &quot;DATA&quot; LF</span>
+<span class="c1">#       binary data: 256*10*2 bytes (dx, dy, dstbox, srcbox)</span>
+<span class="c1">#</span>
+<span class="c1"># To place a character, cut out srcbox and paste at dstbox,</span>
+<span class="c1"># relative to the character position.  Then move the character</span>
+<span class="c1"># position according to dx, dy.</span>
+<span class="c1"># --------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="BaseImageFont">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.BaseImageFont">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">BaseImageFont</span><span class="p">(</span><span class="n">abc</span><span class="o">.</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Used by ImageDraw and ImageText&quot;&quot;&quot;</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getbbox</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="nb">bytearray</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getmask</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Image</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">ImagingCore</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getlength</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="ImageFont">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.ImageFont">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ImageFont</span><span class="p">(</span><span class="n">BaseImageFont</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PIL font wrapper&quot;&quot;&quot;</span>
+
+    <span class="n">font</span><span class="p">:</span> <span class="n">ImagingFont</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load_pilfont</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+            <span class="n">image</span><span class="p">:</span> <span class="n">ImageFile</span><span class="o">.</span><span class="n">ImageFile</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">filename</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;.png&quot;</span><span class="p">,</span> <span class="s2">&quot;.gif&quot;</span><span class="p">,</span> <span class="s2">&quot;.pbm&quot;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">image</span><span class="p">:</span>
+                    <span class="n">image</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">fullname</span> <span class="o">=</span> <span class="n">root</span> <span class="o">+</span> <span class="n">ext</span>
+                    <span class="n">image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">fullname</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">pass</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">image</span><span class="o">.</span><span class="n">mode</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;L&quot;</span><span class="p">):</span>
+                        <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">image</span><span class="p">:</span>
+                    <span class="n">image</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+                <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;cannot find glyph data file </span><span class="si">{</span><span class="n">root</span><span class="si">}</span><span class="s2">.</span><span class="se">{{</span><span class="s2">gif|pbm|png</span><span class="se">}}</span><span class="s2">&quot;</span>
+                <span class="k">raise</span> <span class="ne">OSError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">file</span> <span class="o">=</span> <span class="n">fullname</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_load_pilfont_data</span><span class="p">(</span><span class="n">fp</span><span class="p">,</span> <span class="n">image</span><span class="p">)</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load_pilfont_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file</span><span class="p">:</span> <span class="n">IO</span><span class="p">[</span><span class="nb">bytes</span><span class="p">],</span> <span class="n">image</span><span class="p">:</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># check image</span>
+        <span class="k">if</span> <span class="n">image</span><span class="o">.</span><span class="n">mode</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;L&quot;</span><span class="p">):</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;invalid font image mode&quot;</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># read PILfont header</span>
+        <span class="k">if</span> <span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span> <span class="o">!=</span> <span class="sa">b</span><span class="s2">&quot;PILfont</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">:</span>
+            <span class="n">image</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Not a PILfont file&quot;</span>
+            <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="n">file</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">info</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># FIXME: should be a dictionary</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="n">file</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">s</span> <span class="ow">or</span> <span class="n">s</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;DATA</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
+
+        <span class="c1"># read PILfont metrics</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">256</span> <span class="o">*</span> <span class="mi">20</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_load</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">image</span><span class="p">:</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">image</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">font</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">font</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">im</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ImageFont.getmask">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.ImageFont.getmask">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getmask</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Image</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">ImagingCore</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a bitmap for the text.</span>
+
+<span class="sd">        If the font uses antialiasing, the bitmap should have mode ``L`` and use a</span>
+<span class="sd">        maximum value of 255. Otherwise, it should have mode ``1``.</span>
+
+<span class="sd">        :param text: Text to render.</span>
+<span class="sd">        :param mode: Used by some graphics drivers to indicate what mode the</span>
+<span class="sd">                     driver prefers; if empty, the renderer may return either</span>
+<span class="sd">                     mode. Note that the mode is always a string, to simplify</span>
+<span class="sd">                     C-level implementations.</span>
+
+<span class="sd">                     .. versionadded:: 1.1.5</span>
+
+<span class="sd">        :return: An internal PIL storage memory instance as defined by the</span>
+<span class="sd">                 :py:mod:`PIL.Image.core` interface module.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_string_length_check</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="n">Image</span><span class="o">.</span><span class="n">_decompression_bomb_check</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getmask</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">mode</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ImageFont.getbbox">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.ImageFont.getbbox">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getbbox</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="nb">bytearray</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns bounding box (in pixels) of given text.</span>
+
+<span class="sd">        .. versionadded:: 9.2.0</span>
+
+<span class="sd">        :param text: Text to render.</span>
+
+<span class="sd">        :return: ``(left, top, right, bottom)`` bounding box</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_string_length_check</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="n">width</span><span class="p">,</span> <span class="n">height</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span></div>
+
+
+<div class="viewcode-block" id="ImageFont.getlength">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.ImageFont.getlength">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getlength</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="nb">bytearray</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns length (in pixels) of given text.</span>
+<span class="sd">        This is the amount by which following text should be offset.</span>
+
+<span class="sd">        .. versionadded:: 9.2.0</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_string_length_check</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="n">width</span><span class="p">,</span> <span class="n">height</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">width</span></div>
+</div>
+
+
+
+<span class="c1">##</span>
+<span class="c1"># Wrapper for FreeType fonts.  Application code should use the</span>
+<span class="c1"># &lt;b&gt;truetype&lt;/b&gt; factory function to create font objects.</span>
+
+
+<div class="viewcode-block" id="FreeTypeFont">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FreeTypeFont</span><span class="p">(</span><span class="n">BaseImageFont</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;FreeType font wrapper (requires _imagingft service)&quot;&quot;&quot;</span>
+
+    <span class="n">font</span><span class="p">:</span> <span class="n">Font</span>
+    <span class="n">font_bytes</span><span class="p">:</span> <span class="nb">bytes</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">font</span><span class="p">:</span> <span class="n">StrOrBytesPath</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">,</span>
+        <span class="n">size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="n">index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">layout_engine</span><span class="p">:</span> <span class="n">Layout</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># FIXME: use service provider instead</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">core</span><span class="p">,</span> <span class="n">DeferredError</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">core</span><span class="o">.</span><span class="n">ex</span>
+
+        <span class="k">if</span> <span class="n">size</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;font size must be greater than 0, not </span><span class="si">{</span><span class="n">size</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">path</span> <span class="o">=</span> <span class="n">font</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">=</span> <span class="n">size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">index</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="o">=</span> <span class="n">encoding</span>
+
+        <span class="k">if</span> <span class="n">layout_engine</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">Layout</span><span class="o">.</span><span class="n">BASIC</span><span class="p">,</span> <span class="n">Layout</span><span class="o">.</span><span class="n">RAQM</span><span class="p">):</span>
+            <span class="n">layout_engine</span> <span class="o">=</span> <span class="n">Layout</span><span class="o">.</span><span class="n">BASIC</span>
+            <span class="k">if</span> <span class="n">core</span><span class="o">.</span><span class="n">HAVE_RAQM</span><span class="p">:</span>
+                <span class="n">layout_engine</span> <span class="o">=</span> <span class="n">Layout</span><span class="o">.</span><span class="n">RAQM</span>
+        <span class="k">elif</span> <span class="n">layout_engine</span> <span class="o">==</span> <span class="n">Layout</span><span class="o">.</span><span class="n">RAQM</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">core</span><span class="o">.</span><span class="n">HAVE_RAQM</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                <span class="s2">&quot;Raqm layout was requested, but Raqm is not available. &quot;</span>
+                <span class="s2">&quot;Falling back to basic layout.&quot;</span>
+            <span class="p">)</span>
+            <span class="n">layout_engine</span> <span class="o">=</span> <span class="n">Layout</span><span class="o">.</span><span class="n">BASIC</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">layout_engine</span> <span class="o">=</span> <span class="n">layout_engine</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">load_from_bytes</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">IO</span><span class="p">[</span><span class="nb">bytes</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">font_bytes</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">font</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">getfont</span><span class="p">(</span>
+                <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">encoding</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">font_bytes</span><span class="p">,</span> <span class="n">layout_engine</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">is_path</span><span class="p">(</span><span class="n">font</span><span class="p">):</span>
+            <span class="n">font</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fspath</span><span class="p">(</span><span class="n">font</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span><span class="p">:</span>
+                <span class="n">font_bytes_path</span> <span class="o">=</span> <span class="n">font</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">font</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">)</span> <span class="k">else</span> <span class="n">font</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">font_bytes_path</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;ascii&quot;</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">UnicodeDecodeError</span><span class="p">:</span>
+                    <span class="c1"># FreeType cannot load fonts with non-ASCII characters on Windows</span>
+                    <span class="c1"># So load it into memory first</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">font</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                        <span class="n">load_from_bytes</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+                    <span class="k">return</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">font</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">getfont</span><span class="p">(</span>
+                <span class="n">font</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">encoding</span><span class="p">,</span> <span class="n">layout_engine</span><span class="o">=</span><span class="n">layout_engine</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">load_from_bytes</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;IO[bytes]&quot;</span><span class="p">,</span> <span class="n">font</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__getstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">path</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">encoding</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">layout_engine</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__setstate__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">path</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">encoding</span><span class="p">,</span> <span class="n">layout_engine</span> <span class="o">=</span> <span class="n">state</span>
+        <span class="n">FreeTypeFont</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">encoding</span><span class="p">,</span> <span class="n">layout_engine</span><span class="p">)</span>
+
+<div class="viewcode-block" id="FreeTypeFont.getname">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.getname">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getname</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: A tuple of the font family (e.g. Helvetica) and the font style</span>
+<span class="sd">            (e.g. Bold)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">family</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">style</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.getmetrics">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.getmetrics">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getmetrics</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :return: A tuple of the font ascent (the distance from the baseline to</span>
+<span class="sd">            the highest outline point) and descent (the distance from the</span>
+<span class="sd">            baseline to the lowest outline point, a negative value)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">ascent</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">descent</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.getlength">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.getlength">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getlength</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">direction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">features</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns length (in pixels with 1/64 precision) of given text when rendered</span>
+<span class="sd">        in font with provided direction, features, and language.</span>
+
+<span class="sd">        This is the amount by which following text should be offset.</span>
+<span class="sd">        Text bounding box may extend past the length in some fonts,</span>
+<span class="sd">        e.g. when using italics or accents.</span>
+
+<span class="sd">        The result is returned as a float; it is a whole number if using basic layout.</span>
+
+<span class="sd">        Note that the sum of two lengths may not equal the length of a concatenated</span>
+<span class="sd">        string due to kerning. If you need to adjust for kerning, include the following</span>
+<span class="sd">        character and subtract its length.</span>
+
+<span class="sd">        For example, instead of ::</span>
+
+<span class="sd">          hello = font.getlength(&quot;Hello&quot;)</span>
+<span class="sd">          world = font.getlength(&quot;World&quot;)</span>
+<span class="sd">          hello_world = hello + world  # not adjusted for kerning</span>
+<span class="sd">          assert hello_world == font.getlength(&quot;HelloWorld&quot;)  # may fail</span>
+
+<span class="sd">        use ::</span>
+
+<span class="sd">          hello = font.getlength(&quot;HelloW&quot;) - font.getlength(&quot;W&quot;)  # adjusted for kerning</span>
+<span class="sd">          world = font.getlength(&quot;World&quot;)</span>
+<span class="sd">          hello_world = hello + world  # adjusted for kerning</span>
+<span class="sd">          assert hello_world == font.getlength(&quot;HelloWorld&quot;)  # True</span>
+
+<span class="sd">        or disable kerning with (requires libraqm) ::</span>
+
+<span class="sd">          hello = draw.textlength(&quot;Hello&quot;, font, features=[&quot;-kern&quot;])</span>
+<span class="sd">          world = draw.textlength(&quot;World&quot;, font, features=[&quot;-kern&quot;])</span>
+<span class="sd">          hello_world = hello + world  # kerning is disabled, no need to adjust</span>
+<span class="sd">          assert hello_world == draw.textlength(&quot;HelloWorld&quot;, font, features=[&quot;-kern&quot;])</span>
+
+<span class="sd">        .. versionadded:: 8.0.0</span>
+
+<span class="sd">        :param text: Text to measure.</span>
+<span class="sd">        :param mode: Used by some graphics drivers to indicate what mode the</span>
+<span class="sd">                     driver prefers; if empty, the renderer may return either</span>
+<span class="sd">                     mode. Note that the mode is always a string, to simplify</span>
+<span class="sd">                     C-level implementations.</span>
+
+<span class="sd">        :param direction: Direction of the text. It can be &#39;rtl&#39; (right to</span>
+<span class="sd">                          left), &#39;ltr&#39; (left to right) or &#39;ttb&#39; (top to bottom).</span>
+<span class="sd">                          Requires libraqm.</span>
+
+<span class="sd">        :param features: A list of OpenType font features to be used during text</span>
+<span class="sd">                         layout. This is usually used to turn on optional</span>
+<span class="sd">                         font features that are not enabled by default,</span>
+<span class="sd">                         for example &#39;dlig&#39; or &#39;ss01&#39;, but can be also</span>
+<span class="sd">                         used to turn off default font features for</span>
+<span class="sd">                         example &#39;-liga&#39; to disable ligatures or &#39;-kern&#39;</span>
+<span class="sd">                         to disable kerning.  To get all supported</span>
+<span class="sd">                         features, see</span>
+<span class="sd">                         https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist</span>
+<span class="sd">                         Requires libraqm.</span>
+
+<span class="sd">        :param language: Language of the text. Different languages may use</span>
+<span class="sd">                         different glyph shapes or ligatures. This parameter tells</span>
+<span class="sd">                         the font which language the text is in, and to apply the</span>
+<span class="sd">                         correct substitutions as appropriate, if available.</span>
+<span class="sd">                         It should be a `BCP 47 language code</span>
+<span class="sd">                         &lt;https://www.w3.org/International/articles/language-tags/&gt;`_</span>
+<span class="sd">                         Requires libraqm.</span>
+
+<span class="sd">        :return: Either width for horizontal text, or height for vertical text.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_string_length_check</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getlength</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">direction</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">language</span><span class="p">)</span> <span class="o">/</span> <span class="mi">64</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.getbbox">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.getbbox">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getbbox</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="nb">bytearray</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">direction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">features</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">stroke_width</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">anchor</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns bounding box (in pixels) of given text relative to given anchor</span>
+<span class="sd">        when rendered in font with provided direction, features, and language.</span>
+
+<span class="sd">        Use :py:meth:`getlength()` to get the offset of following text with</span>
+<span class="sd">        1/64 pixel precision. The bounding box includes extra margins for</span>
+<span class="sd">        some fonts, e.g. italics or accents.</span>
+
+<span class="sd">        .. versionadded:: 8.0.0</span>
+
+<span class="sd">        :param text: Text to render.</span>
+<span class="sd">        :param mode: Used by some graphics drivers to indicate what mode the</span>
+<span class="sd">                     driver prefers; if empty, the renderer may return either</span>
+<span class="sd">                     mode. Note that the mode is always a string, to simplify</span>
+<span class="sd">                     C-level implementations.</span>
+
+<span class="sd">        :param direction: Direction of the text. It can be &#39;rtl&#39; (right to</span>
+<span class="sd">                          left), &#39;ltr&#39; (left to right) or &#39;ttb&#39; (top to bottom).</span>
+<span class="sd">                          Requires libraqm.</span>
+
+<span class="sd">        :param features: A list of OpenType font features to be used during text</span>
+<span class="sd">                         layout. This is usually used to turn on optional</span>
+<span class="sd">                         font features that are not enabled by default,</span>
+<span class="sd">                         for example &#39;dlig&#39; or &#39;ss01&#39;, but can be also</span>
+<span class="sd">                         used to turn off default font features for</span>
+<span class="sd">                         example &#39;-liga&#39; to disable ligatures or &#39;-kern&#39;</span>
+<span class="sd">                         to disable kerning.  To get all supported</span>
+<span class="sd">                         features, see</span>
+<span class="sd">                         https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist</span>
+<span class="sd">                         Requires libraqm.</span>
+
+<span class="sd">        :param language: Language of the text. Different languages may use</span>
+<span class="sd">                         different glyph shapes or ligatures. This parameter tells</span>
+<span class="sd">                         the font which language the text is in, and to apply the</span>
+<span class="sd">                         correct substitutions as appropriate, if available.</span>
+<span class="sd">                         It should be a `BCP 47 language code</span>
+<span class="sd">                         &lt;https://www.w3.org/International/articles/language-tags/&gt;`_</span>
+<span class="sd">                         Requires libraqm.</span>
+
+<span class="sd">        :param stroke_width: The width of the text stroke.</span>
+
+<span class="sd">        :param anchor:  The text anchor alignment. Determines the relative location of</span>
+<span class="sd">                        the anchor to the text. The default alignment is top left,</span>
+<span class="sd">                        specifically ``la`` for horizontal text and ``lt`` for</span>
+<span class="sd">                        vertical text. See :ref:`text-anchors` for details.</span>
+
+<span class="sd">        :return: ``(left, top, right, bottom)`` bounding box</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_string_length_check</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="n">size</span><span class="p">,</span> <span class="n">offset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getsize</span><span class="p">(</span>
+            <span class="n">text</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">direction</span><span class="p">,</span> <span class="n">features</span><span class="p">,</span> <span class="n">language</span><span class="p">,</span> <span class="n">anchor</span>
+        <span class="p">)</span>
+        <span class="n">left</span><span class="p">,</span> <span class="n">top</span> <span class="o">=</span> <span class="n">offset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">stroke_width</span><span class="p">,</span> <span class="n">offset</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">stroke_width</span>
+        <span class="n">width</span><span class="p">,</span> <span class="n">height</span> <span class="o">=</span> <span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">stroke_width</span><span class="p">,</span> <span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">stroke_width</span>
+        <span class="k">return</span> <span class="n">left</span><span class="p">,</span> <span class="n">top</span><span class="p">,</span> <span class="n">left</span> <span class="o">+</span> <span class="n">width</span><span class="p">,</span> <span class="n">top</span> <span class="o">+</span> <span class="n">height</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.getmask">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.getmask">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getmask</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">direction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">features</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">stroke_width</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">anchor</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">ink</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">start</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Image</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">ImagingCore</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a bitmap for the text.</span>
+
+<span class="sd">        If the font uses antialiasing, the bitmap should have mode ``L`` and use a</span>
+<span class="sd">        maximum value of 255. If the font has embedded color data, the bitmap</span>
+<span class="sd">        should have mode ``RGBA``. Otherwise, it should have mode ``1``.</span>
+
+<span class="sd">        :param text: Text to render.</span>
+<span class="sd">        :param mode: Used by some graphics drivers to indicate what mode the</span>
+<span class="sd">                     driver prefers; if empty, the renderer may return either</span>
+<span class="sd">                     mode. Note that the mode is always a string, to simplify</span>
+<span class="sd">                     C-level implementations.</span>
+
+<span class="sd">                     .. versionadded:: 1.1.5</span>
+
+<span class="sd">        :param direction: Direction of the text. It can be &#39;rtl&#39; (right to</span>
+<span class="sd">                          left), &#39;ltr&#39; (left to right) or &#39;ttb&#39; (top to bottom).</span>
+<span class="sd">                          Requires libraqm.</span>
+
+<span class="sd">                          .. versionadded:: 4.2.0</span>
+
+<span class="sd">        :param features: A list of OpenType font features to be used during text</span>
+<span class="sd">                         layout. This is usually used to turn on optional</span>
+<span class="sd">                         font features that are not enabled by default,</span>
+<span class="sd">                         for example &#39;dlig&#39; or &#39;ss01&#39;, but can be also</span>
+<span class="sd">                         used to turn off default font features for</span>
+<span class="sd">                         example &#39;-liga&#39; to disable ligatures or &#39;-kern&#39;</span>
+<span class="sd">                         to disable kerning.  To get all supported</span>
+<span class="sd">                         features, see</span>
+<span class="sd">                         https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist</span>
+<span class="sd">                         Requires libraqm.</span>
+
+<span class="sd">                         .. versionadded:: 4.2.0</span>
+
+<span class="sd">        :param language: Language of the text. Different languages may use</span>
+<span class="sd">                         different glyph shapes or ligatures. This parameter tells</span>
+<span class="sd">                         the font which language the text is in, and to apply the</span>
+<span class="sd">                         correct substitutions as appropriate, if available.</span>
+<span class="sd">                         It should be a `BCP 47 language code</span>
+<span class="sd">                         &lt;https://www.w3.org/International/articles/language-tags/&gt;`_</span>
+<span class="sd">                         Requires libraqm.</span>
+
+<span class="sd">                         .. versionadded:: 6.0.0</span>
+
+<span class="sd">        :param stroke_width: The width of the text stroke.</span>
+
+<span class="sd">                         .. versionadded:: 6.2.0</span>
+
+<span class="sd">        :param anchor:  The text anchor alignment. Determines the relative location of</span>
+<span class="sd">                        the anchor to the text. The default alignment is top left,</span>
+<span class="sd">                        specifically ``la`` for horizontal text and ``lt`` for</span>
+<span class="sd">                        vertical text. See :ref:`text-anchors` for details.</span>
+
+<span class="sd">                         .. versionadded:: 8.0.0</span>
+
+<span class="sd">        :param ink: Foreground ink for rendering in RGBA mode.</span>
+
+<span class="sd">                         .. versionadded:: 8.0.0</span>
+
+<span class="sd">        :param start: Tuple of horizontal and vertical offset, as text may render</span>
+<span class="sd">                      differently when starting at fractional coordinates.</span>
+
+<span class="sd">                         .. versionadded:: 9.4.0</span>
+
+<span class="sd">        :return: An internal PIL storage memory instance as defined by the</span>
+<span class="sd">                 :py:mod:`PIL.Image.core` interface module.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">getmask2</span><span class="p">(</span>
+            <span class="n">text</span><span class="p">,</span>
+            <span class="n">mode</span><span class="p">,</span>
+            <span class="n">direction</span><span class="o">=</span><span class="n">direction</span><span class="p">,</span>
+            <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
+            <span class="n">language</span><span class="o">=</span><span class="n">language</span><span class="p">,</span>
+            <span class="n">stroke_width</span><span class="o">=</span><span class="n">stroke_width</span><span class="p">,</span>
+            <span class="n">anchor</span><span class="o">=</span><span class="n">anchor</span><span class="p">,</span>
+            <span class="n">ink</span><span class="o">=</span><span class="n">ink</span><span class="p">,</span>
+            <span class="n">start</span><span class="o">=</span><span class="n">start</span><span class="p">,</span>
+        <span class="p">)[</span><span class="mi">0</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.getmask2">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.getmask2">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getmask2</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span>
+        <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+        <span class="n">direction</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">features</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">language</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">stroke_width</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">anchor</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">ink</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">start</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Image</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">ImagingCore</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a bitmap for the text.</span>
+
+<span class="sd">        If the font uses antialiasing, the bitmap should have mode ``L`` and use a</span>
+<span class="sd">        maximum value of 255. If the font has embedded color data, the bitmap</span>
+<span class="sd">        should have mode ``RGBA``. Otherwise, it should have mode ``1``.</span>
+
+<span class="sd">        :param text: Text to render.</span>
+<span class="sd">        :param mode: Used by some graphics drivers to indicate what mode the</span>
+<span class="sd">                     driver prefers; if empty, the renderer may return either</span>
+<span class="sd">                     mode. Note that the mode is always a string, to simplify</span>
+<span class="sd">                     C-level implementations.</span>
+
+<span class="sd">                     .. versionadded:: 1.1.5</span>
+
+<span class="sd">        :param direction: Direction of the text. It can be &#39;rtl&#39; (right to</span>
+<span class="sd">                          left), &#39;ltr&#39; (left to right) or &#39;ttb&#39; (top to bottom).</span>
+<span class="sd">                          Requires libraqm.</span>
+
+<span class="sd">                          .. versionadded:: 4.2.0</span>
+
+<span class="sd">        :param features: A list of OpenType font features to be used during text</span>
+<span class="sd">                         layout. This is usually used to turn on optional</span>
+<span class="sd">                         font features that are not enabled by default,</span>
+<span class="sd">                         for example &#39;dlig&#39; or &#39;ss01&#39;, but can be also</span>
+<span class="sd">                         used to turn off default font features for</span>
+<span class="sd">                         example &#39;-liga&#39; to disable ligatures or &#39;-kern&#39;</span>
+<span class="sd">                         to disable kerning.  To get all supported</span>
+<span class="sd">                         features, see</span>
+<span class="sd">                         https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist</span>
+<span class="sd">                         Requires libraqm.</span>
+
+<span class="sd">                         .. versionadded:: 4.2.0</span>
+
+<span class="sd">        :param language: Language of the text. Different languages may use</span>
+<span class="sd">                         different glyph shapes or ligatures. This parameter tells</span>
+<span class="sd">                         the font which language the text is in, and to apply the</span>
+<span class="sd">                         correct substitutions as appropriate, if available.</span>
+<span class="sd">                         It should be a `BCP 47 language code</span>
+<span class="sd">                         &lt;https://www.w3.org/International/articles/language-tags/&gt;`_</span>
+<span class="sd">                         Requires libraqm.</span>
+
+<span class="sd">                         .. versionadded:: 6.0.0</span>
+
+<span class="sd">        :param stroke_width: The width of the text stroke.</span>
+
+<span class="sd">                         .. versionadded:: 6.2.0</span>
+
+<span class="sd">        :param anchor:  The text anchor alignment. Determines the relative location of</span>
+<span class="sd">                        the anchor to the text. The default alignment is top left,</span>
+<span class="sd">                        specifically ``la`` for horizontal text and ``lt`` for</span>
+<span class="sd">                        vertical text. See :ref:`text-anchors` for details.</span>
+
+<span class="sd">                         .. versionadded:: 8.0.0</span>
+
+<span class="sd">        :param ink: Foreground ink for rendering in RGBA mode.</span>
+
+<span class="sd">                         .. versionadded:: 8.0.0</span>
+
+<span class="sd">        :param start: Tuple of horizontal and vertical offset, as text may render</span>
+<span class="sd">                      differently when starting at fractional coordinates.</span>
+
+<span class="sd">                         .. versionadded:: 9.4.0</span>
+
+<span class="sd">        :return: A tuple of an internal PIL storage memory instance as defined by the</span>
+<span class="sd">                 :py:mod:`PIL.Image.core` interface module, and the text offset, the</span>
+<span class="sd">                 gap between the starting coordinate and the first marking</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_string_length_check</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">start</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">fill</span><span class="p">(</span><span class="n">width</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Image</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">ImagingCore</span><span class="p">:</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+            <span class="n">Image</span><span class="o">.</span><span class="n">_decompression_bomb_check</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">Image</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="s2">&quot;RGBA&quot;</span> <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;RGBA&quot;</span> <span class="k">else</span> <span class="s2">&quot;L&quot;</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">render</span><span class="p">(</span>
+            <span class="n">text</span><span class="p">,</span>
+            <span class="n">fill</span><span class="p">,</span>
+            <span class="n">mode</span><span class="p">,</span>
+            <span class="n">direction</span><span class="p">,</span>
+            <span class="n">features</span><span class="p">,</span>
+            <span class="n">language</span><span class="p">,</span>
+            <span class="n">stroke_width</span><span class="p">,</span>
+            <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stroke_filled&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+            <span class="n">anchor</span><span class="p">,</span>
+            <span class="n">ink</span><span class="p">,</span>
+            <span class="n">start</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.font_variant">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.font_variant">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">font_variant</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">font</span><span class="p">:</span> <span class="n">StrOrBytesPath</span> <span class="o">|</span> <span class="n">BinaryIO</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">layout_engine</span><span class="p">:</span> <span class="n">Layout</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FreeTypeFont</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create a copy of this FreeTypeFont object,</span>
+<span class="sd">        using any specified arguments to override the settings.</span>
+
+<span class="sd">        Parameters are identical to the parameters used to initialize this</span>
+<span class="sd">        object.</span>
+
+<span class="sd">        :return: A FreeTypeFont object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">font</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">font</span> <span class="o">=</span> <span class="n">BytesIO</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">font_bytes</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                <span class="n">font</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">path</span>
+        <span class="k">return</span> <span class="n">FreeTypeFont</span><span class="p">(</span>
+            <span class="n">font</span><span class="o">=</span><span class="n">font</span><span class="p">,</span>
+            <span class="n">size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="k">if</span> <span class="n">size</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">size</span><span class="p">,</span>
+            <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="k">if</span> <span class="n">index</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">index</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">encoding</span> <span class="k">if</span> <span class="n">encoding</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">encoding</span><span class="p">,</span>
+            <span class="n">layout_engine</span><span class="o">=</span><span class="p">(</span>
+                <span class="n">layout_engine</span> <span class="k">if</span> <span class="n">layout_engine</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">layout_engine</span>
+            <span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.get_variation_names">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.get_variation_names">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_variation_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">bytes</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :returns: A list of the named styles in a variation font.</span>
+<span class="sd">        :exception OSError: If the font is not a variation font.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getvarnames</span><span class="p">():</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\x00</span><span class="s2">&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">names</span><span class="p">:</span>
+                <span class="n">names</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">names</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.set_variation_by_name">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.set_variation_by_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_variation_by_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param name: The name of the style.</span>
+<span class="sd">        :exception OSError: If the font is not a variation font.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_variation_names</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">):</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">name</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="n">names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="n">index</span> <span class="o">==</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_last_variation_index&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">):</span>
+            <span class="c1"># When the same name is set twice in a row,</span>
+            <span class="c1"># there is an &#39;unknown freetype error&#39;</span>
+            <span class="c1"># https://savannah.nongnu.org/bugs/?56186</span>
+            <span class="k">return</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_variation_index</span> <span class="o">=</span> <span class="n">index</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">setvarname</span><span class="p">(</span><span class="n">index</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.get_variation_axes">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.get_variation_axes">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_variation_axes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Axis</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :returns: A list of the axes in a variation font.</span>
+<span class="sd">        :exception OSError: If the font is not a variation font.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">axes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getvaraxes</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">axis</span> <span class="ow">in</span> <span class="n">axes</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">in</span> <span class="n">axis</span><span class="p">:</span>
+                <span class="n">axis</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">axis</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\x00</span><span class="s2">&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">axes</span></div>
+
+
+<div class="viewcode-block" id="FreeTypeFont.set_variation_by_axes">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.FreeTypeFont.set_variation_by_axes">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_variation_by_axes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        :param axes: A list of values for each axis.</span>
+<span class="sd">        :exception OSError: If the font is not a variation font.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">setvaraxes</span><span class="p">(</span><span class="n">axes</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TransposedFont">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.TransposedFont">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TransposedFont</span><span class="p">(</span><span class="n">BaseImageFont</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wrapper for writing rotated or mirrored text&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">font</span><span class="p">:</span> <span class="n">ImageFont</span> <span class="o">|</span> <span class="n">FreeTypeFont</span><span class="p">,</span> <span class="n">orientation</span><span class="p">:</span> <span class="n">Image</span><span class="o">.</span><span class="n">Transpose</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Wrapper that creates a transposed font from any existing font</span>
+<span class="sd">        object.</span>
+
+<span class="sd">        :param font: A font object.</span>
+<span class="sd">        :param orientation: An optional orientation.  If given, this should</span>
+<span class="sd">            be one of Image.Transpose.FLIP_LEFT_RIGHT, Image.Transpose.FLIP_TOP_BOTTOM,</span>
+<span class="sd">            Image.Transpose.ROTATE_90, Image.Transpose.ROTATE_180, or</span>
+<span class="sd">            Image.Transpose.ROTATE_270.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">font</span> <span class="o">=</span> <span class="n">font</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">orientation</span> <span class="o">=</span> <span class="n">orientation</span>  <span class="c1"># any &#39;transpose&#39; argument, or None</span>
+
+<div class="viewcode-block" id="TransposedFont.getmask">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.TransposedFont.getmask">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getmask</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Image</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">ImagingCore</span><span class="p">:</span>
+        <span class="n">im</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getmask</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">orientation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">im</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">orientation</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">im</span></div>
+
+
+<div class="viewcode-block" id="TransposedFont.getbbox">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.TransposedFont.getbbox">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getbbox</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span> <span class="o">|</span> <span class="nb">bytearray</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+        <span class="c1"># TransposedFont doesn&#39;t support getmask2, move top-left point to (0, 0)</span>
+        <span class="c1"># this has no effect on ImageFont and simulates anchor=&quot;lt&quot; for FreeTypeFont</span>
+        <span class="n">left</span><span class="p">,</span> <span class="n">top</span><span class="p">,</span> <span class="n">right</span><span class="p">,</span> <span class="n">bottom</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getbbox</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">width</span> <span class="o">=</span> <span class="n">right</span> <span class="o">-</span> <span class="n">left</span>
+        <span class="n">height</span> <span class="o">=</span> <span class="n">bottom</span> <span class="o">-</span> <span class="n">top</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">orientation</span> <span class="ow">in</span> <span class="p">(</span><span class="n">Image</span><span class="o">.</span><span class="n">Transpose</span><span class="o">.</span><span class="n">ROTATE_90</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Transpose</span><span class="o">.</span><span class="n">ROTATE_270</span><span class="p">):</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">height</span><span class="p">,</span> <span class="n">width</span>
+        <span class="k">return</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span></div>
+
+
+<div class="viewcode-block" id="TransposedFont.getlength">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.TransposedFont.getlength">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">getlength</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">orientation</span> <span class="ow">in</span> <span class="p">(</span><span class="n">Image</span><span class="o">.</span><span class="n">Transpose</span><span class="o">.</span><span class="n">ROTATE_90</span><span class="p">,</span> <span class="n">Image</span><span class="o">.</span><span class="n">Transpose</span><span class="o">.</span><span class="n">ROTATE_270</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;text length is undefined for text rotated by 90 or 270 degrees&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">font</span><span class="o">.</span><span class="n">getlength</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="load">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.load">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ImageFont</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Load a font file. This function loads a font object from the given</span>
+<span class="sd">    bitmap font file, and returns the corresponding font object. For loading TrueType</span>
+<span class="sd">    or OpenType fonts instead, see :py:func:`~PIL.ImageFont.truetype`.</span>
+
+<span class="sd">    :param filename: Name of font file.</span>
+<span class="sd">    :return: A font object.</span>
+<span class="sd">    :exception OSError: If the file could not be read.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">f</span> <span class="o">=</span> <span class="n">ImageFont</span><span class="p">()</span>
+    <span class="n">f</span><span class="o">.</span><span class="n">_load_pilfont</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">f</span></div>
+
+
+
+<div class="viewcode-block" id="truetype">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.truetype">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">truetype</span><span class="p">(</span>
+    <span class="n">font</span><span class="p">:</span> <span class="n">StrOrBytesPath</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">,</span>
+    <span class="n">size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="n">layout_engine</span><span class="p">:</span> <span class="n">Layout</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FreeTypeFont</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Load a TrueType or OpenType font from a file or file-like object,</span>
+<span class="sd">    and create a font object. This function loads a font object from the given</span>
+<span class="sd">    file or file-like object, and creates a font object for a font of the given</span>
+<span class="sd">    size. For loading bitmap fonts instead, see :py:func:`~PIL.ImageFont.load`</span>
+<span class="sd">    and :py:func:`~PIL.ImageFont.load_path`.</span>
+
+<span class="sd">    Pillow uses FreeType to open font files. On Windows, be aware that FreeType</span>
+<span class="sd">    will keep the file open as long as the FreeTypeFont object exists. Windows</span>
+<span class="sd">    limits the number of files that can be open in C at once to 512, so if many</span>
+<span class="sd">    fonts are opened simultaneously and that limit is approached, an</span>
+<span class="sd">    ``OSError`` may be thrown, reporting that FreeType &quot;cannot open resource&quot;.</span>
+<span class="sd">    A workaround would be to copy the file(s) into memory, and open that instead.</span>
+
+<span class="sd">    This function requires the _imagingft service.</span>
+
+<span class="sd">    :param font: A filename or file-like object containing a TrueType font.</span>
+<span class="sd">                 If the file is not found in this filename, the loader may also</span>
+<span class="sd">                 search in other directories, such as:</span>
+
+<span class="sd">                 * The :file:`fonts/` directory on Windows,</span>
+<span class="sd">                 * :file:`/Library/Fonts/`, :file:`/System/Library/Fonts/`</span>
+<span class="sd">                   and :file:`~/Library/Fonts/` on macOS.</span>
+<span class="sd">                 * :file:`~/.local/share/fonts`, :file:`/usr/local/share/fonts`,</span>
+<span class="sd">                   and :file:`/usr/share/fonts` on Linux; or those specified by</span>
+<span class="sd">                   the ``XDG_DATA_HOME`` and ``XDG_DATA_DIRS`` environment variables</span>
+<span class="sd">                   for user-installed and system-wide fonts, respectively.</span>
+
+<span class="sd">    :param size: The requested size, in pixels.</span>
+<span class="sd">    :param index: Which font face to load (default is first available face).</span>
+<span class="sd">    :param encoding: Which font encoding to use (default is Unicode). Possible</span>
+<span class="sd">                     encodings include (see the FreeType documentation for more</span>
+<span class="sd">                     information):</span>
+
+<span class="sd">                     * &quot;unic&quot; (Unicode)</span>
+<span class="sd">                     * &quot;symb&quot; (Microsoft Symbol)</span>
+<span class="sd">                     * &quot;ADOB&quot; (Adobe Standard)</span>
+<span class="sd">                     * &quot;ADBE&quot; (Adobe Expert)</span>
+<span class="sd">                     * &quot;ADBC&quot; (Adobe Custom)</span>
+<span class="sd">                     * &quot;armn&quot; (Apple Roman)</span>
+<span class="sd">                     * &quot;sjis&quot; (Shift JIS)</span>
+<span class="sd">                     * &quot;gb  &quot; (PRC)</span>
+<span class="sd">                     * &quot;big5&quot;</span>
+<span class="sd">                     * &quot;wans&quot; (Extended Wansung)</span>
+<span class="sd">                     * &quot;joha&quot; (Johab)</span>
+<span class="sd">                     * &quot;lat1&quot; (Latin-1)</span>
+
+<span class="sd">                     This specifies the character set to use. It does not alter the</span>
+<span class="sd">                     encoding of any text provided in subsequent operations.</span>
+<span class="sd">    :param layout_engine: Which layout engine to use, if available:</span>
+<span class="sd">                     :attr:`.ImageFont.Layout.BASIC` or :attr:`.ImageFont.Layout.RAQM`.</span>
+<span class="sd">                     If it is available, Raqm layout will be used by default.</span>
+<span class="sd">                     Otherwise, basic layout will be used.</span>
+
+<span class="sd">                     Raqm layout is recommended for all non-English text. If Raqm layout</span>
+<span class="sd">                     is not required, basic layout will have better performance.</span>
+
+<span class="sd">                     You can check support for Raqm layout using</span>
+<span class="sd">                     :py:func:`PIL.features.check_feature` with ``feature=&quot;raqm&quot;``.</span>
+
+<span class="sd">                     .. versionadded:: 4.2.0</span>
+<span class="sd">    :return: A font object.</span>
+<span class="sd">    :exception OSError: If the file could not be read.</span>
+<span class="sd">    :exception ValueError: If the font size is not greater than zero.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">freetype</span><span class="p">(</span><span class="n">font</span><span class="p">:</span> <span class="n">StrOrBytesPath</span> <span class="o">|</span> <span class="n">BinaryIO</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FreeTypeFont</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">FreeTypeFont</span><span class="p">(</span><span class="n">font</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">encoding</span><span class="p">,</span> <span class="n">layout_engine</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">freetype</span><span class="p">(</span><span class="n">font</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_path</span><span class="p">(</span><span class="n">font</span><span class="p">):</span>
+            <span class="k">raise</span>
+        <span class="n">ttf_filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">font</span><span class="p">)</span>
+
+        <span class="n">dirs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span><span class="p">:</span>
+            <span class="c1"># check the windows font repository</span>
+            <span class="c1"># NOTE: must use uppercase WINDIR, to work around bugs in</span>
+            <span class="c1"># 1.5.2&#39;s os.environ.get()</span>
+            <span class="n">windir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;WINDIR&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">windir</span><span class="p">:</span>
+                <span class="n">dirs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">windir</span><span class="p">,</span> <span class="s2">&quot;fonts&quot;</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;linux&quot;</span><span class="p">,</span> <span class="s2">&quot;linux2&quot;</span><span class="p">):</span>
+            <span class="n">data_home</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;XDG_DATA_HOME&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">data_home</span><span class="p">:</span>
+                <span class="c1"># The freedesktop spec defines the following default directory for</span>
+                <span class="c1"># when XDG_DATA_HOME is unset or empty. This user-level directory</span>
+                <span class="c1"># takes precedence over system-level directories.</span>
+                <span class="n">data_home</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s2">&quot;~/.local/share&quot;</span><span class="p">)</span>
+            <span class="n">xdg_dirs</span> <span class="o">=</span> <span class="p">[</span><span class="n">data_home</span><span class="p">]</span>
+
+            <span class="n">data_dirs</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;XDG_DATA_DIRS&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">data_dirs</span><span class="p">:</span>
+                <span class="c1"># Similarly, defaults are defined for the system-level directories</span>
+                <span class="n">data_dirs</span> <span class="o">=</span> <span class="s2">&quot;/usr/local/share:/usr/share&quot;</span>
+            <span class="n">xdg_dirs</span> <span class="o">+=</span> <span class="n">data_dirs</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+
+            <span class="n">dirs</span> <span class="o">+=</span> <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">xdg_dir</span><span class="p">,</span> <span class="s2">&quot;fonts&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">xdg_dir</span> <span class="ow">in</span> <span class="n">xdg_dirs</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;darwin&quot;</span><span class="p">:</span>
+            <span class="n">dirs</span> <span class="o">+=</span> <span class="p">[</span>
+                <span class="s2">&quot;/Library/Fonts&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;/System/Library/Fonts&quot;</span><span class="p">,</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s2">&quot;~/Library/Fonts&quot;</span><span class="p">),</span>
+            <span class="p">]</span>
+
+        <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">ttf_filename</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">first_font_with_a_different_extension</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">directory</span> <span class="ow">in</span> <span class="n">dirs</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">walkroot</span><span class="p">,</span> <span class="n">walkdir</span><span class="p">,</span> <span class="n">walkfilenames</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">directory</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">walkfilename</span> <span class="ow">in</span> <span class="n">walkfilenames</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">ext</span> <span class="ow">and</span> <span class="n">walkfilename</span> <span class="o">==</span> <span class="n">ttf_filename</span><span class="p">:</span>
+                        <span class="k">return</span> <span class="n">freetype</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">walkroot</span><span class="p">,</span> <span class="n">walkfilename</span><span class="p">))</span>
+                    <span class="k">elif</span> <span class="ow">not</span> <span class="n">ext</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">walkfilename</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">ttf_filename</span><span class="p">:</span>
+                        <span class="n">fontpath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">walkroot</span><span class="p">,</span> <span class="n">walkfilename</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">fontpath</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;.ttf&quot;</span><span class="p">:</span>
+                            <span class="k">return</span> <span class="n">freetype</span><span class="p">(</span><span class="n">fontpath</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="n">ext</span> <span class="ow">and</span> <span class="n">first_font_with_a_different_extension</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                            <span class="n">first_font_with_a_different_extension</span> <span class="o">=</span> <span class="n">fontpath</span>
+        <span class="k">if</span> <span class="n">first_font_with_a_different_extension</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">freetype</span><span class="p">(</span><span class="n">first_font_with_a_different_extension</span><span class="p">)</span>
+        <span class="k">raise</span></div>
+
+
+
+<div class="viewcode-block" id="load_path">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.load_path">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_path</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="n">StrOrBytesPath</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ImageFont</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Load font file. Same as :py:func:`~PIL.ImageFont.load`, but searches for a</span>
+<span class="sd">    bitmap font along the Python path.</span>
+
+<span class="sd">    :param filename: Name of font file.</span>
+<span class="sd">    :return: A font object.</span>
+<span class="sd">    :exception OSError: If the file could not be read.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fsdecode</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">directory</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">load</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">filename</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
+            <span class="k">pass</span>
+    <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;cannot find font file &quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s1">&quot; in sys.path&#39;</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+        <span class="n">msg</span> <span class="o">+=</span> <span class="sa">f</span><span class="s1">&#39;, did you mean ImageFont.load(&quot;</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s1">&quot;) instead?&#39;</span>
+
+    <span class="k">raise</span> <span class="ne">OSError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="load_default_imagefont">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.load_default_imagefont">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_default_imagefont</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">ImageFont</span><span class="p">:</span>
+    <span class="n">f</span> <span class="o">=</span> <span class="n">ImageFont</span><span class="p">()</span>
+    <span class="n">f</span><span class="o">.</span><span class="n">_load_pilfont_data</span><span class="p">(</span>
+        <span class="c1"># courB08</span>
+        <span class="n">BytesIO</span><span class="p">(</span><span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">UElMZm9udAo7Ozs7OzsxMDsKREFUQQoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYAAAAA//8AAQAAAAAAAAABAAEA</span>
+<span class="s2">BgAAAAH/+gADAAAAAQAAAAMABgAGAAAAAf/6AAT//QADAAAABgADAAYAAAAA//kABQABAAYAAAAL</span>
+<span class="s2">AAgABgAAAAD/+AAFAAEACwAAABAACQAGAAAAAP/5AAUAAAAQAAAAFQAHAAYAAP////oABQAAABUA</span>
+<span class="s2">AAAbAAYABgAAAAH/+QAE//wAGwAAAB4AAwAGAAAAAf/5AAQAAQAeAAAAIQAIAAYAAAAB//kABAAB</span>
+<span class="s2">ACEAAAAkAAgABgAAAAD/+QAE//0AJAAAACgABAAGAAAAAP/6AAX//wAoAAAALQAFAAYAAAAB//8A</span>
+<span class="s2">BAACAC0AAAAwAAMABgAAAAD//AAF//0AMAAAADUAAQAGAAAAAf//AAMAAAA1AAAANwABAAYAAAAB</span>
+<span class="s2">//kABQABADcAAAA7AAgABgAAAAD/+QAFAAAAOwAAAEAABwAGAAAAAP/5AAYAAABAAAAARgAHAAYA</span>
+<span class="s2">AAAA//kABQAAAEYAAABLAAcABgAAAAD/+QAFAAAASwAAAFAABwAGAAAAAP/5AAYAAABQAAAAVgAH</span>
+<span class="s2">AAYAAAAA//kABQAAAFYAAABbAAcABgAAAAD/+QAFAAAAWwAAAGAABwAGAAAAAP/5AAUAAABgAAAA</span>
+<span class="s2">ZQAHAAYAAAAA//kABQAAAGUAAABqAAcABgAAAAD/+QAFAAAAagAAAG8ABwAGAAAAAf/8AAMAAABv</span>
+<span class="s2">AAAAcQAEAAYAAAAA//wAAwACAHEAAAB0AAYABgAAAAD/+gAE//8AdAAAAHgABQAGAAAAAP/7AAT/</span>
+<span class="s2">/gB4AAAAfAADAAYAAAAB//oABf//AHwAAACAAAUABgAAAAD/+gAFAAAAgAAAAIUABgAGAAAAAP/5</span>
+<span class="s2">AAYAAQCFAAAAiwAIAAYAAP////oABgAAAIsAAACSAAYABgAA////+gAFAAAAkgAAAJgABgAGAAAA</span>
+<span class="s2">AP/6AAUAAACYAAAAnQAGAAYAAP////oABQAAAJ0AAACjAAYABgAA////+gAFAAAAowAAAKkABgAG</span>
+<span class="s2">AAD////6AAUAAACpAAAArwAGAAYAAAAA//oABQAAAK8AAAC0AAYABgAA////+gAGAAAAtAAAALsA</span>
+<span class="s2">BgAGAAAAAP/6AAQAAAC7AAAAvwAGAAYAAP////oABQAAAL8AAADFAAYABgAA////+gAGAAAAxQAA</span>
+<span class="s2">AMwABgAGAAD////6AAUAAADMAAAA0gAGAAYAAP////oABQAAANIAAADYAAYABgAA////+gAGAAAA</span>
+<span class="s2">2AAAAN8ABgAGAAAAAP/6AAUAAADfAAAA5AAGAAYAAP////oABQAAAOQAAADqAAYABgAAAAD/+gAF</span>
+<span class="s2">AAEA6gAAAO8ABwAGAAD////6AAYAAADvAAAA9gAGAAYAAAAA//oABQAAAPYAAAD7AAYABgAA////</span>
+<span class="s2">+gAFAAAA+wAAAQEABgAGAAD////6AAYAAAEBAAABCAAGAAYAAP////oABgAAAQgAAAEPAAYABgAA</span>
+<span class="s2">////+gAGAAABDwAAARYABgAGAAAAAP/6AAYAAAEWAAABHAAGAAYAAP////oABgAAARwAAAEjAAYA</span>
+<span class="s2">BgAAAAD/+gAFAAABIwAAASgABgAGAAAAAf/5AAQAAQEoAAABKwAIAAYAAAAA//kABAABASsAAAEv</span>
+<span class="s2">AAgABgAAAAH/+QAEAAEBLwAAATIACAAGAAAAAP/5AAX//AEyAAABNwADAAYAAAAAAAEABgACATcA</span>
+<span class="s2">AAE9AAEABgAAAAH/+QAE//wBPQAAAUAAAwAGAAAAAP/7AAYAAAFAAAABRgAFAAYAAP////kABQAA</span>
+<span class="s2">AUYAAAFMAAcABgAAAAD/+wAFAAABTAAAAVEABQAGAAAAAP/5AAYAAAFRAAABVwAHAAYAAAAA//sA</span>
+<span class="s2">BQAAAVcAAAFcAAUABgAAAAD/+QAFAAABXAAAAWEABwAGAAAAAP/7AAYAAgFhAAABZwAHAAYAAP//</span>
+<span class="s2">//kABQAAAWcAAAFtAAcABgAAAAD/+QAGAAABbQAAAXMABwAGAAAAAP/5AAQAAgFzAAABdwAJAAYA</span>
+<span class="s2">AP////kABgAAAXcAAAF+AAcABgAAAAD/+QAGAAABfgAAAYQABwAGAAD////7AAUAAAGEAAABigAF</span>
+<span class="s2">AAYAAP////sABQAAAYoAAAGQAAUABgAAAAD/+wAFAAABkAAAAZUABQAGAAD////7AAUAAgGVAAAB</span>
+<span class="s2">mwAHAAYAAAAA//sABgACAZsAAAGhAAcABgAAAAD/+wAGAAABoQAAAacABQAGAAAAAP/7AAYAAAGn</span>
+<span class="s2">AAABrQAFAAYAAAAA//kABgAAAa0AAAGzAAcABgAA////+wAGAAABswAAAboABQAGAAD////7AAUA</span>
+<span class="s2">AAG6AAABwAAFAAYAAP////sABgAAAcAAAAHHAAUABgAAAAD/+wAGAAABxwAAAc0ABQAGAAD////7</span>
+<span class="s2">AAYAAgHNAAAB1AAHAAYAAAAA//sABQAAAdQAAAHZAAUABgAAAAH/+QAFAAEB2QAAAd0ACAAGAAAA</span>
+<span class="s2">Av/6AAMAAQHdAAAB3gAHAAYAAAAA//kABAABAd4AAAHiAAgABgAAAAD/+wAF//0B4gAAAecAAgAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYAAAAB</span>
+<span class="s2">//sAAwACAecAAAHpAAcABgAAAAD/+QAFAAEB6QAAAe4ACAAGAAAAAP/5AAYAAAHuAAAB9AAHAAYA</span>
+<span class="s2">AAAA//oABf//AfQAAAH5AAUABgAAAAD/+QAGAAAB+QAAAf8ABwAGAAAAAv/5AAMAAgH/AAACAAAJ</span>
+<span class="s2">AAYAAAAA//kABQABAgAAAAIFAAgABgAAAAH/+gAE//sCBQAAAggAAQAGAAAAAP/5AAYAAAIIAAAC</span>
+<span class="s2">DgAHAAYAAAAB//kABf/+Ag4AAAISAAUABgAA////+wAGAAACEgAAAhkABQAGAAAAAP/7AAX//gIZ</span>
+<span class="s2">AAACHgADAAYAAAAA//wABf/9Ah4AAAIjAAEABgAAAAD/+QAHAAACIwAAAioABwAGAAAAAP/6AAT/</span>
+<span class="s2">+wIqAAACLgABAAYAAAAA//kABP/8Ai4AAAIyAAMABgAAAAD/+gAFAAACMgAAAjcABgAGAAAAAf/5</span>
+<span class="s2">AAT//QI3AAACOgAEAAYAAAAB//kABP/9AjoAAAI9AAQABgAAAAL/+QAE//sCPQAAAj8AAgAGAAD/</span>
+<span class="s2">///7AAYAAgI/AAACRgAHAAYAAAAA//kABgABAkYAAAJMAAgABgAAAAH//AAD//0CTAAAAk4AAQAG</span>
+<span class="s2">AAAAAf//AAQAAgJOAAACUQADAAYAAAAB//kABP/9AlEAAAJUAAQABgAAAAH/+QAF//4CVAAAAlgA</span>
+<span class="s2">BQAGAAD////7AAYAAAJYAAACXwAFAAYAAP////kABgAAAl8AAAJmAAcABgAA////+QAGAAACZgAA</span>
+<span class="s2">Am0ABwAGAAD////5AAYAAAJtAAACdAAHAAYAAAAA//sABQACAnQAAAJ5AAcABgAA////9wAGAAAC</span>
+<span class="s2">eQAAAoAACQAGAAD////3AAYAAAKAAAAChwAJAAYAAP////cABgAAAocAAAKOAAkABgAA////9wAG</span>
+<span class="s2">AAACjgAAApUACQAGAAD////4AAYAAAKVAAACnAAIAAYAAP////cABgAAApwAAAKjAAkABgAA////</span>
+<span class="s2">+gAGAAACowAAAqoABgAGAAAAAP/6AAUAAgKqAAACrwAIAAYAAP////cABQAAAq8AAAK1AAkABgAA</span>
+<span class="s2">////9wAFAAACtQAAArsACQAGAAD////3AAUAAAK7AAACwQAJAAYAAP////gABQAAAsEAAALHAAgA</span>
+<span class="s2">BgAAAAD/9wAEAAACxwAAAssACQAGAAAAAP/3AAQAAALLAAACzwAJAAYAAAAA//cABAAAAs8AAALT</span>
+<span class="s2">AAkABgAAAAD/+AAEAAAC0wAAAtcACAAGAAD////6AAUAAALXAAAC3QAGAAYAAP////cABgAAAt0A</span>
+<span class="s2">AALkAAkABgAAAAD/9wAFAAAC5AAAAukACQAGAAAAAP/3AAUAAALpAAAC7gAJAAYAAAAA//cABQAA</span>
+<span class="s2">Au4AAALzAAkABgAAAAD/9wAFAAAC8wAAAvgACQAGAAAAAP/4AAUAAAL4AAAC/QAIAAYAAAAA//oA</span>
+<span class="s2">Bf//Av0AAAMCAAUABgAA////+gAGAAADAgAAAwkABgAGAAD////3AAYAAAMJAAADEAAJAAYAAP//</span>
+<span class="s2">//cABgAAAxAAAAMXAAkABgAA////9wAGAAADFwAAAx4ACQAGAAD////4AAYAAAAAAAoABwASAAYA</span>
+<span class="s2">AP////cABgAAAAcACgAOABMABgAA////+gAFAAAADgAKABQAEAAGAAD////6AAYAAAAUAAoAGwAQ</span>
+<span class="s2">AAYAAAAA//gABgAAABsACgAhABIABgAAAAD/+AAGAAAAIQAKACcAEgAGAAAAAP/4AAYAAAAnAAoA</span>
+<span class="s2">LQASAAYAAAAA//gABgAAAC0ACgAzABIABgAAAAD/+QAGAAAAMwAKADkAEQAGAAAAAP/3AAYAAAA5</span>
+<span class="s2">AAoAPwATAAYAAP////sABQAAAD8ACgBFAA8ABgAAAAD/+wAFAAIARQAKAEoAEQAGAAAAAP/4AAUA</span>
+<span class="s2">AABKAAoATwASAAYAAAAA//gABQAAAE8ACgBUABIABgAAAAD/+AAFAAAAVAAKAFkAEgAGAAAAAP/5</span>
+<span class="s2">AAUAAABZAAoAXgARAAYAAAAA//gABgAAAF4ACgBkABIABgAAAAD/+AAGAAAAZAAKAGoAEgAGAAAA</span>
+<span class="s2">AP/4AAYAAABqAAoAcAASAAYAAAAA//kABgAAAHAACgB2ABEABgAAAAD/+AAFAAAAdgAKAHsAEgAG</span>
+<span class="s2">AAD////4AAYAAAB7AAoAggASAAYAAAAA//gABQAAAIIACgCHABIABgAAAAD/+AAFAAAAhwAKAIwA</span>
+<span class="s2">EgAGAAAAAP/4AAUAAACMAAoAkQASAAYAAAAA//gABQAAAJEACgCWABIABgAAAAD/+QAFAAAAlgAK</span>
+<span class="s2">AJsAEQAGAAAAAP/6AAX//wCbAAoAoAAPAAYAAAAA//oABQABAKAACgClABEABgAA////+AAGAAAA</span>
+<span class="s2">pQAKAKwAEgAGAAD////4AAYAAACsAAoAswASAAYAAP////gABgAAALMACgC6ABIABgAA////+QAG</span>
+<span class="s2">AAAAugAKAMEAEQAGAAD////4AAYAAgDBAAoAyAAUAAYAAP////kABQACAMgACgDOABMABgAA////</span>
+<span class="s2">+QAGAAIAzgAKANUAEw==</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)),</span>
+        <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">iVBORw0KGgoAAAANSUhEUgAAAx4AAAAUAQAAAAArMtZoAAAEwElEQVR4nABlAJr/AHVE4czCI/4u</span>
+<span class="s2">Mc4b7vuds/xzjz5/3/7u/n9vMe7vnfH/9++vPn/xyf5zhxzjt8GHw8+2d83u8x27199/nxuQ6Od9</span>
+<span class="s2">M43/5z2I+9n9ZtmDBwMQECDRQw/eQIQohJXxpBCNVE6QCCAAAAD//wBlAJr/AgALyj1t/wINwq0g</span>
+<span class="s2">LeNZUworuN1cjTPIzrTX6ofHWeo3v336qPzfEwRmBnHTtf95/fglZK5N0PDgfRTslpGBvz7LFc4F</span>
+<span class="s2">IUXBWQGjQ5MGCx34EDFPwXiY4YbYxavpnhHFrk14CDAAAAD//wBlAJr/AgKqRooH2gAgPeggvUAA</span>
+<span class="s2">Bu2WfgPoAwzRAABAAAAAAACQgLz/3Uv4Gv+gX7BJgDeeGP6AAAD1NMDzKHD7ANWr3loYbxsAD791</span>
+<span class="s2">NAADfcoIDyP44K/jv4Y63/Z+t98Ovt+ub4T48LAAAAD//wBlAJr/AuplMlADJAAAAGuAphWpqhMx</span>
+<span class="s2">in0A/fRvAYBABPgBwBUgABBQ/sYAyv9g0bCHgOLoGAAAAAAAREAAwI7nr0ArYpow7aX8//9LaP/9</span>
+<span class="s2">SjdavWA8ePHeBIKB//81/83ndznOaXx379wAAAD//wBlAJr/AqDxW+D3AABAAbUh/QMnbQag/gAY</span>
+<span class="s2">AYDAAACgtgD/gOqAAAB5IA/8AAAk+n9w0AAA8AAAmFRJuPo27ciC0cD5oeW4E7KA/wD3ECMAn2tt</span>
+<span class="s2">y8PgwH8AfAxFzC0JzeAMtratAsC/ffwAAAD//wBlAJr/BGKAyCAA4AAAAvgeYTAwHd1kmQF5chkG</span>
+<span class="s2">ABoMIHcL5xVpTfQbUqzlAAAErwAQBgAAEOClA5D9il08AEh/tUzdCBsXkbgACED+woQg8Si9VeqY</span>
+<span class="s2">lODCn7lmF6NhnAEYgAAA/NMIAAAAAAD//2JgjLZgVGBg5Pv/Tvpc8hwGBjYGJADjHDrAwPzAjv/H</span>
+<span class="s2">/Wf3PzCwtzcwHmBgYGcwbZz8wHaCAQMDOwMDQ8MCBgYOC3W7mp+f0w+wHOYxO3OG+e376hsMZjk3</span>
+<span class="s2">AAAAAP//YmCMY2A4wMAIN5e5gQETPD6AZisDAwMDgzSDAAPjByiHcQMDAwMDg1nOze1lByRu5/47</span>
+<span class="s2">c4859311AYNZzg0AAAAA//9iYGDBYihOIIMuwIjGL39/fwffA8b//xv/P2BPtzzHwCBjUQAAAAD/</span>
+<span class="s2">/yLFBrIBAAAA//9i1HhcwdhizX7u8NZNzyLbvT97bfrMf/QHI8evOwcSqGUJAAAA//9iYBB81iSw</span>
+<span class="s2">pEE170Qrg5MIYydHqwdDQRMrAwcVrQAAAAD//2J4x7j9AAMDn8Q/BgYLBoaiAwwMjPdvMDBYM1Tv</span>
+<span class="s2">oJodAAAAAP//Yqo/83+dxePWlxl3npsel9lvLfPcqlE9725C+acfVLMEAAAA//9i+s9gwCoaaGMR</span>
+<span class="s2">evta/58PTEWzr21hufPjA8N+qlnBwAAAAAD//2JiWLci5v1+HmFXDqcnULE/MxgYGBj+f6CaJQAA</span>
+<span class="s2">AAD//2Ji2FrkY3iYpYC5qDeGgeEMAwPDvwQBBoYvcTwOVLMEAAAA//9isDBgkP///0EOg9z35v//</span>
+<span class="s2">Gc/eeW7BwPj5+QGZhANUswMAAAD//2JgqGBgYGBgqEMXlvhMPUsAAAAA//8iYDd1AAAAAP//AwDR</span>
+<span class="s2">w7IkEbzhVQAAAABJRU5ErkJggg==</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">))),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">f</span></div>
+
+
+
+<div class="viewcode-block" id="load_default">
+<a class="viewcode-back" href="../../reference/ImageFont.html#PIL.ImageFont.load_default">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">load_default</span><span class="p">(</span><span class="n">size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FreeTypeFont</span> <span class="o">|</span> <span class="n">ImageFont</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;If FreeType support is available, load a version of Aileron Regular,</span>
+<span class="sd">    https://dotcolon.net/fonts/aileron, with a more limited character set.</span>
+
+<span class="sd">    Otherwise, load a &quot;better than nothing&quot; font.</span>
+
+<span class="sd">    .. versionadded:: 1.1.4</span>
+
+<span class="sd">    :param size: The font size of Aileron Regular.</span>
+
+<span class="sd">        .. versionadded:: 10.1.0</span>
+
+<span class="sd">    :return: A font object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">core</span><span class="p">,</span> <span class="n">ModuleType</span><span class="p">)</span> <span class="ow">or</span> <span class="n">size</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">truetype</span><span class="p">(</span>
+            <span class="n">BytesIO</span><span class="p">(</span><span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">AAEAAAAPAIAAAwBwRkZUTYwDlUAAADFoAAAAHEdERUYAqADnAAAo8AAAACRHUE9ThhmITwAAKfgAA</span>
+<span class="s2">AduR1NVQnHxefoAACkUAAAA4k9TLzJovoHLAAABeAAAAGBjbWFw5lFQMQAAA6gAAAGqZ2FzcP//AA</span>
+<span class="s2">MAACjoAAAACGdseWYmRXoPAAAGQAAAHfhoZWFkE18ayQAAAPwAAAA2aGhlYQboArEAAAE0AAAAJGh</span>
+<span class="s2">tdHjjERZ8AAAB2AAAAdBsb2NhuOexrgAABVQAAADqbWF4cAC7AEYAAAFYAAAAIG5hbWUr+h5lAAAk</span>
+<span class="s2">OAAAA6Jwb3N0D3oPTQAAJ9wAAAEKAAEAAAABGhxJDqIhXw889QALA+gAAAAA0Bqf2QAAAADhCh2h/</span>
+<span class="s2">2r/LgOxAyAAAAAIAAIAAAAAAAAAAQAAA8r/GgAAA7j/av9qA7EAAQAAAAAAAAAAAAAAAAAAAHQAAQ</span>
+<span class="s2">AAAHQAQwAFAAAAAAACAAAAAQABAAAAQAAAAAAAAAADAfoBkAAFAAgCigJYAAAASwKKAlgAAAFeADI</span>
+<span class="s2">BPgAAAAAFAAAAAAAAAAAAAAcAAAAAAAAAAAAAAABVS1dOAEAAIPsCAwL/GgDIA8oA5iAAAJMAAAAA</span>
+<span class="s2">AhICsgAAACAAAwH0AAAAAAAAAU0AAADYAAAA8gA5AVMAVgJEAEYCRAA1AuQAKQKOAEAAsAArATsAZ</span>
+<span class="s2">AE7AB4CMABVAkQAUADc/+EBEgAgANwAJQEv//sCRAApAkQAggJEADwCRAAtAkQAIQJEADkCRAArAk</span>
+<span class="s2">QAMgJEACwCRAAxANwAJQDc/+ECRABnAkQAUAJEAEQB8wAjA1QANgJ/AB0CcwBkArsALwLFAGQCSwB</span>
+<span class="s2">kAjcAZALGAC8C2gBkAQgAZAIgADcCYQBkAj8AZANiAGQCzgBkAuEALwJWAGQC3QAvAmsAZAJJADQC</span>
+<span class="s2">ZAAiAqoAXgJuACADuAAaAnEAGQJFABMCTwAuATMAYgEv//sBJwAiAkQAUAH0ADIBLAApAhMAJAJjA</span>
+<span class="s2">EoCEQAeAmcAHgIlAB4BIgAVAmcAHgJRAEoA7gA+AOn/8wIKAEoA9wBGA1cASgJRAEoCSgAeAmMASg</span>
+<span class="s2">JnAB4BSgBKAcsAGAE5ABQCUABCAgIAAQMRAAEB4v/6AgEAAQHOABQBLwBAAPoAYAEvACECRABNA0Y</span>
+<span class="s2">AJAItAHgBKgAcAkQAUAEsAHQAygAgAi0AOQD3ADYA9wAWAaEANgGhABYCbAAlAYMAeAGDADkA6/9q</span>
+<span class="s2">AhsAFAIKABUB/QAVAAAAAwAAAAMAAAAcAAEAAAAAAKQAAwABAAAAHAAEAIgAAAAeABAAAwAOAH4Aq</span>
+<span class="s2">QCrALEAtAC3ALsgGSAdICYgOiBEISL7Av//AAAAIACpAKsAsAC0ALcAuyAYIBwgJiA5IEQhIvsB//</span>
+<span class="s2">//4/+5/7j/tP+y/7D/reBR4E/gR+A14CzfTwVxAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAEGAAABAAAAAAAAAAECAAAAAgAAAAAAAAAAAAAAAAAAAAEAAAMEBQYHCAkKCwwNDg8QERIT</span>
+<span class="s2">FBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj9AQUJDREVGR0hJSktMT</span>
+<span class="s2">U5PUFFSU1RVVldYWVpbXF1eX2BhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGQAAA</span>
+<span class="s2">AAAAAAYnFmAAAAAABlAAAAAAAAAAAAAAAAAAAAAAAAAAAAY2htAAAAAAAAAABrbGlqAAAAAHAAbm9</span>
+<span class="s2">ycwBnAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAmACYAJgAmAD4AUgCCAMoBCgFO</span>
+<span class="s2">AVwBcgGIAaYBvAHKAdYB6AH2AgwCIAJKAogCpgLWAw4DIgNkA5wDugPUA+gD/AQQBEYEogS8BPoFJ</span>
+<span class="s2">gVSBWoFgAWwBcoF1gX6BhQGJAZMBmgGiga0BuIHGgdUB2YHkAeiB8AH3AfyCAoIHAgqCDoITghcCG</span>
+<span class="s2">oIogjSCPoJKglYCXwJwgnqCgIKKApACl4Klgq8CtwLDAs8C1YLjAuyC9oL7gwMDCYMSAxgDKAMrAz</span>
+<span class="s2">qDQoNTA1mDYQNoA2uDcAN2g3oDfYODA4iDkoOXA5sDnoOnA7EDvwAAAAFAAAAAAH0ArwAAwAGAAkA</span>
+<span class="s2">DAAPAAAxESERAxMhExcRASELARETAfT6qv6syKr+jgFUqsiqArz9RAGLAP/+1P8B/v3VAP8BLP4CA</span>
+<span class="s2">P8AAgA5//IAuQKyAAMACwAANyMDMwIyFhQGIiY0oE4MZk84JCQ4JLQB/v3AJDgkJDgAAgBWAeUBPA</span>
+<span class="s2">LfAAMABwAAEyMnMxcjJzOmRgpagkYKWgHl+vr6AAAAAAIARgAAAf4CsgAbAB8AAAEHMxUjByM3Iwc</span>
+<span class="s2">jNyM1MzcjNTM3MwczNzMHMxUrAQczAZgdZXEvOi9bLzovWmYdZXEvOi9bLzovWp9bHlsBn4w429vb</span>
+<span class="s2">2ziMONvb29s4jAAAAAMANf+mAg4DDAAfACYALAAAJRQGBxUjNS4BJzMeARcRLgE0Njc1MxUeARcjJ</span>
+<span class="s2">icVHgEBFBYXNQ4BExU+ATU0Ag5xWDpgcgRcBz41Xl9oVTpVYwpcC1ttXP6cLTQuM5szOrVRZwlOTQ</span>
+<span class="s2">ZqVzZECAEAGlukZAlOTQdrUG8O7iNlAQgxNhDlCDj+8/YGOjReAAAAAAUAKf/yArsCvAAHAAsAFQA</span>
+<span class="s2">dACcAABIyFhQGIiY0EyMBMwQiBhUUFjI2NTQSMhYUBiImNDYiBhUUFjI2NTR5iFBQiFCVVwHAV/5c</span>
+<span class="s2">OiMjOiPmiFBQiFCxOiMjOiMCvFaSVlaS/ZoCsjIzMC80NC8w/uNWklZWkhozMC80NC8wAAAAAgBA/</span>
+<span class="s2">/ICbgLAACIALgAAARUjEQYjIiY1NDY3LgE1NDYzMhcVJiMiBhUUFhcWOwE1MxUFFBYzMjc1IyIHDg</span>
+<span class="s2">ECbmBcYYOOVkg7R4hsQjY4Q0RNRD4SLDxW/pJUXzksPCkUUk0BgUb+zBVUZ0BkDw5RO1huCkULQzp</span>
+<span class="s2">COAMBcHDHRz0J/AIHRQAAAAEAKwHlAIUC3wADAAATIycze0YKWgHl+gAAAAABAGT/sAEXAwwACQAA</span>
+<span class="s2">EzMGEBcjLgE0Nt06dXU6OUBAAwzG/jDGVePs4wAAAAEAHv+wANEDDAAJAAATMx4BFAYHIzYQHjo5Q</span>
+<span class="s2">EA5OnUDDFXj7ONVxgHQAAAAAQBVAFIB2wHbAA4AAAE3FwcXBycHJzcnNxcnMwEtmxOfcTJjYzJxnx</span>
+<span class="s2">ObCj4BKD07KYolmZkliik7PbMAAQBQAFUB9AIlAAsAAAEjFSM1IzUzNTMVMwH0tTq1tTq1AR/Kyjj</span>
+<span class="s2">OzgAAAAAB/+H/iACMAGQABAAANwcjNzOMWlFOXVrS3AAAAQAgAP8A8gE3AAMAABMjNTPy0tIA/zgA</span>
+<span class="s2">AQAl//IApQByAAcAADYyFhQGIiY0STgkJDgkciQ4JCQ4AAAAAf/7/+IBNALQAAMAABcjEzM5Pvs+H</span>
+<span class="s2">gLuAAAAAAIAKf/yAhsCwAADAAcAABIgECA2IBAgKQHy/g5gATL+zgLA/TJEAkYAAAAAAQCCAAABlg</span>
+<span class="s2">KyAAgAAAERIxEHNTc2MwGWVr6SIygCsv1OAldxW1sWAAEAPAAAAg4CwAAZAAA3IRUhNRM+ATU0JiM</span>
+<span class="s2">iDwEjNz4BMzIWFRQGB7kBUv4x+kI2QTt+EAFWAQp8aGVtSl5GRjEA/0RVLzlLmAoKa3FsUkNxXQAA</span>
+<span class="s2">AAEALf/yAhYCwAAqAAABHgEVFAYjIi8BMxceATMyNjU0KwE1MzI2NTQmIyIGDwEjNz4BMzIWFRQGA</span>
+<span class="s2">YxBSZJo2RUBVgEHV0JBUaQREUBUQzc5TQcBVgEKfGhfcEMBbxJbQl1x0AoKRkZHPn9GSD80QUVCCg</span>
+<span class="s2">pfbGBPOlgAAAACACEAAAIkArIACgAPAAAlIxUjNSE1ATMRMyMRBg8BAiRXVv6qAVZWV60dHLCurq4</span>
+<span class="s2">rAdn+QgFLMibzAAABADn/8gIZArIAHQAAATIWFRQGIyIvATMXFjMyNjU0JiMiByMTIRUhBzc2ATNv</span>
+<span class="s2">d5Fl1RQBVgIad0VSTkVhL1IwAYj+vh8rMAHHgGdtgcUKCoFXTU5bYgGRRvAuHQAAAAACACv/8gITA</span>
+<span class="s2">sAAFwAjAAABMhYVFAYjIhE0NjMyFh8BIycmIyIDNzYTMjY1NCYjIgYVFBYBLmp7imr0l3RZdAgBXA</span>
+<span class="s2">IYZ5wKJzU6QVNJSz5SUAHSgWltiQFGxcNlVQoKdv7sPiz+ZF1LTmJbU0lhAAAAAQAyAAACGgKyAAY</span>
+<span class="s2">AAAEVASMBITUCGv6oXAFL/oECsij9dgJsRgAAAAMALP/xAhgCwAAWACAALAAAAR4BFRQGIyImNTQ2</span>
+<span class="s2">Ny4BNTQ2MhYVFAYmIgYVFBYyNjU0AzI2NTQmIyIGFRQWAZQ5S5BmbIpPOjA7ecp5P2F8Q0J8RIVJS</span>
+<span class="s2">0pLTEtOAW0TXTxpZ2ZqPF0SE1A3VWVlVTdQ/UU0N0RENzT9/ko+Ok1NOj1LAAIAMf/yAhkCwAAXAC</span>
+<span class="s2">MAAAEyERQGIyImLwEzFxYzMhMHBiMiJjU0NhMyNjU0JiMiBhUUFgEl9Jd0WXQIAVwCGGecCic1SWp</span>
+<span class="s2">7imo+UlBAQVNJAsD+usXDZVUKCnYBFD4sgWltif5kW1NJYV1LTmIAAAACACX/8gClAiAABwAPAAAS</span>
+<span class="s2">MhYUBiImNBIyFhQGIiY0STgkJDgkJDgkJDgkAiAkOCQkOP52JDgkJDgAAAAC/+H/iAClAiAABwAMA</span>
+<span class="s2">AASMhYUBiImNBMHIzczSTgkJDgkaFpSTl4CICQ4JCQ4/mba5gAAAQBnAB4B+AH0AAYAAAENARUlNS</span>
+<span class="s2">UB+P6qAVb+bwGRAbCmpkbJRMkAAAIAUAC7AfQBuwADAAcAAAEhNSERITUhAfT+XAGk/lwBpAGDOP8</span>
+<span class="s2">AOAABAEQAHgHVAfQABgAAARUFNS0BNQHV/m8BVv6qAStEyUSmpkYAAAAAAgAj//IB1ALAABgAIAAA</span>
+<span class="s2">ATIWFRQHDgEHIz4BNz4BNTQmIyIGByM+ARIyFhQGIiY0AQRibmktIAJWBSEqNig+NTlHBFoDezQ4J</span>
+<span class="s2">CQ4JALAZ1BjaS03JS1DMD5LLDQ/SUVgcv2yJDgkJDgAAAAAAgA2/5gDFgKYADYAQgAAAQMGFRQzMj</span>
+<span class="s2">Y1NCYjIg4CFRQWMzI2NxcGIyImNTQ+AjMyFhUUBiMiJwcGIyImNTQ2MzIfATcHNzYmIyIGFRQzMjY</span>
+<span class="s2">Cej8EJjJJlnBAfGQ+oHtAhjUYg5OPx0h2k06Os3xRWQsVLjY5VHtdPBwJETcJDyUoOkZEJz8B0f74</span>
+<span class="s2">EQ8kZl6EkTFZjVOLlyknMVm1pmCiaTq4lX6CSCknTVRmmR8wPdYnQzxuSWVGAAIAHQAAAncCsgAHA</span>
+<span class="s2">AoAACUjByMTMxMjATMDAcj+UVz4dO5d/sjPZPT0ArL9TgE6ATQAAAADAGQAAAJMArIAEAAbACcAAA</span>
+<span class="s2">EeARUUBgcGKwERMzIXFhUUJRUzMjc2NTQnJiMTPgE1NCcmKwEVMzIBvkdHZkwiNt7LOSGq/oeFHBt</span>
+<span class="s2">hahIlSTM+cB8Yj5UWAW8QT0VYYgwFArIEF5Fv1eMED2NfDAL93AU+N24PBP0AAAAAAQAv//ICjwLA</span>
+<span class="s2">ABsAAAEyFh8BIycmIyIGFRQWMzI/ATMHDgEjIiY1NDYBdX+PCwFWAiKiaHx5ZaIiAlYBCpWBk6a0A</span>
+<span class="s2">sCAagoKpqN/gaOmCgplhcicn8sAAAIAZAAAAp8CsgAMABkAAAEeARUUBgcGKwERMzITPgE1NCYnJi</span>
+<span class="s2">sBETMyAY59lJp8IzXN0jUVWmdjWRs5d3I4Aq4QqJWUug8EArL9mQ+PeHGHDgX92gAAAAABAGQAAAI</span>
+<span class="s2">vArIACwAAJRUhESEVIRUhFSEVAi/+NQHB/pUBTf6zRkYCskbwRvAAAAABAGQAAAIlArIACQAAExUh</span>
+<span class="s2">FSERIxEhFboBQ/69VgHBAmzwRv7KArJGAAAAAAEAL//yAo8CwAAfAAABMxEjNQcGIyImNTQ2MzIWH</span>
+<span class="s2">wEjJyYjIgYVFBYzMjY1IwGP90wfPnWTprSSf48LAVYCIqJofHllVG+hAU3+s3hARsicn8uAagoKpq</span>
+<span class="s2">N/gaN1XAAAAAEAZAAAAowCsgALAAABESMRIREjETMRIRECjFb+hFZWAXwCsv1OAS7+0gKy/sQBPAA</span>
+<span class="s2">AAAABAGQAAAC6ArIAAwAAMyMRM7pWVgKyAAABADf/8gHoArIAEwAAAREUBw4BIyImLwEzFxYzMjc2</span>
+<span class="s2">NREB6AIFcGpgbQIBVgIHfXQKAQKy/lYxIltob2EpKYyEFD0BpwAAAAABAGQAAAJ0ArIACwAACQEjA</span>
+<span class="s2">wcVIxEzEQEzATsBJ3ntQlZWAVVlAWH+nwEnR+ACsv6RAW8AAQBkAAACLwKyAAUAACUVIREzEQIv/j</span>
+<span class="s2">VWRkYCsv2UAAABAGQAAAMUArIAFAAAAREjETQ3BgcDIwMmJxYVESMRMxsBAxRWAiMxemx8NxsCVo7</span>
+<span class="s2">MywKy/U4BY7ZLco7+nAFmoFxLtP6dArL9lwJpAAAAAAEAZAAAAoACsgANAAAhIwEWFREjETMBJjUR</span>
+<span class="s2">MwKAhP67A1aEAUUDVAJeeov+pwKy/aJ5jAFZAAAAAgAv//ICuwLAAAkAEwAAEiAWFRQGICY1NBIyN</span>
+<span class="s2">jU0JiIGFRTbATSsrP7MrNrYenrYegLAxaKhxsahov47nIeIm5uIhwACAGQAAAJHArIADgAYAAABHg</span>
+<span class="s2">EVFAYHBisBESMRMzITNjQnJisBETMyAZRUX2VOHzuAVtY7GlxcGDWIiDUCrgtnVlVpCgT+5gKy/rU</span>
+<span class="s2">V1BUF/vgAAAACAC//zAK9AsAAEgAcAAAlFhcHJiMiBwYjIiY1NDYgFhUUJRQWMjY1NCYiBgI9PUMx</span>
+<span class="s2">UDcfKh8omqysATSs/dR62Hp62HpICTg7NgkHxqGixcWitbWHnJyHiJubAAIAZAAAAlgCsgAXACMAA</span>
+<span class="s2">CUWFyMmJyYnJisBESMRMzIXHgEVFAYHFiUzMjc+ATU0JyYrAQIqDCJfGQwNWhAhglbiOx9QXEY1Tv</span>
+<span class="s2">6bhDATMj1lGSyMtYgtOXR0BwH+1wKyBApbU0BSESRAAgVAOGoQBAABADT/8gIoAsAAJQAAATIWFyM</span>
+<span class="s2">uASMiBhUUFhceARUUBiMiJiczHgEzMjY1NCYnLgE1NDYBOmd2ClwGS0E6SUNRdW+HZnKKC1wPWkQ9</span>
+<span class="s2">Uk1cZGuEAsBwXUJHNjQ3OhIbZVZZbm5kREo+NT5DFRdYUFdrAAAAAAEAIgAAAmQCsgAHAAABIxEjE</span>
+<span class="s2">SM1IQJk9lb2AkICbP2UAmxGAAEAXv/yAmQCsgAXAAABERQHDgEiJicmNREzERQXHgEyNjc2NRECZA</span>
+<span class="s2">IIgfCBCAJWAgZYmlgGAgKy/k0qFFxzc1wUKgGz/lUrEkRQUEQSKwGrAAAAAAEAIAAAAnoCsgAGAAA</span>
+<span class="s2">hIwMzGwEzAYJ07l3N1FwCsv2PAnEAAAEAGgAAA7ECsgAMAAABAyMLASMDMxsBMxsBA7HAcZyicrZi</span>
+<span class="s2">kaB0nJkCsv1OAlP9rQKy/ZsCW/2kAmYAAAEAGQAAAm8CsgALAAAhCwEjEwMzGwEzAxMCCsrEY/bkY</span>
+<span class="s2">re+Y/D6AST+3AFcAVb+5gEa/q3+oQAAAQATAAACUQKyAAgAAAERIxEDMxsBMwFdVvRjwLphARD+8A</span>
+<span class="s2">EQAaL+sQFPAAABAC4AAAI5ArIACQAAJRUhNQEhNSEVAQI5/fUBof57Aen+YUZGQgIqRkX92QAAAAA</span>
+<span class="s2">BAGL/sAEFAwwABwAAARUjETMVIxEBBWlpowMMOP0UOANcAAAB//v/4gE0AtAAAwAABSMDMwE0Pvs+</span>
+<span class="s2">HgLuAAAAAQAi/7AAxQMMAAcAABcjNTMRIzUzxaNpaaNQOALsOAABAFAA1wH0AmgABgAAJQsBIxMzE</span>
+<span class="s2">wGwjY1GsESw1wFZ/qcBkf5vAAAAAQAy/6oBwv/iAAMAAAUhNSEBwv5wAZBWOAAAAAEAKQJEALYCsg</span>
+<span class="s2">ADAAATIycztjhVUAJEbgAAAAACACT/8gHQAiAAHQAlAAAhJwcGIyImNTQ2OwE1NCcmIyIHIz4BMzI</span>
+<span class="s2">XFh0BFBcnMjY9ASYVFAF6CR0wVUtgkJoiAgdgaQlaBm1Zrg4DCuQ9R+5MOSFQR1tbDiwUUXBUXowf</span>
+<span class="s2">J8c9SjRORzYSgVwAAAAAAgBK//ICRQLfABEAHgAAATIWFRQGIyImLwEVIxEzETc2EzI2NTQmIyIGH</span>
+<span class="s2">QEUFgFUcYCVbiNJEyNWVigySElcU01JXmECIJd4i5QTEDRJAt/+3jkq/hRuZV55ZWsdX14AAQAe//</span>
+<span class="s2">IB9wIgABgAAAEyFhcjJiMiBhUUFjMyNjczDgEjIiY1NDYBF152DFocbEJXU0A1Rw1aE3pbaoKQAiB</span>
+<span class="s2">oWH5qZm1tPDlaXYuLgZcAAAACAB7/8gIZAt8AEQAeAAABESM1BwYjIiY1NDYzMhYfAREDMjY9ATQm</span>
+<span class="s2">IyIGFRQWAhlWKDJacYCVbiNJEyOnSV5hQUlcUwLf/SFVOSqXeIuUExA0ARb9VWVrHV9ebmVeeQACA</span>
+<span class="s2">B7/8gH9AiAAFQAbAAABFAchHgEzMjY3Mw4BIyImNTQ2MzIWJyIGByEmAf0C/oAGUkA1SwlaD4FXbI</span>
+<span class="s2">WObmt45UBVBwEqDQEYFhNjWD84W16Oh3+akU9aU60AAAEAFQAAARoC8gAWAAATBh0BMxUjESMRIzU</span>
+<span class="s2">zNTQ3PgEzMhcVJqcDbW1WOTkDB0k8Hx5oAngVITRC/jQBzEIsJRs5PwVHEwAAAAIAHv8uAhkCIAAi</span>
+<span class="s2">AC8AAAERFAcOASMiLwEzFx4BMzI2NzY9AQcGIyImNTQ2MzIWHwE1AzI2PQE0JiMiBhUUFgIZAQSEd</span>
+<span class="s2">NwRAVcBBU5DTlUDASgyWnGAlW4jSRMjp0leYUFJXFMCEv5wSh1zeq8KCTI8VU0ZIQk5Kpd4i5QTED</span>
+<span class="s2">RJ/iJlax1fXm5lXnkAAQBKAAACCgLkABcAAAEWFREjETQnLgEHDgEdASMRMxE3NjMyFgIIAlYCBDs</span>
+<span class="s2">6RVRWViE5UVViAYUbQP7WASQxGzI7AQJyf+kC5P7TPSxUAAACAD4AAACsAsAABwALAAASMhYUBiIm</span>
+<span class="s2">NBMjETNeLiAgLiBiVlYCwCAuICAu/WACEgAC//P/LgCnAsAABwAVAAASMhYUBiImNBcRFAcGIyInN</span>
+<span class="s2">RY3NjURWS4gIC4gYgMLcRwNSgYCAsAgLiAgLo79wCUbZAJGBzMOHgJEAAAAAQBKAAACCALfAAsAAC</span>
+<span class="s2">EnBxUjETMREzMHEwGTwTJWVvdu9/rgN6kC3/4oAQv6/ugAAQBG//wA3gLfAA8AABMRFBceATcVBiM</span>
+<span class="s2">iJicmNRGcAQIcIxkkKi4CAQLf/bkhERoSBD4EJC8SNAJKAAAAAQBKAAADEAIgACQAAAEWFREjETQn</span>
+<span class="s2">JiMiFREjETQnJiMiFREjETMVNzYzMhYXNzYzMhYDCwVWBAxedFYEDF50VlYiJko7ThAvJkpEVAGfI</span>
+<span class="s2">jn+vAEcQyRZ1v76ARxDJFnW/voCEk08HzYtRB9HAAAAAAEASgAAAgoCIAAWAAABFhURIxE0JyYjIg</span>
+<span class="s2">YdASMRMxU3NjMyFgIIAlYCCXBEVVZWITlRVWIBhRtA/tYBJDEbbHR/6QISWz0sVAAAAAACAB7/8gI</span>
+<span class="s2">sAiAABwARAAASIBYUBiAmNBIyNjU0JiIGFRSlAQCHh/8Ah7ieWlqeWgIgn/Cfn/D+s3ZfYHV1YF8A</span>
+<span class="s2">AgBK/zwCRQIgABEAHgAAATIWFRQGIyImLwERIxEzFTc2EzI2NTQmIyIGHQEUFgFUcYCVbiNJEyNWV</span>
+<span class="s2">igySElcU01JXmECIJd4i5QTEDT+8wLWVTkq/hRuZV55ZWsdX14AAgAe/zwCGQIgABEAHgAAAREjEQ</span>
+<span class="s2">cGIyImNTQ2MzIWHwE1AzI2PQE0JiMiBhUUFgIZVigyWnGAlW4jSRMjp0leYUFJXFMCEv0qARk5Kpd</span>
+<span class="s2">4i5QTEDRJ/iJlax1fXm5lXnkAAQBKAAABPgIeAA0AAAEyFxUmBhURIxEzFTc2ARoWDkdXVlYwIwIe</span>
+<span class="s2">B0EFVlf+0gISU0cYAAEAGP/yAa0CIAAjAAATMhYXIyYjIgYVFBYXHgEVFAYjIiYnMxYzMjY1NCYnL</span>
+<span class="s2">gE1NDbkV2MJWhNdKy04PF1XbVhWbgxaE2ktOjlEUllkAiBaS2MrJCUoEBlPQkhOVFZoKCUmLhIWSE</span>
+<span class="s2">BIUwAAAAEAFP/4ARQCiQAXAAATERQXHgE3FQYjIiYnJjURIzUzNTMVMxWxAQMmMx8qMjMEAUdHVmM</span>
+<span class="s2">BzP7PGw4mFgY/BSwxDjQBNUJ7e0IAAAABAEL/8gICAhIAFwAAAREjNQcGIyImJyY1ETMRFBceATMy</span>
+<span class="s2">Nj0BAgJWITlRT2EKBVYEBkA1RFECEv3uWj4qTToiOQE+/tIlJC43c4DpAAAAAAEAAQAAAfwCEgAGA</span>
+<span class="s2">AABAyMDMxsBAfzJaclfop8CEv3uAhL+LQHTAAABAAEAAAMLAhIADAAAAQMjCwEjAzMbATMbAQMLqW</span>
+<span class="s2">Z2dmapY3t0a3Z7AhL97gG+/kICEv5AAcD+QwG9AAAB//oAAAHWAhIACwAAARMjJwcjEwMzFzczARq</span>
+<span class="s2">8ZIuKY763ZoWFYwEO/vLV1QEMAQbNzQAAAQAB/y4B+wISABEAAAEDDgEjIic1FjMyNj8BAzMbAQH7</span>
+<span class="s2">2iFZQB8NDRIpNhQH02GenQIS/cFVUAJGASozEwIt/i4B0gABABQAAAGxAg4ACQAAJRUhNQEhNSEVA</span>
+<span class="s2">QGx/mMBNP7iAYL+zkREQgGIREX+ewAAAAABAED/sAEOAwwALAAAASMiBhUUFxYVFAYHHgEVFAcGFR</span>
+<span class="s2">QWOwEVIyImNTQ3NjU0JzU2NTQnJjU0NjsBAQ4MKiMLDS4pKS4NCyMqDAtERAwLUlILDERECwLUGBk</span>
+<span class="s2">WTlsgKzUFBTcrIFtOFhkYOC87GFVMIkUIOAhFIkxVGDsvAAAAAAEAYP84AJoDIAADAAAXIxEzmjo6</span>
+<span class="s2">yAPoAAEAIf+wAO8DDAAsAAATFQYVFBcWFRQGKwE1MzI2NTQnJjU0NjcuATU0NzY1NCYrATUzMhYVF</span>
+<span class="s2">AcGFRTvUgsMREQLDCojCw0uKSkuDQsjKgwLREQMCwF6OAhFIkxVGDsvOBgZFk5bICs1BQU3KyBbTh</span>
+<span class="s2">YZGDgvOxhVTCJFAAABAE0A3wH2AWQAEwAAATMUIyImJyYjIhUjNDMyFhcWMzIBvjhuGywtQR0xOG4</span>
+<span class="s2">bLC1BHTEBZIURGCNMhREYIwAAAwAk/94DIgLoAAcAEQApAAAAIBYQBiAmECQgBhUUFiA2NTQlMhYX</span>
+<span class="s2">IyYjIgYUFjMyNjczDgEjIiY1NDYBAQFE3d3+vN0CB/7wubkBELn+xVBnD1wSWDo+QTcqOQZcEmZWX</span>
+<span class="s2">HN2Aujg/rbg4AFKpr+Mjb6+jYxbWEldV5ZZNShLVn5na34AAgB4AFIB9AGeAAUACwAAAQcXIyc3Mw</span>
+<span class="s2">cXIyc3AUqJiUmJifOJiUmJiQGepqampqampqYAAAIAHAHSAQ4CwAAHAA8AABIyFhQGIiY0NiIGFBY</span>
+<span class="s2">yNjRgakREakSTNCEhNCECwEJqQkJqCiM4IyM4AAAAAAIAUAAAAfQCCwALAA8AAAEzFSMVIzUjNTM1</span>
+<span class="s2">MxMhNSEBP7W1OrW1OrX+XAGkAVs4tLQ4sP31OAAAAQB0AkQBAQKyAAMAABMjNzOsOD1QAkRuAAAAA</span>
+<span class="s2">AEAIADsAKoBdgAHAAASMhYUBiImNEg6KCg6KAF2KDooKDoAAAIAOQBSAbUBngAFAAsAACUHIzcnMw</span>
+<span class="s2">UHIzcnMwELiUmJiUkBM4lJiYlJ+KampqampqYAAAABADYB5QDhAt8ABAAAEzczByM2Xk1OXQHv8Po</span>
+<span class="s2">AAQAWAeUAwQLfAAQAABMHIzczwV5NTl0C1fD6AAIANgHlAYsC3wAEAAkAABM3MwcjPwEzByM2Xk1O</span>
+<span class="s2">XapeTU5dAe/w+grw+gAAAgAWAeUBawLfAAQACQAAEwcjNzMXByM3M8FeTU5dql5NTl0C1fD6CvD6A</span>
+<span class="s2">AADACX/8gI1AHIABwAPABcAADYyFhQGIiY0NjIWFAYiJjQ2MhYUBiImNEk4JCQ4JOw4JCQ4JOw4JC</span>
+<span class="s2">Q4JHIkOCQkOCQkOCQkOCQkOCQkOAAAAAEAeABSAUoBngAFAAABBxcjJzcBSomJSYmJAZ6mpqamAAA</span>
+<span class="s2">AAAEAOQBSAQsBngAFAAAlByM3JzMBC4lJiYlJ+KampgAAAf9qAAABgQKyAAMAACsBATM/VwHAVwKy</span>
+<span class="s2">AAAAAAIAFAHIAdwClAAHABQAABMVIxUjNSM1BRUjNwcjJxcjNTMXN9pKMkoByDICKzQqATJLKysCl</span>
+<span class="s2">CmjoykBy46KiY3Lm5sAAQAVAAABvALyABgAAAERIxEjESMRIzUzNTQ3NjMyFxUmBgcGHQEBvFbCVj</span>
+<span class="s2">k5AxHHHx5iVgcDAg798gHM/jQBzEIOJRuWBUcIJDAVIRYAAAABABX//AHkAvIAJQAAJR4BNxUGIyI</span>
+<span class="s2">mJyY1ESYjIgcGHQEzFSMRIxEjNTM1NDc2MzIXERQBowIcIxkkKi4CAR4nXgwDbW1WLy8DEbNdOmYa</span>
+<span class="s2">EQQ/BCQvEjQCFQZWFSEWQv40AcxCDiUblhP9uSEAAAAAAAAWAQ4AAQAAAAAAAAATACgAAQAAAAAAA</span>
+<span class="s2">QAHAEwAAQAAAAAAAgAHAGQAAQAAAAAAAwAaAKIAAQAAAAAABAAHAM0AAQAAAAAABQA8AU8AAQAAAA</span>
+<span class="s2">AABgAPAawAAQAAAAAACAALAdQAAQAAAAAACQALAfgAAQAAAAAACwAXAjQAAQAAAAAADAAXAnwAAwA</span>
+<span class="s2">BBAkAAAAmAAAAAwABBAkAAQAOADwAAwABBAkAAgAOAFQAAwABBAkAAwA0AGwAAwABBAkABAAOAL0A</span>
+<span class="s2">AwABBAkABQB4ANUAAwABBAkABgAeAYwAAwABBAkACAAWAbwAAwABBAkACQAWAeAAAwABBAkACwAuA</span>
+<span class="s2">gQAAwABBAkADAAuAkwATgBvACAAUgBpAGcAaAB0AHMAIABSAGUAcwBlAHIAdgBlAGQALgAATm8gUm</span>
+<span class="s2">lnaHRzIFJlc2VydmVkLgAAQQBpAGwAZQByAG8AbgAAQWlsZXJvbgAAUgBlAGcAdQBsAGEAcgAAUmV</span>
+<span class="s2">ndWxhcgAAMQAuADEAMAAyADsAVQBLAFcATgA7AEEAaQBsAGUAcgBvAG4ALQBSAGUAZwB1AGwAYQBy</span>
+<span class="s2">AAAxLjEwMjtVS1dOO0FpbGVyb24tUmVndWxhcgAAQQBpAGwAZQByAG8AbgAAQWlsZXJvbgAAVgBlA</span>
+<span class="s2">HIAcwBpAG8AbgAgADEALgAxADAAMgA7AFAAUwAgADAAMAAxAC4AMQAwADIAOwBoAG8AdABjAG8Abg</span>
+<span class="s2">B2ACAAMQAuADAALgA3ADAAOwBtAGEAawBlAG8AdABmAC4AbABpAGIAMgAuADUALgA1ADgAMwAyADk</span>
+<span class="s2">AAFZlcnNpb24gMS4xMDI7UFMgMDAxLjEwMjtob3Rjb252IDEuMC43MDttYWtlb3RmLmxpYjIuNS41</span>
+<span class="s2">ODMyOQAAQQBpAGwAZQByAG8AbgAtAFIAZQBnAHUAbABhAHIAAEFpbGVyb24tUmVndWxhcgAAUwBvA</span>
+<span class="s2">HIAYQAgAFMAYQBnAGEAbgBvAABTb3JhIFNhZ2FubwAAUwBvAHIAYQAgAFMAYQBnAGEAbgBvAABTb3</span>
+<span class="s2">JhIFNhZ2FubwAAaAB0AHQAcAA6AC8ALwB3AHcAdwAuAGQAbwB0AGMAbwBsAG8AbgAuAG4AZQB0AAB</span>
+<span class="s2">odHRwOi8vd3d3LmRvdGNvbG9uLm5ldAAAaAB0AHQAcAA6AC8ALwB3AHcAdwAuAGQAbwB0AGMAbwBs</span>
+<span class="s2">AG8AbgAuAG4AZQB0AABodHRwOi8vd3d3LmRvdGNvbG9uLm5ldAAAAAACAAAAAAAA/4MAMgAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAHQAAAABAAIAAwAEAAUABgAHAAgACQAKAAsADAANAA4ADwAQABEAEgATAB</span>
+<span class="s2">QAFQAWABcAGAAZABoAGwAcAB0AHgAfACAAIQAiACMAJAAlACYAJwAoACkAKgArACwALQAuAC8AMAA</span>
+<span class="s2">xADIAMwA0ADUANgA3ADgAOQA6ADsAPAA9AD4APwBAAEEAQgBDAEQARQBGAEcASABJAEoASwBMAE0A</span>
+<span class="s2">TgBPAFAAUQBSAFMAVABVAFYAVwBYAFkAWgBbAFwAXQBeAF8AYABhAIsAqQCDAJMAjQDDAKoAtgC3A</span>
+<span class="s2">LQAtQCrAL4AvwC8AIwAwADBAAAAAAAB//8AAgABAAAADAAAABwAAAACAAIAAwBxAAEAcgBzAAIABA</span>
+<span class="s2">AAAAIAAAABAAAACgBMAGYAAkRGTFQADmxhdG4AGgAEAAAAAP//AAEAAAAWAANDQVQgAB5NT0wgABZ</span>
+<span class="s2">ST00gABYAAP//AAEAAAAA//8AAgAAAAEAAmxpZ2EADmxvY2wAFAAAAAEAAQAAAAEAAAACAAYAEAAG</span>
+<span class="s2">AAAAAgASADQABAAAAAEATAADAAAAAgAQABYAAQAcAAAAAQABAE8AAQABAGcAAQABAE8AAwAAAAIAE</span>
+<span class="s2">AAWAAEAHAAAAAEAAQAvAAEAAQBnAAEAAQAvAAEAGgABAAgAAgAGAAwAcwACAE8AcgACAEwAAQABAE</span>
+<span class="s2">kAAAABAAAACgBGAGAAAkRGTFQADmxhdG4AHAAEAAAAAP//AAIAAAABABYAA0NBVCAAFk1PTCAAFlJ</span>
+<span class="s2">PTSAAFgAA//8AAgAAAAEAAmNwc3AADmtlcm4AFAAAAAEAAAAAAAEAAQACAAYADgABAAAAAQASAAIA</span>
+<span class="s2">AAACAB4ANgABAAoABQAFAAoAAgABACQAPQAAAAEAEgAEAAAAAQAMAAEAOP/nAAEAAQAkAAIGigAEA</span>
+<span class="s2">AAFJAXKABoAGQAA//gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAD/sv+4/+z/7v/MAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAD/xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/9T/6AAAAAD/8QAA</span>
+<span class="s2">ABD/vQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/7gAAAAAAAAAAAAAAAAAA//MAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABIAAAAAAAAAAP/5AAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/gAAD/4AAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//L/9AAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAA/+gAAAAAAAkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/zAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/mAAAAAAAAAAAAAAAAAAD</span>
+<span class="s2">/4gAA//AAAAAA//YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/+AAAAAAAAP/OAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/zv/qAAAAAP/0AAAACAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/ZAAD/egAA/1kAAAAA/5D/rgAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAD/9AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAD/8AAA/7b/8P+wAAD/8P/E/98AAAAA/8P/+P/0//oAAAAAAAAAAAAA//gA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/+AAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/w//C/9MAAP/SAAD/9wAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAD/yAAA/+kAAAAA//QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/9wAAAAD//QAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAP/2AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAP/cAAAAAAAAAAAAAAAA/7YAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAP/8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/6AAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAkAFAAEAAAAAQACwAAABcA</span>
+<span class="s2">BgAAAAAAAAAIAA4AAAAAAAsAEgAAAAAAAAATABkAAwANAAAAAQAJAAAAAAAAAAAAAAAAAAAAGAAAA</span>
+<span class="s2">AAABwAAAAAAAAAAAAAAFQAFAAAAAAAYABgAAAAUAAAACgAAAAwAAgAPABEAFgAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFAAEAEQBdAAYAAAAAAAAAAAAAAAAAAAAAAAA</span>
+<span class="s2">AAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAcAAAAAAAAABwAAAAAACAAAAAAAAAAAAAcAAAAHAAAAEwAJ</span>
+<span class="s2">ABUADgAPAAAACwAQAAAAAAAAAAAAAAAAAAUAGAACAAIAAgAAAAIAGAAXAAAAGAAAABYAFgACABYAA</span>
+<span class="s2">gAWAAAAEQADAAoAFAAMAA0ABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASAAAAEgAGAAEAHgAkAC</span>
+<span class="s2">YAJwApACoALQAuAC8AMgAzADcAOAA5ADoAPAA9AEUASABOAE8AUgBTAFUAVwBZAFoAWwBcAF0AcwA</span>
+<span class="s2">AAAAAAQAAAADa3tfFAAAAANAan9kAAAAA4QodoQ==</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)),</span>
+            <span class="mi">10</span> <span class="k">if</span> <span class="n">size</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">size</span><span class="p">,</span>
+            <span class="n">layout_engine</span><span class="o">=</span><span class="n">Layout</span><span class="o">.</span><span class="n">BASIC</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">load_default_imagefont</span><span class="p">()</span></div>
+
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 1995-2011 Fredrik Lundh and contributors (PIL), 2010 Jeffrey &#39;Alex&#39; Clark and contributors (Pillow), Alexander Karpinsky and contributors (Pillow-SIMD), 2026 Matteo Ferrabone and contributors (Pillow-AllSIMD)
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=457d1205"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/tabs.js?v=3ee01567"></script>
+    <script src="../../_static/js/activate_tab.js?v=f8fe9d20"></script>
+    </body>
+</html>

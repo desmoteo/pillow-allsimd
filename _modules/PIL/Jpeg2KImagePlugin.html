@@ -1,0 +1,916 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="author" title="About these documents" href="../../about.html"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
+
+    <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
+        <title>PIL.Jpeg2KImagePlugin - Pillow-AllSIMD 13.0.0.post0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/dark.css?v=1a645143" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     Pillow-AllSIMD: Pillow with SIMD kernels for x86 and arm64, a fork of <a href="https://github.com/uploadcare/pillow-simd">Pillow-SIMD</a> and <a href="https://github.com/python-pillow/Pillow">Pillow</a>, whose documentation this is, with Pillow-AllSIMD's additions. Pillow's own: <a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../allsimd.html">About Pillow-AllSIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../installation/index.html">Installation</a><input aria-label="Toggle navigation of Installation" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/basic-installation.html">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/python-support.html">Python support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/platform-support.html">Platform support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/building-from-source.html">Building from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/building-from-source.html#old-versions">Old versions</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../handbook/index.html">Handbook</a><input aria-label="Toggle navigation of Handbook" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/tutorial.html">Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/concepts.html">Concepts</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../handbook/appendices.html">Appendices</a><input aria-label="Toggle navigation of Appendices" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/image-file-formats.html">Image file formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/text-anchors.html">Text anchors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/third-party-plugins.html">Third-party plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html">Writing your own image plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html#decoders">Decoders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-c">Writing your own file codec in C</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-python">Writing your own file codec in Python</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/security.html">Security</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/Image.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Image</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageChops.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageChops</span></code> (“channel operations”) module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageCms.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageCms</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageColor.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageColor</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageEnhance.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageEnhance</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageFile.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFile</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageFilter.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageFont.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageGrab.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageGrab</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageMath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageMorph.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMorph</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageOps.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageOps</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImagePalette.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePalette</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImagePath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageQt.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageQt</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageSequence.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageSequence</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageShow.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageShow</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageStat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageStat</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageText.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageText</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageTk.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTk</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageTransform.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTransform</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageWin.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageWin</span></code> module (Windows-only)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ExifTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ExifTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/TiffTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">TiffTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/JpegPresets.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">JpegPresets</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/PSDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PSDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/PixelAccess.html"><code class="xref py py-class docutils literal notranslate"><span class="pre">PixelAccess</span></code> class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/features.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">features</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/fast_mode.html">Fast mode (Pillow-AllSIMD)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../PIL.html">PIL package (autodoc of remaining modules)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/plugins.html">Plugin reference</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../reference/internal_design.html">Internal reference</a><input aria-label="Toggle navigation of Internal reference" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/open_files.html">File handling in Pillow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/limits.html">Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/block_allocator.html">Block allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/internal_modules.html">Internal modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/c_extension_debugging.html">C extension debugging on Linux, with GDB/Valgrind</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/arrow_support.html">Arrow support</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../porting.html">Porting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../allsimd-changelog.html">Changelog (Pillow-AllSIMD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../allsimd-changelog.html#pillow-simd">Pillow-SIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../releasenotes/index.html">Release notes</a><input aria-label="Toggle navigation of Release notes" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/versioning.html">Versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/13.0.0.html">13.0.0 (2026-10-16)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.3.0.html">12.3.0 (2026-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.2.0.html">12.2.0 (2026-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.1.1.html">12.1.1 (2026-02-11)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.1.0.html">12.1.0 (2026-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.0.0.html">12.0.0 (2025-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.3.0.html">11.3.0 (2025-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.2.1.html">11.2.1 (2025-04-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.1.0.html">11.1.0 (2025-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.0.0.html">11.0.0 (2024-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.4.0.html">10.4.0 (2024-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.3.0.html">10.3.0 (2024-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.2.0.html">10.2.0 (2024-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.1.0.html">10.1.0 (2023-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.0.1.html">10.0.1 (2023-09-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.0.0.html">10.0.0 (2023-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.5.0.html">9.5.0 (2023-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.4.0.html">9.4.0 (2023-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.3.0.html">9.3.0 (2022-10-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.2.0.html">9.2.0 (2022-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.1.1.html">9.1.1 (2022-05-17)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.1.0.html">9.1.0 (2022-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.0.1.html">9.0.1 (2022-02-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.0.0.html">9.0.0 (2022-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.4.0.html">8.4.0 (2021-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.3.2.html">8.3.2 (2021-09-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.3.1.html">8.3.1 (2021-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.3.0.html">8.3.0 (2021-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.2.0.html">8.2.0 (2021-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.1.2.html">8.1.2 (2021-03-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.1.1.html">8.1.1 (2021-03-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.1.0.html">8.1.0 (2021-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.0.1.html">8.0.1 (2020-10-22)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.0.0.html">8.0.0 (2020-10-14)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.2.0.html">7.2.0 (2020-06-30)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.1.2.html">7.1.2 (2020-04-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.1.1.html">7.1.1 (2020-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.1.0.html">7.1.0 (2020-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.0.0.html">7.0.0 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.2.2.html">6.2.2 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.2.1.html">6.2.1 (2019-10-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.2.0.html">6.2.0 (2019-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.1.0.html">6.1.0 (2019-07-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.0.0.html">6.0.0 (2019-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.4.1.html">5.4.1 (2019-01-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.4.0.html">5.4.0 (2019-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.3.0.html">5.3.0 (2018-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.2.0.html">5.2.0 (2018-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.1.0.html">5.1.0 (2018-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.0.0.html">5.0.0 (2018-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.3.0.html">4.3.0 (2017-10-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.2.1.html">4.2.1 (2017-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.2.0.html">4.2.0 (2017-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.1.1.html">4.1.1 (2017-04-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.1.0.html">4.1.0 (2017-04-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.0.0.html">4.0.0 (2017-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.4.0.html">3.4.0 (2016-10-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.3.2.html">3.3.2 (2016-09-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.3.0.html">3.3.0 (2016-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.2.0.html">3.2.0 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.1.2.html">3.1.2 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.1.1.html">3.1.1 (2016-02-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.1.0.html">3.1.0 (2016-01-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.0.0.html">3.0.0 (2015-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.8.0.html">2.8.0 (2015-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.7.0.html">2.7.0 (2014-12-31)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.6.0.html">2.6.0 (2014-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.5.2.html">2.5.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.3.2.html">2.3.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.3.1.html">2.3.1 (2014-03-14)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../deprecations.html">Deprecations and removals</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for PIL.Jpeg2KImagePlugin</h1><div class="highlight"><pre>
+<span></span><span class="c1">#</span>
+<span class="c1"># The Python Imaging Library</span>
+<span class="c1"># $Id$</span>
+<span class="c1">#</span>
+<span class="c1"># JPEG2000 file handling</span>
+<span class="c1">#</span>
+<span class="c1"># History:</span>
+<span class="c1"># 2014-03-12 ajh  Created</span>
+<span class="c1"># 2021-06-30 rogermb  Extract dpi information from the &#39;resc&#39; header box</span>
+<span class="c1">#</span>
+<span class="c1"># Copyright (c) 2014 Coriolis Systems Limited</span>
+<span class="c1"># Copyright (c) 2014 Alastair Houghton</span>
+<span class="c1">#</span>
+<span class="c1"># See the README file for information on usage and redistribution.</span>
+<span class="c1">#</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="n">__lazy_modules__</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;io&quot;</span><span class="p">,</span> <span class="s2">&quot;struct&quot;</span><span class="p">}</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">struct</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">cast</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span><span class="p">,</span> <span class="n">ImageFile</span><span class="p">,</span> <span class="n">ImagePalette</span><span class="p">,</span> <span class="n">_binary</span>
+
+<span class="n">TYPE_CHECKING</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">IO</span>
+
+
+<div class="viewcode-block" id="BoxReader">
+<a class="viewcode-back" href="../../reference/plugins.html#PIL.Jpeg2KImagePlugin.BoxReader">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">BoxReader</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A small helper class to read fields stored in JPEG2000 header boxes</span>
+<span class="sd">    and to easily step into and read sub-boxes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fp</span><span class="p">:</span> <span class="n">IO</span><span class="p">[</span><span class="nb">bytes</span><span class="p">],</span> <span class="n">length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fp</span> <span class="o">=</span> <span class="n">fp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">has_length</span> <span class="o">=</span> <span class="n">length</span> <span class="o">&gt;=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">length</span> <span class="o">=</span> <span class="n">length</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_can_read</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_bytes</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_length</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">+</span> <span class="n">num_bytes</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">length</span><span class="p">:</span>
+            <span class="c1"># Outside box: ensure we don&#39;t read past the known file length</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># Inside box contents: ensure read does not go past box boundaries</span>
+            <span class="k">return</span> <span class="n">num_bytes</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>  <span class="c1"># No length known, just read</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_read_bytes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_bytes</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_read</span><span class="p">(</span><span class="n">num_bytes</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Not enough data in header&quot;</span>
+            <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">+</span> <span class="n">num_bytes</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="o">**</span><span class="mi">63</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Box length too large&quot;</span>
+            <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">num_bytes</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">num_bytes</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Expected to read </span><span class="si">{</span><span class="n">num_bytes</span><span class="si">}</span><span class="s2"> bytes but only got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="k">raise</span> <span class="ne">OSError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span> <span class="o">-=</span> <span class="n">num_bytes</span>
+        <span class="k">return</span> <span class="n">data</span>
+
+<div class="viewcode-block" id="BoxReader.read_fields">
+<a class="viewcode-back" href="../../reference/plugins.html#PIL.Jpeg2KImagePlugin.BoxReader.read_fields">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">calcsize</span><span class="p">(</span><span class="n">field_format</span><span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_bytes</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack</span><span class="p">(</span><span class="n">field_format</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BoxReader.read_boxes">
+<a class="viewcode-back" href="../../reference/plugins.html#PIL.Jpeg2KImagePlugin.BoxReader.read_boxes">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">read_boxes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BoxReader</span><span class="p">:</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_bytes</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">BoxReader</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">data</span><span class="p">),</span> <span class="n">size</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BoxReader.has_next_box">
+<a class="viewcode-back" href="../../reference/plugins.html#PIL.Jpeg2KImagePlugin.BoxReader.has_next_box">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_next_box</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_length</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">length</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="BoxReader.next_box_type">
+<a class="viewcode-back" href="../../reference/plugins.html#PIL.Jpeg2KImagePlugin.BoxReader.next_box_type">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">next_box_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
+        <span class="c1"># Skip the rest of the box if it has not been read</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="o">**</span><span class="mi">63</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Box length too large&quot;</span>
+                <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">SEEK_CUR</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+        <span class="c1"># Read the length and type of the next box</span>
+        <span class="n">lbox</span><span class="p">,</span> <span class="n">tbox</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="s2">&quot;tuple[int, bytes]&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_fields</span><span class="p">(</span><span class="s2">&quot;&gt;I4s&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">lbox</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">lbox</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_fields</span><span class="p">(</span><span class="s2">&quot;&gt;Q&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="n">hlen</span> <span class="o">=</span> <span class="mi">16</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">hlen</span> <span class="o">=</span> <span class="mi">8</span>
+
+        <span class="k">if</span> <span class="n">lbox</span> <span class="o">&lt;</span> <span class="n">hlen</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_can_read</span><span class="p">(</span><span class="n">lbox</span> <span class="o">-</span> <span class="n">hlen</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Invalid header length&quot;</span>
+            <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">remaining_in_box</span> <span class="o">=</span> <span class="n">lbox</span> <span class="o">-</span> <span class="n">hlen</span>
+        <span class="k">return</span> <span class="n">tbox</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_codestream</span><span class="p">(</span><span class="n">fp</span><span class="p">:</span> <span class="n">IO</span><span class="p">[</span><span class="nb">bytes</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse the JPEG 2000 codestream to extract the size and component</span>
+<span class="sd">    count from the SIZ marker segment, returning a PIL (size, mode) tuple.&quot;&quot;&quot;</span>
+
+    <span class="n">hdr</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">lsiz</span> <span class="o">=</span> <span class="n">_binary</span><span class="o">.</span><span class="n">i16be</span><span class="p">(</span><span class="n">hdr</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">lsiz</span> <span class="o">&lt;</span> <span class="mi">38</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;SIZ marker length must be at least 38&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+    <span class="n">siz</span> <span class="o">=</span> <span class="n">hdr</span> <span class="o">+</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">lsiz</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">lsiz</span><span class="p">,</span> <span class="n">rsiz</span><span class="p">,</span> <span class="n">xsiz</span><span class="p">,</span> <span class="n">ysiz</span><span class="p">,</span> <span class="n">xosiz</span><span class="p">,</span> <span class="n">yosiz</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">csiz</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack_from</span><span class="p">(</span>
+        <span class="s2">&quot;&gt;HHIIIIIIIIH&quot;</span><span class="p">,</span> <span class="n">siz</span>
+    <span class="p">)</span>
+
+    <span class="n">size</span> <span class="o">=</span> <span class="p">(</span><span class="n">xsiz</span> <span class="o">-</span> <span class="n">xosiz</span><span class="p">,</span> <span class="n">ysiz</span> <span class="o">-</span> <span class="n">yosiz</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">csiz</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">ssiz</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack_from</span><span class="p">(</span><span class="s2">&quot;&gt;B&quot;</span><span class="p">,</span> <span class="n">siz</span><span class="p">,</span> <span class="mi">38</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">ssiz</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&amp;</span> <span class="mh">0x7F</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&gt;</span> <span class="mi">8</span><span class="p">:</span>
+            <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;I;16&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;L&quot;</span>
+    <span class="k">elif</span> <span class="n">csiz</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;LA&quot;</span>
+    <span class="k">elif</span> <span class="n">csiz</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span>
+    <span class="k">elif</span> <span class="n">csiz</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;RGBA&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;unable to determine J2K image mode&quot;</span>
+        <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">size</span><span class="p">,</span> <span class="n">mode</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_res_to_dpi</span><span class="p">(</span><span class="n">num</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">denom</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">exp</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert JPEG2000&#39;s (numerator, denominator, exponent-base-10) resolution,</span>
+<span class="sd">    calculated as (num / denom) * 10^exp and stored in dots per meter,</span>
+<span class="sd">    to floating-point dots per inch.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">denom</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="p">(</span><span class="mi">254</span> <span class="o">*</span> <span class="n">num</span> <span class="o">*</span> <span class="p">(</span><span class="mi">10</span><span class="o">**</span><span class="n">exp</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="mi">10000</span> <span class="o">*</span> <span class="n">denom</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_jp2_header</span><span class="p">(</span>
+    <span class="n">fp</span><span class="p">:</span> <span class="n">IO</span><span class="p">[</span><span class="nb">bytes</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span>
+    <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+    <span class="nb">str</span><span class="p">,</span>
+    <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">ImagePalette</span><span class="o">.</span><span class="n">ImagePalette</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse the JP2 header box to extract size, component count,</span>
+<span class="sd">    color space information, and optionally DPI information,</span>
+<span class="sd">    returning a (size, mode, mimetype, dpi) tuple.&quot;&quot;&quot;</span>
+
+    <span class="c1"># Find the JP2 header box</span>
+    <span class="n">reader</span> <span class="o">=</span> <span class="n">BoxReader</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
+    <span class="n">header</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">mimetype</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">while</span> <span class="n">reader</span><span class="o">.</span><span class="n">has_next_box</span><span class="p">():</span>
+        <span class="n">tbox</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">next_box_type</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">tbox</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;jp2h&quot;</span><span class="p">:</span>
+            <span class="n">header</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">read_boxes</span><span class="p">()</span>
+            <span class="k">break</span>
+        <span class="k">elif</span> <span class="n">tbox</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;ftyp&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">reader</span><span class="o">.</span><span class="n">read_fields</span><span class="p">(</span><span class="s2">&quot;&gt;4s&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;jpx &quot;</span><span class="p">:</span>
+                <span class="n">mimetype</span> <span class="o">=</span> <span class="s2">&quot;image/jpx&quot;</span>
+    <span class="k">assert</span> <span class="n">header</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+    <span class="n">size</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">mode</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">bpc</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">nc</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">dpi</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># 2-tuple of DPI info, or None</span>
+    <span class="n">palette</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">colr</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">while</span> <span class="n">header</span><span class="o">.</span><span class="n">has_next_box</span><span class="p">():</span>
+        <span class="n">tbox</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">next_box_type</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">tbox</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;ihdr&quot;</span><span class="p">:</span>
+            <span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">nc</span><span class="p">,</span> <span class="n">bpc</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">read_fields</span><span class="p">(</span><span class="s2">&quot;&gt;IIHB&quot;</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">height</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bpc</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">nc</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="p">(</span><span class="n">bpc</span> <span class="o">&amp;</span> <span class="mh">0x7F</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">8</span><span class="p">:</span>
+                <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;I;16&quot;</span>
+            <span class="k">elif</span> <span class="n">nc</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;L&quot;</span>
+            <span class="k">elif</span> <span class="n">nc</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;LA&quot;</span>
+            <span class="k">elif</span> <span class="n">nc</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span>
+            <span class="k">elif</span> <span class="n">nc</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+                <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;RGBA&quot;</span>
+        <span class="k">elif</span> <span class="n">tbox</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;colr&quot;</span><span class="p">:</span>
+            <span class="n">meth</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">enumcs</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">read_fields</span><span class="p">(</span><span class="s2">&quot;&gt;BBBI&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">meth</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">enumcs</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">15</span><span class="p">):</span>
+                    <span class="n">colr</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+                <span class="k">elif</span> <span class="n">enumcs</span> <span class="o">==</span> <span class="mi">12</span><span class="p">:</span>
+                    <span class="n">colr</span> <span class="o">=</span> <span class="s2">&quot;CMYK&quot;</span>
+                    <span class="k">if</span> <span class="n">nc</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+                        <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;CMYK&quot;</span>
+                <span class="k">elif</span> <span class="n">enumcs</span> <span class="o">==</span> <span class="mi">17</span><span class="p">:</span>
+                    <span class="n">colr</span> <span class="o">=</span> <span class="s2">&quot;L&quot;</span>
+        <span class="k">elif</span> <span class="n">tbox</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;pclr&quot;</span> <span class="ow">and</span> <span class="n">mode</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;L&quot;</span><span class="p">,</span> <span class="s2">&quot;LA&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">colr</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;L&quot;</span><span class="p">):</span>
+            <span class="n">ne</span><span class="p">,</span> <span class="n">npc</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">read_fields</span><span class="p">(</span><span class="s2">&quot;&gt;HB&quot;</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ne</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">npc</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+            <span class="n">max_bitdepth</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">bitdepth</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">read_fields</span><span class="p">(</span><span class="s2">&quot;&gt;&quot;</span> <span class="o">+</span> <span class="p">(</span><span class="s2">&quot;B&quot;</span> <span class="o">*</span> <span class="n">npc</span><span class="p">)):</span>
+                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bitdepth</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">bitdepth</span> <span class="o">&gt;</span> <span class="n">max_bitdepth</span><span class="p">:</span>
+                    <span class="n">max_bitdepth</span> <span class="o">=</span> <span class="n">bitdepth</span>
+            <span class="k">if</span> <span class="n">max_bitdepth</span> <span class="o">&lt;=</span> <span class="mi">8</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">npc</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+                    <span class="n">palette_mode</span> <span class="o">=</span> <span class="s2">&quot;CMYK&quot;</span> <span class="k">if</span> <span class="n">colr</span> <span class="o">==</span> <span class="s2">&quot;CMYK&quot;</span> <span class="k">else</span> <span class="s2">&quot;RGBA&quot;</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">palette_mode</span> <span class="o">=</span> <span class="s2">&quot;RGB&quot;</span>
+                <span class="n">palette</span> <span class="o">=</span> <span class="n">ImagePalette</span><span class="o">.</span><span class="n">ImagePalette</span><span class="p">(</span><span class="n">palette_mode</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ne</span><span class="p">):</span>
+                    <span class="n">color</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                    <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">read_fields</span><span class="p">(</span><span class="s2">&quot;&gt;&quot;</span> <span class="o">+</span> <span class="p">(</span><span class="s2">&quot;B&quot;</span> <span class="o">*</span> <span class="n">npc</span><span class="p">)):</span>
+                        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+                        <span class="n">color</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                    <span class="n">palette</span><span class="o">.</span><span class="n">getcolor</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">color</span><span class="p">))</span>
+                <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;P&quot;</span> <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;L&quot;</span> <span class="k">else</span> <span class="s2">&quot;PA&quot;</span>
+        <span class="k">elif</span> <span class="n">tbox</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;res &quot;</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">read_boxes</span><span class="p">()</span>
+            <span class="k">while</span> <span class="n">res</span><span class="o">.</span><span class="n">has_next_box</span><span class="p">():</span>
+                <span class="n">tres</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">next_box_type</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">tres</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;resc&quot;</span><span class="p">:</span>
+                    <span class="n">vrcn</span><span class="p">,</span> <span class="n">vrcd</span><span class="p">,</span> <span class="n">hrcn</span><span class="p">,</span> <span class="n">hrcd</span><span class="p">,</span> <span class="n">vrce</span><span class="p">,</span> <span class="n">hrce</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">read_fields</span><span class="p">(</span><span class="s2">&quot;&gt;HHHHBB&quot;</span><span class="p">)</span>
+                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vrcn</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vrcd</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">hrcn</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">hrcd</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">vrce</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">hrce</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+                    <span class="n">hres</span> <span class="o">=</span> <span class="n">_res_to_dpi</span><span class="p">(</span><span class="n">hrcn</span><span class="p">,</span> <span class="n">hrcd</span><span class="p">,</span> <span class="n">hrce</span><span class="p">)</span>
+                    <span class="n">vres</span> <span class="o">=</span> <span class="n">_res_to_dpi</span><span class="p">(</span><span class="n">vrcn</span><span class="p">,</span> <span class="n">vrcd</span><span class="p">,</span> <span class="n">vrce</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">hres</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">vres</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">dpi</span> <span class="o">=</span> <span class="p">(</span><span class="n">hres</span><span class="p">,</span> <span class="n">vres</span><span class="p">)</span>
+                    <span class="k">break</span>
+
+    <span class="k">if</span> <span class="n">size</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">mode</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Malformed JP2 header&quot;</span>
+        <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">size</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">mimetype</span><span class="p">,</span> <span class="n">dpi</span><span class="p">,</span> <span class="n">palette</span>
+
+
+<span class="c1">##</span>
+<span class="c1"># Image plugin for JPEG2000 images.</span>
+
+
+<div class="viewcode-block" id="Jpeg2KImageFile">
+<a class="viewcode-back" href="../../reference/plugins.html#PIL.Jpeg2KImagePlugin.Jpeg2KImageFile">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Jpeg2KImageFile</span><span class="p">(</span><span class="n">ImageFile</span><span class="o">.</span><span class="n">ImageFile</span><span class="p">):</span>
+    <span class="nb">format</span> <span class="o">=</span> <span class="s2">&quot;JPEG2000&quot;</span>
+    <span class="n">format_description</span> <span class="o">=</span> <span class="s2">&quot;JPEG 2000 (ISO 15444)&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_open</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">sig</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sig</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;</span><span class="se">\xff\x4f\xff\x51</span><span class="s2">&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">codec</span> <span class="o">=</span> <span class="s2">&quot;j2k&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span> <span class="o">=</span> <span class="n">_parse_codestream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_parse_comment</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sig</span> <span class="o">=</span> <span class="n">sig</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">sig</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;</span><span class="se">\x00\x00\x00\x0c</span><span class="s2">jP  </span><span class="se">\x0d\x0a\x87\x0a</span><span class="s2">&quot;</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">codec</span> <span class="o">=</span> <span class="s2">&quot;jp2&quot;</span>
+                <span class="n">header</span> <span class="o">=</span> <span class="n">_parse_jp2_header</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mode</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">custom_mimetype</span><span class="p">,</span> <span class="n">dpi</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">palette</span> <span class="o">=</span> <span class="n">header</span>
+                <span class="k">if</span> <span class="n">dpi</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s2">&quot;dpi&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dpi</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">12</span><span class="p">)</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;jp2c</span><span class="se">\xff\x4f\xff\x51</span><span class="s2">&quot;</span><span class="p">):</span>
+                    <span class="n">_parse_codestream</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_parse_comment</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;not a JPEG 2000 file&quot;</span>
+                <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reduce</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layers</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="n">fd</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">length</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">fileno</span><span class="p">()</span>
+            <span class="n">length</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fstat</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span><span class="o">.</span><span class="n">st_size</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">fd</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">pos</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">io</span><span class="o">.</span><span class="n">SEEK_END</span><span class="p">)</span>
+                <span class="n">length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="n">pos</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">length</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tile</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">ImageFile</span><span class="o">.</span><span class="n">_Tile</span><span class="p">(</span>
+                <span class="s2">&quot;jpeg2k&quot;</span><span class="p">,</span>
+                <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">),</span>
+                <span class="mi">0</span><span class="p">,</span>
+                <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">codec</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reduce</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">layers</span><span class="p">,</span> <span class="n">fd</span><span class="p">,</span> <span class="n">length</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_parse_comment</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">marker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">marker</span><span class="p">:</span>
+                <span class="k">break</span>
+            <span class="n">typ</span> <span class="o">=</span> <span class="n">marker</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">typ</span> <span class="ow">in</span> <span class="p">(</span><span class="mh">0x90</span><span class="p">,</span> <span class="mh">0xD9</span><span class="p">):</span>
+                <span class="c1"># Start of tile or end of codestream</span>
+                <span class="k">break</span>
+            <span class="n">hdr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">length</span> <span class="o">=</span> <span class="n">_binary</span><span class="o">.</span><span class="n">i16be</span><span class="p">(</span><span class="n">hdr</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">length</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Marker length too small&quot;</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">typ</span> <span class="o">==</span> <span class="mh">0x64</span><span class="p">:</span>
+                <span class="c1"># Comment</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="p">[</span><span class="s2">&quot;comment&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">length</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)[</span><span class="mi">2</span><span class="p">:]</span>
+                <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">fp</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="n">length</span> <span class="o">-</span> <span class="mi">2</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">SEEK_CUR</span><span class="p">)</span>
+
+    <span class="nd">@property</span>  <span class="c1"># type: ignore[override]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reduce</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span>
+        <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">]</span>
+        <span class="o">|</span> <span class="nb">int</span>
+    <span class="p">):</span>
+        <span class="c1"># https://github.com/python-pillow/Pillow/issues/4343 found that the</span>
+        <span class="c1"># new Image &#39;reduce&#39; method was shadowed by this plugin&#39;s &#39;reduce&#39;</span>
+        <span class="c1"># property. This attempts to allow for both scenarios</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reduce</span> <span class="ow">or</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">reduce</span>
+
+    <span class="nd">@reduce</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reduce</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reduce</span> <span class="o">=</span> <span class="n">value</span>
+
+<div class="viewcode-block" id="Jpeg2KImageFile.load">
+<a class="viewcode-back" href="../../reference/plugins.html#PIL.Jpeg2KImagePlugin.Jpeg2KImageFile.load">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Image</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">PixelAccess</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reduce</span><span class="p">:</span>
+            <span class="n">power</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reduce</span>
+            <span class="n">adjust</span> <span class="o">=</span> <span class="n">power</span> <span class="o">&gt;&gt;</span> <span class="mi">1</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_size</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">int</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">adjust</span><span class="p">)</span> <span class="o">/</span> <span class="n">power</span><span class="p">),</span>
+                <span class="nb">int</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">adjust</span><span class="p">)</span> <span class="o">/</span> <span class="n">power</span><span class="p">),</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Update the reduce and layers settings</span>
+            <span class="n">t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">)</span>
+            <span class="n">t3</span> <span class="o">=</span> <span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reduce</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">layers</span><span class="p">,</span> <span class="n">t</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">3</span><span class="p">],</span> <span class="n">t</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">4</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tile</span> <span class="o">=</span> <span class="p">[</span><span class="n">ImageFile</span><span class="o">.</span><span class="n">_Tile</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">),</span> <span class="n">t</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">t3</span><span class="p">)]</span>
+
+        <span class="k">return</span> <span class="n">ImageFile</span><span class="o">.</span><span class="n">ImageFile</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_accept</span><span class="p">(</span><span class="n">prefix</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">prefix</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span>
+        <span class="p">(</span><span class="sa">b</span><span class="s2">&quot;</span><span class="se">\xff\x4f\xff\x51</span><span class="s2">&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;</span><span class="se">\x00\x00\x00\x0c</span><span class="s2">jP  </span><span class="se">\x0d\x0a\x87\x0a</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+
+<span class="c1"># ------------------------------------------------------------</span>
+<span class="c1"># Save support</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_save</span><span class="p">(</span><span class="n">im</span><span class="p">:</span> <span class="n">Image</span><span class="o">.</span><span class="n">Image</span><span class="p">,</span> <span class="n">fp</span><span class="p">:</span> <span class="n">IO</span><span class="p">[</span><span class="nb">bytes</span><span class="p">],</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="c1"># Get the keyword arguments</span>
+    <span class="n">info</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">encoderinfo</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">filename</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;.j2k&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;no_jp2&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="n">kind</span> <span class="o">=</span> <span class="s2">&quot;j2k&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">kind</span> <span class="o">=</span> <span class="s2">&quot;jp2&quot;</span>
+
+    <span class="n">offset</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;offset&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">tile_offset</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tile_offset&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">tile_size</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tile_size&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">quality_mode</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;quality_mode&quot;</span><span class="p">,</span> <span class="s2">&quot;rates&quot;</span><span class="p">)</span>
+    <span class="n">quality_layers</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;quality_layers&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">quality_layers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span>
+        <span class="nb">isinstance</span><span class="p">(</span><span class="n">quality_layers</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">))</span>
+        <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span>
+            <span class="nb">isinstance</span><span class="p">(</span><span class="n">quality_layer</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">))</span> <span class="k">for</span> <span class="n">quality_layer</span> <span class="ow">in</span> <span class="n">quality_layers</span>
+        <span class="p">)</span>
+    <span class="p">):</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;quality_layers must be a sequence of numbers&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="n">num_resolutions</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_resolutions&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">cblk_size</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;codeblock_size&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">precinct_size</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;precinct_size&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">irreversible</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;irreversible&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="n">progression</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;progression&quot;</span><span class="p">,</span> <span class="s2">&quot;LRCP&quot;</span><span class="p">)</span>
+    <span class="n">cinema_mode</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cinema_mode&quot;</span><span class="p">,</span> <span class="s2">&quot;no&quot;</span><span class="p">)</span>
+    <span class="n">mct</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;mct&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">signed</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;signed&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="n">comment</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;comment&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">comment</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">comment</span> <span class="o">=</span> <span class="n">comment</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span>
+    <span class="n">plt</span> <span class="o">=</span> <span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;plt&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">fd</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">fp</span><span class="p">,</span> <span class="s2">&quot;fileno&quot;</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">fd</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">fileno</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">fd</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+    <span class="n">im</span><span class="o">.</span><span class="n">encoderconfig</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">offset</span><span class="p">,</span>
+        <span class="n">tile_offset</span><span class="p">,</span>
+        <span class="n">tile_size</span><span class="p">,</span>
+        <span class="n">quality_mode</span><span class="p">,</span>
+        <span class="n">quality_layers</span><span class="p">,</span>
+        <span class="n">num_resolutions</span><span class="p">,</span>
+        <span class="n">cblk_size</span><span class="p">,</span>
+        <span class="n">precinct_size</span><span class="p">,</span>
+        <span class="n">irreversible</span><span class="p">,</span>
+        <span class="n">progression</span><span class="p">,</span>
+        <span class="n">cinema_mode</span><span class="p">,</span>
+        <span class="n">mct</span><span class="p">,</span>
+        <span class="n">signed</span><span class="p">,</span>
+        <span class="n">fd</span><span class="p">,</span>
+        <span class="n">comment</span><span class="p">,</span>
+        <span class="n">plt</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">ImageFile</span><span class="o">.</span><span class="n">_save</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">fp</span><span class="p">,</span> <span class="p">[</span><span class="n">ImageFile</span><span class="o">.</span><span class="n">_Tile</span><span class="p">(</span><span class="s2">&quot;jpeg2k&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">*</span><span class="n">im</span><span class="o">.</span><span class="n">size</span><span class="p">),</span> <span class="mi">0</span><span class="p">,</span> <span class="n">kind</span><span class="p">)])</span>
+
+
+<span class="c1"># ------------------------------------------------------------</span>
+<span class="c1"># Registry stuff</span>
+
+
+<span class="n">Image</span><span class="o">.</span><span class="n">register_open</span><span class="p">(</span><span class="n">Jpeg2KImageFile</span><span class="o">.</span><span class="n">format</span><span class="p">,</span> <span class="n">Jpeg2KImageFile</span><span class="p">,</span> <span class="n">_accept</span><span class="p">)</span>
+<span class="n">Image</span><span class="o">.</span><span class="n">register_save</span><span class="p">(</span><span class="n">Jpeg2KImageFile</span><span class="o">.</span><span class="n">format</span><span class="p">,</span> <span class="n">_save</span><span class="p">)</span>
+
+<span class="n">Image</span><span class="o">.</span><span class="n">register_extensions</span><span class="p">(</span>
+    <span class="n">Jpeg2KImageFile</span><span class="o">.</span><span class="n">format</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;.jp2&quot;</span><span class="p">,</span> <span class="s2">&quot;.j2k&quot;</span><span class="p">,</span> <span class="s2">&quot;.jpc&quot;</span><span class="p">,</span> <span class="s2">&quot;.jpf&quot;</span><span class="p">,</span> <span class="s2">&quot;.jpx&quot;</span><span class="p">,</span> <span class="s2">&quot;.j2c&quot;</span><span class="p">]</span>
+<span class="p">)</span>
+
+<span class="n">Image</span><span class="o">.</span><span class="n">register_mime</span><span class="p">(</span><span class="n">Jpeg2KImageFile</span><span class="o">.</span><span class="n">format</span><span class="p">,</span> <span class="s2">&quot;image/jp2&quot;</span><span class="p">)</span>
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 1995-2011 Fredrik Lundh and contributors (PIL), 2010 Jeffrey &#39;Alex&#39; Clark and contributors (Pillow), Alexander Karpinsky and contributors (Pillow-SIMD), 2026 Matteo Ferrabone and contributors (Pillow-AllSIMD)
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=457d1205"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/tabs.js?v=3ee01567"></script>
+    <script src="../../_static/js/activate_tab.js?v=f8fe9d20"></script>
+    </body>
+</html>

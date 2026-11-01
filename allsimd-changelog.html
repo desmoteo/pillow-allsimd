@@ -1,0 +1,974 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="./">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="Changelog (Pillow-AllSIMD)" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://desmoteo.github.io/pillow-allsimd/allsimd-changelog.html" />
+<meta property="og:site_name" content="Pillow-AllSIMD" />
+<meta property="og:description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. 13.0.0.post0 (unreleased): Based on Pillow 13.0.0 The project is Pillow-AllSIMD ( pillow-allsimd), a fork of Pillow-SIMD: the di..." />
+<meta name="description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. 13.0.0.post0 (unreleased): Based on Pillow 13.0.0 The project is Pillow-AllSIMD ( pillow-allsimd), a fork of Pillow-SIMD: the di..." />
+<link rel="author" title="About these documents" href="about.html"><link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Release notes" href="releasenotes/index.html"><link rel="prev" title="About" href="about.html">
+
+    <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
+        <title>Changelog (Pillow-AllSIMD) - Pillow-AllSIMD 13.0.0.post0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=4c969af8" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="_static/css/dark.css?v=1a645143" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     Pillow-AllSIMD: Pillow with SIMD kernels for x86 and arm64, a fork of <a href="https://github.com/uploadcare/pillow-simd">Pillow-SIMD</a> and <a href="https://github.com/python-pillow/Pillow">Pillow</a>, whose documentation this is, with Pillow-AllSIMD's additions. Pillow's own: <a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+  
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="allsimd.html">About Pillow-AllSIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="installation/index.html">Installation</a><input aria-label="Toggle navigation of Installation" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="installation/basic-installation.html">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation/python-support.html">Python support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation/platform-support.html">Platform support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation/building-from-source.html">Building from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="installation/building-from-source.html#old-versions">Old versions</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="handbook/index.html">Handbook</a><input aria-label="Toggle navigation of Handbook" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="handbook/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="handbook/tutorial.html">Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="handbook/concepts.html">Concepts</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="handbook/appendices.html">Appendices</a><input aria-label="Toggle navigation of Appendices" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="handbook/image-file-formats.html">Image file formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="handbook/text-anchors.html">Text anchors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="handbook/third-party-plugins.html">Third-party plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="handbook/writing-your-own-image-plugin.html">Writing your own image plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="handbook/writing-your-own-image-plugin.html#decoders">Decoders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-c">Writing your own file codec in C</a></li>
+<li class="toctree-l3"><a class="reference internal" href="handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-python">Writing your own file codec in Python</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="handbook/security.html">Security</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="reference/Image.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Image</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageChops.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageChops</span></code> (“channel operations”) module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageCms.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageCms</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageColor.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageColor</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageEnhance.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageEnhance</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageFile.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFile</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageFilter.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageFont.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageGrab.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageGrab</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageMath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageMorph.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMorph</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageOps.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageOps</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImagePalette.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePalette</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImagePath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageQt.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageQt</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageSequence.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageSequence</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageShow.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageShow</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageStat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageStat</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageText.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageText</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageTk.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTk</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageTransform.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTransform</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ImageWin.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageWin</span></code> module (Windows-only)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/ExifTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ExifTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/TiffTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">TiffTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/JpegPresets.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">JpegPresets</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/PSDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PSDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/PixelAccess.html"><code class="xref py py-class docutils literal notranslate"><span class="pre">PixelAccess</span></code> class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/features.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">features</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/fast_mode.html">Fast mode (Pillow-AllSIMD)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="PIL.html">PIL package (autodoc of remaining modules)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/plugins.html">Plugin reference</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="reference/internal_design.html">Internal reference</a><input aria-label="Toggle navigation of Internal reference" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="reference/open_files.html">File handling in Pillow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference/limits.html">Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference/block_allocator.html">Block allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference/internal_modules.html">Internal modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference/c_extension_debugging.html">C extension debugging on Linux, with GDB/Valgrind</a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference/arrow_support.html">Arrow support</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="porting.html">Porting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="about.html">About</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Changelog (Pillow-AllSIMD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#pillow-simd">Pillow-SIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="releasenotes/index.html">Release notes</a><input aria-label="Toggle navigation of Release notes" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/versioning.html">Versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/13.0.0.html">13.0.0 (2026-10-16)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/12.3.0.html">12.3.0 (2026-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/12.2.0.html">12.2.0 (2026-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/12.1.1.html">12.1.1 (2026-02-11)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/12.1.0.html">12.1.0 (2026-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/12.0.0.html">12.0.0 (2025-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/11.3.0.html">11.3.0 (2025-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/11.2.1.html">11.2.1 (2025-04-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/11.1.0.html">11.1.0 (2025-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/11.0.0.html">11.0.0 (2024-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/10.4.0.html">10.4.0 (2024-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/10.3.0.html">10.3.0 (2024-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/10.2.0.html">10.2.0 (2024-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/10.1.0.html">10.1.0 (2023-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/10.0.1.html">10.0.1 (2023-09-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/10.0.0.html">10.0.0 (2023-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/9.5.0.html">9.5.0 (2023-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/9.4.0.html">9.4.0 (2023-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/9.3.0.html">9.3.0 (2022-10-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/9.2.0.html">9.2.0 (2022-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/9.1.1.html">9.1.1 (2022-05-17)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/9.1.0.html">9.1.0 (2022-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/9.0.1.html">9.0.1 (2022-02-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/9.0.0.html">9.0.0 (2022-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.4.0.html">8.4.0 (2021-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.3.2.html">8.3.2 (2021-09-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.3.1.html">8.3.1 (2021-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.3.0.html">8.3.0 (2021-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.2.0.html">8.2.0 (2021-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.1.2.html">8.1.2 (2021-03-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.1.1.html">8.1.1 (2021-03-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.1.0.html">8.1.0 (2021-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.0.1.html">8.0.1 (2020-10-22)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/8.0.0.html">8.0.0 (2020-10-14)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/7.2.0.html">7.2.0 (2020-06-30)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/7.1.2.html">7.1.2 (2020-04-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/7.1.1.html">7.1.1 (2020-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/7.1.0.html">7.1.0 (2020-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/7.0.0.html">7.0.0 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/6.2.2.html">6.2.2 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/6.2.1.html">6.2.1 (2019-10-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/6.2.0.html">6.2.0 (2019-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/6.1.0.html">6.1.0 (2019-07-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/6.0.0.html">6.0.0 (2019-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/5.4.1.html">5.4.1 (2019-01-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/5.4.0.html">5.4.0 (2019-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/5.3.0.html">5.3.0 (2018-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/5.2.0.html">5.2.0 (2018-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/5.1.0.html">5.1.0 (2018-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/5.0.0.html">5.0.0 (2018-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/4.3.0.html">4.3.0 (2017-10-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/4.2.1.html">4.2.1 (2017-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/4.2.0.html">4.2.0 (2017-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/4.1.1.html">4.1.1 (2017-04-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/4.1.0.html">4.1.0 (2017-04-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/4.0.0.html">4.0.0 (2017-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/3.4.0.html">3.4.0 (2016-10-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/3.3.2.html">3.3.2 (2016-09-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/3.3.0.html">3.3.0 (2016-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/3.2.0.html">3.2.0 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/3.1.2.html">3.1.2 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/3.1.1.html">3.1.1 (2016-02-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/3.1.0.html">3.1.0 (2016-01-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/3.0.0.html">3.0.0 (2015-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/2.8.0.html">2.8.0 (2015-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/2.7.0.html">2.7.0 (2014-12-31)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/2.6.0.html">2.6.0 (2014-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/2.5.2.html">2.5.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/2.3.2.html">2.3.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="releasenotes/2.3.1.html">2.3.1 (2014-03-14)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="deprecations.html">Deprecations and removals</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="_sources/allsimd-changelog.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="changelog-pillow-allsimd">
+<h1>Changelog (Pillow-AllSIMD)<a class="headerlink" href="#changelog-pillow-allsimd" title="Link to this heading">¶</a></h1>
+<p>Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks.</p>
+<section id="post0-unreleased">
+<h2>13.0.0.post0 (unreleased)<a class="headerlink" href="#post0-unreleased" title="Link to this heading">¶</a></h2>
+<p>Based on Pillow 13.0.0</p>
+<ul class="simple">
+<li><p>The project is Pillow-AllSIMD (<code class="docutils literal notranslate"><span class="pre">pillow-allsimd</span></code>), a fork of Pillow-SIMD:
+the distribution name, the documentation and the credits say so; the fast
+mode variable is <code class="docutils literal notranslate"><span class="pre">PILLOW_ALLSIMD_FAST</span></code> (<code class="docutils literal notranslate"><span class="pre">PILLOW_SIMD_FAST</span></code>, its former
+name, still works)</p></li>
+<li><p>Fast mode is on by default: the operations with a fast kernel (Gaussian
+blur, RGB &lt;-&gt; YCbCr, RGB -&gt; HSV, transforms and rotate(), blend(), large
+downscales) give results within a few documented levels of Pillow’s.
+<code class="docutils literal notranslate"><span class="pre">PILLOW_ALLSIMD_FAST=0</span></code> or <code class="docutils literal notranslate"><span class="pre">Image.set_fast(False)</span></code> selects the exact
+kernels, as before. Large downscales take the reduce() shortcut on 8-bit
+images only (32-bit sums overflow on I and F images), and leave a
+malformed box to resize()’s own error</p></li>
+<li><p>Merged Pillow 13.0.0: security fixes, free-threading locks (the SIMD
+paths run inside them), vertical-first resampling and the MKS2013 and
+MKS2021 filters, which use the SIMD resample kernels (MKS2021 RGB 1/4:
+about 10x the 13.0 wheel on AVX2)</p></li>
+<li><p>arm64: NEON again for the horizontal box blur of 4-byte images and the
+unsharp mask row, which beat the compiler’s code with GCC 12 and 14
+(gaussian RGB 1.27x, unsharp RGB 1.31x on Cortex-A78AE); 13.0’s
+histogram loops on arm64 (1.1x)</p></li>
+<li><p>Rank, median, minimum and maximum filters of 1-byte images up to 11x11
+use a sorting network pruned for the rank, vectorised by the compiler:
+median 5 65x, rank 7 50x faster than Pillow 13.0 (2560x1600)</p></li>
+<li><p>Rank filters read the image’s edges instead of an expanded copy (median 3
+2.5x); ImageDraw: vector span fill and RGBA ink blend (filled shapes
+1.6x to 2.3x), masked fills for text and bitmap(); floodfill in C (60x)</p></li>
+<li><p>point(): XOR, AND and solarize tables as byte operations (ImageOps
+invert, posterize, solarize 3.3x), output not zero-filled; ImageEnhance
+contrast and brightness as lookup tables (1.5x)</p></li>
+<li><p>PNG encoding: vector row filters (level 1 1.7x); RGB &lt;-&gt; YCbCr without
+table lookups (1.6x, 3.1x)</p></li>
+<li><p>Text: rendered glyphs and their boxes are cached per font (text 5.9x,
+stroked text 17x, textbbox 2.1x)</p></li>
+<li><p>Palette mapping (quantize, convert to an adaptive palette): a colour cache
+and, for max coverage, a vector nearest-entry search (1.2x to 1.7x)</p></li>
+<li><p>Transposes and 90 degree rotations in register blocks (L 3.2x, RGB 1.4x);
+flips and rotate 180 by vector row reversal (RGB 1.4x, L 10x)</p></li>
+<li><p>Resampling of F, I and I;16 images in vectors of doubles, every sum in
+the scalar code’s order (1.8x to 5.5x)</p></li>
+<li><p>Arcs, chords and pie slices are clipped without allocating (1.25x);
+alpha_composite() with an offset composites in place (2.2x); tobytes()
+encodes in one chunk (1.9x)</p></li>
+<li><p>Resize: the AVX-VNNI build no longer puts vpdpwssd in the horizontal
+pass, where each pixel is one long chain of additions: shrinks with long
+kernels (2560x1600 to 26x16) 1.3x to 1.6x faster, now level with AVX2;
+RGB in the portable build sums three channels, not four (1.2x, level with
+Pillow 13.0 for big shrinks)</p></li>
+<li><p>Perspective transforms: the coordinates of a tile row are computed in
+one loop the compiler vectorizes, so the two divisions per pixel run
+several at once (1.4x RGB bilinear and bicubic, 1.8x L nearest, AVX2);
+quad transforms with the bilinear filter inlined (1.2x). Same output</p></li>
+<li><p>RGB -&gt; HSV: AVX2 kernel for 8 pixels, the same operations per lane as
+the SSE4 one; identical for all 16.7 million RGB values; 2.2x</p></li>
+<li><p>RGB -&gt; CMYK, L -&gt; RGB/LA, RGB &lt;-&gt; RGBA a pixel at a time, which the
+compiler vectorizes (1.6x to 2.9x; the AVX2 build’s CMYK was 15% slower
+than SSE4); ImageChops add and subtract with scale 1 in integers, other
+scales by table, lighter and darker without clipping (add 1.6x)</p></li>
+<li><p>BoxBlur, GaussianBlur, UnsharpMask: the passes of each direction run
+together, every horizontal pass on a row while it is in cache, the
+vertical ones in one sweep with a ring of rows per pass; AVX2 blurs two
+rows at once horizontally and 32 bytes per step vertically. Same
+output. AVX2: Gaussian RGB 2x, box blur 2.3x, unsharp mask 1.8x</p></li>
+<li><p>Rank filters (min, max, median, any rank up to 11x11) on RGB, RGBA,
+CMYK, LA and other 4-byte modes run all bands in one pass instead of
+splitting and merging; min and max keep their row results in a ring of
+rows and vectorize both passes; 3x3 and 5x5 medians in registers
+(SSE4, AVX2, NEON; Devillard’s 99-comparator network for 5x5). RGB
+min/max 3x3 11x, median 3x3 5.3x, median 5x5 2.4x, L median 3x3 2.8x,
+median 5x5 2.5x (AVX2)</p></li>
+<li><p>Images take transparent huge pages on Linux, as numpy arrays do: box
+blur 1.5x (its vertical pass), ImageChops lighter 1.6x, most passes
+over large images a few percent</p></li>
+<li><p>x86: RGBa -&gt; RGBA is exact (colour above alpha gave 0, alpha 0 gave
+colour 0); slightly slower</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">checks/simd_test_remote.sh</span></code> runs the test suite per SIMD build in a
+container, on a remote host or locally, so the host’s Python version does
+not matter</p></li>
+<li><p>Fast mode switch: <code class="docutils literal notranslate"><span class="pre">PILLOW_ALLSIMD_FAST=1</span></code>, <code class="docutils literal notranslate"><span class="pre">Image.set_fast()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">Image.get_fast()</span></code>, <code class="docutils literal notranslate"><span class="pre">Image.fast_mode()</span></code> and the <code class="docutils literal notranslate"><span class="pre">fast</span></code> feature.
+Off by default; it lets operations use kernels whose results may differ
+from Pillow’s by small, documented amounts (<code class="docutils literal notranslate"><span class="pre">design/SIMD_FAST_KERNELS.md</span></code>)</p></li>
+<li><p>Fast mode: GaussianBlur and UnsharpMask up to radius 6 apply Pillow’s three
+box passes as one kernel with 8-bit weights in one pass, with exact bands
+near the edges: within 3 levels of the exact result, closer to a true
+Gaussian, 3.3x (x86) and 3.2x (arm64) faster at radius 1</p></li>
+<li><p>Fast mode: RGB, RGBA, RGBX &lt;-&gt; YCbCr with JPEG’s formulas at 14-bit
+coefficients and one rounding: within 1 level of the exact result and
+closer to the formulas (0.3% of values off by one, against 47%); to YCbCr
+1.5x (x86) and 2.2x (arm64), back 1.3x and 1.7x</p></li>
+<li><p>Fast mode: RGB, RGBA, RGBX -&gt; HSV with the hue and saturation truncated
+exactly (one 32-bit float division each): the hue is 1 above the exact
+result for 0.3% of colours, saturation and value are the same; 2.9x (x86),
+2.0x (arm64)</p></li>
+<li><p>Fast mode: affine, perspective and quad transforms and rotate() with the
+bilinear and bicubic filters (L and 4-byte modes) take positions in fixed
+point and integer filters with one rounding: within 2 levels of the exact
+result, 0.6% of values off by one against float interpolation (exact:
+41%); rotate bilinear 2.7x (x86) and 2.6x (arm64), bicubic 2.9x and 3.4x,
+perspective 2.1x and 1.9x, L rotate bilinear 2.8x and 1.9x (vertical
+first in 16-bit lanes, four pixels per AVX2 step, eight L pixels per
+step)</p></li>
+<li><p>Fast mode: blend() with 0 &lt; alpha &lt; 1 interpolates in integers, alpha in
+2^-15 units, rounded (pmulhrsw, vqrdmulh): within 1 level of the exact
+result, 1.7x (x86) and 4.1x (arm64)</p></li>
+<li><p>Fast mode: resize() with the bicubic, Lanczos and MKS filters and no
+reducing_gap uses 3.0, so downscales of 6x and more shrink with reduce()
+first: within 2 levels at photo sizes, 1/8 Lanczos 1.9x (x86) and 2.5x
+(arm64)</p></li>
+<li><p>BoxBlur with one pass each way and radii the direct kernel takes
+(integers up to 4, below 1): each row is blurred horizontally into a ring
+of rows just before the vertical pass reads it, instead of through a full
+temporary image; the same pixels (radius 1 2.1x, 2 1.7x, 3 1.5x, AVX2)</p></li>
+<li><p>arm64: point() tables on 8-bit bands with NEON lookups (tbl, tbx) in the
+256-entry tables, a row’s bands as planes so each table loads once (L
+1.9x, RGB 1.3x, both now level with or ahead of OpenCV)</p></li>
+<li><p>Fast mode: perspective positions in 32-bit floats from the exact integer
+sums (images below 32768 pixels a side), four lanes per division on SSE4
+and NEON, eight on AVX2; still the same on every build (arm64 1.2x)</p></li>
+<li><p>WebP: one-frame files decode straight into the image with libwebp’s
+simple API, without the animation decoder’s canvas and two copies (the
+same pixels; 1.38x, 2560x1600 RGB, now ahead of OpenCV)</p></li>
+<li><p>JPEG: RGB images decode to 4-byte pixels in libjpeg-turbo’s colour
+conversion (JCS_EXT_RGBX) instead of being expanded row by row (1.05x);
+PNG: the “up” filter undone 16 bytes at a time (1.1x on such rows)</p></li>
+<li><p>ImageDraw polygon outlines wider than 1 px keep the polygon’s inside as
+spans per row, from the same scan as its fill, instead of a mask of its
+bounding box: the same pixels, 1.1x for the benchmark’s ROI polygons and
+1.7x for polygons 1400 px across</p></li>
+<li><p>arm64: RGBa -&gt; RGBA (and so RGBA resize and transforms) divides once per
+pixel instead of once per channel, with the same result for every colour
+and alpha (1.12x)</p></li>
+<li><p>Pixel conversions written so that they vectorize under Python’s
+<code class="docutils literal notranslate"><span class="pre">-fno-strict-overflow</span></code> (RGBA -&gt; RGB 1.9x, RGB -&gt; RGBA 1.9x, L -&gt; RGB
+2.1x with AVX2); NEON loops for L -&gt; RGB, RGB &lt;-&gt; RGBA and CMYK</p></li>
+<li><p>ImageChops <code class="docutils literal notranslate"><span class="pre">add</span></code> and <code class="docutils literal notranslate"><span class="pre">subtract</span></code> with scale 1 and offset 0 as saturating
+vector additions (AVX2 1.8x, NEON 2.4x)</p></li>
+<li><p>Rank filters: the 3x3 median in registers also at -O2 (Debian, Ubuntu and
+conda Pythons: 1.75x), minimum and maximum in one pass (1.4x AVX2, 1.3x
+NEON)</p></li>
+<li><p>Box and Gaussian blur: radii below 2 and integer radii up to 4 without
+running sums, in SSE4, AVX2 and NEON (Gaussian RGB radius 1 1.7x on
+both; box radius 2 1.2x AVX2, 1.6x NEON; unsharp mask 1.2x AVX2, 1.5x
+NEON)</p></li>
+<li><p>RGB &lt;-&gt; YCbCr: AVX2, and 16 pixels per step on NEON (AVX2 2.0x and 1.9x);
+RGB -&gt; HSV on NEON (1.4x)</p></li>
+<li><p>Kernel filters: kernels whose coefficients don’t fit 16 bits at 13
+fractional bits (FIND_EDGES, CONTOUR, EDGE_ENHANCE) use the integer
+kernels at the highest precision that keeps them exact (2.2x AVX2, 2.0x
+NEON), and EDGE_ENHANCE and other kernels with half-integer coefficients
+now give the scalar build’s result on x86; 3x3 kernels for L images keep
+their coefficients in registers (1.1x AVX2)</p></li>
+<li><p>Text: glyph advances cached for the basic layout (3.3x x86, 4.2x arm64);
+polygons: scan-line intersections sorted without qsort (1.25x)</p></li>
+<li><p>ImageDraw: thin lines and rectangle outlines write their pixels directly
+again, as before Pillow 13.0, instead of through a function pointer per
+pixel (500 bounding boxes 2 px wide: 1.6x)</p></li>
+<li><p>ImageDraw.polygon() with an outline wider than 1 px: the mask that keeps
+the outline inside the polygon covers only the polygon, not the whole
+image (100 ROI polygons on 2560x1600: 6.6x). Same pixels</p></li>
+<li><p>arm64: rotate() and the affine, perspective and quad transforms with the
+bilinear and bicubic filters on RGB and RGBA images in NEON doubles: the
+scalar filters’ integer differences for the 4 bands of two rows in
+16-bit lanes, converted exactly, then the same fused multiply-adds; two
+pixels at a time where their source pixels are inside the image. The
+same pixels; rotate bicubic RGBA 1.59x, RGB 1.32x, bilinear RGB 1.47x,
+RGBA 1.54x, perspective 1.25x to 1.30x, quad 1.37x (Cortex-A78AE)</p></li>
+<li><p>arm64: alpha_composite() looks the scalar code’s per-pixel division up in
+a table of every source and destination alpha (128 KB, built on first
+use), with NEON for the rest: the same pixels, 1.25x; reduce() by 4x4 of
+4-byte images in NEON pairwise sums (1.15x)</p></li>
+<li><p>resize() of RGBA and LA images premultiplies the source rows inside the
+first resample pass and removes it from the rows of the last, where they
+are in the cache, instead of converting the whole image to RGBa and back.
+The same pixels; x86 1.1x to 1.7x (2048x1280 bilinear 1.68x), arm64
+1.1x to 1.3x</p></li>
+<li><p>arm64: RGBa -&gt; RGBA (and so RGBA resizes) looks up 255 * c / alpha in a
+64 KB table of the scalar code’s results, two pixels per 64-bit word:
+1.7x on Cortex-A78AE, where the float kernel was bound by conversions
+(on x86 the table is slower than the vector kernels, which stay)</p></li>
+<li><p>arm64, fast mode: RGB -&gt; HSV computes the hue in 16-bit lanes with one
+division and takes the saturation from that table (1.67x); YCbCr -&gt; RGB
+multiplies Cr and Cb in 16-bit lanes with rounding doubling multiplies
+(1.53x). The same pixels as before; both now faster than OpenCV</p></li>
+<li><p>MinFilter and MaxFilter of the same size: the row ends clamp the pixel
+index instead of copying each row into a padded buffer, and the 3x3
+filters skip the loop over the sources (3x3 RGB: 1.1x to 1.2x AVX2,
+1.4x NEON)</p></li>
+<li><p>Box blur radii 1 to 4 without running sums: the sum’s sources unrolled
+per radius (radius 2 RGB: 1.46x AVX2 at -O3)</p></li>
+<li><p>32-bit x86: the SIMD builds do floating point in SSE registers
+(<code class="docutils literal notranslate"><span class="pre">-mfpmath=sse</span></code>); on the x87 unit a transform’s pixels could depend on
+the code around them. <code class="docutils literal notranslate"><span class="pre">-C</span> <span class="pre">simd=native</span></code> passes <code class="docutils literal notranslate"><span class="pre">-mcpu=native</span></code> on POWER
+and is refused on RISC-V with a hint. The portable build passes the test
+suite on riscv64, ppc64le, s390x, armv7 and 32-bit x86
+(<code class="docutils literal notranslate"><span class="pre">design/OTHER_ARCHITECTURES.md</span></code>); <code class="docutils literal notranslate"><span class="pre">checks/simd_test_remote.sh</span></code> takes those
+platforms, and <code class="docutils literal notranslate"><span class="pre">checks/simd_hashes.py</span></code> hashes I and F pixels
+little-endian, so big-endian builds compare</p></li>
+<li><p>Fast mode: resize() of 8-bit images with 4-byte pixels fuses the two
+passes through a ring of rows, keeps the horizontal sums to 2^-6 levels
+and multiplies in 16 bits in the vertical pass (pmulhrsw, vqrdmulh): within
+1 level of the exact result and closer to a float resize; upscales 1.16x
+to 1.28x (x86) and 1.31x to 1.47x (arm64), downscales to 1.20x on arm64
+and within 4% on x86. The same pixels on every build</p></li>
+</ul>
+<p>Build</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-C</span> <span class="pre">simd=auto|sse4|avx2|avxvnni|native|native512|neon|disable</span></code>
+option; flags chosen per target architecture; SSE4.1 baseline on x86
+(was SSE4.2). <code class="docutils literal notranslate"><span class="pre">native</span></code> builds for the build machine’s CPU
+(<code class="docutils literal notranslate"><span class="pre">-march=native</span></code>, float contraction off), <code class="docutils literal notranslate"><span class="pre">native512</span></code> also prefers
+512-bit vectors; both only run on CPUs like the build machine’s</p></li>
+<li><p>AVX-VNNI build (<code class="docutils literal notranslate"><span class="pre">-C</span> <span class="pre">simd=avxvnni</span></code>): the 16-bit multiply-add of the
+resample and integer filter kernels becomes one vpdpwssd. Same output;
+integer filters on RGB 1.3x to 2.1x faster than AVX2</p></li>
+<li><p>arm64: NEON kernels; other architectures build portable C code</p></li>
+</ul>
+<p>New and faster kernels</p>
+<ul class="simple">
+<li><p>Resize of 1-byte images (L): SIMD horizontal pass (SSE4, NEON), 2.4x to
+8x faster on x86, 2.5x to 3.3x on arm64</p></li>
+<li><p>Reduce: 1x2, 2x1, 2x2 about 2x faster on x86; 2x2 and 4x4 for 1-byte
+images on SSE4 and NEON, 6x to 10x faster; NEON for 4-byte images with
+horizontal factors up to 512 (1.6x to 4.5x on arm64); restored 4x4 and 5x5
+for 1-byte images</p></li>
+<li><p>Filter: integer kernel for L images, up to 2x faster; on arm64 NEON
+integer kernels and NEON float kernels for 4-byte images (FIND_EDGES on
+RGB 1.7x). Like the x86 float kernels, the float ones can differ by 1
+from the scalar code for inexact coefficients</p></li>
+<li><p>BoxBlur, GaussianBlur: vertical pass without transposes, up to 1.8x
+faster; on x86 1-byte images are blurred four rows at a time, 1.9x to 3x</p></li>
+<li><p>UnsharpMask: SIMD post-pass on x86, about 1.7x faster</p></li>
+<li><p>ColorLUT: NEON kernel (1.5x), output identical to the scalar code</p></li>
+<li><p>ImageChops.multiply, screen: exact division by 255 without a divide;
+SSE4, AVX2 and NEON. 6.4x to 12x faster on x86, 3.4x on arm64</p></li>
+<li><p>RankFilter, MinFilter, MaxFilter, MedianFilter on 1-byte images: a
+sorting network for 3x3 windows (any rank) and row-then-column minimum
+and maximum for any size, 14x to 130x faster; the GIL is released</p></li>
+<li><p>Filter with integer kernels on L images: AVX2 path, 32 pixels per step,
+2x faster than SSE4 (2.2x with AVX-VNNI); output unchanged</p></li>
+<li><p>Quantize with median cut or maximum coverage, convert(“P”, ADAPTIVE):
+the color hash table takes its nodes from blocks instead of one malloc
+each; the same chains, so the same palette and pixels. 1.7x faster on a
+2560x1600 image of random colors</p></li>
+<li><p>RGB to HSV: SSE4 kernel for 4 pixels with the float and double steps of
+the scalar code, and fmod(h, 1.0) replaced by its exact equivalent for
+the range h is in. 5.4x faster than upstream on SSE4, 1.4x in the scalar
+build; output identical for all 16.7 million RGB values</p></li>
+<li><p>Filter with 3x3 float kernels on L images (CONTOUR, FIND_EDGES): AVX2
+path, 8 pixels per step, 1.9x faster than SSE4; output unchanged</p></li>
+<li><p>Rotate and transform (affine, perspective, quad, mesh): the output is
+computed in 64x64 tiles, which keeps the source rows in cache; bilinear
+and bicubic filters for 3- and 4-band images take all channels in one
+AVX2 vector of doubles (two with SSE4). Output identical. On x86, rotate
+30 degrees 2560x1600 RGB: nearest 3x to 4.6x, bilinear 1.6x (SSE4) to 2x
+(AVX2), bicubic 1.4x to 2.2x; perspective 2x to 2.5x. The tiles alone
+make the scalar build 1.2x (bilinear, bicubic) to 4x (nearest) faster</p></li>
+<li><p>ModeFilter: the window histogram is updated by columns, and windows
+of fewer than 16 values check only their own values; 13x faster for
+size 3, 3.4x to 4.8x for sizes 5 to 17; output unchanged; the GIL is
+released</p></li>
+<li><p>Histogram of 8-bit images: counts split over several tables, 1.2x to
+2.4x faster</p></li>
+<li><p>ImageChops.offset: two row copies instead of a modulo per pixel, 13x
+faster</p></li>
+<li><p>RGB pack and unpack (frombytes, tobytes, codecs): SSE4 and NEON,
+1.1x to 1.7x faster</p></li>
+<li><p>arm64: alpha composition and the vertical blur pass use the portable C
+code, which GCC vectorises better than the previous NEON kernels did</p></li>
+<li><p>Released the GIL in AlphaComposite, Bands, Blend and Chops</p></li>
+</ul>
+<p>Fixes</p>
+<ul class="simple">
+<li><p>BoxBlur, GaussianBlur: fixed swapped channels for single-axis blurs on
+4-byte modes; fixed reads past 1-pixel lines</p></li>
+<li><p>Filter: fixed I;16 images going to the 8-bit kernel</p></li>
+<li><p>Reduce: fixed 1x3 rounding</p></li>
+<li><p>AlphaComposite, Convert: results no longer depend on the pixel’s position
+in the row</p></li>
+<li><p>ImageChops.offset: fixed reads and writes past the end of each row for
+I;16 images</p></li>
+<li><p>From Pillow 13.0: I;16 filters keep the high byte and clamp to 0..65535;
+BoxBlur and GaussianBlur reject NaN, infinite and &gt;= 2**31 radii;
+ImagingExpand’s size check no longer overflows or divides by zero; masked
+histograms of LA images count the alpha band</p></li>
+</ul>
+</section>
+</section>
+<section id="pillow-simd">
+<h1>Pillow-SIMD<a class="headerlink" href="#pillow-simd" title="Link to this heading">¶</a></h1>
+<p>The changelog of Pillow-SIMD (<a class="reference external" href="https://github.com/uploadcare/pillow-simd">https://github.com/uploadcare/pillow-simd</a>), by
+Alexander Karpinsky and contributors, up to the fork.</p>
+<section id="post2-9-4-0-post2-9-3-0-post2-9-2-0-post2-9-1-1-post2-9-0-0-post3">
+<h2>9.5.0.post2 &amp; 9.4.0.post2 &amp; 9.3.0.post2 &amp; 9.2.0.post2 &amp; 9.1.1.post2 &amp; 9.0.0.post3<a class="headerlink" href="#post2-9-4-0-post2-9-3-0-post2-9-2-0-post2-9-1-1-post2-9-0-0-post3" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Fixed color overflow in LUT processing</p></li>
+</ul>
+</section>
+<section id="post1">
+<h2>9.0.0.post1<a class="headerlink" href="#post1" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Fixed possible overflow in LUT processing</p></li>
+<li><p>Restored compatibility with Visual C Compiler</p></li>
+</ul>
+</section>
+<section id="post4">
+<h2>7.0.0.post4<a class="headerlink" href="#post4" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Filter: fixed wrong offset handling for 3x3 single-band version</p></li>
+</ul>
+</section>
+<section id="post3">
+<h2>7.0.0.post3<a class="headerlink" href="#post3" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>ColorLUT: fixed potential access violation, up to 2x faster</p></li>
+</ul>
+</section>
+<section id="post2">
+<h2>7.0.0.post2<a class="headerlink" href="#post2" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>ColorLUT: SSE4 &amp; AVX2</p></li>
+</ul>
+</section>
+<section id="post1-6-2-2-post1-6-1-0-post1-6-0-0-post2">
+<h2>7.0.0.post1 &amp; 6.2.2.post1 &amp; 6.1.0.post1 &amp; 6.0.0.post2<a class="headerlink" href="#post1-6-2-2-post1-6-1-0-post1-6-0-0-post2" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Bands: access violation in <code class="docutils literal notranslate"><span class="pre">getband</span></code> in some environments</p></li>
+</ul>
+</section>
+<section id="post0">
+<h2>7.0.0.post0<a class="headerlink" href="#post0" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Reduce: SSE4</p></li>
+</ul>
+</section>
+<section id="id1">
+<h2>6.0.0.post1<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>GCC 9.0+: fixed unaligned read for <code class="docutils literal notranslate"><span class="pre">_mm_cvtepu8_epi32</span></code> and
+<code class="docutils literal notranslate"><span class="pre">_mm256_cvtepu8_epi32</span></code> functions.</p></li>
+</ul>
+</section>
+<section id="post0-and-5-3-0-post1">
+<h2>6.0.0.post0 and 5.3.0.post1<a class="headerlink" href="#post0-and-5-3-0-post1" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Resampling: correct max coefficient calculation. Some rare combinations of
+initial and requested sizes lead to black lines.</p></li>
+</ul>
+</section>
+<section id="id2">
+<h2>4.3.0.post0<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Float-based filters, single-band: 3x3 SSE4, 5x5 SSE4</p></li>
+<li><p>Float-based filters, multi-band: 3x3 SSE4 &amp; AVX2, 5x5 SSE4</p></li>
+<li><p>Int-based filters, multi-band: 3x3 SSE4 &amp; AVX2, 5x5 SSE4 &amp; AVX2</p></li>
+<li><p>Box blur: fast path for radius &lt; 1</p></li>
+<li><p>Alpha composite: fast division approximation</p></li>
+<li><p>Color conversion: SSE4 RGB-to-L conversion, fast division in RGBa-to-RGBA
+conversion</p></li>
+<li><p>Resampling: optimized coefficients loading</p></li>
+<li><p>Split and get_channel: SSE4</p></li>
+</ul>
+</section>
+<section id="id3">
+<h2>3.4.1.post1<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Fixed a critical memory error for some combinations of source and destination
+sizes.</p></li>
+</ul>
+</section>
+<section id="id4">
+<h2>3.4.1.post0<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Numerous resampling optimizations, including a 16-bit intermediate color
+representation and heavy unrolling.</p></li>
+</ul>
+</section>
+<section id="id5">
+<h2>3.3.2.post0<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Maintenance release</p></li>
+</ul>
+</section>
+<section id="id6">
+<h2>3.3.0.post2<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Fixed an error in RGBa -&gt; RGBA conversion</p></li>
+</ul>
+</section>
+<section id="id7">
+<h2>3.3.0.post1<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h2>
+<section id="alpha-compositing">
+<h3>Alpha compositing<a class="headerlink" href="#alpha-compositing" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>SSE4 and AVX2 fixed-point full-loading implementations.
+Up to 4.6x faster.</p></li>
+</ul>
+</section>
+</section>
+<section id="id8">
+<h2>3.3.0.post0<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h2>
+<section id="resampling">
+<h3>Resampling<a class="headerlink" href="#resampling" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>SSE4 and AVX2 fixed-point full-loading horizontal pass.</p></li>
+<li><p>SSE4 and AVX2 fixed-point full-loading vertical pass.</p></li>
+</ul>
+</section>
+<section id="conversion">
+<h3>Conversion<a class="headerlink" href="#conversion" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>RGBA -&gt; RGBa SSE4 and AVX2 fixed-point full-loading implementations.
+Up to 2.6x faster.</p></li>
+<li><p>RGBa -&gt; RGBA AVX2 implementation using gather instructions.
+Up to 5x faster.</p></li>
+</ul>
+</section>
+</section>
+<section id="id9">
+<h2>3.2.0.post3<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h2>
+<section id="id10">
+<h3>Resampling<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>SSE4 and AVX2 float full-loading horizontal pass.</p></li>
+<li><p>SSE4 float full-loading vertical pass.</p></li>
+</ul>
+</section>
+</section>
+<section id="id11">
+<h2>3.2.0.post2<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h2>
+<section id="id12">
+<h3>Resampling<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>SSE4 and AVX2 float full-loading horizontal pass.</p></li>
+<li><p>SSE4 float per-pixel loading vertical pass.</p></li>
+</ul>
+</section>
+</section>
+<section id="id13">
+<h2>2.9.0.post1<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h2>
+<section id="id14">
+<h3>Resampling<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>SSE4 and AVX2 float per-pixel loading horizontal pass.</p></li>
+<li><p>SSE4 float per-pixel loading vertical pass.</p></li>
+<li><p>SSE4: up to 2x for downscaling and 3.5x for upscaling.</p></li>
+<li><p>AVX2: up to 2.7x for downscaling and 3.5x for upscaling.</p></li>
+</ul>
+</section>
+<section id="box-blur">
+<h3>Box blur<a class="headerlink" href="#box-blur" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p>Simple SSE4 fixed-point implementations with per-pixel loading.</p></li>
+<li><p>Up to 2.1x faster.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="releasenotes/index.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Release notes</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="about.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">About</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 1995-2011 Fredrik Lundh and contributors (PIL), 2010 Jeffrey &#39;Alex&#39; Clark and contributors (Pillow), Alexander Karpinsky and contributors (Pillow-SIMD), 2026 Matteo Ferrabone and contributors (Pillow-AllSIMD)
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Changelog (Pillow-AllSIMD)</a><ul>
+<li><a class="reference internal" href="#post0-unreleased">13.0.0.post0 (unreleased)</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#pillow-simd">Pillow-SIMD</a><ul>
+<li><a class="reference internal" href="#post2-9-4-0-post2-9-3-0-post2-9-2-0-post2-9-1-1-post2-9-0-0-post3">9.5.0.post2 &amp; 9.4.0.post2 &amp; 9.3.0.post2 &amp; 9.2.0.post2 &amp; 9.1.1.post2 &amp; 9.0.0.post3</a></li>
+<li><a class="reference internal" href="#post1">9.0.0.post1</a></li>
+<li><a class="reference internal" href="#post4">7.0.0.post4</a></li>
+<li><a class="reference internal" href="#post3">7.0.0.post3</a></li>
+<li><a class="reference internal" href="#post2">7.0.0.post2</a></li>
+<li><a class="reference internal" href="#post1-6-2-2-post1-6-1-0-post1-6-0-0-post2">7.0.0.post1 &amp; 6.2.2.post1 &amp; 6.1.0.post1 &amp; 6.0.0.post2</a></li>
+<li><a class="reference internal" href="#post0">7.0.0.post0</a></li>
+<li><a class="reference internal" href="#id1">6.0.0.post1</a></li>
+<li><a class="reference internal" href="#post0-and-5-3-0-post1">6.0.0.post0 and 5.3.0.post1</a></li>
+<li><a class="reference internal" href="#id2">4.3.0.post0</a></li>
+<li><a class="reference internal" href="#id3">3.4.1.post1</a></li>
+<li><a class="reference internal" href="#id4">3.4.1.post0</a></li>
+<li><a class="reference internal" href="#id5">3.3.2.post0</a></li>
+<li><a class="reference internal" href="#id6">3.3.0.post2</a></li>
+<li><a class="reference internal" href="#id7">3.3.0.post1</a><ul>
+<li><a class="reference internal" href="#alpha-compositing">Alpha compositing</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id8">3.3.0.post0</a><ul>
+<li><a class="reference internal" href="#resampling">Resampling</a></li>
+<li><a class="reference internal" href="#conversion">Conversion</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id9">3.2.0.post3</a><ul>
+<li><a class="reference internal" href="#id10">Resampling</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id11">3.2.0.post2</a><ul>
+<li><a class="reference internal" href="#id12">Resampling</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#id13">2.9.0.post1</a><ul>
+<li><a class="reference internal" href="#id14">Resampling</a></li>
+<li><a class="reference internal" href="#box-blur">Box blur</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="_static/documentation_options.js?v=457d1205"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/tabs.js?v=3ee01567"></script>
+    <script src="_static/js/activate_tab.js?v=f8fe9d20"></script>
+    </body>
+</html>

@@ -1,0 +1,782 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="ImageFilter module" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://desmoteo.github.io/pillow-allsimd/reference/ImageFilter.html" />
+<meta property="og:site_name" content="Pillow-AllSIMD" />
+<meta property="og:description" content="The ImageFilter module contains definitions for a pre-defined set of filters, which can be used with the Image.filter() method. Example: Filter an image: Filters: Pillow provides the following set ..." />
+<meta name="description" content="The ImageFilter module contains definitions for a pre-defined set of filters, which can be used with the Image.filter() method. Example: Filter an image: Filters: Pillow provides the following set ..." />
+<link rel="author" title="About these documents" href="../about.html"><link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="ImageFont module" href="ImageFont.html"><link rel="prev" title="ImageFile module" href="ImageFile.html">
+
+    <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
+        <title>ImageFilter module - Pillow-AllSIMD 13.0.0.post0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/dark.css?v=1a645143" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     Pillow-AllSIMD: Pillow with SIMD kernels for x86 and arm64, a fork of <a href="https://github.com/uploadcare/pillow-simd">Pillow-SIMD</a> and <a href="https://github.com/python-pillow/Pillow">Pillow</a>, whose documentation this is, with Pillow-AllSIMD's additions. Pillow's own: <a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../allsimd.html">About Pillow-AllSIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../installation/index.html">Installation</a><input aria-label="Toggle navigation of Installation" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation/basic-installation.html">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/python-support.html">Python support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/platform-support.html">Platform support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/building-from-source.html">Building from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/building-from-source.html#old-versions">Old versions</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../handbook/index.html">Handbook</a><input aria-label="Toggle navigation of Handbook" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/tutorial.html">Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/concepts.html">Concepts</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../handbook/appendices.html">Appendices</a><input aria-label="Toggle navigation of Appendices" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/image-file-formats.html">Image file formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/text-anchors.html">Text anchors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/third-party-plugins.html">Third-party plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html">Writing your own image plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#decoders">Decoders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-c">Writing your own file codec in C</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-python">Writing your own file codec in Python</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/security.html">Security</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Reference</a><input aria-label="Toggle navigation of Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="Image.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Image</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageChops.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageChops</span></code> (“channel operations”) module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageCms.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageCms</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageColor.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageColor</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageEnhance.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageEnhance</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageFile.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFile</span></code> module</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageFont.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageGrab.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageGrab</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageMath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageMorph.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMorph</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageOps.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageOps</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImagePalette.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePalette</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImagePath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageQt.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageQt</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageSequence.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageSequence</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageShow.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageShow</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageStat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageStat</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageText.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageText</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageTk.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTk</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageTransform.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTransform</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageWin.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageWin</span></code> module (Windows-only)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ExifTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ExifTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="TiffTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">TiffTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="JpegPresets.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">JpegPresets</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="PSDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PSDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="PixelAccess.html"><code class="xref py py-class docutils literal notranslate"><span class="pre">PixelAccess</span></code> class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">features</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fast_mode.html">Fast mode (Pillow-AllSIMD)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../PIL.html">PIL package (autodoc of remaining modules)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugin reference</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="internal_design.html">Internal reference</a><input aria-label="Toggle navigation of Internal reference" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="open_files.html">File handling in Pillow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="limits.html">Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="block_allocator.html">Block allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="internal_modules.html">Internal modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="c_extension_debugging.html">C extension debugging on Linux, with GDB/Valgrind</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arrow_support.html">Arrow support</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../porting.html">Porting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../allsimd-changelog.html">Changelog (Pillow-AllSIMD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../allsimd-changelog.html#pillow-simd">Pillow-SIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../releasenotes/index.html">Release notes</a><input aria-label="Toggle navigation of Release notes" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/versioning.html">Versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/13.0.0.html">13.0.0 (2026-10-16)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.3.0.html">12.3.0 (2026-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.2.0.html">12.2.0 (2026-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.1.1.html">12.1.1 (2026-02-11)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.1.0.html">12.1.0 (2026-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.0.0.html">12.0.0 (2025-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.3.0.html">11.3.0 (2025-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.2.1.html">11.2.1 (2025-04-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.1.0.html">11.1.0 (2025-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.0.0.html">11.0.0 (2024-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.4.0.html">10.4.0 (2024-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.3.0.html">10.3.0 (2024-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.2.0.html">10.2.0 (2024-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.1.0.html">10.1.0 (2023-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.0.1.html">10.0.1 (2023-09-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.0.0.html">10.0.0 (2023-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.5.0.html">9.5.0 (2023-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.4.0.html">9.4.0 (2023-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.3.0.html">9.3.0 (2022-10-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.2.0.html">9.2.0 (2022-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.1.1.html">9.1.1 (2022-05-17)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.1.0.html">9.1.0 (2022-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.0.1.html">9.0.1 (2022-02-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.0.0.html">9.0.0 (2022-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.4.0.html">8.4.0 (2021-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.3.2.html">8.3.2 (2021-09-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.3.1.html">8.3.1 (2021-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.3.0.html">8.3.0 (2021-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.2.0.html">8.2.0 (2021-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.1.2.html">8.1.2 (2021-03-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.1.1.html">8.1.1 (2021-03-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.1.0.html">8.1.0 (2021-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.0.1.html">8.0.1 (2020-10-22)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.0.0.html">8.0.0 (2020-10-14)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.2.0.html">7.2.0 (2020-06-30)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.1.2.html">7.1.2 (2020-04-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.1.1.html">7.1.1 (2020-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.1.0.html">7.1.0 (2020-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.0.0.html">7.0.0 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.2.2.html">6.2.2 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.2.1.html">6.2.1 (2019-10-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.2.0.html">6.2.0 (2019-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.1.0.html">6.1.0 (2019-07-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.0.0.html">6.0.0 (2019-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.4.1.html">5.4.1 (2019-01-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.4.0.html">5.4.0 (2019-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.3.0.html">5.3.0 (2018-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.2.0.html">5.2.0 (2018-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.1.0.html">5.1.0 (2018-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.0.0.html">5.0.0 (2018-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.3.0.html">4.3.0 (2017-10-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.2.1.html">4.2.1 (2017-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.2.0.html">4.2.0 (2017-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.1.1.html">4.1.1 (2017-04-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.1.0.html">4.1.0 (2017-04-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.0.0.html">4.0.0 (2017-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.4.0.html">3.4.0 (2016-10-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.3.2.html">3.3.2 (2016-09-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.3.0.html">3.3.0 (2016-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.2.0.html">3.2.0 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.1.2.html">3.1.2 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.1.1.html">3.1.1 (2016-02-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.1.0.html">3.1.0 (2016-01-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.0.0.html">3.0.0 (2015-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.8.0.html">2.8.0 (2015-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.7.0.html">2.7.0 (2014-12-31)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.6.0.html">2.6.0 (2014-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.5.2.html">2.5.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.3.2.html">2.3.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.3.1.html">2.3.1 (2014-03-14)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../deprecations.html">Deprecations and removals</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/reference/ImageFilter.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="imagefilter-module">
+<span id="module-PIL.ImageFilter"></span><h1><a class="reference internal" href="#module-PIL.ImageFilter" title="PIL.ImageFilter"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code></a> module<a class="headerlink" href="#imagefilter-module" title="Link to this heading">¶</a></h1>
+<p>The <a class="reference internal" href="#module-PIL.ImageFilter" title="PIL.ImageFilter"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code></a> module contains definitions for a pre-defined set of
+filters, which can be used with the <a class="reference internal" href="Image.html#PIL.Image.Image.filter" title="PIL.Image.Image.filter"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Image.filter()</span></code></a> method.</p>
+<section id="example-filter-an-image">
+<h2>Example: Filter an image<a class="headerlink" href="#example-filter-an-image" title="Link to this heading">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">ImageFilter</span>
+
+<span class="n">im1</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">ImageFilter</span><span class="o">.</span><span class="n">BLUR</span><span class="p">)</span>
+
+<span class="n">im2</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">ImageFilter</span><span class="o">.</span><span class="n">MinFilter</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="n">im3</span> <span class="o">=</span> <span class="n">im</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">ImageFilter</span><span class="o">.</span><span class="n">MinFilter</span><span class="p">)</span>  <span class="c1"># same as MinFilter(3)</span>
+</pre></div>
+</div>
+</section>
+<section id="filters">
+<h2>Filters<a class="headerlink" href="#filters" title="Link to this heading">¶</a></h2>
+<p>Pillow provides the following set of predefined image enhancement filters:</p>
+<ul class="simple">
+<li><p><strong>BLUR</strong></p></li>
+<li><p><strong>CONTOUR</strong></p></li>
+<li><p><strong>DETAIL</strong></p></li>
+<li><p><strong>EDGE_ENHANCE</strong></p></li>
+<li><p><strong>EDGE_ENHANCE_MORE</strong></p></li>
+<li><p><strong>EMBOSS</strong></p></li>
+<li><p><strong>FIND_EDGES</strong></p></li>
+<li><p><strong>SHARPEN</strong></p></li>
+<li><p><strong>SMOOTH</strong></p></li>
+<li><p><strong>SMOOTH_MORE</strong></p></li>
+</ul>
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.Color3DLUT">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">Color3DLUT</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">table</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="internal_modules.html#PIL._typing.NumpyArray" title="PIL._typing.NumpyArray"><span class="pre">NumpyArray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#Color3DLUT"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.Color3DLUT" title="Link to this definition">¶</a></dt>
+<dd><p>Three-dimensional color lookup table.</p>
+<p>Transforms 3-channel pixels using the values of the channels as coordinates
+in the 3D lookup table and interpolating the nearest elements.</p>
+<p>This method allows you to apply almost any color transformation
+in constant time by using pre-calculated decimated tables.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 5.2.0.</span></p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>size</strong> – Size of the table. One int or tuple of (int, int, int).
+Minimal size in any dimension is 2, maximum is 65.</p></li>
+<li><p><strong>table</strong> – Flat lookup table. A list of <code class="docutils literal notranslate"><span class="pre">channels</span> <span class="pre">*</span> <span class="pre">size**3</span></code>
+float elements or a list of <code class="docutils literal notranslate"><span class="pre">size**3</span></code> channels-sized
+tuples with floats. Channels are changed first,
+then first dimension, then second, then third.
+Value 0.0 corresponds lowest value of output, 1.0 highest.</p></li>
+<li><p><strong>channels</strong> – Number of channels in the table. Should be 3 or 4.
+Default is 3.</p></li>
+<li><p><strong>target_mode</strong> – A mode for the result image. Should have not less
+than <code class="docutils literal notranslate"><span class="pre">channels</span></code> channels. Default is <code class="docutils literal notranslate"><span class="pre">None</span></code>,
+which means that mode wouldn’t be changed.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFilter.Color3DLUT.generate">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">generate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#PIL.ImageFilter.Color3DLUT" title="PIL.ImageFilter.Color3DLUT"><span class="pre">Color3DLUT</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#Color3DLUT.generate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.Color3DLUT.generate" title="Link to this definition">¶</a></dt>
+<dd><p>Generates new LUT using provided callback.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>size</strong> – Size of the table. Passed to the constructor.</p></li>
+<li><p><strong>callback</strong> – Function with three parameters which correspond
+three color channels. Will be called <code class="docutils literal notranslate"><span class="pre">size**3</span></code>
+times with values from 0.0 to 1.0 and should return
+a tuple with <code class="docutils literal notranslate"><span class="pre">channels</span></code> elements.</p></li>
+<li><p><strong>channels</strong> – The number of channels which should return callback.</p></li>
+<li><p><strong>target_mode</strong> – Passed to the constructor of the resulting
+lookup table.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFilter.Color3DLUT.transform">
+<span class="sig-name descname"><span class="pre">transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">with_normals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#PIL.ImageFilter.Color3DLUT" title="PIL.ImageFilter.Color3DLUT"><span class="pre">Color3DLUT</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#Color3DLUT.transform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.Color3DLUT.transform" title="Link to this definition">¶</a></dt>
+<dd><p>Transforms the table values using provided callback and returns
+a new LUT with altered values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>callback</strong> – A function which takes old lookup table values
+and returns a new set of values. The number
+of arguments which function should take is
+<code class="docutils literal notranslate"><span class="pre">self.channels</span></code> or <code class="docutils literal notranslate"><span class="pre">3</span> <span class="pre">+</span> <span class="pre">self.channels</span></code>
+if <code class="docutils literal notranslate"><span class="pre">with_normals</span></code> flag is set.
+Should return a tuple of <code class="docutils literal notranslate"><span class="pre">self.channels</span></code> or
+<code class="docutils literal notranslate"><span class="pre">channels</span></code> elements if it is set.</p></li>
+<li><p><strong>with_normals</strong> – If true, <code class="docutils literal notranslate"><span class="pre">callback</span></code> will be called with
+coordinates in the color cube as the first
+three arguments. Otherwise, <code class="docutils literal notranslate"><span class="pre">callback</span></code>
+will be called only with actual color values.</p></li>
+<li><p><strong>channels</strong> – The number of channels in the resulting lookup table.</p></li>
+<li><p><strong>target_mode</strong> – Passed to the constructor of the resulting
+lookup table.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.BoxBlur">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">BoxBlur</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#BoxBlur"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.BoxBlur" title="Link to this definition">¶</a></dt>
+<dd><p>Blurs the image by setting each pixel to the average value of the pixels
+in a square box extending radius pixels in each direction.
+Supports float radius of arbitrary size. Uses an optimized implementation
+which runs in linear time relative to the size of the image
+for any radius value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>radius</strong> – <p>Size of the box in a direction. Either a sequence of two numbers for
+x and y, or a single number for both.</p>
+<p>Radius 0 does not blur, returns an identical image.
+Radius 1 takes 1 pixel in each direction, i.e. 9 pixels in total.</p>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.GaussianBlur">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">GaussianBlur</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#GaussianBlur"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.GaussianBlur" title="Link to this definition">¶</a></dt>
+<dd><p>Blurs the image with a sequence of extended box filters, which
+approximates a Gaussian kernel. For details on accuracy see
+&lt;<a class="reference external" href="https://www.mia.uni-saarland.de/Publications/gwosdek-ssvm11.pdf">https://www.mia.uni-saarland.de/Publications/gwosdek-ssvm11.pdf</a>&gt;</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>radius</strong> – Standard deviation of the Gaussian kernel. Either a sequence of two
+numbers for x and y, or a single number for both.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.UnsharpMask">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">UnsharpMask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">percent</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">150</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#UnsharpMask"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.UnsharpMask" title="Link to this definition">¶</a></dt>
+<dd><p>Unsharp mask filter.</p>
+<p>See Wikipedia’s entry on <a class="reference external" href="https://en.wikipedia.org/wiki/Unsharp_masking#Digital_unsharp_masking">digital unsharp masking</a> for an explanation of
+the parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>radius</strong> – Blur Radius</p></li>
+<li><p><strong>percent</strong> – Unsharp strength, in percent</p></li>
+<li><p><strong>threshold</strong> – Threshold controls the minimum brightness change that
+will be sharpened</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.Kernel">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">Kernel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Sequence</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#Kernel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.Kernel" title="Link to this definition">¶</a></dt>
+<dd><p>Create a convolution kernel.
+This only supports 3x3 and 5x5 integer and floating point kernels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>size</strong> – Kernel size, given as (width, height). This must be (3,3) or (5,5).</p></li>
+<li><p><strong>kernel</strong> – A sequence containing kernel weights. The kernel will be flipped
+vertically before being applied to the image.</p></li>
+<li><p><strong>scale</strong> – Scale factor. If given, the result for each pixel is divided by this
+value. The default is the sum of the kernel weights.</p></li>
+<li><p><strong>offset</strong> – Offset. If given, this value is added to the result, after it has
+been divided by the scale factor.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.RankFilter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">RankFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">rank</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#RankFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.RankFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Create a rank filter.  The rank filter sorts all pixels in
+a window of the given size, and returns the <code class="docutils literal notranslate"><span class="pre">rank</span></code>’th value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>size</strong> – The kernel size, in pixels.</p></li>
+<li><p><strong>rank</strong> – What pixel value to pick.  Use 0 for a min filter,
+<code class="docutils literal notranslate"><span class="pre">size</span> <span class="pre">*</span> <span class="pre">size</span> <span class="pre">/</span> <span class="pre">2</span></code> for a median filter, <code class="docutils literal notranslate"><span class="pre">size</span> <span class="pre">*</span> <span class="pre">size</span> <span class="pre">-</span> <span class="pre">1</span></code>
+for a max filter, etc.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.MedianFilter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">MedianFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#MedianFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.MedianFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Create a median filter. Picks the median pixel value in a window with the
+given size.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>size</strong> – The kernel size, in pixels.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.MinFilter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">MinFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#MinFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.MinFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Create a min filter.  Picks the lowest pixel value in a window with the
+given size.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>size</strong> – The kernel size, in pixels.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.MaxFilter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">MaxFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#MaxFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.MaxFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Create a max filter.  Picks the largest pixel value in a window with the
+given size.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>size</strong> – The kernel size, in pixels.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.ModeFilter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">ModeFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#ModeFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.ModeFilter" title="Link to this definition">¶</a></dt>
+<dd><p>Create a mode filter. Picks the most frequent pixel value in a box with the
+given size.  Pixel values that occur only once or twice are ignored; if no
+pixel value occurs more than twice, the original pixel value is preserved.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>size</strong> – The kernel size, in pixels.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.Filter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">Filter</span></span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#Filter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.Filter" title="Link to this definition">¶</a></dt>
+<dd><p>An abstract mixin used for filtering images
+(for use with <a class="reference internal" href="Image.html#PIL.Image.Image.filter" title="PIL.Image.Image.filter"><code class="xref py py-meth docutils literal notranslate"><span class="pre">filter()</span></code></a>).</p>
+<p>Implementors must provide the following method:</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFilter.Filter.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">image</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#Filter.filter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.Filter.filter" title="Link to this definition">¶</a></dt>
+<dd><p>Applies a filter to a single-band image, or a single band of an image.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A filtered copy of the image.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFilter.MultibandFilter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFilter.</span></span><span class="sig-name descname"><span class="pre">MultibandFilter</span></span><a class="reference internal" href="../_modules/PIL/ImageFilter.html#MultibandFilter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFilter.MultibandFilter" title="Link to this definition">¶</a></dt>
+<dd><p>An abstract mixin used for filtering multi-band images
+(for use with <a class="reference internal" href="Image.html#PIL.Image.Image.filter" title="PIL.Image.Image.filter"><code class="xref py py-meth docutils literal notranslate"><span class="pre">filter()</span></code></a>).</p>
+<p>Implementors must provide the following method:</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFilter.MultibandFilter.filter">
+<span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">image</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#PIL.ImageFilter.MultibandFilter.filter" title="Link to this definition">¶</a></dt>
+<dd><p>Applies a filter to a multi-band image.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A filtered copy of the image.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="ImageFont.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="ImageFile.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFile</span></code> module</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 1995-2011 Fredrik Lundh and contributors (PIL), 2010 Jeffrey &#39;Alex&#39; Clark and contributors (Pillow), Alexander Karpinsky and contributors (Pillow-SIMD), 2026 Matteo Ferrabone and contributors (Pillow-AllSIMD)
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</a><ul>
+<li><a class="reference internal" href="#example-filter-an-image">Example: Filter an image</a></li>
+<li><a class="reference internal" href="#filters">Filters</a><ul>
+<li><a class="reference internal" href="#PIL.ImageFilter.Color3DLUT"><code class="docutils literal notranslate"><span class="pre">Color3DLUT</span></code></a><ul>
+<li><a class="reference internal" href="#PIL.ImageFilter.Color3DLUT.generate"><code class="docutils literal notranslate"><span class="pre">Color3DLUT.generate()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.Color3DLUT.transform"><code class="docutils literal notranslate"><span class="pre">Color3DLUT.transform()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#PIL.ImageFilter.BoxBlur"><code class="docutils literal notranslate"><span class="pre">BoxBlur</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.GaussianBlur"><code class="docutils literal notranslate"><span class="pre">GaussianBlur</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.UnsharpMask"><code class="docutils literal notranslate"><span class="pre">UnsharpMask</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.Kernel"><code class="docutils literal notranslate"><span class="pre">Kernel</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.RankFilter"><code class="docutils literal notranslate"><span class="pre">RankFilter</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.MedianFilter"><code class="docutils literal notranslate"><span class="pre">MedianFilter</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.MinFilter"><code class="docutils literal notranslate"><span class="pre">MinFilter</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.MaxFilter"><code class="docutils literal notranslate"><span class="pre">MaxFilter</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.ModeFilter"><code class="docutils literal notranslate"><span class="pre">ModeFilter</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFilter.Filter"><code class="docutils literal notranslate"><span class="pre">Filter</span></code></a><ul>
+<li><a class="reference internal" href="#PIL.ImageFilter.Filter.filter"><code class="docutils literal notranslate"><span class="pre">Filter.filter()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#PIL.ImageFilter.MultibandFilter"><code class="docutils literal notranslate"><span class="pre">MultibandFilter</span></code></a><ul>
+<li><a class="reference internal" href="#PIL.ImageFilter.MultibandFilter.filter"><code class="docutils literal notranslate"><span class="pre">MultibandFilter.filter()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=457d1205"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/tabs.js?v=3ee01567"></script>
+    <script src="../_static/js/activate_tab.js?v=f8fe9d20"></script>
+    </body>
+</html>

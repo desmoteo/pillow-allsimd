@@ -1,0 +1,1272 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="ImageFont module" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://desmoteo.github.io/pillow-allsimd/reference/ImageFont.html" />
+<meta property="og:site_name" content="Pillow-AllSIMD" />
+<meta property="og:description" content="The ImageFont module defines a class with the same name. Instances of this class store bitmap fonts, and are used with the PIL.ImageDraw.ImageDraw.text() method or the PIL.ImageText.Text class. Pil..." />
+<meta name="description" content="The ImageFont module defines a class with the same name. Instances of this class store bitmap fonts, and are used with the PIL.ImageDraw.ImageDraw.text() method or the PIL.ImageText.Text class. Pil..." />
+<link rel="author" title="About these documents" href="../about.html"><link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="ImageGrab module" href="ImageGrab.html"><link rel="prev" title="ImageFilter module" href="ImageFilter.html">
+
+    <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
+        <title>ImageFont module - Pillow-AllSIMD 13.0.0.post0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/dark.css?v=1a645143" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     Pillow-AllSIMD: Pillow with SIMD kernels for x86 and arm64, a fork of <a href="https://github.com/uploadcare/pillow-simd">Pillow-SIMD</a> and <a href="https://github.com/python-pillow/Pillow">Pillow</a>, whose documentation this is, with Pillow-AllSIMD's additions. Pillow's own: <a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../allsimd.html">About Pillow-AllSIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../installation/index.html">Installation</a><input aria-label="Toggle navigation of Installation" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation/basic-installation.html">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/python-support.html">Python support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/platform-support.html">Platform support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/building-from-source.html">Building from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/building-from-source.html#old-versions">Old versions</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../handbook/index.html">Handbook</a><input aria-label="Toggle navigation of Handbook" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/tutorial.html">Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/concepts.html">Concepts</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../handbook/appendices.html">Appendices</a><input aria-label="Toggle navigation of Appendices" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/image-file-formats.html">Image file formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/text-anchors.html">Text anchors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/third-party-plugins.html">Third-party plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html">Writing your own image plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#decoders">Decoders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-c">Writing your own file codec in C</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-python">Writing your own file codec in Python</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/security.html">Security</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Reference</a><input aria-label="Toggle navigation of Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="Image.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Image</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageChops.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageChops</span></code> (“channel operations”) module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageCms.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageCms</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageColor.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageColor</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageEnhance.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageEnhance</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageFile.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFile</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageFilter.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageGrab.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageGrab</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageMath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageMorph.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMorph</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageOps.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageOps</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImagePalette.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePalette</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImagePath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageQt.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageQt</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageSequence.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageSequence</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageShow.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageShow</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageStat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageStat</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageText.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageText</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageTk.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTk</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageTransform.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTransform</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageWin.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageWin</span></code> module (Windows-only)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ExifTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ExifTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="TiffTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">TiffTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="JpegPresets.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">JpegPresets</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="PSDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PSDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="PixelAccess.html"><code class="xref py py-class docutils literal notranslate"><span class="pre">PixelAccess</span></code> class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">features</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fast_mode.html">Fast mode (Pillow-AllSIMD)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../PIL.html">PIL package (autodoc of remaining modules)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugin reference</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="internal_design.html">Internal reference</a><input aria-label="Toggle navigation of Internal reference" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="open_files.html">File handling in Pillow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="limits.html">Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="block_allocator.html">Block allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="internal_modules.html">Internal modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="c_extension_debugging.html">C extension debugging on Linux, with GDB/Valgrind</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arrow_support.html">Arrow support</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../porting.html">Porting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../allsimd-changelog.html">Changelog (Pillow-AllSIMD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../allsimd-changelog.html#pillow-simd">Pillow-SIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../releasenotes/index.html">Release notes</a><input aria-label="Toggle navigation of Release notes" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/versioning.html">Versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/13.0.0.html">13.0.0 (2026-10-16)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.3.0.html">12.3.0 (2026-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.2.0.html">12.2.0 (2026-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.1.1.html">12.1.1 (2026-02-11)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.1.0.html">12.1.0 (2026-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.0.0.html">12.0.0 (2025-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.3.0.html">11.3.0 (2025-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.2.1.html">11.2.1 (2025-04-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.1.0.html">11.1.0 (2025-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.0.0.html">11.0.0 (2024-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.4.0.html">10.4.0 (2024-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.3.0.html">10.3.0 (2024-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.2.0.html">10.2.0 (2024-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.1.0.html">10.1.0 (2023-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.0.1.html">10.0.1 (2023-09-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.0.0.html">10.0.0 (2023-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.5.0.html">9.5.0 (2023-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.4.0.html">9.4.0 (2023-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.3.0.html">9.3.0 (2022-10-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.2.0.html">9.2.0 (2022-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.1.1.html">9.1.1 (2022-05-17)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.1.0.html">9.1.0 (2022-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.0.1.html">9.0.1 (2022-02-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.0.0.html">9.0.0 (2022-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.4.0.html">8.4.0 (2021-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.3.2.html">8.3.2 (2021-09-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.3.1.html">8.3.1 (2021-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.3.0.html">8.3.0 (2021-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.2.0.html">8.2.0 (2021-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.1.2.html">8.1.2 (2021-03-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.1.1.html">8.1.1 (2021-03-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.1.0.html">8.1.0 (2021-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.0.1.html">8.0.1 (2020-10-22)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.0.0.html">8.0.0 (2020-10-14)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.2.0.html">7.2.0 (2020-06-30)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.1.2.html">7.1.2 (2020-04-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.1.1.html">7.1.1 (2020-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.1.0.html">7.1.0 (2020-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.0.0.html">7.0.0 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.2.2.html">6.2.2 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.2.1.html">6.2.1 (2019-10-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.2.0.html">6.2.0 (2019-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.1.0.html">6.1.0 (2019-07-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.0.0.html">6.0.0 (2019-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.4.1.html">5.4.1 (2019-01-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.4.0.html">5.4.0 (2019-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.3.0.html">5.3.0 (2018-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.2.0.html">5.2.0 (2018-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.1.0.html">5.1.0 (2018-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.0.0.html">5.0.0 (2018-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.3.0.html">4.3.0 (2017-10-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.2.1.html">4.2.1 (2017-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.2.0.html">4.2.0 (2017-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.1.1.html">4.1.1 (2017-04-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.1.0.html">4.1.0 (2017-04-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.0.0.html">4.0.0 (2017-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.4.0.html">3.4.0 (2016-10-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.3.2.html">3.3.2 (2016-09-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.3.0.html">3.3.0 (2016-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.2.0.html">3.2.0 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.1.2.html">3.1.2 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.1.1.html">3.1.1 (2016-02-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.1.0.html">3.1.0 (2016-01-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.0.0.html">3.0.0 (2015-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.8.0.html">2.8.0 (2015-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.7.0.html">2.7.0 (2014-12-31)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.6.0.html">2.6.0 (2014-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.5.2.html">2.5.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.3.2.html">2.3.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.3.1.html">2.3.1 (2014-03-14)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../deprecations.html">Deprecations and removals</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/reference/ImageFont.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="imagefont-module">
+<span id="module-PIL.ImageFont"></span><h1><a class="reference internal" href="#module-PIL.ImageFont" title="PIL.ImageFont"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code></a> module<a class="headerlink" href="#imagefont-module" title="Link to this heading">¶</a></h1>
+<p>The <a class="reference internal" href="#module-PIL.ImageFont" title="PIL.ImageFont"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code></a> module defines a class with the same name. Instances of
+this class store bitmap fonts, and are used with the
+<a class="reference internal" href="ImageDraw.html#PIL.ImageDraw.ImageDraw.text" title="PIL.ImageDraw.ImageDraw.text"><code class="xref py py-meth docutils literal notranslate"><span class="pre">PIL.ImageDraw.ImageDraw.text()</span></code></a> method or the <a class="reference internal" href="ImageText.html#PIL.ImageText.Text" title="PIL.ImageText.Text"><code class="xref py py-class docutils literal notranslate"><span class="pre">PIL.ImageText.Text</span></code></a>
+class.</p>
+<p>Pillow uses its own font file format to store bitmap fonts, limited to 256 characters. You
+can use <a class="reference internal" href="../PIL.html#PIL.FontFile.FontFile.to_imagefont" title="PIL.FontFile.FontFile.to_imagefont"><code class="xref py py-meth docutils literal notranslate"><span class="pre">to_imagefont()</span></code></a> to convert BDF and PCF font
+descriptors (X Window font formats) to this format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">PcfFontFile</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;Tests/fonts/10x20-ISO8859-1.pcf&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+    <span class="n">font</span> <span class="o">=</span> <span class="n">PcfFontFile</span><span class="o">.</span><span class="n">PcfFontFile</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
+    <span class="n">imagefont</span> <span class="o">=</span> <span class="n">font</span><span class="o">.</span><span class="n">to_imagefont</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Starting with version 1.1.4, PIL can be configured to support TrueType and
+OpenType fonts (as well as other font formats supported by the FreeType
+library). For earlier versions, TrueType support is only available as part of
+the imToolkit package.</p>
+<p>When measuring text sizes, this module will not break at newline characters. For
+multiline text, see the <a class="reference internal" href="ImageDraw.html#module-PIL.ImageDraw" title="PIL.ImageDraw"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageDraw</span></code></a> module.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>To protect against potential DOS attacks when using arbitrary strings as
+text input, Pillow will raise a <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><code class="xref py py-exc docutils literal notranslate"><span class="pre">ValueError</span></code></a> if the number of characters
+is over a certain limit, <a class="reference internal" href="#PIL.ImageFont.MAX_STRING_LENGTH" title="PIL.ImageFont.MAX_STRING_LENGTH"><code class="xref py py-data docutils literal notranslate"><span class="pre">MAX_STRING_LENGTH</span></code></a>.</p>
+<p>This threshold can be changed by setting
+<a class="reference internal" href="#PIL.ImageFont.MAX_STRING_LENGTH" title="PIL.ImageFont.MAX_STRING_LENGTH"><code class="xref py py-data docutils literal notranslate"><span class="pre">MAX_STRING_LENGTH</span></code></a>. It can be disabled by setting
+<code class="docutils literal notranslate"><span class="pre">ImageFont.MAX_STRING_LENGTH</span> <span class="pre">=</span> <span class="pre">None</span></code>.</p>
+</div>
+<section id="example">
+<h2>Example<a class="headerlink" href="#example" title="Link to this heading">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">ImageFont</span><span class="p">,</span> <span class="n">ImageDraw</span>
+
+<span class="n">draw</span> <span class="o">=</span> <span class="n">ImageDraw</span><span class="o">.</span><span class="n">Draw</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+
+<span class="c1"># use a bitmap font</span>
+<span class="n">font</span> <span class="o">=</span> <span class="n">ImageFont</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;arial.pil&quot;</span><span class="p">)</span>
+
+<span class="n">draw</span><span class="o">.</span><span class="n">text</span><span class="p">((</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">),</span> <span class="s2">&quot;hello&quot;</span><span class="p">,</span> <span class="n">font</span><span class="o">=</span><span class="n">font</span><span class="p">)</span>
+
+<span class="c1"># use a truetype font</span>
+<span class="n">font</span> <span class="o">=</span> <span class="n">ImageFont</span><span class="o">.</span><span class="n">truetype</span><span class="p">(</span><span class="s2">&quot;arial.ttf&quot;</span><span class="p">,</span> <span class="mi">15</span><span class="p">)</span>
+
+<span class="n">draw</span><span class="o">.</span><span class="n">text</span><span class="p">((</span><span class="mi">10</span><span class="p">,</span> <span class="mi">25</span><span class="p">),</span> <span class="s2">&quot;world&quot;</span><span class="p">,</span> <span class="n">font</span><span class="o">=</span><span class="n">font</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="functions">
+<h2>Functions<a class="headerlink" href="#functions" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="PIL.ImageFont.load">
+<span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/os.html#os.PathLike" title="(in Python v3.15)"><span class="pre">PathLike</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#PIL.ImageFont.ImageFont" title="PIL.ImageFont.ImageFont"><span class="pre">ImageFont</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#load"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.load" title="Link to this definition">¶</a></dt>
+<dd><p>Load a font file. This function loads a font object from the given
+bitmap font file, and returns the corresponding font object. For loading TrueType
+or OpenType fonts instead, see <a class="reference internal" href="#PIL.ImageFont.truetype" title="PIL.ImageFont.truetype"><code class="xref py py-func docutils literal notranslate"><span class="pre">truetype()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> – Name of font file.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A font object.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#OSError" title="(in Python v3.15)"><strong>OSError</strong></a> – If the file could not be read.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="PIL.ImageFont.load_path">
+<span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">load_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="internal_modules.html#PIL._typing.StrOrBytesPath" title="PIL._typing.StrOrBytesPath"><span class="pre">StrOrBytesPath</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#PIL.ImageFont.ImageFont" title="PIL.ImageFont.ImageFont"><span class="pre">ImageFont</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#load_path"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.load_path" title="Link to this definition">¶</a></dt>
+<dd><p>Load font file. Same as <a class="reference internal" href="#PIL.ImageFont.load" title="PIL.ImageFont.load"><code class="xref py py-func docutils literal notranslate"><span class="pre">load()</span></code></a>, but searches for a
+bitmap font along the Python path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> – Name of font file.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A font object.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#OSError" title="(in Python v3.15)"><strong>OSError</strong></a> – If the file could not be read.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="PIL.ImageFont.truetype">
+<span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">truetype</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">font</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="internal_modules.html#PIL._typing.StrOrBytesPath" title="PIL._typing.StrOrBytesPath"><span class="pre">StrOrBytesPath</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layout_engine</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#PIL.ImageFont.Layout" title="PIL.ImageFont.Layout"><span class="pre">Layout</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont" title="PIL.ImageFont.FreeTypeFont"><span class="pre">FreeTypeFont</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#truetype"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.truetype" title="Link to this definition">¶</a></dt>
+<dd><p>Load a TrueType or OpenType font from a file or file-like object,
+and create a font object. This function loads a font object from the given
+file or file-like object, and creates a font object for a font of the given
+size. For loading bitmap fonts instead, see <a class="reference internal" href="#PIL.ImageFont.load" title="PIL.ImageFont.load"><code class="xref py py-func docutils literal notranslate"><span class="pre">load()</span></code></a>
+and <a class="reference internal" href="#PIL.ImageFont.load_path" title="PIL.ImageFont.load_path"><code class="xref py py-func docutils literal notranslate"><span class="pre">load_path()</span></code></a>.</p>
+<p>Pillow uses FreeType to open font files. On Windows, be aware that FreeType
+will keep the file open as long as the FreeTypeFont object exists. Windows
+limits the number of files that can be open in C at once to 512, so if many
+fonts are opened simultaneously and that limit is approached, an
+<code class="docutils literal notranslate"><span class="pre">OSError</span></code> may be thrown, reporting that FreeType “cannot open resource”.
+A workaround would be to copy the file(s) into memory, and open that instead.</p>
+<p>This function requires the _imagingft service.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>font</strong> – <p>A filename or file-like object containing a TrueType font.
+If the file is not found in this filename, the loader may also
+search in other directories, such as:</p>
+<ul>
+<li><p>The <code class="file docutils literal notranslate"><span class="pre">fonts/</span></code> directory on Windows,</p></li>
+<li><p><code class="file docutils literal notranslate"><span class="pre">/Library/Fonts/</span></code>, <code class="file docutils literal notranslate"><span class="pre">/System/Library/Fonts/</span></code>
+and <code class="file docutils literal notranslate"><span class="pre">~/Library/Fonts/</span></code> on macOS.</p></li>
+<li><p><code class="file docutils literal notranslate"><span class="pre">~/.local/share/fonts</span></code>, <code class="file docutils literal notranslate"><span class="pre">/usr/local/share/fonts</span></code>,
+and <code class="file docutils literal notranslate"><span class="pre">/usr/share/fonts</span></code> on Linux; or those specified by
+the <code class="docutils literal notranslate"><span class="pre">XDG_DATA_HOME</span></code> and <code class="docutils literal notranslate"><span class="pre">XDG_DATA_DIRS</span></code> environment variables
+for user-installed and system-wide fonts, respectively.</p></li>
+</ul>
+</p></li>
+<li><p><strong>size</strong> – The requested size, in pixels.</p></li>
+<li><p><strong>index</strong> – Which font face to load (default is first available face).</p></li>
+<li><p><strong>encoding</strong> – <p>Which font encoding to use (default is Unicode). Possible
+encodings include (see the FreeType documentation for more
+information):</p>
+<ul>
+<li><p>”unic” (Unicode)</p></li>
+<li><p>”symb” (Microsoft Symbol)</p></li>
+<li><p>”ADOB” (Adobe Standard)</p></li>
+<li><p>”ADBE” (Adobe Expert)</p></li>
+<li><p>”ADBC” (Adobe Custom)</p></li>
+<li><p>”armn” (Apple Roman)</p></li>
+<li><p>”sjis” (Shift JIS)</p></li>
+<li><p>”gb  “ (PRC)</p></li>
+<li><p>”big5”</p></li>
+<li><p>”wans” (Extended Wansung)</p></li>
+<li><p>”joha” (Johab)</p></li>
+<li><p>”lat1” (Latin-1)</p></li>
+</ul>
+<p>This specifies the character set to use. It does not alter the
+encoding of any text provided in subsequent operations.</p>
+</p></li>
+<li><p><strong>layout_engine</strong> – <p>Which layout engine to use, if available:
+<a class="reference internal" href="#PIL.ImageFont.Layout.BASIC" title="PIL.ImageFont.Layout.BASIC"><code class="xref py py-attr docutils literal notranslate"><span class="pre">ImageFont.Layout.BASIC</span></code></a> or <a class="reference internal" href="#PIL.ImageFont.Layout.RAQM" title="PIL.ImageFont.Layout.RAQM"><code class="xref py py-attr docutils literal notranslate"><span class="pre">ImageFont.Layout.RAQM</span></code></a>.
+If it is available, Raqm layout will be used by default.
+Otherwise, basic layout will be used.</p>
+<p>Raqm layout is recommended for all non-English text. If Raqm layout
+is not required, basic layout will have better performance.</p>
+<p>You can check support for Raqm layout using
+<a class="reference internal" href="features.html#PIL.features.check_feature" title="PIL.features.check_feature"><code class="xref py py-func docutils literal notranslate"><span class="pre">PIL.features.check_feature()</span></code></a> with <code class="docutils literal notranslate"><span class="pre">feature=&quot;raqm&quot;</span></code>.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 4.2.0.</span></p>
+</div>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A font object.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#OSError" title="(in Python v3.15)"><strong>OSError</strong></a> – If the file could not be read.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><strong>ValueError</strong></a> – If the font size is not greater than zero.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="PIL.ImageFont.load_default">
+<span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">load_default</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont" title="PIL.ImageFont.FreeTypeFont"><span class="pre">FreeTypeFont</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#PIL.ImageFont.ImageFont" title="PIL.ImageFont.ImageFont"><span class="pre">ImageFont</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#load_default"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.load_default" title="Link to this definition">¶</a></dt>
+<dd><p>If FreeType support is available, load a version of Aileron Regular,
+<a class="reference external" href="https://dotcolon.net/fonts/aileron">https://dotcolon.net/fonts/aileron</a>, with a more limited character set.</p>
+<p>Otherwise, load a “better than nothing” font.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 1.1.4.</span></p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>size</strong> – <p>The font size of Aileron Regular.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 10.1.0.</span></p>
+</div>
+</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A font object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="PIL.ImageFont.load_default_imagefont">
+<span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">load_default_imagefont</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#PIL.ImageFont.ImageFont" title="PIL.ImageFont.ImageFont"><span class="pre">ImageFont</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#load_default_imagefont"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.load_default_imagefont" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
+<section id="methods">
+<h2>Methods<a class="headerlink" href="#methods" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFont.BaseImageFont">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">BaseImageFont</span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#BaseImageFont"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.BaseImageFont" title="Link to this definition">¶</a></dt>
+<dd><p>Used by ImageDraw and ImageText</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFont.ImageFont">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">ImageFont</span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#ImageFont"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.ImageFont" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#PIL.ImageFont.BaseImageFont" title="PIL.ImageFont.BaseImageFont"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseImageFont</span></code></a></p>
+<p>PIL font wrapper</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.ImageFont.getbbox">
+<span class="sig-name descname"><span class="pre">getbbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytearray" title="(in Python v3.15)"><span class="pre">bytearray</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#ImageFont.getbbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.ImageFont.getbbox" title="Link to this definition">¶</a></dt>
+<dd><p>Returns bounding box (in pixels) of given text.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 9.2.0.</span></p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>text</strong> – Text to render.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">(left,</span> <span class="pre">top,</span> <span class="pre">right,</span> <span class="pre">bottom)</span></code> bounding box</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.ImageFont.getlength">
+<span class="sig-name descname"><span class="pre">getlength</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytearray" title="(in Python v3.15)"><span class="pre">bytearray</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#ImageFont.getlength"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.ImageFont.getlength" title="Link to this definition">¶</a></dt>
+<dd><p>Returns length (in pixels) of given text.
+This is the amount by which following text should be offset.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 9.2.0.</span></p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.ImageFont.getmask">
+<span class="sig-name descname"><span class="pre">getmask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="internal_modules.html#PIL.Image.core.ImagingCore" title="PIL.Image.core.ImagingCore"><span class="pre">Image.core.ImagingCore</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#ImageFont.getmask"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.ImageFont.getmask" title="Link to this definition">¶</a></dt>
+<dd><p>Create a bitmap for the text.</p>
+<p>If the font uses antialiasing, the bitmap should have mode <code class="docutils literal notranslate"><span class="pre">L</span></code> and use a
+maximum value of 255. Otherwise, it should have mode <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>text</strong> – Text to render.</p></li>
+<li><p><strong>mode</strong> – <p>Used by some graphics drivers to indicate what mode the
+driver prefers; if empty, the renderer may return either
+mode. Note that the mode is always a string, to simplify
+C-level implementations.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 1.1.5.</span></p>
+</div>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>An internal PIL storage memory instance as defined by the
+<a class="reference internal" href="internal_modules.html#module-PIL.Image.core" title="PIL.Image.core"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PIL.Image.core</span></code></a> interface module.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">FreeTypeFont</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">font</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="internal_modules.html#PIL._typing.StrOrBytesPath" title="PIL._typing.StrOrBytesPath"><span class="pre">StrOrBytesPath</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layout_engine</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#PIL.ImageFont.Layout" title="PIL.ImageFont.Layout"><span class="pre">Layout</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#PIL.ImageFont.BaseImageFont" title="PIL.ImageFont.BaseImageFont"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseImageFont</span></code></a></p>
+<p>FreeType font wrapper (requires _imagingft service)</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.font_variant">
+<span class="sig-name descname"><span class="pre">font_variant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">font</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="internal_modules.html#PIL._typing.StrOrBytesPath" title="PIL._typing.StrOrBytesPath"><span class="pre">StrOrBytesPath</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BinaryIO</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoding</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layout_engine</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#PIL.ImageFont.Layout" title="PIL.ImageFont.Layout"><span class="pre">Layout</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont" title="PIL.ImageFont.FreeTypeFont"><span class="pre">FreeTypeFont</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.font_variant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.font_variant" title="Link to this definition">¶</a></dt>
+<dd><p>Create a copy of this FreeTypeFont object,
+using any specified arguments to override the settings.</p>
+<p>Parameters are identical to the parameters used to initialize this
+object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A FreeTypeFont object.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.get_variation_axes">
+<span class="sig-name descname"><span class="pre">get_variation_axes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#PIL.ImageFont.Axis" title="PIL.ImageFont.Axis"><span class="pre">Axis</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.get_variation_axes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.get_variation_axes" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of the axes in a variation font.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#OSError" title="(in Python v3.15)"><strong>OSError</strong></a> – If the font is not a variation font.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.get_variation_names">
+<span class="sig-name descname"><span class="pre">get_variation_names</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.get_variation_names"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.get_variation_names" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A list of the named styles in a variation font.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#OSError" title="(in Python v3.15)"><strong>OSError</strong></a> – If the font is not a variation font.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.getbbox">
+<span class="sig-name descname"><span class="pre">getbbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytearray" title="(in Python v3.15)"><span class="pre">bytearray</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">language</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stroke_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">anchor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.getbbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.getbbox" title="Link to this definition">¶</a></dt>
+<dd><p>Returns bounding box (in pixels) of given text relative to given anchor
+when rendered in font with provided direction, features, and language.</p>
+<p>Use <a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.getlength" title="PIL.ImageFont.FreeTypeFont.getlength"><code class="xref py py-meth docutils literal notranslate"><span class="pre">getlength()</span></code></a> to get the offset of following text with
+1/64 pixel precision. The bounding box includes extra margins for
+some fonts, e.g. italics or accents.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 8.0.0.</span></p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>text</strong> – Text to render.</p></li>
+<li><p><strong>mode</strong> – Used by some graphics drivers to indicate what mode the
+driver prefers; if empty, the renderer may return either
+mode. Note that the mode is always a string, to simplify
+C-level implementations.</p></li>
+<li><p><strong>direction</strong> – Direction of the text. It can be ‘rtl’ (right to
+left), ‘ltr’ (left to right) or ‘ttb’ (top to bottom).
+Requires libraqm.</p></li>
+<li><p><strong>features</strong> – A list of OpenType font features to be used during text
+layout. This is usually used to turn on optional
+font features that are not enabled by default,
+for example ‘dlig’ or ‘ss01’, but can be also
+used to turn off default font features for
+example ‘-liga’ to disable ligatures or ‘-kern’
+to disable kerning.  To get all supported
+features, see
+<a class="reference external" href="https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist">https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist</a>
+Requires libraqm.</p></li>
+<li><p><strong>language</strong> – Language of the text. Different languages may use
+different glyph shapes or ligatures. This parameter tells
+the font which language the text is in, and to apply the
+correct substitutions as appropriate, if available.
+It should be a <a class="reference external" href="https://www.w3.org/International/articles/language-tags/">BCP 47 language code</a>
+Requires libraqm.</p></li>
+<li><p><strong>stroke_width</strong> – The width of the text stroke.</p></li>
+<li><p><strong>anchor</strong> – The text anchor alignment. Determines the relative location of
+the anchor to the text. The default alignment is top left,
+specifically <code class="docutils literal notranslate"><span class="pre">la</span></code> for horizontal text and <code class="docutils literal notranslate"><span class="pre">lt</span></code> for
+vertical text. See <a class="reference internal" href="../handbook/text-anchors.html#text-anchors"><span class="std std-ref">Text anchors</span></a> for details.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">(left,</span> <span class="pre">top,</span> <span class="pre">right,</span> <span class="pre">bottom)</span></code> bounding box</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.getlength">
+<span class="sig-name descname"><span class="pre">getlength</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">language</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.getlength"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.getlength" title="Link to this definition">¶</a></dt>
+<dd><p>Returns length (in pixels with 1/64 precision) of given text when rendered
+in font with provided direction, features, and language.</p>
+<p>This is the amount by which following text should be offset.
+Text bounding box may extend past the length in some fonts,
+e.g. when using italics or accents.</p>
+<p>The result is returned as a float; it is a whole number if using basic layout.</p>
+<p>Note that the sum of two lengths may not equal the length of a concatenated
+string due to kerning. If you need to adjust for kerning, include the following
+character and subtract its length.</p>
+<p>For example, instead of</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hello</span> <span class="o">=</span> <span class="n">font</span><span class="o">.</span><span class="n">getlength</span><span class="p">(</span><span class="s2">&quot;Hello&quot;</span><span class="p">)</span>
+<span class="n">world</span> <span class="o">=</span> <span class="n">font</span><span class="o">.</span><span class="n">getlength</span><span class="p">(</span><span class="s2">&quot;World&quot;</span><span class="p">)</span>
+<span class="n">hello_world</span> <span class="o">=</span> <span class="n">hello</span> <span class="o">+</span> <span class="n">world</span>  <span class="c1"># not adjusted for kerning</span>
+<span class="k">assert</span> <span class="n">hello_world</span> <span class="o">==</span> <span class="n">font</span><span class="o">.</span><span class="n">getlength</span><span class="p">(</span><span class="s2">&quot;HelloWorld&quot;</span><span class="p">)</span>  <span class="c1"># may fail</span>
+</pre></div>
+</div>
+<p>use</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hello</span> <span class="o">=</span> <span class="n">font</span><span class="o">.</span><span class="n">getlength</span><span class="p">(</span><span class="s2">&quot;HelloW&quot;</span><span class="p">)</span> <span class="o">-</span> <span class="n">font</span><span class="o">.</span><span class="n">getlength</span><span class="p">(</span><span class="s2">&quot;W&quot;</span><span class="p">)</span>  <span class="c1"># adjusted for kerning</span>
+<span class="n">world</span> <span class="o">=</span> <span class="n">font</span><span class="o">.</span><span class="n">getlength</span><span class="p">(</span><span class="s2">&quot;World&quot;</span><span class="p">)</span>
+<span class="n">hello_world</span> <span class="o">=</span> <span class="n">hello</span> <span class="o">+</span> <span class="n">world</span>  <span class="c1"># adjusted for kerning</span>
+<span class="k">assert</span> <span class="n">hello_world</span> <span class="o">==</span> <span class="n">font</span><span class="o">.</span><span class="n">getlength</span><span class="p">(</span><span class="s2">&quot;HelloWorld&quot;</span><span class="p">)</span>  <span class="c1"># True</span>
+</pre></div>
+</div>
+<p>or disable kerning with (requires libraqm)</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">hello</span> <span class="o">=</span> <span class="n">draw</span><span class="o">.</span><span class="n">textlength</span><span class="p">(</span><span class="s2">&quot;Hello&quot;</span><span class="p">,</span> <span class="n">font</span><span class="p">,</span> <span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;-kern&quot;</span><span class="p">])</span>
+<span class="n">world</span> <span class="o">=</span> <span class="n">draw</span><span class="o">.</span><span class="n">textlength</span><span class="p">(</span><span class="s2">&quot;World&quot;</span><span class="p">,</span> <span class="n">font</span><span class="p">,</span> <span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;-kern&quot;</span><span class="p">])</span>
+<span class="n">hello_world</span> <span class="o">=</span> <span class="n">hello</span> <span class="o">+</span> <span class="n">world</span>  <span class="c1"># kerning is disabled, no need to adjust</span>
+<span class="k">assert</span> <span class="n">hello_world</span> <span class="o">==</span> <span class="n">draw</span><span class="o">.</span><span class="n">textlength</span><span class="p">(</span><span class="s2">&quot;HelloWorld&quot;</span><span class="p">,</span> <span class="n">font</span><span class="p">,</span> <span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;-kern&quot;</span><span class="p">])</span>
+</pre></div>
+</div>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 8.0.0.</span></p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>text</strong> – Text to measure.</p></li>
+<li><p><strong>mode</strong> – Used by some graphics drivers to indicate what mode the
+driver prefers; if empty, the renderer may return either
+mode. Note that the mode is always a string, to simplify
+C-level implementations.</p></li>
+<li><p><strong>direction</strong> – Direction of the text. It can be ‘rtl’ (right to
+left), ‘ltr’ (left to right) or ‘ttb’ (top to bottom).
+Requires libraqm.</p></li>
+<li><p><strong>features</strong> – A list of OpenType font features to be used during text
+layout. This is usually used to turn on optional
+font features that are not enabled by default,
+for example ‘dlig’ or ‘ss01’, but can be also
+used to turn off default font features for
+example ‘-liga’ to disable ligatures or ‘-kern’
+to disable kerning.  To get all supported
+features, see
+<a class="reference external" href="https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist">https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist</a>
+Requires libraqm.</p></li>
+<li><p><strong>language</strong> – <p>Language of the text. Different languages may use
+different glyph shapes or ligatures. This parameter tells
+the font which language the text is in, and to apply the
+correct substitutions as appropriate, if available.
+It should be a <a class="reference external" href="https://www.w3.org/International/articles/language-tags/">BCP 47 language code</a>
+Requires libraqm.</p>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Either width for horizontal text, or height for vertical text.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.getmask">
+<span class="sig-name descname"><span class="pre">getmask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">language</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stroke_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">anchor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ink</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="internal_modules.html#PIL.Image.core.ImagingCore" title="PIL.Image.core.ImagingCore"><span class="pre">Image.core.ImagingCore</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.getmask"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.getmask" title="Link to this definition">¶</a></dt>
+<dd><p>Create a bitmap for the text.</p>
+<p>If the font uses antialiasing, the bitmap should have mode <code class="docutils literal notranslate"><span class="pre">L</span></code> and use a
+maximum value of 255. If the font has embedded color data, the bitmap
+should have mode <code class="docutils literal notranslate"><span class="pre">RGBA</span></code>. Otherwise, it should have mode <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>text</strong> – Text to render.</p></li>
+<li><p><strong>mode</strong> – <p>Used by some graphics drivers to indicate what mode the
+driver prefers; if empty, the renderer may return either
+mode. Note that the mode is always a string, to simplify
+C-level implementations.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 1.1.5.</span></p>
+</div>
+</p></li>
+<li><p><strong>direction</strong> – <p>Direction of the text. It can be ‘rtl’ (right to
+left), ‘ltr’ (left to right) or ‘ttb’ (top to bottom).
+Requires libraqm.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 4.2.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>features</strong> – <p>A list of OpenType font features to be used during text
+layout. This is usually used to turn on optional
+font features that are not enabled by default,
+for example ‘dlig’ or ‘ss01’, but can be also
+used to turn off default font features for
+example ‘-liga’ to disable ligatures or ‘-kern’
+to disable kerning.  To get all supported
+features, see
+<a class="reference external" href="https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist">https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist</a>
+Requires libraqm.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 4.2.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>language</strong> – <p>Language of the text. Different languages may use
+different glyph shapes or ligatures. This parameter tells
+the font which language the text is in, and to apply the
+correct substitutions as appropriate, if available.
+It should be a <a class="reference external" href="https://www.w3.org/International/articles/language-tags/">BCP 47 language code</a>
+Requires libraqm.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 6.0.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>stroke_width</strong> – <p>The width of the text stroke.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 6.2.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>anchor</strong> – <p>The text anchor alignment. Determines the relative location of
+the anchor to the text. The default alignment is top left,
+specifically <code class="docutils literal notranslate"><span class="pre">la</span></code> for horizontal text and <code class="docutils literal notranslate"><span class="pre">lt</span></code> for
+vertical text. See <a class="reference internal" href="../handbook/text-anchors.html#text-anchors"><span class="std std-ref">Text anchors</span></a> for details.</p>
+<blockquote>
+<div><div class="versionadded">
+<p><span class="versionmodified added">Added in version 8.0.0.</span></p>
+</div>
+</div></blockquote>
+</p></li>
+<li><p><strong>ink</strong> – <p>Foreground ink for rendering in RGBA mode.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 8.0.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>start</strong> – <p>Tuple of horizontal and vertical offset, as text may render
+differently when starting at fractional coordinates.</p>
+<blockquote>
+<div><div class="versionadded">
+<p><span class="versionmodified added">Added in version 9.4.0.</span></p>
+</div>
+</div></blockquote>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>An internal PIL storage memory instance as defined by the
+<a class="reference internal" href="internal_modules.html#module-PIL.Image.core" title="PIL.Image.core"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PIL.Image.core</span></code></a> interface module.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.getmask2">
+<span class="sig-name descname"><span class="pre">getmask2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">direction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">language</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stroke_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">anchor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ink</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="internal_modules.html#PIL.Image.core.ImagingCore" title="PIL.Image.core.ImagingCore"><span class="pre">Image.core.ImagingCore</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.getmask2"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.getmask2" title="Link to this definition">¶</a></dt>
+<dd><p>Create a bitmap for the text.</p>
+<p>If the font uses antialiasing, the bitmap should have mode <code class="docutils literal notranslate"><span class="pre">L</span></code> and use a
+maximum value of 255. If the font has embedded color data, the bitmap
+should have mode <code class="docutils literal notranslate"><span class="pre">RGBA</span></code>. Otherwise, it should have mode <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>text</strong> – Text to render.</p></li>
+<li><p><strong>mode</strong> – <p>Used by some graphics drivers to indicate what mode the
+driver prefers; if empty, the renderer may return either
+mode. Note that the mode is always a string, to simplify
+C-level implementations.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 1.1.5.</span></p>
+</div>
+</p></li>
+<li><p><strong>direction</strong> – <p>Direction of the text. It can be ‘rtl’ (right to
+left), ‘ltr’ (left to right) or ‘ttb’ (top to bottom).
+Requires libraqm.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 4.2.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>features</strong> – <p>A list of OpenType font features to be used during text
+layout. This is usually used to turn on optional
+font features that are not enabled by default,
+for example ‘dlig’ or ‘ss01’, but can be also
+used to turn off default font features for
+example ‘-liga’ to disable ligatures or ‘-kern’
+to disable kerning.  To get all supported
+features, see
+<a class="reference external" href="https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist">https://learn.microsoft.com/en-us/typography/opentype/spec/featurelist</a>
+Requires libraqm.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 4.2.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>language</strong> – <p>Language of the text. Different languages may use
+different glyph shapes or ligatures. This parameter tells
+the font which language the text is in, and to apply the
+correct substitutions as appropriate, if available.
+It should be a <a class="reference external" href="https://www.w3.org/International/articles/language-tags/">BCP 47 language code</a>
+Requires libraqm.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 6.0.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>stroke_width</strong> – <p>The width of the text stroke.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 6.2.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>anchor</strong> – <p>The text anchor alignment. Determines the relative location of
+the anchor to the text. The default alignment is top left,
+specifically <code class="docutils literal notranslate"><span class="pre">la</span></code> for horizontal text and <code class="docutils literal notranslate"><span class="pre">lt</span></code> for
+vertical text. See <a class="reference internal" href="../handbook/text-anchors.html#text-anchors"><span class="std std-ref">Text anchors</span></a> for details.</p>
+<blockquote>
+<div><div class="versionadded">
+<p><span class="versionmodified added">Added in version 8.0.0.</span></p>
+</div>
+</div></blockquote>
+</p></li>
+<li><p><strong>ink</strong> – <p>Foreground ink for rendering in RGBA mode.</p>
+<div class="versionadded">
+<p><span class="versionmodified added">Added in version 8.0.0.</span></p>
+</div>
+</p></li>
+<li><p><strong>start</strong> – <p>Tuple of horizontal and vertical offset, as text may render
+differently when starting at fractional coordinates.</p>
+<blockquote>
+<div><div class="versionadded">
+<p><span class="versionmodified added">Added in version 9.4.0.</span></p>
+</div>
+</div></blockquote>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple of an internal PIL storage memory instance as defined by the
+<a class="reference internal" href="internal_modules.html#module-PIL.Image.core" title="PIL.Image.core"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PIL.Image.core</span></code></a> interface module, and the text offset, the
+gap between the starting coordinate and the first marking</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.getmetrics">
+<span class="sig-name descname"><span class="pre">getmetrics</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.getmetrics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.getmetrics" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A tuple of the font ascent (the distance from the baseline to
+the highest outline point) and descent (the distance from the
+baseline to the lowest outline point, a negative value)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.getname">
+<span class="sig-name descname"><span class="pre">getname</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.getname"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.getname" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A tuple of the font family (e.g. Helvetica) and the font style
+(e.g. Bold)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.set_variation_by_axes">
+<span class="sig-name descname"><span class="pre">set_variation_by_axes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">axes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.set_variation_by_axes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.set_variation_by_axes" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>axes</strong> – A list of values for each axis.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#OSError" title="(in Python v3.15)"><strong>OSError</strong></a> – If the font is not a variation font.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.FreeTypeFont.set_variation_by_name">
+<span class="sig-name descname"><span class="pre">set_variation_by_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#FreeTypeFont.set_variation_by_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.FreeTypeFont.set_variation_by_name" title="Link to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> – The name of the style.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#OSError" title="(in Python v3.15)"><strong>OSError</strong></a> – If the font is not a variation font.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFont.TransposedFont">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">TransposedFont</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">font</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#PIL.ImageFont.ImageFont" title="PIL.ImageFont.ImageFont"><span class="pre">ImageFont</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont" title="PIL.ImageFont.FreeTypeFont"><span class="pre">FreeTypeFont</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">orientation</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="Image.html#PIL.Image.Transpose" title="PIL.Image.Transpose"><span class="pre">Transpose</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/PIL/ImageFont.html#TransposedFont"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.TransposedFont" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#PIL.ImageFont.BaseImageFont" title="PIL.ImageFont.BaseImageFont"><code class="xref py py-class docutils literal notranslate"><span class="pre">BaseImageFont</span></code></a></p>
+<p>Wrapper for writing rotated or mirrored text</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.TransposedFont.getbbox">
+<span class="sig-name descname"><span class="pre">getbbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytearray" title="(in Python v3.15)"><span class="pre">bytearray</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#TransposedFont.getbbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.TransposedFont.getbbox" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.TransposedFont.getlength">
+<span class="sig-name descname"><span class="pre">getlength</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><span class="pre">float</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#TransposedFont.getlength"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.TransposedFont.getlength" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="PIL.ImageFont.TransposedFont.getmask">
+<span class="sig-name descname"><span class="pre">getmask</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><span class="pre">str</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="internal_modules.html#PIL.Image.core.ImagingCore" title="PIL.Image.core.ImagingCore"><span class="pre">Image.core.ImagingCore</span></a></span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#TransposedFont.getmask"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.TransposedFont.getmask" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="constants">
+<h2>Constants<a class="headerlink" href="#constants" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFont.Layout">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">Layout</span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#Layout"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.Layout" title="Link to this definition">¶</a></dt>
+<dd><dl class="py attribute">
+<dt class="sig sig-object py" id="PIL.ImageFont.Layout.BASIC">
+<span class="sig-name descname"><span class="pre">BASIC</span></span><a class="headerlink" href="#PIL.ImageFont.Layout.BASIC" title="Link to this definition">¶</a></dt>
+<dd><p>Use basic text layout for TrueType font.
+Advanced features such as text direction are not supported.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="PIL.ImageFont.Layout.RAQM">
+<span class="sig-name descname"><span class="pre">RAQM</span></span><a class="headerlink" href="#PIL.ImageFont.Layout.RAQM" title="Link to this definition">¶</a></dt>
+<dd><p>Use Raqm text layout for TrueType font.
+Advanced features are supported.</p>
+<p>Requires Raqm, you can check support using
+<a class="reference internal" href="features.html#PIL.features.check_feature" title="PIL.features.check_feature"><code class="xref py py-func docutils literal notranslate"><span class="pre">PIL.features.check_feature()</span></code></a> with <code class="docutils literal notranslate"><span class="pre">feature=&quot;raqm&quot;</span></code>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="PIL.ImageFont.MAX_STRING_LENGTH">
+<span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">MAX_STRING_LENGTH</span></span><a class="headerlink" href="#PIL.ImageFont.MAX_STRING_LENGTH" title="Link to this definition">¶</a></dt>
+<dd><p>Set to 1,000,000, to protect against potential DOS attacks. Pillow will
+raise a <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><code class="xref py py-exc docutils literal notranslate"><span class="pre">ValueError</span></code></a> if the number of characters is over this limit. The
+check can be disabled by setting <code class="docutils literal notranslate"><span class="pre">ImageFont.MAX_STRING_LENGTH</span> <span class="pre">=</span> <span class="pre">None</span></code>.</p>
+</dd></dl>
+
+</section>
+<section id="dictionaries">
+<h2>Dictionaries<a class="headerlink" href="#dictionaries" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="PIL.ImageFont.Axis">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">PIL.ImageFont.</span></span><span class="sig-name descname"><span class="pre">Axis</span></span><a class="reference internal" href="../_modules/PIL/ImageFont.html#Axis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#PIL.ImageFont.Axis" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.TypedDict" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TypedDict</span></code></a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="PIL.ImageFont.Axis.default">
+<span class="sig-name descname"><span class="pre">default</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><a class="headerlink" href="#PIL.ImageFont.Axis.default" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="PIL.ImageFont.Axis.maximum">
+<span class="sig-name descname"><span class="pre">maximum</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><a class="headerlink" href="#PIL.ImageFont.Axis.maximum" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="PIL.ImageFont.Axis.minimum">
+<span class="sig-name descname"><span class="pre">minimum</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.15)"><span class="pre">None</span></a></span><a class="headerlink" href="#PIL.ImageFont.Axis.minimum" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="PIL.ImageFont.Axis.name">
+<span class="sig-name descname"><span class="pre">name</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">NotRequired</span><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#bytes" title="(in Python v3.15)"><span class="pre">bytes</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#PIL.ImageFont.Axis.name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="ImageGrab.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageGrab</span></code> module</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="ImageFilter.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 1995-2011 Fredrik Lundh and contributors (PIL), 2010 Jeffrey &#39;Alex&#39; Clark and contributors (Pillow), Alexander Karpinsky and contributors (Pillow-SIMD), 2026 Matteo Ferrabone and contributors (Pillow-AllSIMD)
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</a><ul>
+<li><a class="reference internal" href="#example">Example</a></li>
+<li><a class="reference internal" href="#functions">Functions</a><ul>
+<li><a class="reference internal" href="#PIL.ImageFont.load"><code class="docutils literal notranslate"><span class="pre">load()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.load_path"><code class="docutils literal notranslate"><span class="pre">load_path()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.truetype"><code class="docutils literal notranslate"><span class="pre">truetype()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.load_default"><code class="docutils literal notranslate"><span class="pre">load_default()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.load_default_imagefont"><code class="docutils literal notranslate"><span class="pre">load_default_imagefont()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#methods">Methods</a><ul>
+<li><a class="reference internal" href="#PIL.ImageFont.BaseImageFont"><code class="docutils literal notranslate"><span class="pre">BaseImageFont</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.ImageFont"><code class="docutils literal notranslate"><span class="pre">ImageFont</span></code></a><ul>
+<li><a class="reference internal" href="#PIL.ImageFont.ImageFont.getbbox"><code class="docutils literal notranslate"><span class="pre">ImageFont.getbbox()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.ImageFont.getlength"><code class="docutils literal notranslate"><span class="pre">ImageFont.getlength()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.ImageFont.getmask"><code class="docutils literal notranslate"><span class="pre">ImageFont.getmask()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont</span></code></a><ul>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.font_variant"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.font_variant()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.get_variation_axes"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.get_variation_axes()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.get_variation_names"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.get_variation_names()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.getbbox"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.getbbox()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.getlength"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.getlength()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.getmask"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.getmask()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.getmask2"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.getmask2()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.getmetrics"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.getmetrics()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.getname"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.getname()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.set_variation_by_axes"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.set_variation_by_axes()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.FreeTypeFont.set_variation_by_name"><code class="docutils literal notranslate"><span class="pre">FreeTypeFont.set_variation_by_name()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#PIL.ImageFont.TransposedFont"><code class="docutils literal notranslate"><span class="pre">TransposedFont</span></code></a><ul>
+<li><a class="reference internal" href="#PIL.ImageFont.TransposedFont.getbbox"><code class="docutils literal notranslate"><span class="pre">TransposedFont.getbbox()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.TransposedFont.getlength"><code class="docutils literal notranslate"><span class="pre">TransposedFont.getlength()</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.TransposedFont.getmask"><code class="docutils literal notranslate"><span class="pre">TransposedFont.getmask()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#constants">Constants</a><ul>
+<li><a class="reference internal" href="#PIL.ImageFont.Layout"><code class="docutils literal notranslate"><span class="pre">Layout</span></code></a><ul>
+<li><a class="reference internal" href="#PIL.ImageFont.Layout.BASIC"><code class="docutils literal notranslate"><span class="pre">Layout.BASIC</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.Layout.RAQM"><code class="docutils literal notranslate"><span class="pre">Layout.RAQM</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#PIL.ImageFont.MAX_STRING_LENGTH"><code class="docutils literal notranslate"><span class="pre">MAX_STRING_LENGTH</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dictionaries">Dictionaries</a><ul>
+<li><a class="reference internal" href="#PIL.ImageFont.Axis"><code class="docutils literal notranslate"><span class="pre">Axis</span></code></a><ul>
+<li><a class="reference internal" href="#PIL.ImageFont.Axis.default"><code class="docutils literal notranslate"><span class="pre">Axis.default</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.Axis.maximum"><code class="docutils literal notranslate"><span class="pre">Axis.maximum</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.Axis.minimum"><code class="docutils literal notranslate"><span class="pre">Axis.minimum</span></code></a></li>
+<li><a class="reference internal" href="#PIL.ImageFont.Axis.name"><code class="docutils literal notranslate"><span class="pre">Axis.name</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=457d1205"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/tabs.js?v=3ee01567"></script>
+    <script src="../_static/js/activate_tab.js?v=f8fe9d20"></script>
+    </body>
+</html>

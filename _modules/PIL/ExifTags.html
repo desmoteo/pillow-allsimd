@@ -1,0 +1,821 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><link rel="author" title="About these documents" href="../../about.html"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
+
+    <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
+        <title>PIL.ExifTags - Pillow-AllSIMD 13.0.0.post0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/css/dark.css?v=1a645143" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     Pillow-AllSIMD: Pillow with SIMD kernels for x86 and arm64, a fork of <a href="https://github.com/uploadcare/pillow-simd">Pillow-SIMD</a> and <a href="https://github.com/python-pillow/Pillow">Pillow</a>, whose documentation this is, with Pillow-AllSIMD's additions. Pillow's own: <a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon no-toc" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../allsimd.html">About Pillow-AllSIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../installation/index.html">Installation</a><input aria-label="Toggle navigation of Installation" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/basic-installation.html">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/python-support.html">Python support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/platform-support.html">Platform support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/building-from-source.html">Building from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../installation/building-from-source.html#old-versions">Old versions</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../handbook/index.html">Handbook</a><input aria-label="Toggle navigation of Handbook" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/tutorial.html">Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/concepts.html">Concepts</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../handbook/appendices.html">Appendices</a><input aria-label="Toggle navigation of Appendices" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/image-file-formats.html">Image file formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/text-anchors.html">Text anchors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/third-party-plugins.html">Third-party plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html">Writing your own image plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html#decoders">Decoders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-c">Writing your own file codec in C</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-python">Writing your own file codec in Python</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../handbook/security.html">Security</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/Image.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Image</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageChops.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageChops</span></code> (“channel operations”) module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageCms.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageCms</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageColor.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageColor</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageEnhance.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageEnhance</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageFile.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFile</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageFilter.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageFont.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageGrab.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageGrab</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageMath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageMorph.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMorph</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageOps.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageOps</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImagePalette.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePalette</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImagePath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageQt.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageQt</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageSequence.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageSequence</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageShow.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageShow</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageStat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageStat</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageText.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageText</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageTk.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTk</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageTransform.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTransform</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ImageWin.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageWin</span></code> module (Windows-only)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/ExifTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ExifTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/TiffTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">TiffTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/JpegPresets.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">JpegPresets</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/PSDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PSDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/PixelAccess.html"><code class="xref py py-class docutils literal notranslate"><span class="pre">PixelAccess</span></code> class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/features.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">features</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/fast_mode.html">Fast mode (Pillow-AllSIMD)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../PIL.html">PIL package (autodoc of remaining modules)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../reference/plugins.html">Plugin reference</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../reference/internal_design.html">Internal reference</a><input aria-label="Toggle navigation of Internal reference" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/open_files.html">File handling in Pillow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/limits.html">Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/block_allocator.html">Block allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/internal_modules.html">Internal modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/c_extension_debugging.html">C extension debugging on Linux, with GDB/Valgrind</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../reference/arrow_support.html">Arrow support</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../porting.html">Porting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../allsimd-changelog.html">Changelog (Pillow-AllSIMD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../allsimd-changelog.html#pillow-simd">Pillow-SIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../releasenotes/index.html">Release notes</a><input aria-label="Toggle navigation of Release notes" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/versioning.html">Versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/13.0.0.html">13.0.0 (2026-10-16)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.3.0.html">12.3.0 (2026-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.2.0.html">12.2.0 (2026-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.1.1.html">12.1.1 (2026-02-11)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.1.0.html">12.1.0 (2026-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/12.0.0.html">12.0.0 (2025-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.3.0.html">11.3.0 (2025-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.2.1.html">11.2.1 (2025-04-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.1.0.html">11.1.0 (2025-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/11.0.0.html">11.0.0 (2024-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.4.0.html">10.4.0 (2024-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.3.0.html">10.3.0 (2024-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.2.0.html">10.2.0 (2024-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.1.0.html">10.1.0 (2023-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.0.1.html">10.0.1 (2023-09-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/10.0.0.html">10.0.0 (2023-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.5.0.html">9.5.0 (2023-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.4.0.html">9.4.0 (2023-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.3.0.html">9.3.0 (2022-10-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.2.0.html">9.2.0 (2022-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.1.1.html">9.1.1 (2022-05-17)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.1.0.html">9.1.0 (2022-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.0.1.html">9.0.1 (2022-02-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/9.0.0.html">9.0.0 (2022-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.4.0.html">8.4.0 (2021-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.3.2.html">8.3.2 (2021-09-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.3.1.html">8.3.1 (2021-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.3.0.html">8.3.0 (2021-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.2.0.html">8.2.0 (2021-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.1.2.html">8.1.2 (2021-03-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.1.1.html">8.1.1 (2021-03-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.1.0.html">8.1.0 (2021-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.0.1.html">8.0.1 (2020-10-22)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/8.0.0.html">8.0.0 (2020-10-14)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.2.0.html">7.2.0 (2020-06-30)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.1.2.html">7.1.2 (2020-04-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.1.1.html">7.1.1 (2020-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.1.0.html">7.1.0 (2020-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/7.0.0.html">7.0.0 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.2.2.html">6.2.2 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.2.1.html">6.2.1 (2019-10-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.2.0.html">6.2.0 (2019-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.1.0.html">6.1.0 (2019-07-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/6.0.0.html">6.0.0 (2019-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.4.1.html">5.4.1 (2019-01-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.4.0.html">5.4.0 (2019-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.3.0.html">5.3.0 (2018-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.2.0.html">5.2.0 (2018-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.1.0.html">5.1.0 (2018-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/5.0.0.html">5.0.0 (2018-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.3.0.html">4.3.0 (2017-10-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.2.1.html">4.2.1 (2017-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.2.0.html">4.2.0 (2017-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.1.1.html">4.1.1 (2017-04-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.1.0.html">4.1.0 (2017-04-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/4.0.0.html">4.0.0 (2017-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.4.0.html">3.4.0 (2016-10-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.3.2.html">3.3.2 (2016-09-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.3.0.html">3.3.0 (2016-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.2.0.html">3.2.0 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.1.2.html">3.1.2 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.1.1.html">3.1.1 (2016-02-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.1.0.html">3.1.0 (2016-01-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/3.0.0.html">3.0.0 (2015-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.8.0.html">2.8.0 (2015-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.7.0.html">2.7.0 (2014-12-31)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.6.0.html">2.6.0 (2014-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.5.2.html">2.5.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.3.2.html">2.3.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../releasenotes/2.3.1.html">2.3.1 (2014-03-14)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../deprecations.html">Deprecations and removals</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon no-toc" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <h1>Source code for PIL.ExifTags</h1><div class="highlight"><pre>
+<span></span><span class="c1">#</span>
+<span class="c1"># The Python Imaging Library.</span>
+<span class="c1"># $Id$</span>
+<span class="c1">#</span>
+<span class="c1"># EXIF tags</span>
+<span class="c1">#</span>
+<span class="c1"># Copyright (c) 2003 by Secret Labs AB</span>
+<span class="c1">#</span>
+<span class="c1"># See the README file for information on usage and redistribution.</span>
+<span class="c1">#</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">This module provides constants and clear-text names for various</span>
+<span class="sd">well-known EXIF tags.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">IntEnum</span>
+
+
+<div class="viewcode-block" id="Base">
+<a class="viewcode-back" href="../../reference/ExifTags.html#PIL.ExifTags.Base">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Base</span><span class="p">(</span><span class="n">IntEnum</span><span class="p">):</span>
+    <span class="c1"># possibly incomplete</span>
+    <span class="n">InteropIndex</span> <span class="o">=</span> <span class="mh">0x0001</span>
+    <span class="n">ProcessingSoftware</span> <span class="o">=</span> <span class="mh">0x000B</span>
+    <span class="n">NewSubfileType</span> <span class="o">=</span> <span class="mh">0x00FE</span>
+    <span class="n">SubfileType</span> <span class="o">=</span> <span class="mh">0x00FF</span>
+    <span class="n">ImageWidth</span> <span class="o">=</span> <span class="mh">0x0100</span>
+    <span class="n">ImageLength</span> <span class="o">=</span> <span class="mh">0x0101</span>
+    <span class="n">BitsPerSample</span> <span class="o">=</span> <span class="mh">0x0102</span>
+    <span class="n">Compression</span> <span class="o">=</span> <span class="mh">0x0103</span>
+    <span class="n">PhotometricInterpretation</span> <span class="o">=</span> <span class="mh">0x0106</span>
+    <span class="n">Thresholding</span> <span class="o">=</span> <span class="mh">0x0107</span>
+    <span class="n">CellWidth</span> <span class="o">=</span> <span class="mh">0x0108</span>
+    <span class="n">CellLength</span> <span class="o">=</span> <span class="mh">0x0109</span>
+    <span class="n">FillOrder</span> <span class="o">=</span> <span class="mh">0x010A</span>
+    <span class="n">DocumentName</span> <span class="o">=</span> <span class="mh">0x010D</span>
+    <span class="n">ImageDescription</span> <span class="o">=</span> <span class="mh">0x010E</span>
+    <span class="n">Make</span> <span class="o">=</span> <span class="mh">0x010F</span>
+    <span class="n">Model</span> <span class="o">=</span> <span class="mh">0x0110</span>
+    <span class="n">StripOffsets</span> <span class="o">=</span> <span class="mh">0x0111</span>
+    <span class="n">Orientation</span> <span class="o">=</span> <span class="mh">0x0112</span>
+    <span class="n">SamplesPerPixel</span> <span class="o">=</span> <span class="mh">0x0115</span>
+    <span class="n">RowsPerStrip</span> <span class="o">=</span> <span class="mh">0x0116</span>
+    <span class="n">StripByteCounts</span> <span class="o">=</span> <span class="mh">0x0117</span>
+    <span class="n">MinSampleValue</span> <span class="o">=</span> <span class="mh">0x0118</span>
+    <span class="n">MaxSampleValue</span> <span class="o">=</span> <span class="mh">0x0119</span>
+    <span class="n">XResolution</span> <span class="o">=</span> <span class="mh">0x011A</span>
+    <span class="n">YResolution</span> <span class="o">=</span> <span class="mh">0x011B</span>
+    <span class="n">PlanarConfiguration</span> <span class="o">=</span> <span class="mh">0x011C</span>
+    <span class="n">PageName</span> <span class="o">=</span> <span class="mh">0x011D</span>
+    <span class="n">FreeOffsets</span> <span class="o">=</span> <span class="mh">0x0120</span>
+    <span class="n">FreeByteCounts</span> <span class="o">=</span> <span class="mh">0x0121</span>
+    <span class="n">GrayResponseUnit</span> <span class="o">=</span> <span class="mh">0x0122</span>
+    <span class="n">GrayResponseCurve</span> <span class="o">=</span> <span class="mh">0x0123</span>
+    <span class="n">T4Options</span> <span class="o">=</span> <span class="mh">0x0124</span>
+    <span class="n">T6Options</span> <span class="o">=</span> <span class="mh">0x0125</span>
+    <span class="n">ResolutionUnit</span> <span class="o">=</span> <span class="mh">0x0128</span>
+    <span class="n">PageNumber</span> <span class="o">=</span> <span class="mh">0x0129</span>
+    <span class="n">TransferFunction</span> <span class="o">=</span> <span class="mh">0x012D</span>
+    <span class="n">Software</span> <span class="o">=</span> <span class="mh">0x0131</span>
+    <span class="n">DateTime</span> <span class="o">=</span> <span class="mh">0x0132</span>
+    <span class="n">Artist</span> <span class="o">=</span> <span class="mh">0x013B</span>
+    <span class="n">HostComputer</span> <span class="o">=</span> <span class="mh">0x013C</span>
+    <span class="n">Predictor</span> <span class="o">=</span> <span class="mh">0x013D</span>
+    <span class="n">WhitePoint</span> <span class="o">=</span> <span class="mh">0x013E</span>
+    <span class="n">PrimaryChromaticities</span> <span class="o">=</span> <span class="mh">0x013F</span>
+    <span class="n">ColorMap</span> <span class="o">=</span> <span class="mh">0x0140</span>
+    <span class="n">HalftoneHints</span> <span class="o">=</span> <span class="mh">0x0141</span>
+    <span class="n">TileWidth</span> <span class="o">=</span> <span class="mh">0x0142</span>
+    <span class="n">TileLength</span> <span class="o">=</span> <span class="mh">0x0143</span>
+    <span class="n">TileOffsets</span> <span class="o">=</span> <span class="mh">0x0144</span>
+    <span class="n">TileByteCounts</span> <span class="o">=</span> <span class="mh">0x0145</span>
+    <span class="n">SubIFDs</span> <span class="o">=</span> <span class="mh">0x014A</span>
+    <span class="n">InkSet</span> <span class="o">=</span> <span class="mh">0x014C</span>
+    <span class="n">InkNames</span> <span class="o">=</span> <span class="mh">0x014D</span>
+    <span class="n">NumberOfInks</span> <span class="o">=</span> <span class="mh">0x014E</span>
+    <span class="n">DotRange</span> <span class="o">=</span> <span class="mh">0x0150</span>
+    <span class="n">TargetPrinter</span> <span class="o">=</span> <span class="mh">0x0151</span>
+    <span class="n">ExtraSamples</span> <span class="o">=</span> <span class="mh">0x0152</span>
+    <span class="n">SampleFormat</span> <span class="o">=</span> <span class="mh">0x0153</span>
+    <span class="n">SMinSampleValue</span> <span class="o">=</span> <span class="mh">0x0154</span>
+    <span class="n">SMaxSampleValue</span> <span class="o">=</span> <span class="mh">0x0155</span>
+    <span class="n">TransferRange</span> <span class="o">=</span> <span class="mh">0x0156</span>
+    <span class="n">ClipPath</span> <span class="o">=</span> <span class="mh">0x0157</span>
+    <span class="n">XClipPathUnits</span> <span class="o">=</span> <span class="mh">0x0158</span>
+    <span class="n">YClipPathUnits</span> <span class="o">=</span> <span class="mh">0x0159</span>
+    <span class="n">Indexed</span> <span class="o">=</span> <span class="mh">0x015A</span>
+    <span class="n">JPEGTables</span> <span class="o">=</span> <span class="mh">0x015B</span>
+    <span class="n">OPIProxy</span> <span class="o">=</span> <span class="mh">0x015F</span>
+    <span class="n">JPEGProc</span> <span class="o">=</span> <span class="mh">0x0200</span>
+    <span class="n">JpegIFOffset</span> <span class="o">=</span> <span class="mh">0x0201</span>
+    <span class="n">JpegIFByteCount</span> <span class="o">=</span> <span class="mh">0x0202</span>
+    <span class="n">JpegRestartInterval</span> <span class="o">=</span> <span class="mh">0x0203</span>
+    <span class="n">JpegLosslessPredictors</span> <span class="o">=</span> <span class="mh">0x0205</span>
+    <span class="n">JpegPointTransforms</span> <span class="o">=</span> <span class="mh">0x0206</span>
+    <span class="n">JpegQTables</span> <span class="o">=</span> <span class="mh">0x0207</span>
+    <span class="n">JpegDCTables</span> <span class="o">=</span> <span class="mh">0x0208</span>
+    <span class="n">JpegACTables</span> <span class="o">=</span> <span class="mh">0x0209</span>
+    <span class="n">YCbCrCoefficients</span> <span class="o">=</span> <span class="mh">0x0211</span>
+    <span class="n">YCbCrSubSampling</span> <span class="o">=</span> <span class="mh">0x0212</span>
+    <span class="n">YCbCrPositioning</span> <span class="o">=</span> <span class="mh">0x0213</span>
+    <span class="n">ReferenceBlackWhite</span> <span class="o">=</span> <span class="mh">0x0214</span>
+    <span class="n">XMLPacket</span> <span class="o">=</span> <span class="mh">0x02BC</span>
+    <span class="n">RelatedImageFileFormat</span> <span class="o">=</span> <span class="mh">0x1000</span>
+    <span class="n">RelatedImageWidth</span> <span class="o">=</span> <span class="mh">0x1001</span>
+    <span class="n">RelatedImageLength</span> <span class="o">=</span> <span class="mh">0x1002</span>
+    <span class="n">Rating</span> <span class="o">=</span> <span class="mh">0x4746</span>
+    <span class="n">RatingPercent</span> <span class="o">=</span> <span class="mh">0x4749</span>
+    <span class="n">ImageID</span> <span class="o">=</span> <span class="mh">0x800D</span>
+    <span class="n">CFARepeatPatternDim</span> <span class="o">=</span> <span class="mh">0x828D</span>
+    <span class="n">BatteryLevel</span> <span class="o">=</span> <span class="mh">0x828F</span>
+    <span class="n">Copyright</span> <span class="o">=</span> <span class="mh">0x8298</span>
+    <span class="n">ExposureTime</span> <span class="o">=</span> <span class="mh">0x829A</span>
+    <span class="n">FNumber</span> <span class="o">=</span> <span class="mh">0x829D</span>
+    <span class="n">IPTCNAA</span> <span class="o">=</span> <span class="mh">0x83BB</span>
+    <span class="n">ImageResources</span> <span class="o">=</span> <span class="mh">0x8649</span>
+    <span class="n">ExifOffset</span> <span class="o">=</span> <span class="mh">0x8769</span>
+    <span class="n">InterColorProfile</span> <span class="o">=</span> <span class="mh">0x8773</span>
+    <span class="n">ExposureProgram</span> <span class="o">=</span> <span class="mh">0x8822</span>
+    <span class="n">SpectralSensitivity</span> <span class="o">=</span> <span class="mh">0x8824</span>
+    <span class="n">GPSInfo</span> <span class="o">=</span> <span class="mh">0x8825</span>
+    <span class="n">ISOSpeedRatings</span> <span class="o">=</span> <span class="mh">0x8827</span>
+    <span class="n">OECF</span> <span class="o">=</span> <span class="mh">0x8828</span>
+    <span class="n">Interlace</span> <span class="o">=</span> <span class="mh">0x8829</span>
+    <span class="n">TimeZoneOffset</span> <span class="o">=</span> <span class="mh">0x882A</span>
+    <span class="n">SelfTimerMode</span> <span class="o">=</span> <span class="mh">0x882B</span>
+    <span class="n">SensitivityType</span> <span class="o">=</span> <span class="mh">0x8830</span>
+    <span class="n">StandardOutputSensitivity</span> <span class="o">=</span> <span class="mh">0x8831</span>
+    <span class="n">RecommendedExposureIndex</span> <span class="o">=</span> <span class="mh">0x8832</span>
+    <span class="n">ISOSpeed</span> <span class="o">=</span> <span class="mh">0x8833</span>
+    <span class="n">ISOSpeedLatitudeyyy</span> <span class="o">=</span> <span class="mh">0x8834</span>
+    <span class="n">ISOSpeedLatitudezzz</span> <span class="o">=</span> <span class="mh">0x8835</span>
+    <span class="n">ExifVersion</span> <span class="o">=</span> <span class="mh">0x9000</span>
+    <span class="n">DateTimeOriginal</span> <span class="o">=</span> <span class="mh">0x9003</span>
+    <span class="n">DateTimeDigitized</span> <span class="o">=</span> <span class="mh">0x9004</span>
+    <span class="n">OffsetTime</span> <span class="o">=</span> <span class="mh">0x9010</span>
+    <span class="n">OffsetTimeOriginal</span> <span class="o">=</span> <span class="mh">0x9011</span>
+    <span class="n">OffsetTimeDigitized</span> <span class="o">=</span> <span class="mh">0x9012</span>
+    <span class="n">ComponentsConfiguration</span> <span class="o">=</span> <span class="mh">0x9101</span>
+    <span class="n">CompressedBitsPerPixel</span> <span class="o">=</span> <span class="mh">0x9102</span>
+    <span class="n">ShutterSpeedValue</span> <span class="o">=</span> <span class="mh">0x9201</span>
+    <span class="n">ApertureValue</span> <span class="o">=</span> <span class="mh">0x9202</span>
+    <span class="n">BrightnessValue</span> <span class="o">=</span> <span class="mh">0x9203</span>
+    <span class="n">ExposureBiasValue</span> <span class="o">=</span> <span class="mh">0x9204</span>
+    <span class="n">MaxApertureValue</span> <span class="o">=</span> <span class="mh">0x9205</span>
+    <span class="n">SubjectDistance</span> <span class="o">=</span> <span class="mh">0x9206</span>
+    <span class="n">MeteringMode</span> <span class="o">=</span> <span class="mh">0x9207</span>
+    <span class="n">LightSource</span> <span class="o">=</span> <span class="mh">0x9208</span>
+    <span class="n">Flash</span> <span class="o">=</span> <span class="mh">0x9209</span>
+    <span class="n">FocalLength</span> <span class="o">=</span> <span class="mh">0x920A</span>
+    <span class="n">Noise</span> <span class="o">=</span> <span class="mh">0x920D</span>
+    <span class="n">ImageNumber</span> <span class="o">=</span> <span class="mh">0x9211</span>
+    <span class="n">SecurityClassification</span> <span class="o">=</span> <span class="mh">0x9212</span>
+    <span class="n">ImageHistory</span> <span class="o">=</span> <span class="mh">0x9213</span>
+    <span class="n">TIFFEPStandardID</span> <span class="o">=</span> <span class="mh">0x9216</span>
+    <span class="n">MakerNote</span> <span class="o">=</span> <span class="mh">0x927C</span>
+    <span class="n">UserComment</span> <span class="o">=</span> <span class="mh">0x9286</span>
+    <span class="n">SubsecTime</span> <span class="o">=</span> <span class="mh">0x9290</span>
+    <span class="n">SubsecTimeOriginal</span> <span class="o">=</span> <span class="mh">0x9291</span>
+    <span class="n">SubsecTimeDigitized</span> <span class="o">=</span> <span class="mh">0x9292</span>
+    <span class="n">AmbientTemperature</span> <span class="o">=</span> <span class="mh">0x9400</span>
+    <span class="n">Humidity</span> <span class="o">=</span> <span class="mh">0x9401</span>
+    <span class="n">Pressure</span> <span class="o">=</span> <span class="mh">0x9402</span>
+    <span class="n">WaterDepth</span> <span class="o">=</span> <span class="mh">0x9403</span>
+    <span class="n">Acceleration</span> <span class="o">=</span> <span class="mh">0x9404</span>
+    <span class="n">CameraElevationAngle</span> <span class="o">=</span> <span class="mh">0x9405</span>
+    <span class="n">XPTitle</span> <span class="o">=</span> <span class="mh">0x9C9B</span>
+    <span class="n">XPComment</span> <span class="o">=</span> <span class="mh">0x9C9C</span>
+    <span class="n">XPAuthor</span> <span class="o">=</span> <span class="mh">0x9C9D</span>
+    <span class="n">XPKeywords</span> <span class="o">=</span> <span class="mh">0x9C9E</span>
+    <span class="n">XPSubject</span> <span class="o">=</span> <span class="mh">0x9C9F</span>
+    <span class="n">FlashPixVersion</span> <span class="o">=</span> <span class="mh">0xA000</span>
+    <span class="n">ColorSpace</span> <span class="o">=</span> <span class="mh">0xA001</span>
+    <span class="n">ExifImageWidth</span> <span class="o">=</span> <span class="mh">0xA002</span>
+    <span class="n">ExifImageHeight</span> <span class="o">=</span> <span class="mh">0xA003</span>
+    <span class="n">RelatedSoundFile</span> <span class="o">=</span> <span class="mh">0xA004</span>
+    <span class="n">ExifInteroperabilityOffset</span> <span class="o">=</span> <span class="mh">0xA005</span>
+    <span class="n">FlashEnergy</span> <span class="o">=</span> <span class="mh">0xA20B</span>
+    <span class="n">SpatialFrequencyResponse</span> <span class="o">=</span> <span class="mh">0xA20C</span>
+    <span class="n">FocalPlaneXResolution</span> <span class="o">=</span> <span class="mh">0xA20E</span>
+    <span class="n">FocalPlaneYResolution</span> <span class="o">=</span> <span class="mh">0xA20F</span>
+    <span class="n">FocalPlaneResolutionUnit</span> <span class="o">=</span> <span class="mh">0xA210</span>
+    <span class="n">SubjectLocation</span> <span class="o">=</span> <span class="mh">0xA214</span>
+    <span class="n">ExposureIndex</span> <span class="o">=</span> <span class="mh">0xA215</span>
+    <span class="n">SensingMethod</span> <span class="o">=</span> <span class="mh">0xA217</span>
+    <span class="n">FileSource</span> <span class="o">=</span> <span class="mh">0xA300</span>
+    <span class="n">SceneType</span> <span class="o">=</span> <span class="mh">0xA301</span>
+    <span class="n">CFAPattern</span> <span class="o">=</span> <span class="mh">0xA302</span>
+    <span class="n">CustomRendered</span> <span class="o">=</span> <span class="mh">0xA401</span>
+    <span class="n">ExposureMode</span> <span class="o">=</span> <span class="mh">0xA402</span>
+    <span class="n">WhiteBalance</span> <span class="o">=</span> <span class="mh">0xA403</span>
+    <span class="n">DigitalZoomRatio</span> <span class="o">=</span> <span class="mh">0xA404</span>
+    <span class="n">FocalLengthIn35mmFilm</span> <span class="o">=</span> <span class="mh">0xA405</span>
+    <span class="n">SceneCaptureType</span> <span class="o">=</span> <span class="mh">0xA406</span>
+    <span class="n">GainControl</span> <span class="o">=</span> <span class="mh">0xA407</span>
+    <span class="n">Contrast</span> <span class="o">=</span> <span class="mh">0xA408</span>
+    <span class="n">Saturation</span> <span class="o">=</span> <span class="mh">0xA409</span>
+    <span class="n">Sharpness</span> <span class="o">=</span> <span class="mh">0xA40A</span>
+    <span class="n">DeviceSettingDescription</span> <span class="o">=</span> <span class="mh">0xA40B</span>
+    <span class="n">SubjectDistanceRange</span> <span class="o">=</span> <span class="mh">0xA40C</span>
+    <span class="n">ImageUniqueID</span> <span class="o">=</span> <span class="mh">0xA420</span>
+    <span class="n">CameraOwnerName</span> <span class="o">=</span> <span class="mh">0xA430</span>
+    <span class="n">BodySerialNumber</span> <span class="o">=</span> <span class="mh">0xA431</span>
+    <span class="n">LensSpecification</span> <span class="o">=</span> <span class="mh">0xA432</span>
+    <span class="n">LensMake</span> <span class="o">=</span> <span class="mh">0xA433</span>
+    <span class="n">LensModel</span> <span class="o">=</span> <span class="mh">0xA434</span>
+    <span class="n">LensSerialNumber</span> <span class="o">=</span> <span class="mh">0xA435</span>
+    <span class="n">CompositeImage</span> <span class="o">=</span> <span class="mh">0xA460</span>
+    <span class="n">CompositeImageCount</span> <span class="o">=</span> <span class="mh">0xA461</span>
+    <span class="n">CompositeImageExposureTimes</span> <span class="o">=</span> <span class="mh">0xA462</span>
+    <span class="n">Gamma</span> <span class="o">=</span> <span class="mh">0xA500</span>
+    <span class="n">PrintImageMatching</span> <span class="o">=</span> <span class="mh">0xC4A5</span>
+    <span class="n">DNGVersion</span> <span class="o">=</span> <span class="mh">0xC612</span>
+    <span class="n">DNGBackwardVersion</span> <span class="o">=</span> <span class="mh">0xC613</span>
+    <span class="n">UniqueCameraModel</span> <span class="o">=</span> <span class="mh">0xC614</span>
+    <span class="n">LocalizedCameraModel</span> <span class="o">=</span> <span class="mh">0xC615</span>
+    <span class="n">CFAPlaneColor</span> <span class="o">=</span> <span class="mh">0xC616</span>
+    <span class="n">CFALayout</span> <span class="o">=</span> <span class="mh">0xC617</span>
+    <span class="n">LinearizationTable</span> <span class="o">=</span> <span class="mh">0xC618</span>
+    <span class="n">BlackLevelRepeatDim</span> <span class="o">=</span> <span class="mh">0xC619</span>
+    <span class="n">BlackLevel</span> <span class="o">=</span> <span class="mh">0xC61A</span>
+    <span class="n">BlackLevelDeltaH</span> <span class="o">=</span> <span class="mh">0xC61B</span>
+    <span class="n">BlackLevelDeltaV</span> <span class="o">=</span> <span class="mh">0xC61C</span>
+    <span class="n">WhiteLevel</span> <span class="o">=</span> <span class="mh">0xC61D</span>
+    <span class="n">DefaultScale</span> <span class="o">=</span> <span class="mh">0xC61E</span>
+    <span class="n">DefaultCropOrigin</span> <span class="o">=</span> <span class="mh">0xC61F</span>
+    <span class="n">DefaultCropSize</span> <span class="o">=</span> <span class="mh">0xC620</span>
+    <span class="n">ColorMatrix1</span> <span class="o">=</span> <span class="mh">0xC621</span>
+    <span class="n">ColorMatrix2</span> <span class="o">=</span> <span class="mh">0xC622</span>
+    <span class="n">CameraCalibration1</span> <span class="o">=</span> <span class="mh">0xC623</span>
+    <span class="n">CameraCalibration2</span> <span class="o">=</span> <span class="mh">0xC624</span>
+    <span class="n">ReductionMatrix1</span> <span class="o">=</span> <span class="mh">0xC625</span>
+    <span class="n">ReductionMatrix2</span> <span class="o">=</span> <span class="mh">0xC626</span>
+    <span class="n">AnalogBalance</span> <span class="o">=</span> <span class="mh">0xC627</span>
+    <span class="n">AsShotNeutral</span> <span class="o">=</span> <span class="mh">0xC628</span>
+    <span class="n">AsShotWhiteXY</span> <span class="o">=</span> <span class="mh">0xC629</span>
+    <span class="n">BaselineExposure</span> <span class="o">=</span> <span class="mh">0xC62A</span>
+    <span class="n">BaselineNoise</span> <span class="o">=</span> <span class="mh">0xC62B</span>
+    <span class="n">BaselineSharpness</span> <span class="o">=</span> <span class="mh">0xC62C</span>
+    <span class="n">BayerGreenSplit</span> <span class="o">=</span> <span class="mh">0xC62D</span>
+    <span class="n">LinearResponseLimit</span> <span class="o">=</span> <span class="mh">0xC62E</span>
+    <span class="n">CameraSerialNumber</span> <span class="o">=</span> <span class="mh">0xC62F</span>
+    <span class="n">LensInfo</span> <span class="o">=</span> <span class="mh">0xC630</span>
+    <span class="n">ChromaBlurRadius</span> <span class="o">=</span> <span class="mh">0xC631</span>
+    <span class="n">AntiAliasStrength</span> <span class="o">=</span> <span class="mh">0xC632</span>
+    <span class="n">ShadowScale</span> <span class="o">=</span> <span class="mh">0xC633</span>
+    <span class="n">DNGPrivateData</span> <span class="o">=</span> <span class="mh">0xC634</span>
+    <span class="n">MakerNoteSafety</span> <span class="o">=</span> <span class="mh">0xC635</span>
+    <span class="n">CalibrationIlluminant1</span> <span class="o">=</span> <span class="mh">0xC65A</span>
+    <span class="n">CalibrationIlluminant2</span> <span class="o">=</span> <span class="mh">0xC65B</span>
+    <span class="n">BestQualityScale</span> <span class="o">=</span> <span class="mh">0xC65C</span>
+    <span class="n">RawDataUniqueID</span> <span class="o">=</span> <span class="mh">0xC65D</span>
+    <span class="n">OriginalRawFileName</span> <span class="o">=</span> <span class="mh">0xC68B</span>
+    <span class="n">OriginalRawFileData</span> <span class="o">=</span> <span class="mh">0xC68C</span>
+    <span class="n">ActiveArea</span> <span class="o">=</span> <span class="mh">0xC68D</span>
+    <span class="n">MaskedAreas</span> <span class="o">=</span> <span class="mh">0xC68E</span>
+    <span class="n">AsShotICCProfile</span> <span class="o">=</span> <span class="mh">0xC68F</span>
+    <span class="n">AsShotPreProfileMatrix</span> <span class="o">=</span> <span class="mh">0xC690</span>
+    <span class="n">CurrentICCProfile</span> <span class="o">=</span> <span class="mh">0xC691</span>
+    <span class="n">CurrentPreProfileMatrix</span> <span class="o">=</span> <span class="mh">0xC692</span>
+    <span class="n">ColorimetricReference</span> <span class="o">=</span> <span class="mh">0xC6BF</span>
+    <span class="n">CameraCalibrationSignature</span> <span class="o">=</span> <span class="mh">0xC6F3</span>
+    <span class="n">ProfileCalibrationSignature</span> <span class="o">=</span> <span class="mh">0xC6F4</span>
+    <span class="n">AsShotProfileName</span> <span class="o">=</span> <span class="mh">0xC6F6</span>
+    <span class="n">NoiseReductionApplied</span> <span class="o">=</span> <span class="mh">0xC6F7</span>
+    <span class="n">ProfileName</span> <span class="o">=</span> <span class="mh">0xC6F8</span>
+    <span class="n">ProfileHueSatMapDims</span> <span class="o">=</span> <span class="mh">0xC6F9</span>
+    <span class="n">ProfileHueSatMapData1</span> <span class="o">=</span> <span class="mh">0xC6FA</span>
+    <span class="n">ProfileHueSatMapData2</span> <span class="o">=</span> <span class="mh">0xC6FB</span>
+    <span class="n">ProfileToneCurve</span> <span class="o">=</span> <span class="mh">0xC6FC</span>
+    <span class="n">ProfileEmbedPolicy</span> <span class="o">=</span> <span class="mh">0xC6FD</span>
+    <span class="n">ProfileCopyright</span> <span class="o">=</span> <span class="mh">0xC6FE</span>
+    <span class="n">ForwardMatrix1</span> <span class="o">=</span> <span class="mh">0xC714</span>
+    <span class="n">ForwardMatrix2</span> <span class="o">=</span> <span class="mh">0xC715</span>
+    <span class="n">PreviewApplicationName</span> <span class="o">=</span> <span class="mh">0xC716</span>
+    <span class="n">PreviewApplicationVersion</span> <span class="o">=</span> <span class="mh">0xC717</span>
+    <span class="n">PreviewSettingsName</span> <span class="o">=</span> <span class="mh">0xC718</span>
+    <span class="n">PreviewSettingsDigest</span> <span class="o">=</span> <span class="mh">0xC719</span>
+    <span class="n">PreviewColorSpace</span> <span class="o">=</span> <span class="mh">0xC71A</span>
+    <span class="n">PreviewDateTime</span> <span class="o">=</span> <span class="mh">0xC71B</span>
+    <span class="n">RawImageDigest</span> <span class="o">=</span> <span class="mh">0xC71C</span>
+    <span class="n">OriginalRawFileDigest</span> <span class="o">=</span> <span class="mh">0xC71D</span>
+    <span class="n">SubTileBlockSize</span> <span class="o">=</span> <span class="mh">0xC71E</span>
+    <span class="n">RowInterleaveFactor</span> <span class="o">=</span> <span class="mh">0xC71F</span>
+    <span class="n">ProfileLookTableDims</span> <span class="o">=</span> <span class="mh">0xC725</span>
+    <span class="n">ProfileLookTableData</span> <span class="o">=</span> <span class="mh">0xC726</span>
+    <span class="n">OpcodeList1</span> <span class="o">=</span> <span class="mh">0xC740</span>
+    <span class="n">OpcodeList2</span> <span class="o">=</span> <span class="mh">0xC741</span>
+    <span class="n">OpcodeList3</span> <span class="o">=</span> <span class="mh">0xC74E</span>
+    <span class="n">NoiseProfile</span> <span class="o">=</span> <span class="mh">0xC761</span>
+    <span class="n">FrameRate</span> <span class="o">=</span> <span class="mh">0xC764</span></div>
+
+
+
+<span class="sd">&quot;&quot;&quot;Maps EXIF tags to tag names.&quot;&quot;&quot;</span>
+<span class="n">TAGS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="o">**</span><span class="p">{</span><span class="n">i</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">i</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">Base</span><span class="p">},</span>
+    <span class="mh">0x920C</span><span class="p">:</span> <span class="s2">&quot;SpatialFrequencyResponse&quot;</span><span class="p">,</span>
+    <span class="mh">0x9214</span><span class="p">:</span> <span class="s2">&quot;SubjectLocation&quot;</span><span class="p">,</span>
+    <span class="mh">0x9215</span><span class="p">:</span> <span class="s2">&quot;ExposureIndex&quot;</span><span class="p">,</span>
+    <span class="mh">0x828E</span><span class="p">:</span> <span class="s2">&quot;CFAPattern&quot;</span><span class="p">,</span>
+    <span class="mh">0x920B</span><span class="p">:</span> <span class="s2">&quot;FlashEnergy&quot;</span><span class="p">,</span>
+    <span class="mh">0x9216</span><span class="p">:</span> <span class="s2">&quot;TIFF/EPStandardID&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="GPS">
+<a class="viewcode-back" href="../../reference/ExifTags.html#PIL.ExifTags.GPS">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GPS</span><span class="p">(</span><span class="n">IntEnum</span><span class="p">):</span>
+    <span class="n">GPSVersionID</span> <span class="o">=</span> <span class="mh">0x00</span>
+    <span class="n">GPSLatitudeRef</span> <span class="o">=</span> <span class="mh">0x01</span>
+    <span class="n">GPSLatitude</span> <span class="o">=</span> <span class="mh">0x02</span>
+    <span class="n">GPSLongitudeRef</span> <span class="o">=</span> <span class="mh">0x03</span>
+    <span class="n">GPSLongitude</span> <span class="o">=</span> <span class="mh">0x04</span>
+    <span class="n">GPSAltitudeRef</span> <span class="o">=</span> <span class="mh">0x05</span>
+    <span class="n">GPSAltitude</span> <span class="o">=</span> <span class="mh">0x06</span>
+    <span class="n">GPSTimeStamp</span> <span class="o">=</span> <span class="mh">0x07</span>
+    <span class="n">GPSSatellites</span> <span class="o">=</span> <span class="mh">0x08</span>
+    <span class="n">GPSStatus</span> <span class="o">=</span> <span class="mh">0x09</span>
+    <span class="n">GPSMeasureMode</span> <span class="o">=</span> <span class="mh">0x0A</span>
+    <span class="n">GPSDOP</span> <span class="o">=</span> <span class="mh">0x0B</span>
+    <span class="n">GPSSpeedRef</span> <span class="o">=</span> <span class="mh">0x0C</span>
+    <span class="n">GPSSpeed</span> <span class="o">=</span> <span class="mh">0x0D</span>
+    <span class="n">GPSTrackRef</span> <span class="o">=</span> <span class="mh">0x0E</span>
+    <span class="n">GPSTrack</span> <span class="o">=</span> <span class="mh">0x0F</span>
+    <span class="n">GPSImgDirectionRef</span> <span class="o">=</span> <span class="mh">0x10</span>
+    <span class="n">GPSImgDirection</span> <span class="o">=</span> <span class="mh">0x11</span>
+    <span class="n">GPSMapDatum</span> <span class="o">=</span> <span class="mh">0x12</span>
+    <span class="n">GPSDestLatitudeRef</span> <span class="o">=</span> <span class="mh">0x13</span>
+    <span class="n">GPSDestLatitude</span> <span class="o">=</span> <span class="mh">0x14</span>
+    <span class="n">GPSDestLongitudeRef</span> <span class="o">=</span> <span class="mh">0x15</span>
+    <span class="n">GPSDestLongitude</span> <span class="o">=</span> <span class="mh">0x16</span>
+    <span class="n">GPSDestBearingRef</span> <span class="o">=</span> <span class="mh">0x17</span>
+    <span class="n">GPSDestBearing</span> <span class="o">=</span> <span class="mh">0x18</span>
+    <span class="n">GPSDestDistanceRef</span> <span class="o">=</span> <span class="mh">0x19</span>
+    <span class="n">GPSDestDistance</span> <span class="o">=</span> <span class="mh">0x1A</span>
+    <span class="n">GPSProcessingMethod</span> <span class="o">=</span> <span class="mh">0x1B</span>
+    <span class="n">GPSAreaInformation</span> <span class="o">=</span> <span class="mh">0x1C</span>
+    <span class="n">GPSDateStamp</span> <span class="o">=</span> <span class="mh">0x1D</span>
+    <span class="n">GPSDifferential</span> <span class="o">=</span> <span class="mh">0x1E</span>
+    <span class="n">GPSHPositioningError</span> <span class="o">=</span> <span class="mh">0x1F</span></div>
+
+
+
+<span class="sd">&quot;&quot;&quot;Maps EXIF GPS tags to tag names.&quot;&quot;&quot;</span>
+<span class="n">GPSTAGS</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="o">.</span><span class="n">value</span><span class="p">:</span> <span class="n">i</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">GPS</span><span class="p">}</span>
+
+
+<div class="viewcode-block" id="Interop">
+<a class="viewcode-back" href="../../reference/ExifTags.html#PIL.ExifTags.Interop">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Interop</span><span class="p">(</span><span class="n">IntEnum</span><span class="p">):</span>
+    <span class="n">InteropIndex</span> <span class="o">=</span> <span class="mh">0x0001</span>
+    <span class="n">InteropVersion</span> <span class="o">=</span> <span class="mh">0x0002</span>
+    <span class="n">RelatedImageFileFormat</span> <span class="o">=</span> <span class="mh">0x1000</span>
+    <span class="n">RelatedImageWidth</span> <span class="o">=</span> <span class="mh">0x1001</span>
+    <span class="n">RelatedImageHeight</span> <span class="o">=</span> <span class="mh">0x1002</span></div>
+
+
+
+<div class="viewcode-block" id="IFD">
+<a class="viewcode-back" href="../../reference/ExifTags.html#PIL.ExifTags.IFD">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">IFD</span><span class="p">(</span><span class="n">IntEnum</span><span class="p">):</span>
+    <span class="n">Exif</span> <span class="o">=</span> <span class="mh">0x8769</span>
+    <span class="n">GPSInfo</span> <span class="o">=</span> <span class="mh">0x8825</span>
+    <span class="n">MakerNote</span> <span class="o">=</span> <span class="mh">0x927C</span>
+    <span class="n">Interop</span> <span class="o">=</span> <span class="mh">0xA005</span>
+    <span class="n">IFD1</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span></div>
+
+
+
+<div class="viewcode-block" id="LightSource">
+<a class="viewcode-back" href="../../reference/ExifTags.html#PIL.ExifTags.LightSource">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LightSource</span><span class="p">(</span><span class="n">IntEnum</span><span class="p">):</span>
+    <span class="n">Unknown</span> <span class="o">=</span> <span class="mh">0x00</span>
+    <span class="n">Daylight</span> <span class="o">=</span> <span class="mh">0x01</span>
+    <span class="n">Fluorescent</span> <span class="o">=</span> <span class="mh">0x02</span>
+    <span class="n">Tungsten</span> <span class="o">=</span> <span class="mh">0x03</span>
+    <span class="n">Flash</span> <span class="o">=</span> <span class="mh">0x04</span>
+    <span class="n">Fine</span> <span class="o">=</span> <span class="mh">0x09</span>
+    <span class="n">Cloudy</span> <span class="o">=</span> <span class="mh">0x0A</span>
+    <span class="n">Shade</span> <span class="o">=</span> <span class="mh">0x0B</span>
+    <span class="n">DaylightFluorescent</span> <span class="o">=</span> <span class="mh">0x0C</span>
+    <span class="n">DayWhiteFluorescent</span> <span class="o">=</span> <span class="mh">0x0D</span>
+    <span class="n">CoolWhiteFluorescent</span> <span class="o">=</span> <span class="mh">0x0E</span>
+    <span class="n">WhiteFluorescent</span> <span class="o">=</span> <span class="mh">0x0F</span>
+    <span class="n">StandardLightA</span> <span class="o">=</span> <span class="mh">0x11</span>
+    <span class="n">StandardLightB</span> <span class="o">=</span> <span class="mh">0x12</span>
+    <span class="n">StandardLightC</span> <span class="o">=</span> <span class="mh">0x13</span>
+    <span class="n">D55</span> <span class="o">=</span> <span class="mh">0x14</span>
+    <span class="n">D65</span> <span class="o">=</span> <span class="mh">0x15</span>
+    <span class="n">D75</span> <span class="o">=</span> <span class="mh">0x16</span>
+    <span class="n">D50</span> <span class="o">=</span> <span class="mh">0x17</span>
+    <span class="n">ISO</span> <span class="o">=</span> <span class="mh">0x18</span>
+    <span class="n">Other</span> <span class="o">=</span> <span class="mh">0xFF</span></div>
+
+</pre></div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          
+          
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 1995-2011 Fredrik Lundh and contributors (PIL), 2010 Jeffrey &#39;Alex&#39; Clark and contributors (Pillow), Alexander Karpinsky and contributors (Pillow-SIMD), 2026 Matteo Ferrabone and contributors (Pillow-AllSIMD)
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer no-toc">
+      
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=457d1205"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/tabs.js?v=3ee01567"></script>
+    <script src="../../_static/js/activate_tab.js?v=f8fe9d20"></script>
+    </body>
+</html>

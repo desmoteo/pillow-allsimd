@@ -1,0 +1,934 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="C extension debugging on Linux, with GDB/Valgrind" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://desmoteo.github.io/pillow-allsimd/reference/c_extension_debugging.html" />
+<meta property="og:site_name" content="Pillow-AllSIMD" />
+<meta property="og:description" content="Install the tools: You need some basics in addition to the basic tools to build pillow. These are what’s required on Ubuntu, YMMV for other distributions. python3-dbg package for the gdb extensions..." />
+<meta name="description" content="Install the tools: You need some basics in addition to the basic tools to build pillow. These are what’s required on Ubuntu, YMMV for other distributions. python3-dbg package for the gdb extensions..." />
+<link rel="author" title="About these documents" href="../about.html"><link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="Arrow support" href="arrow_support.html"><link rel="prev" title="Internal modules" href="internal_modules.html">
+
+    <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
+        <title>C extension debugging on Linux, with GDB/Valgrind - Pillow-AllSIMD 13.0.0.post0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/dark.css?v=1a645143" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     Pillow-AllSIMD: Pillow with SIMD kernels for x86 and arm64, a fork of <a href="https://github.com/uploadcare/pillow-simd">Pillow-SIMD</a> and <a href="https://github.com/python-pillow/Pillow">Pillow</a>, whose documentation this is, with Pillow-AllSIMD's additions. Pillow's own: <a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../allsimd.html">About Pillow-AllSIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../installation/index.html">Installation</a><input aria-label="Toggle navigation of Installation" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation/basic-installation.html">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/python-support.html">Python support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/platform-support.html">Platform support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/building-from-source.html">Building from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/building-from-source.html#old-versions">Old versions</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../handbook/index.html">Handbook</a><input aria-label="Toggle navigation of Handbook" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/tutorial.html">Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/concepts.html">Concepts</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../handbook/appendices.html">Appendices</a><input aria-label="Toggle navigation of Appendices" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/image-file-formats.html">Image file formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/text-anchors.html">Text anchors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/third-party-plugins.html">Third-party plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html">Writing your own image plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#decoders">Decoders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-c">Writing your own file codec in C</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-python">Writing your own file codec in Python</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/security.html">Security</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Reference</a><input aria-label="Toggle navigation of Reference" checked="" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="Image.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Image</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageChops.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageChops</span></code> (“channel operations”) module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageCms.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageCms</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageColor.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageColor</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageEnhance.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageEnhance</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageFile.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFile</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageFilter.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageFont.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageGrab.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageGrab</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageMath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageMorph.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMorph</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageOps.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageOps</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImagePalette.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePalette</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImagePath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageQt.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageQt</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageSequence.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageSequence</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageShow.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageShow</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageStat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageStat</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageText.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageText</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageTk.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTk</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageTransform.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTransform</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ImageWin.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageWin</span></code> module (Windows-only)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ExifTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ExifTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="TiffTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">TiffTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="JpegPresets.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">JpegPresets</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="PSDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PSDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="PixelAccess.html"><code class="xref py py-class docutils literal notranslate"><span class="pre">PixelAccess</span></code> class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">features</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fast_mode.html">Fast mode (Pillow-AllSIMD)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../PIL.html">PIL package (autodoc of remaining modules)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugin reference</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="internal_design.html">Internal reference</a><input aria-label="Toggle navigation of Internal reference" checked="" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="open_files.html">File handling in Pillow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="limits.html">Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="block_allocator.html">Block allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="internal_modules.html">Internal modules</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">C extension debugging on Linux, with GDB/Valgrind</a></li>
+<li class="toctree-l3"><a class="reference internal" href="arrow_support.html">Arrow support</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../porting.html">Porting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../allsimd-changelog.html">Changelog (Pillow-AllSIMD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../allsimd-changelog.html#pillow-simd">Pillow-SIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../releasenotes/index.html">Release notes</a><input aria-label="Toggle navigation of Release notes" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/versioning.html">Versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/13.0.0.html">13.0.0 (2026-10-16)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.3.0.html">12.3.0 (2026-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.2.0.html">12.2.0 (2026-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.1.1.html">12.1.1 (2026-02-11)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.1.0.html">12.1.0 (2026-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/12.0.0.html">12.0.0 (2025-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.3.0.html">11.3.0 (2025-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.2.1.html">11.2.1 (2025-04-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.1.0.html">11.1.0 (2025-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/11.0.0.html">11.0.0 (2024-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.4.0.html">10.4.0 (2024-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.3.0.html">10.3.0 (2024-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.2.0.html">10.2.0 (2024-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.1.0.html">10.1.0 (2023-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.0.1.html">10.0.1 (2023-09-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/10.0.0.html">10.0.0 (2023-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.5.0.html">9.5.0 (2023-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.4.0.html">9.4.0 (2023-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.3.0.html">9.3.0 (2022-10-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.2.0.html">9.2.0 (2022-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.1.1.html">9.1.1 (2022-05-17)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.1.0.html">9.1.0 (2022-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.0.1.html">9.0.1 (2022-02-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/9.0.0.html">9.0.0 (2022-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.4.0.html">8.4.0 (2021-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.3.2.html">8.3.2 (2021-09-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.3.1.html">8.3.1 (2021-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.3.0.html">8.3.0 (2021-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.2.0.html">8.2.0 (2021-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.1.2.html">8.1.2 (2021-03-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.1.1.html">8.1.1 (2021-03-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.1.0.html">8.1.0 (2021-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.0.1.html">8.0.1 (2020-10-22)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/8.0.0.html">8.0.0 (2020-10-14)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.2.0.html">7.2.0 (2020-06-30)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.1.2.html">7.1.2 (2020-04-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.1.1.html">7.1.1 (2020-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.1.0.html">7.1.0 (2020-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/7.0.0.html">7.0.0 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.2.2.html">6.2.2 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.2.1.html">6.2.1 (2019-10-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.2.0.html">6.2.0 (2019-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.1.0.html">6.1.0 (2019-07-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/6.0.0.html">6.0.0 (2019-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.4.1.html">5.4.1 (2019-01-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.4.0.html">5.4.0 (2019-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.3.0.html">5.3.0 (2018-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.2.0.html">5.2.0 (2018-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.1.0.html">5.1.0 (2018-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/5.0.0.html">5.0.0 (2018-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.3.0.html">4.3.0 (2017-10-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.2.1.html">4.2.1 (2017-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.2.0.html">4.2.0 (2017-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.1.1.html">4.1.1 (2017-04-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.1.0.html">4.1.0 (2017-04-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/4.0.0.html">4.0.0 (2017-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.4.0.html">3.4.0 (2016-10-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.3.2.html">3.3.2 (2016-09-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.3.0.html">3.3.0 (2016-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.2.0.html">3.2.0 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.1.2.html">3.1.2 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.1.1.html">3.1.1 (2016-02-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.1.0.html">3.1.0 (2016-01-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/3.0.0.html">3.0.0 (2015-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.8.0.html">2.8.0 (2015-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.7.0.html">2.7.0 (2014-12-31)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.6.0.html">2.6.0 (2014-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.5.2.html">2.5.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.3.2.html">2.3.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../releasenotes/2.3.1.html">2.3.1 (2014-03-14)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../deprecations.html">Deprecations and removals</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/reference/c_extension_debugging.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="c-extension-debugging-on-linux-with-gdb-valgrind">
+<h1>C extension debugging on Linux, with GDB/Valgrind<a class="headerlink" href="#c-extension-debugging-on-linux-with-gdb-valgrind" title="Link to this heading">¶</a></h1>
+<section id="install-the-tools">
+<h2>Install the tools<a class="headerlink" href="#install-the-tools" title="Link to this heading">¶</a></h2>
+<p>You need some basics in addition to the basic tools to build
+pillow. These are what’s required on Ubuntu, YMMV for other
+distributions.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">python3-dbg</span></code> package for the gdb extensions and python symbols</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gdb</span></code> and <code class="docutils literal notranslate"><span class="pre">valgrind</span></code></p></li>
+<li><p>Potentially debug symbols for libraries. On Ubuntu you can follow those
+instructions to install the corresponding packages: <a class="reference external" href="https://wiki.ubuntu.com/Debug%20Symbol%20Packages#Getting_-dbgsym.ddeb_packages">Debug Symbol Packages</a></p></li>
+</ul>
+<p>Then <code class="docutils literal notranslate"><span class="pre">sudo</span> <span class="pre">apt-get</span> <span class="pre">install</span> <span class="pre">libtiff5-dbgsym</span></code></p>
+<ul class="simple">
+<li><p>There’s a bug with the <code class="docutils literal notranslate"><span class="pre">python3-dbg</span></code> package for at least Python 3.8 on
+Ubuntu 20.04, and you need to add a new link or two to make it autoload when
+running Python:</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">cd</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">share</span><span class="o">/</span><span class="n">gdb</span><span class="o">/</span><span class="n">auto</span><span class="o">-</span><span class="n">load</span><span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="nb">bin</span>
+<span class="n">ln</span> <span class="o">-</span><span class="n">s</span> <span class="n">python3</span><span class="mf">.8</span><span class="n">m</span><span class="o">-</span><span class="n">gdb</span><span class="o">.</span><span class="n">py</span> <span class="n">python3</span><span class="mf">.8</span><span class="n">d</span><span class="o">-</span><span class="n">gdb</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>In Ubuntu 18.04, it’s actually including the path to the virtualenv
+in the search for the <code class="docutils literal notranslate"><span class="pre">python3.*-gdb.py</span></code> file, but you can
+helpfully put in the same directory as the binary.</p></li>
+<li><p>I also find that history is really useful for gdb, so I added this to
+my <code class="docutils literal notranslate"><span class="pre">~/.gdbinit</span></code> file:</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nb">set</span> <span class="n">history</span> <span class="n">filename</span> <span class="o">~/.</span><span class="n">gdb_history</span>
+<span class="nb">set</span> <span class="n">history</span> <span class="n">save</span> <span class="n">on</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>If the python stack isn’t working in gdb, then
+<code class="docutils literal notranslate"><span class="pre">set</span> <span class="pre">debug</span> <span class="pre">auto-load</span></code> can also be helpful in <code class="docutils literal notranslate"><span class="pre">.gdbinit</span></code>.</p></li>
+<li><p>Make a virtualenv with the debug python and activate it, then install
+whatever dependencies are required and build. You want to build with
+the debug python so you get symbols for your extension.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">virtualenv</span> <span class="o">-</span><span class="n">p</span> <span class="n">python3</span><span class="mf">.8</span><span class="o">-</span><span class="n">dbg</span> <span class="o">~/</span><span class="n">vpy38</span><span class="o">-</span><span class="n">dbg</span>
+<span class="n">source</span> <span class="o">~/</span><span class="n">vpy38</span><span class="o">-</span><span class="n">dbg</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">activate</span>
+<span class="n">cd</span> <span class="o">~/</span><span class="n">Pillow</span> <span class="o">&amp;&amp;</span> <span class="n">make</span> <span class="n">install</span>
+</pre></div>
+</div>
+</section>
+<section id="test-case">
+<h2>Test case<a class="headerlink" href="#test-case" title="Link to this heading">¶</a></h2>
+<p>Take your test image, and make a really simple harness.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span>
+
+<span class="k">with</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">as</span> <span class="n">im</span><span class="p">:</span>
+    <span class="n">im</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Run this through valgrind, but note that python triggers some issues
+on its own, so you’re looking for items within the Pillow hierarchy
+that don’t look like they’re solely in the python call chain. In this
+example, the ones we’re interested in are after the warnings, and have
+<code class="docutils literal notranslate"><span class="pre">decode.c</span></code> and <code class="docutils literal notranslate"><span class="pre">TiffDecode.c</span></code> in the call stack:</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(vpy38-dbg) ubuntu@primary:~/Home/tests$ valgrind python test_tiff.py
+==51890== Memcheck, a memory error detector
+==51890== Copyright (C) 2002-2017, and GNU GPL&#39;d, by Julian Seward et al.
+==51890== Using Valgrind-3.15.0 and LibVEX; rerun with -h for copyright info
+==51890== Command: python test_tiff.py
+==51890==
+==51890== Invalid read of size 4
+==51890==    at 0x472E3D: address_in_range (obmalloc.c:1401)
+==51890==    by 0x472EEA: pymalloc_free (obmalloc.c:1677)
+==51890==    by 0x474960: _PyObject_Free (obmalloc.c:1896)
+==51890==    by 0x473BAC: _PyMem_DebugRawFree (obmalloc.c:2187)
+==51890==    by 0x473BD4: _PyMem_DebugFree (obmalloc.c:2318)
+==51890==    by 0x474C08: PyObject_Free (obmalloc.c:709)
+==51890==    by 0x45DD60: dictresize (dictobject.c:1259)
+==51890==    by 0x45DD76: insertion_resize (dictobject.c:1019)
+==51890==    by 0x464F30: PyDict_SetDefault (dictobject.c:2924)
+==51890==    by 0x4D03BE: PyUnicode_InternInPlace (unicodeobject.c:15289)
+==51890==    by 0x4D0700: PyUnicode_InternFromString (unicodeobject.c:15322)
+==51890==    by 0x64D2FC: descr_new (descrobject.c:857)
+==51890==  Address 0x4c1b020 is 384 bytes inside a block of size 1,160 free&#39;d
+==51890==    at 0x483CA3F: free (in /usr/lib/x86_64-linux-gnu/valgrind/vgpreload_memcheck-amd64-linux.so)
+==51890==    by 0x4735D3: _PyMem_RawFree (obmalloc.c:127)
+==51890==    by 0x473BAC: _PyMem_DebugRawFree (obmalloc.c:2187)
+==51890==    by 0x474941: PyMem_RawFree (obmalloc.c:595)
+==51890==    by 0x47496E: _PyObject_Free (obmalloc.c:1898)
+==51890==    by 0x473BAC: _PyMem_DebugRawFree (obmalloc.c:2187)
+==51890==    by 0x473BD4: _PyMem_DebugFree (obmalloc.c:2318)
+==51890==    by 0x474C08: PyObject_Free (obmalloc.c:709)
+==51890==    by 0x45DD60: dictresize (dictobject.c:1259)
+==51890==    by 0x45DD76: insertion_resize (dictobject.c:1019)
+==51890==    by 0x464F30: PyDict_SetDefault (dictobject.c:2924)
+==51890==    by 0x4D03BE: PyUnicode_InternInPlace (unicodeobject.c:15289)
+==51890==  Block was alloc&#39;d at
+==51890==    at 0x483B7F3: malloc (in /usr/lib/x86_64-linux-gnu/valgrind/vgpreload_memcheck-amd64-linux.so)
+==51890==    by 0x473646: _PyMem_RawMalloc (obmalloc.c:99)
+==51890==    by 0x473529: _PyMem_DebugRawAlloc (obmalloc.c:2120)
+==51890==    by 0x473565: _PyMem_DebugRawMalloc (obmalloc.c:2153)
+==51890==    by 0x4748B1: PyMem_RawMalloc (obmalloc.c:572)
+==51890==    by 0x475909: _PyObject_Malloc (obmalloc.c:1628)
+==51890==    by 0x473529: _PyMem_DebugRawAlloc (obmalloc.c:2120)
+==51890==    by 0x473565: _PyMem_DebugRawMalloc (obmalloc.c:2153)
+==51890==    by 0x4736B0: _PyMem_DebugMalloc (obmalloc.c:2303)
+==51890==    by 0x474B78: PyObject_Malloc (obmalloc.c:685)
+==51890==    by 0x45C435: new_keys_object (dictobject.c:558)
+==51890==    by 0x45DA95: dictresize (dictobject.c:1202)
+==51890==
+==51890== Invalid read of size 4
+==51890==    at 0x472E3D: address_in_range (obmalloc.c:1401)
+==51890==    by 0x47594A: pymalloc_realloc (obmalloc.c:1929)
+==51890==    by 0x475A02: _PyObject_Realloc (obmalloc.c:1982)
+==51890==    by 0x473DCA: _PyMem_DebugRawRealloc (obmalloc.c:2240)
+==51890==    by 0x473FF8: _PyMem_DebugRealloc (obmalloc.c:2326)
+==51890==    by 0x4749FB: PyMem_Realloc (obmalloc.c:623)
+==51890==    by 0x44A6FC: list_resize (listobject.c:70)
+==51890==    by 0x44A872: app1 (listobject.c:340)
+==51890==    by 0x44FD65: PyList_Append (listobject.c:352)
+==51890==    by 0x514315: r_ref (marshal.c:945)
+==51890==    by 0x516034: r_object (marshal.c:1139)
+==51890==    by 0x516C70: r_object (marshal.c:1389)
+==51890==  Address 0x4c41020 is 32 bytes before a block of size 1,600 in arena &quot;client&quot;
+==51890==
+==51890== Conditional jump or move depends on uninitialised value(s)
+==51890==    at 0x472E46: address_in_range (obmalloc.c:1403)
+==51890==    by 0x47594A: pymalloc_realloc (obmalloc.c:1929)
+==51890==    by 0x475A02: _PyObject_Realloc (obmalloc.c:1982)
+==51890==    by 0x473DCA: _PyMem_DebugRawRealloc (obmalloc.c:2240)
+==51890==    by 0x473FF8: _PyMem_DebugRealloc (obmalloc.c:2326)
+==51890==    by 0x4749FB: PyMem_Realloc (obmalloc.c:623)
+==51890==    by 0x44A6FC: list_resize (listobject.c:70)
+==51890==    by 0x44A872: app1 (listobject.c:340)
+==51890==    by 0x44FD65: PyList_Append (listobject.c:352)
+==51890==    by 0x5E3321: _posix_listdir (posixmodule.c:3823)
+==51890==    by 0x5E33A8: os_listdir_impl (posixmodule.c:3879)
+==51890==    by 0x5E4D77: os_listdir (posixmodule.c.h:1197)
+==51890==
+==51890== Use of uninitialised value of size 8
+==51890==    at 0x472E59: address_in_range (obmalloc.c:1403)
+==51890==    by 0x47594A: pymalloc_realloc (obmalloc.c:1929)
+==51890==    by 0x475A02: _PyObject_Realloc (obmalloc.c:1982)
+==51890==    by 0x473DCA: _PyMem_DebugRawRealloc (obmalloc.c:2240)
+==51890==    by 0x473FF8: _PyMem_DebugRealloc (obmalloc.c:2326)
+==51890==    by 0x4749FB: PyMem_Realloc (obmalloc.c:623)
+==51890==    by 0x44A6FC: list_resize (listobject.c:70)
+==51890==    by 0x44A872: app1 (listobject.c:340)
+==51890==    by 0x44FD65: PyList_Append (listobject.c:352)
+==51890==    by 0x5E3321: _posix_listdir (posixmodule.c:3823)
+==51890==    by 0x5E33A8: os_listdir_impl (posixmodule.c:3879)
+==51890==    by 0x5E4D77: os_listdir (posixmodule.c.h:1197)
+==51890==
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 16908288 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 67895296 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 1572864 bytes but only got 0. Skipping tag 42
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 116647 bytes but only got 4867. Skipping tag 42738
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 3468830728 bytes but only got 4851. Skipping tag 279
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 2198732800 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 67239937 bytes but only got 4125. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 33947764 bytes but only got 0. Skipping tag 139
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 17170432 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 80478208 bytes but only got 0. Skipping tag 1
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 787460 bytes but only got 4882. Skipping tag 20
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 1075 bytes but only got 0. Skipping tag 256
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 120586240 bytes but only got 0. Skipping tag 194
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 65536 bytes but only got 0. Skipping tag 3
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 198656 bytes but only got 0. Skipping tag 279
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 206848 bytes but only got 0. Skipping tag 64512
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 130968 bytes but only got 4882. Skipping tag 256
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 77848 bytes but only got 4689. Skipping tag 64270
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 262156 bytes but only got 0. Skipping tag 257
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 33624064 bytes but only got 0. Skipping tag 49152
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 67178752 bytes but only got 4627. Skipping tag 50688
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 33632768 bytes but only got 0. Skipping tag 56320
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 134386688 bytes but only got 4115. Skipping tag 2048
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 33912832 bytes but only got 0. Skipping tag 7168
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 151966208 bytes but only got 4627. Skipping tag 10240
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 119032832 bytes but only got 3859. Skipping tag 256
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 46535680 bytes but only got 0. Skipping tag 256
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 35651584 bytes but only got 0. Skipping tag 42
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 524288 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+_TIFFVSetField: tempfile.tif: Null count for &quot;Tag 769&quot; (type 1, writecount -3, passcount 1).
+_TIFFVSetField: tempfile.tif: Null count for &quot;Tag 42754&quot; (type 1, writecount -3, passcount 1).
+_TIFFVSetField: tempfile.tif: Null count for &quot;Tag 769&quot; (type 1, writecount -3, passcount 1).
+_TIFFVSetField: tempfile.tif: Null count for &quot;Tag 42754&quot; (type 1, writecount -3, passcount 1).
+ZIPDecode: Decoding error at scanline 0, incorrect header check.
+==51890== Invalid write of size 4
+==51890==    at 0x61C39E6: putcontig8bitYCbCr22tile (tif_getimage.c:2146)
+==51890==    by 0x61C5865: gtStripContig (tif_getimage.c:977)
+==51890==    by 0x6094317: ReadStrip (TiffDecode.c:269)
+==51890==    by 0x6094749: ImagingLibTiffDecode (TiffDecode.c:479)
+==51890==    by 0x60615D1: _decode (decode.c:136)
+==51890==    by 0x64BF47: method_vectorcall_VARARGS (descrobject.c:300)
+==51890==    by 0x4EB73C: _PyObject_Vectorcall (abstract.h:127)
+==51890==    by 0x4EB73C: call_function (ceval.c:4963)
+==51890==    by 0x4EB73C: _PyEval_EvalFrameDefault (ceval.c:3486)
+==51890==    by 0x4DF2EE: PyEval_EvalFrameEx (ceval.c:741)
+==51890==    by 0x43627B: function_code_fastcall (call.c:283)
+==51890==    by 0x436D21: _PyFunction_Vectorcall (call.c:410)
+==51890==    by 0x4EB73C: _PyObject_Vectorcall (abstract.h:127)
+==51890==    by 0x4EB73C: call_function (ceval.c:4963)
+==51890==    by 0x4EB73C: _PyEval_EvalFrameDefault (ceval.c:3486)
+==51890==    by 0x4DF2EE: PyEval_EvalFrameEx (ceval.c:741)
+==51890==  Address 0x6f456d4 is 0 bytes after a block of size 68 alloc&#39;d
+==51890==    at 0x483DFAF: realloc (in /usr/lib/x86_64-linux-gnu/valgrind/vgpreload_memcheck-amd64-linux.so)
+==51890==    by 0x60946D0: ImagingLibTiffDecode (TiffDecode.c:469)
+==51890==    by 0x60615D1: _decode (decode.c:136)
+==51890==    by 0x64BF47: method_vectorcall_VARARGS (descrobject.c:300)
+==51890==    by 0x4EB73C: _PyObject_Vectorcall (abstract.h:127)
+==51890==    by 0x4EB73C: call_function (ceval.c:4963)
+==51890==    by 0x4EB73C: _PyEval_EvalFrameDefault (ceval.c:3486)
+==51890==    by 0x4DF2EE: PyEval_EvalFrameEx (ceval.c:741)
+==51890==    by 0x43627B: function_code_fastcall (call.c:283)
+==51890==    by 0x436D21: _PyFunction_Vectorcall (call.c:410)
+==51890==    by 0x4EB73C: _PyObject_Vectorcall (abstract.h:127)
+==51890==    by 0x4EB73C: call_function (ceval.c:4963)
+==51890==    by 0x4EB73C: _PyEval_EvalFrameDefault (ceval.c:3486)
+==51890==    by 0x4DF2EE: PyEval_EvalFrameEx (ceval.c:741)
+==51890==    by 0x4DFDFB: _PyEval_EvalCodeWithName (ceval.c:4298)
+==51890==    by 0x436C40: _PyFunction_Vectorcall (call.c:435)
+==51890==
+==51890== Invalid write of size 4
+==51890==    at 0x61C39B5: putcontig8bitYCbCr22tile (tif_getimage.c:2145)
+==51890==    by 0x61C5865: gtStripContig (tif_getimage.c:977)
+==51890==    by 0x6094317: ReadStrip (TiffDecode.c:269)
+==51890==    by 0x6094749: ImagingLibTiffDecode (TiffDecode.c:479)
+==51890==    by 0x60615D1: _decode (decode.c:136)
+==51890==    by 0x64BF47: method_vectorcall_VARARGS (descrobject.c:300)
+==51890==    by 0x4EB73C: _PyObject_Vectorcall (abstract.h:127)
+==51890==    by 0x4EB73C: call_function (ceval.c:4963)
+==51890==    by 0x4EB73C: _PyEval_EvalFrameDefault (ceval.c:3486)
+==51890==    by 0x4DF2EE: PyEval_EvalFrameEx (ceval.c:741)
+==51890==    by 0x43627B: function_code_fastcall (call.c:283)
+==51890==    by 0x436D21: _PyFunction_Vectorcall (call.c:410)
+==51890==    by 0x4EB73C: _PyObject_Vectorcall (abstract.h:127)
+==51890==    by 0x4EB73C: call_function (ceval.c:4963)
+==51890==    by 0x4EB73C: _PyEval_EvalFrameDefault (ceval.c:3486)
+==51890==    by 0x4DF2EE: PyEval_EvalFrameEx (ceval.c:741)
+==51890==  Address 0x6f456d8 is 4 bytes after a block of size 68 alloc&#39;d
+==51890==    at 0x483DFAF: realloc (in /usr/lib/x86_64-linux-gnu/valgrind/vgpreload_memcheck-amd64-linux.so)
+==51890==    by 0x60946D0: ImagingLibTiffDecode (TiffDecode.c:469)
+==51890==    by 0x60615D1: _decode (decode.c:136)
+==51890==    by 0x64BF47: method_vectorcall_VARARGS (descrobject.c:300)
+==51890==    by 0x4EB73C: _PyObject_Vectorcall (abstract.h:127)
+==51890==    by 0x4EB73C: call_function (ceval.c:4963)
+==51890==    by 0x4EB73C: _PyEval_EvalFrameDefault (ceval.c:3486)
+==51890==    by 0x4DF2EE: PyEval_EvalFrameEx (ceval.c:741)
+==51890==    by 0x43627B: function_code_fastcall (call.c:283)
+==51890==    by 0x436D21: _PyFunction_Vectorcall (call.c:410)
+==51890==    by 0x4EB73C: _PyObject_Vectorcall (abstract.h:127)
+==51890==    by 0x4EB73C: call_function (ceval.c:4963)
+==51890==    by 0x4EB73C: _PyEval_EvalFrameDefault (ceval.c:3486)
+==51890==    by 0x4DF2EE: PyEval_EvalFrameEx (ceval.c:741)
+==51890==    by 0x4DFDFB: _PyEval_EvalCodeWithName (ceval.c:4298)
+==51890==    by 0x436C40: _PyFunction_Vectorcall (call.c:435)
+==51890==
+TIFFFillStrip: Invalid strip byte count 0, strip 1.
+Traceback (most recent call last):
+  File &quot;test_tiff.py&quot;, line 8, in &lt;module&gt;
+    im.load()
+  File &quot;/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py&quot;, line 1087, in load
+    return self._load_libtiff()
+  File &quot;/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py&quot;, line 1191, in _load_libtiff
+    raise OSError(err)
+OSError: -2
+sys:1: ResourceWarning: unclosed file &lt;_io.BufferedReader name=&#39;crash-2020-10-test.tiff&#39;&gt;
+==51890==
+==51890== HEAP SUMMARY:
+==51890==     in use at exit: 748,734 bytes in 444 blocks
+==51890==   total heap usage: 6,320 allocs, 5,876 frees, 69,142,969 bytes allocated
+==51890==
+==51890== LEAK SUMMARY:
+==51890==    definitely lost: 0 bytes in 0 blocks
+==51890==    indirectly lost: 0 bytes in 0 blocks
+==51890==      possibly lost: 721,538 bytes in 372 blocks
+==51890==    still reachable: 27,196 bytes in 72 blocks
+==51890==         suppressed: 0 bytes in 0 blocks
+==51890== Rerun with --leak-check=full to see details of leaked memory
+==51890==
+==51890== Use --track-origins=yes to see where uninitialised values come from
+==51890== For lists of detected and suppressed errors, rerun with: -s
+==51890== ERROR SUMMARY: 2556 errors from 6 contexts (suppressed: 0 from 0)
+(vpy38-dbg) ubuntu@primary:~/Home/tests$
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Now that we’ve confirmed that there’s something odd/bad going on,
+it’s time to gdb.</p></li>
+<li><p>Start with <code class="docutils literal notranslate"><span class="pre">gdb</span> <span class="pre">python</span></code></p></li>
+<li><p>Set a break point starting with the valgrind stack trace.
+<code class="docutils literal notranslate"><span class="pre">b</span> <span class="pre">TiffDecode.c:269</span></code></p></li>
+<li><p>Run the script with <code class="docutils literal notranslate"><span class="pre">r</span> <span class="pre">test_tiff.py</span></code></p></li>
+<li><p>When the break point is hit, explore the state with <code class="docutils literal notranslate"><span class="pre">info</span> <span class="pre">locals</span></code>,
+<code class="docutils literal notranslate"><span class="pre">bt</span></code>, <code class="docutils literal notranslate"><span class="pre">py-bt</span></code>, or <code class="docutils literal notranslate"><span class="pre">p</span> <span class="pre">[variable]</span></code>. For pointers,
+<code class="docutils literal notranslate"><span class="pre">p</span> <span class="pre">*[variable]</span></code> is useful.</p></li>
+</ul>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>(vpy38-dbg) ubuntu@primary:~/Home/tests$ gdb python
+GNU gdb (Ubuntu 9.2-0ubuntu1~20.04) 9.2
+Copyright (C) 2020 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later &lt;https://gnu.org/licenses/gpl.html&gt;
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+Type &quot;show copying&quot; and &quot;show warranty&quot; for details.
+This GDB was configured as &quot;x86_64-linux-gnu&quot;.
+Type &quot;show configuration&quot; for configuration details.
+For bug reporting instructions, please see:
+&lt;http://www.gnu.org/software/gdb/bugs/&gt;.
+Find the GDB manual and other documentation resources online at:
+    &lt;https://www.gnu.org/software/gdb/documentation/&gt;.
+
+For help, type &quot;help&quot;.
+Type &quot;apropos word&quot; to search for commands related to &quot;word&quot;...
+Reading symbols from python...
+(gdb) b TiffDecode.c:269
+No source file named TiffDecode.c.
+Make breakpoint pending on future shared library load? (y or [n]) y
+Breakpoint 1 (TiffDecode.c:269) pending.
+(gdb) r test_tiff.py
+Starting program: /home/ubuntu/vpy38-dbg/bin/python test_tiff.py
+[Thread debugging using libthread_db enabled]
+Using host libthread_db library &quot;/lib/x86_64-linux-gnu/libthread_db.so.1&quot;.
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 16908288 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 67895296 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 1572864 bytes but only got 0. Skipping tag 42
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 116647 bytes but only got 4867. Skipping tag 42738
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 3468830728 bytes but only got 4851. Skipping tag 279
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 2198732800 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 67239937 bytes but only got 4125. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 33947764 bytes but only got 0. Skipping tag 139
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 17170432 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 80478208 bytes but only got 0. Skipping tag 1
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 787460 bytes but only got 4882. Skipping tag 20
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 1075 bytes but only got 0. Skipping tag 256
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 120586240 bytes but only got 0. Skipping tag 194
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 65536 bytes but only got 0. Skipping tag 3
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 198656 bytes but only got 0. Skipping tag 279
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 206848 bytes but only got 0. Skipping tag 64512
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 130968 bytes but only got 4882. Skipping tag 256
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 77848 bytes but only got 4689. Skipping tag 64270
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 262156 bytes but only got 0. Skipping tag 257
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 33624064 bytes but only got 0. Skipping tag 49152
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 67178752 bytes but only got 4627. Skipping tag 50688
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 33632768 bytes but only got 0. Skipping tag 56320
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 134386688 bytes but only got 4115. Skipping tag 2048
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 33912832 bytes but only got 0. Skipping tag 7168
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 151966208 bytes but only got 4627. Skipping tag 10240
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 119032832 bytes but only got 3859. Skipping tag 256
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 46535680 bytes but only got 0. Skipping tag 256
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 35651584 bytes but only got 0. Skipping tag 42
+  warnings.warn(
+/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py:770: UserWarning: Possibly corrupt EXIF data.  Expecting to read 524288 bytes but only got 0. Skipping tag 0
+  warnings.warn(
+_TIFFVSetField: tempfile.tif: Null count for &quot;Tag 769&quot; (type 1, writecount -3, passcount 1).
+_TIFFVSetField: tempfile.tif: Null count for &quot;Tag 42754&quot; (type 1, writecount -3, passcount 1).
+_TIFFVSetField: tempfile.tif: Null count for &quot;Tag 769&quot; (type 1, writecount -3, passcount 1).
+_TIFFVSetField: tempfile.tif: Null count for &quot;Tag 42754&quot; (type 1, writecount -3, passcount 1).
+
+Breakpoint 1, ReadStrip (tiff=tiff@entry=0xae9b90, row=0, buffer=0xac2eb0) at src/libImaging/TiffDecode.c:269
+269                 ok = TIFFRGBAImageGet(&amp;img, buffer, img.width, rows_to_read);
+(gdb) p img
+$1 = {tif = 0xae9b90, stoponerr = 0, isContig = 1, alpha = 0, width = 20, height = 1536, bitspersample = 8, samplesperpixel = 3,
+  orientation = 1, req_orientation = 1, photometric = 6, redcmap = 0x0, greencmap = 0x0, bluecmap = 0x0, get =
+    0x7ffff71d0710 &lt;gtStripContig&gt;, put = {any = 0x7ffff71ce550 &lt;putcontig8bitYCbCr22tile&gt;,
+    contig = 0x7ffff71ce550 &lt;putcontig8bitYCbCr22tile&gt;, separate = 0x7ffff71ce550 &lt;putcontig8bitYCbCr22tile&gt;}, Map = 0x0,
+  BWmap = 0x0, PALmap = 0x0, ycbcr = 0xaf24b0, cielab = 0x0, UaToAa = 0x0, Bitdepth16To8 = 0x0, row_offset = 0, col_offset = 0}
+(gdb) up
+#1  0x00007ffff736174a in ImagingLibTiffDecode (im=0xac1f90, state=0x7ffff76767e0, buffer=&lt;optimized out&gt;, bytes=&lt;optimized out&gt;)
+    at src/libImaging/TiffDecode.c:479
+479                 if (ReadStrip(tiff, state-&gt;y, (UINT32 *)state-&gt;buffer) == -1) {
+(gdb) p *state
+$2 = {count = 0, state = 0, errcode = 0, x = 0, y = 0, ystep = 0, xsize = 17, ysize = 108, xoff = 0, yoff = 0,
+  shuffle = 0x7ffff735f411 &lt;copy4&gt;, bits = 32, bytes = 68, buffer = 0xac2eb0 &quot;P\354\336\367\377\177&quot;, context = 0xa75440, fd = 0x0}
+(gdb) py-bt
+Traceback (most recent call first):
+  File &quot;/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py&quot;, line 1428, in _load_libtiff
+
+  File &quot;/home/ubuntu/vpy38-dbg/lib/python3.8/site-packages/Pillow-8.0.1-py3.8-linux-x86_64.egg/PIL/TiffImagePlugin.py&quot;, line 1087, in load
+    return self._load_libtiff()
+  File &quot;test_tiff.py&quot;, line 8, in &lt;module&gt;
+    im.load()
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Poke around till you understand what’s going on. In this case,
+state-&gt;xsize and img.width are different, which led to an out of
+bounds write, as the receiving buffer was sized for the smaller of
+the two.</p></li>
+</ul>
+</section>
+<section id="caveats">
+<h2>Caveats<a class="headerlink" href="#caveats" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>If your program is running/hung in a docker container and your host
+has the appropriate tools, you can run gdb as the superuser in the
+host and you may be able to get a trace of where the process is hung.
+You probably won’t have the capability to do that from within the
+docker container, as the trace capacity isn’t allowed by default.</p></li>
+<li><p>Variations of this are possible on macOS/Windows, but the details are
+going to be different.</p></li>
+<li><p>IIRC, Fedora has the gdb bits working by default. Ubuntu has always
+been a bit of a battle to make it work.</p></li>
+</ul>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="arrow_support.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Arrow support</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="internal_modules.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Internal modules</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 1995-2011 Fredrik Lundh and contributors (PIL), 2010 Jeffrey &#39;Alex&#39; Clark and contributors (Pillow), Alexander Karpinsky and contributors (Pillow-SIMD), 2026 Matteo Ferrabone and contributors (Pillow-AllSIMD)
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">C extension debugging on Linux, with GDB/Valgrind</a><ul>
+<li><a class="reference internal" href="#install-the-tools">Install the tools</a></li>
+<li><a class="reference internal" href="#test-case">Test case</a></li>
+<li><a class="reference internal" href="#caveats">Caveats</a></li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=457d1205"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/tabs.js?v=3ee01567"></script>
+    <script src="../_static/js/activate_tab.js?v=f8fe9d20"></script>
+    </body>
+</html>

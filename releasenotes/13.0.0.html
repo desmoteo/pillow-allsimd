@@ -1,0 +1,922 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta property="og:title" content="13.0.0 (2026-10-16)" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://desmoteo.github.io/pillow-allsimd/releasenotes/13.0.0.html" />
+<meta property="og:site_name" content="Pillow-AllSIMD" />
+<meta property="og:description" content="Security: CVE identifiers will be added to these entries as they are assigned. Critical: CVE 2026-96639, GHSA-v9pv-5gc8-w2m6: Stale native image storage reused after mode transitions, GHSA-5x8w-8jj..." />
+<meta name="description" content="Security: CVE identifiers will be added to these entries as they are assigned. Critical: CVE 2026-96639, GHSA-v9pv-5gc8-w2m6: Stale native image storage reused after mode transitions, GHSA-5x8w-8jj..." />
+<link rel="author" title="About these documents" href="../about.html"><link rel="index" title="Index" href="../genindex.html"><link rel="search" title="Search" href="../search.html"><link rel="next" title="12.3.0 (2026-07-01)" href="12.3.0.html"><link rel="prev" title="Versioning" href="versioning.html">
+
+    <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
+        <title>13.0.0 (2026-10-16) - Pillow-AllSIMD 13.0.0.post0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/furo-extensions.css?v=8dab3a3b" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/dark.css?v=1a645143" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #eeffcc;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
+
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+<div class="announcement">
+  <aside class="announcement-content">
+     Pillow-AllSIMD: Pillow with SIMD kernels for x86 and arm64, a fork of <a href="https://github.com/uploadcare/pillow-simd">Pillow-SIMD</a> and <a href="https://github.com/python-pillow/Pillow">Pillow</a>, whose documentation this is, with Pillow-AllSIMD's additions. Pillow's own: <a href="https://pillow.readthedocs.io/">pillow.readthedocs.io</a>. 
+  </aside>
+</div>
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../index.html">
+  
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../allsimd.html">About Pillow-AllSIMD</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../installation/index.html">Installation</a><input aria-label="Toggle navigation of Installation" class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../installation/basic-installation.html">Basic installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/python-support.html">Python support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/platform-support.html">Platform support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/building-from-source.html">Building from source</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../installation/building-from-source.html#old-versions">Old versions</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../handbook/index.html">Handbook</a><input aria-label="Toggle navigation of Handbook" class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/overview.html">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/tutorial.html">Tutorial</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/concepts.html">Concepts</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../handbook/appendices.html">Appendices</a><input aria-label="Toggle navigation of Appendices" class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/image-file-formats.html">Image file formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/text-anchors.html">Text anchors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/third-party-plugins.html">Third-party plugins</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html">Writing your own image plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#decoders">Decoders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-c">Writing your own file codec in C</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../handbook/writing-your-own-image-plugin.html#writing-your-own-file-codec-in-python">Writing your own file codec in Python</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../handbook/security.html">Security</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/index.html">Reference</a><input aria-label="Toggle navigation of Reference" class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/Image.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Image</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageChops.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageChops</span></code> (“channel operations”) module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageCms.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageCms</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageColor.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageColor</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageEnhance.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageEnhance</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageFile.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFile</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageFilter.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFilter</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageFont.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageGrab.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageGrab</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageMath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageMorph.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageMorph</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageOps.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageOps</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImagePalette.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePalette</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImagePath.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImagePath</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageQt.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageQt</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageSequence.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageSequence</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageShow.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageShow</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageStat.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageStat</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageText.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageText</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageTk.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTk</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageTransform.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageTransform</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ImageWin.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageWin</span></code> module (Windows-only)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/ExifTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ExifTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/TiffTags.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">TiffTags</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/JpegPresets.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">JpegPresets</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/PSDraw.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">PSDraw</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/PixelAccess.html"><code class="xref py py-class docutils literal notranslate"><span class="pre">PixelAccess</span></code> class</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/features.html"><code class="xref py py-mod docutils literal notranslate"><span class="pre">features</span></code> module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/fast_mode.html">Fast mode (Pillow-AllSIMD)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../PIL.html">PIL package (autodoc of remaining modules)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/plugins.html">Plugin reference</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/internal_design.html">Internal reference</a><input aria-label="Toggle navigation of Internal reference" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/open_files.html">File handling in Pillow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/limits.html">Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/block_allocator.html">Block allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/internal_modules.html">Internal modules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/c_extension_debugging.html">C extension debugging on Linux, with GDB/Valgrind</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/arrow_support.html">Arrow support</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../porting.html">Porting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../allsimd-changelog.html">Changelog (Pillow-AllSIMD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../allsimd-changelog.html#pillow-simd">Pillow-SIMD</a></li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="index.html">Release notes</a><input aria-label="Toggle navigation of Release notes" checked="" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><span class="icon"><svg><use href="#svg-arrow-right"></use></svg></span></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="versioning.html">Versioning</a></li>
+<li class="toctree-l2 current current-page"><a class="current reference internal" href="#">13.0.0 (2026-10-16)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="12.3.0.html">12.3.0 (2026-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="12.2.0.html">12.2.0 (2026-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="12.1.1.html">12.1.1 (2026-02-11)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="12.1.0.html">12.1.0 (2026-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="12.0.0.html">12.0.0 (2025-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="11.3.0.html">11.3.0 (2025-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="11.2.1.html">11.2.1 (2025-04-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="11.1.0.html">11.1.0 (2025-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="11.0.0.html">11.0.0 (2024-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="10.4.0.html">10.4.0 (2024-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="10.3.0.html">10.3.0 (2024-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="10.2.0.html">10.2.0 (2024-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="10.1.0.html">10.1.0 (2023-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="10.0.1.html">10.0.1 (2023-09-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="10.0.0.html">10.0.0 (2023-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="9.5.0.html">9.5.0 (2023-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="9.4.0.html">9.4.0 (2023-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="9.3.0.html">9.3.0 (2022-10-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="9.2.0.html">9.2.0 (2022-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="9.1.1.html">9.1.1 (2022-05-17)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="9.1.0.html">9.1.0 (2022-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="9.0.1.html">9.0.1 (2022-02-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="9.0.0.html">9.0.0 (2022-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.4.0.html">8.4.0 (2021-10-15)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.3.2.html">8.3.2 (2021-09-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.3.1.html">8.3.1 (2021-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.3.0.html">8.3.0 (2021-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.2.0.html">8.2.0 (2021-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.1.2.html">8.1.2 (2021-03-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.1.1.html">8.1.1 (2021-03-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.1.0.html">8.1.0 (2021-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.0.1.html">8.0.1 (2020-10-22)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="8.0.0.html">8.0.0 (2020-10-14)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="7.2.0.html">7.2.0 (2020-06-30)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="7.1.2.html">7.1.2 (2020-04-25)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="7.1.1.html">7.1.1 (2020-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="7.1.0.html">7.1.0 (2020-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="7.0.0.html">7.0.0 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="6.2.2.html">6.2.2 (2020-01-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="6.2.1.html">6.2.1 (2019-10-20)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="6.2.0.html">6.2.0 (2019-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="6.1.0.html">6.1.0 (2019-07-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="6.0.0.html">6.0.0 (2019-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="5.4.1.html">5.4.1 (2019-01-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="5.4.0.html">5.4.0 (2019-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="5.3.0.html">5.3.0 (2018-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="5.2.0.html">5.2.0 (2018-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="5.1.0.html">5.1.0 (2018-04-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="5.0.0.html">5.0.0 (2018-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="4.3.0.html">4.3.0 (2017-10-02)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="4.2.1.html">4.2.1 (2017-07-06)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="4.2.0.html">4.2.0 (2017-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="4.1.1.html">4.1.1 (2017-04-28)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="4.1.0.html">4.1.0 (2017-04-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="4.0.0.html">4.0.0 (2017-01-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="3.4.0.html">3.4.0 (2016-10-03)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="3.3.2.html">3.3.2 (2016-09-29)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="3.3.0.html">3.3.0 (2016-07-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="3.2.0.html">3.2.0 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="3.1.2.html">3.1.2 (2016-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="3.1.1.html">3.1.1 (2016-02-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="3.1.0.html">3.1.0 (2016-01-04)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="3.0.0.html">3.0.0 (2015-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="2.8.0.html">2.8.0 (2015-04-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="2.7.0.html">2.7.0 (2014-12-31)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="2.6.0.html">2.6.0 (2014-10-01)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="2.5.2.html">2.5.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="2.3.2.html">2.3.2 (2014-08-12)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="2.3.1.html">2.3.1 (2014-03-14)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../deprecations.html">Deprecations and removals</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="../_sources/releasenotes/13.0.0.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="id1">
+<h1>13.0.0 (2026-10-16)<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h1>
+<section id="security">
+<h2>Security<a class="headerlink" href="#security" title="Link to this heading">¶</a></h2>
+<p>CVE identifiers will be added to these entries as they are assigned.</p>
+<section id="critical">
+<h3>Critical<a class="headerlink" href="#critical" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><span class="target" id="index-0"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96639"><strong>CVE 2026-96639</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-v9pv-5gc8-w2m6">GHSA-v9pv-5gc8-w2m6</a>: Stale native image storage reused after mode transitions</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-5x8w-8jj5-q52h">GHSA-5x8w-8jj5-q52h</a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-8g5g-8vmr-9782">GHSA-8g5g-8vmr-9782</a>: JPEG decoder buffer overflow from scanlines wider than tile extents</p></li>
+</ul>
+</section>
+<section id="high">
+<h3>High<a class="headerlink" href="#high" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><span class="target" id="index-1"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96644"><strong>CVE 2026-96644</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-9v9v-9qvf-h2hj">GHSA-9v9v-9qvf-h2hj</a>: WMF/EMF heap out-of-bounds read from dimension truncation</p></li>
+<li><p><span class="target" id="index-2"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96637"><strong>CVE 2026-96637</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-g842-9rc4-69pw">GHSA-g842-9rc4-69pw</a>: SPIDER decompression bomb bypass via seek()</p></li>
+<li><p><span class="target" id="index-3"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96643"><strong>CVE 2026-96643</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-g4qv-2jxx-769h">GHSA-g4qv-2jxx-769h</a>: Unbounded Exif header replacement loop</p></li>
+<li><p><span class="target" id="index-4"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96778"><strong>CVE 2026-96778</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-g7cr-3p24-7wf7">GHSA-g7cr-3p24-7wf7</a>: JPEG comment write after ICC profile fills encoder buffer</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-462x-pgg6-55fp">GHSA-462x-pgg6-55fp</a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-c6hw-5grf-ff96">GHSA-c6hw-5grf-ff96</a>: TIFF tile and YCbCr decoding out-of-bounds read from undersized libtiff buffers</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-p4wg-p73j-c528">GHSA-p4wg-p73j-c528</a>: PDF parsing stack exhaustion from long trailer chains and deep or cyclic page trees</p></li>
+<li><p><span class="target" id="index-5"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96640"><strong>CVE 2026-96640</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-mrfp-p49p-3hf2">GHSA-mrfp-p49p-3hf2</a>: PDF append resource exhaustion from repeated page tree references</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-pchr-8j38-3x4p">GHSA-pchr-8j38-3x4p</a>: TIFF encoder accepted an incorrectly sized Colormap for non-8-bit images</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-332p-7hrc-92wf">GHSA-332p-7hrc-92wf</a>: TIFF encoder heap buffer overflow when saving to a file object</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-xcvg-w56q-r89m">GHSA-xcvg-w56q-r89m</a>: TIFF encoder heap buffer overflow when tags override the image size</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-xvh5-g6gv-559v">GHSA-xvh5-g6gv-559v</a>: TIFF encoder memory disclosure and crash from mismatched tag values</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-q45j-58j2-45rg">GHSA-q45j-58j2-45rg</a>: TIFF decoding returned uninitialized memory for short JPEG strips</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-78g4-xqwv-q3g8">GHSA-78g4-xqwv-q3g8</a>: Bundled OpenJPEG heap buffer overflow when reading tile-part data</p></li>
+</ul>
+</section>
+<section id="medium">
+<h3>Medium<a class="headerlink" href="#medium" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-4rr5-89j8-mwwm">GHSA-4rr5-89j8-mwwm</a>: TIFF encoder use-after-free write</p></li>
+<li><p><span class="target" id="index-6"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96636"><strong>CVE 2026-96636</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-p8hx-v2p6-rp84">GHSA-p8hx-v2p6-rp84</a>: MPO, DCX and MIC decompression bomb bypass via seek()</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-f2g6-542v-9j58">GHSA-f2g6-542v-9j58</a>: PDF page tree stack exhaustion via cyclic <code class="docutils literal notranslate"><span class="pre">/Kids</span></code> reference</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-5xm2-6676-qcp9">GHSA-5xm2-6676-qcp9</a>: APNG decompression bomb bypass via delayed disposal-frame sizing</p></li>
+<li><p><span class="target" id="index-7"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96642"><strong>CVE 2026-96642</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-3j72-p6qg-6xp7">GHSA-3j72-p6qg-6xp7</a>: TarIO negative size field causes infinite CPU-spin loop</p></li>
+<li><p><span class="target" id="index-8"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96638"><strong>CVE 2026-96638</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-24rc-8hj2-v98c">GHSA-24rc-8hj2-v98c</a>: BMP RLE decoder memory-amplification denial of service</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-gg2r-wvfm-q9rx">GHSA-gg2r-wvfm-q9rx</a>: MSP RLE decoder expands a tiny file into unbounded memory</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-wqgw-9xfh-qf2g">GHSA-wqgw-9xfh-qf2g</a>: TIFF and Exif IFD parsing memory and CPU amplification from shared tag data</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-jg86-v3jv-hrpm">GHSA-jg86-v3jv-hrpm</a>: Quadratic time when writing many objects to a PDF</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-254f-3936-288h">GHSA-254f-3936-288h</a>: PdfParser unbounded recursion via deeply nested objects</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-rfgq-q3w2-pmv2">GHSA-rfgq-q3w2-pmv2</a>: Image.quantize() crash from an empty target palette</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-xgh8-jp6q-p5x8">GHSA-xgh8-jp6q-p5x8</a>: XBM header parsing regular expression denial of service</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-22hg-r758-rrw9">GHSA-22hg-r758-rrw9</a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-74r2-7ff9-mjj2">GHSA-74r2-7ff9-mjj2</a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-fc9g-5qg7-mf45">GHSA-fc9g-5qg7-mf45</a>: GIF comment handling quadratic-time blowup from repeated concatenation</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-27h8-gf7j-v5hc">GHSA-27h8-gf7j-v5hc</a>: Out-of-bounds read in rank-based filters for zero-dimension images</p></li>
+<li><p><span class="target" id="index-9"></span><a class="cve reference external" href="https://www.cve.org/CVERecord?id=CVE-2026-96641"><strong>CVE 2026-96641</strong></a>, <a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-4rm8-3hmm-39fg">GHSA-4rm8-3hmm-39fg</a>: Integer underflow in PILfont text width calculation</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-cp9v-662q-vvx9">GHSA-cp9v-662q-vvx9</a>: Image.merge() buffer overflow when merging 32-bit images as narrower bands</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-j4m9-6w36-pw47">GHSA-j4m9-6w36-pw47</a>: Uninitialized glyph pointer freed on font rendering error path</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-7mwm-ghpf-9vrm">GHSA-7mwm-ghpf-9vrm</a>: Double free in <code class="docutils literal notranslate"><span class="pre">Image.transform()</span></code> after an allocation failure</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-4558-3h8r-v8xp">GHSA-4558-3h8r-v8xp</a>: <code class="docutils literal notranslate"><span class="pre">P;2L</span></code> and <code class="docutils literal notranslate"><span class="pre">P;4L</span></code> raw mode decoders read past the end of their input</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-w889-685w-c8fh">GHSA-w889-685w-c8fh</a>: EPS filename argument injection into Ghostscript</p></li>
+</ul>
+</section>
+<section id="low">
+<h3>Low<a class="headerlink" href="#low" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-65qm-jvmh-6pqg">GHSA-65qm-jvmh-6pqg</a>: GIF decompression bomb check used a size discarded on failure</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-vx6w-vv9f-6gvg">GHSA-vx6w-vv9f-6gvg</a>: EPS decompression bomb bypass via Ghostscript rendering</p></li>
+<li><p><a class="extlink-ghsa reference external" href="https://github.com/python-pillow/Pillow/security/advisories/GHSA-58r4-6rv3-gfh8">GHSA-58r4-6rv3-gfh8</a>: ImageMorph.MorphOp.apply() out-of-bounds write on zero-width images</p></li>
+</ul>
+</section>
+</section>
+<section id="backwards-incompatible-changes">
+<h2>Backwards incompatible changes<a class="headerlink" href="#backwards-incompatible-changes" title="Link to this heading">¶</a></h2>
+<section id="python-3-10">
+<h3>Python 3.10<a class="headerlink" href="#python-3-10" title="Link to this heading">¶</a></h3>
+<p>Pillow has dropped support for Python 3.10,
+which reached end-of-life in October 2026.</p>
+</section>
+<section id="saving-i-mode-images-as-png">
+<h3>Saving I mode images as PNG<a class="headerlink" href="#saving-i-mode-images-as-png" title="Link to this heading">¶</a></h3>
+<p>In order to fit the 32 bits of I mode images into PNG, when PNG images can only contain
+at most 16 bits for a channel, Pillow has been clipping the values. Rather than quietly
+changing the data, this is now removed. Instead, the image can be converted to another
+mode before saving:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span>
+<span class="n">im</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="s2">&quot;I&quot;</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+<span class="n">im</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span><span class="s2">&quot;I;16&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">&quot;out.png&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="image-fromarray-mode-parameter">
+<h3>Image.fromarray mode parameter<a class="headerlink" href="#image-fromarray-mode-parameter" title="Link to this heading">¶</a></h3>
+<p>Using the <code class="docutils literal notranslate"><span class="pre">mode</span></code> parameter in <a class="reference internal" href="../reference/Image.html#PIL.Image.fromarray" title="PIL.Image.fromarray"><code class="xref py py-meth docutils literal notranslate"><span class="pre">fromarray()</span></code></a> was deprecated in
+Pillow 11.3.0. In Pillow 12.0.0, this was partially reverted, and now the only
+functionality removed is when the mode changes data types. Since pixel values do not
+contain information about palettes or color spaces, the parameter can still be used to
+place grayscale L mode data within a P mode image, or read RGB data as YCbCr for
+example. If omitted, the mode will be automatically determined from the object’s shape
+and type.</p>
+</section>
+<section id="image-image-get-child-images">
+<h3>Image.Image.get_child_images()<a class="headerlink" href="#image-image-get-child-images" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">Image.Image.get_child_images()</span></code> has been moved to
+<code class="docutils literal notranslate"><span class="pre">ImageFile.ImageFile.get_child_images()</span></code>. The method uses an image’s file pointer,
+and so child images could only be retrieved from an <a class="reference internal" href="../reference/ImageFile.html#PIL.ImageFile.ImageFile" title="PIL.ImageFile.ImageFile"><code class="xref py py-class docutils literal notranslate"><span class="pre">PIL.ImageFile.ImageFile</span></code></a>
+instance.</p>
+</section>
+<section id="image-show">
+<h3>Image._show<a class="headerlink" href="#image-show" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">Image._show</span></code> has been removed. Use <a class="reference internal" href="../reference/ImageShow.html#PIL.ImageShow.show" title="PIL.ImageShow.show"><code class="xref py py-meth docutils literal notranslate"><span class="pre">show()</span></code></a> instead.</p>
+</section>
+<section id="imagecms-imagecmsprofile-product-name-and-product-info">
+<h3>ImageCms.ImageCmsProfile.product_name and .product_info<a class="headerlink" href="#imagecms-imagecmsprofile-product-name-and-product-info" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">ImageCms.ImageCmsProfile.product_name</span></code> and the corresponding
+<code class="docutils literal notranslate"><span class="pre">.product_info</span></code> attributes have been removed. They were set to <code class="docutils literal notranslate"><span class="pre">None</span></code> since Pillow
+2.3.0.</p>
+</section>
+<section id="exiftags-ifd-makernote">
+<h3>ExifTags.IFD.Makernote<a class="headerlink" href="#exiftags-ifd-makernote" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">ExifTags.IFD.Makernote</span></code> has been removed. Instead, use <code class="docutils literal notranslate"><span class="pre">ExifTags.IFD.MakerNote</span></code>.</p>
+</section>
+</section>
+<section id="deprecations">
+<h2>Deprecations<a class="headerlink" href="#deprecations" title="Link to this heading">¶</a></h2>
+<section id="im-image-format">
+<h3>IM image format<a class="headerlink" href="#im-image-format" title="Link to this heading">¶</a></h3>
+<p>The IM image format has been deprecated and removal is planned in Pillow 15.0.0
+(2028-10-15). If you are using this format and would like to continue doing so,
+open an issue about what other software uses it.</p>
+</section>
+<section id="jpegimagefile-load-djpeg">
+<h3>JpegImageFile.load_djpeg<a class="headerlink" href="#jpegimagefile-load-djpeg" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">JpegImageFile.load_djpeg</span></code> has been deprecated, and will be removed in Pillow 14
+(2027-10-15).</p>
+<p>Use the built-in JPEG decoder instead, or call <code class="docutils literal notranslate"><span class="pre">djpeg</span></code> directly and decode the
+resulting image with Pillow.</p>
+</section>
+<section id="imageqt-align8to32">
+<h3>ImageQt align8to32()<a class="headerlink" href="#imageqt-align8to32" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">ImageQt.align8to32()</span></code> has been deprecated. This was an undocumented helper function
+intended for internal use, so there is no replacement.</p>
+</section>
+</section>
+<section id="api-changes">
+<h2>API changes<a class="headerlink" href="#api-changes" title="Link to this heading">¶</a></h2>
+<section id="imagecolor-getcolor-with-premultiplied-alpha-modes">
+<h3>ImageColor.getcolor() with premultiplied alpha modes<a class="headerlink" href="#imagecolor-getcolor-with-premultiplied-alpha-modes" title="Link to this heading">¶</a></h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">mode</span></code> is <code class="docutils literal notranslate"><span class="pre">RGBa</span></code> or <code class="docutils literal notranslate"><span class="pre">La</span></code>, <a class="reference internal" href="../reference/ImageColor.html#PIL.ImageColor.getcolor" title="PIL.ImageColor.getcolor"><code class="xref py py-func docutils literal notranslate"><span class="pre">getcolor()</span></code></a> now returns
+color values premultiplied by the alpha channel, matching how pixels are stored in
+those modes. Previously, the unmultiplied values were returned.</p>
+</section>
+<section id="duplicate-tiff-tags">
+<h3>Duplicate TIFF tags<a class="headerlink" href="#duplicate-tiff-tags" title="Link to this heading">¶</a></h3>
+<p>If a TIFF IFD contains the same tag more than once, the first value is now kept.
+Previously, the last value overwrote the earlier ones.</p>
+</section>
+<section id="saving-small-ico-images">
+<h3>Saving small ICO images<a class="headerlink" href="#saving-small-ico-images" title="Link to this heading">¶</a></h3>
+<p>When saving an image smaller than 16x16 pixels as an ICO without a <code class="docutils literal notranslate"><span class="pre">sizes</span></code>
+argument, the image’s own size is now used. Previously, none of the default sizes
+matched, and an ICO containing no images was written. If no size in <code class="docutils literal notranslate"><span class="pre">sizes</span></code> fits
+within the image, a <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><code class="xref py py-exc docutils literal notranslate"><span class="pre">ValueError</span></code></a> is now raised.</p>
+</section>
+</section>
+<section id="api-additions">
+<h2>API additions<a class="headerlink" href="#api-additions" title="Link to this heading">¶</a></h2>
+<section id="new-resizing-filters">
+<h3>New resizing filters<a class="headerlink" href="#new-resizing-filters" title="Link to this heading">¶</a></h3>
+<p>Two new filters are available for <a class="reference internal" href="../reference/Image.html#PIL.Image.Image.resize" title="PIL.Image.Image.resize"><code class="xref py py-meth docutils literal notranslate"><span class="pre">resize()</span></code></a> and
+<a class="reference internal" href="../reference/Image.html#PIL.Image.Image.thumbnail" title="PIL.Image.Image.thumbnail"><code class="xref py py-meth docutils literal notranslate"><span class="pre">thumbnail()</span></code></a>: <code class="docutils literal notranslate"><span class="pre">Image.Resampling.MKS2013</span></code> and
+<code class="docutils literal notranslate"><span class="pre">Image.Resampling.MKS2021</span></code>. These are versions of the Magic Kernel Sharp filter.</p>
+</section>
+<section id="added-strip-namespaces-argument-to-image-getxmp">
+<h3>Added <code class="docutils literal notranslate"><span class="pre">strip_namespaces</span></code> argument to <code class="docutils literal notranslate"><span class="pre">Image.getxmp()</span></code><a class="headerlink" href="#added-strip-namespaces-argument-to-image-getxmp" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="../reference/Image.html#PIL.Image.Image.getxmp" title="PIL.Image.Image.getxmp"><code class="xref py py-meth docutils literal notranslate"><span class="pre">getxmp()</span></code></a> now accepts an optional keyword argument of
+<code class="docutils literal notranslate"><span class="pre">strip_namespaces</span></code>. It is set to <code class="docutils literal notranslate"><span class="pre">True</span></code> by default, stripping each tag’s XML
+namespace URI prefix as before. If set to <code class="docutils literal notranslate"><span class="pre">False</span></code>, each tag’s full
+<code class="docutils literal notranslate"><span class="pre">{namespace-uri}local-name</span></code> form is kept instead, avoiding collisions between tags
+that share a local name across different namespaces.</p>
+</section>
+<section id="added-escape-argument-to-psdraw-text">
+<h3>Added <code class="docutils literal notranslate"><span class="pre">escape</span></code> argument to <code class="docutils literal notranslate"><span class="pre">PSDraw.text()</span></code><a class="headerlink" href="#added-escape-argument-to-psdraw-text" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="../reference/PSDraw.html#PIL.PSDraw.PSDraw.text" title="PIL.PSDraw.PSDraw.text"><code class="xref py py-meth docutils literal notranslate"><span class="pre">text()</span></code></a> now accepts a keyword-only boolean argument,
+<code class="docutils literal notranslate"><span class="pre">escape</span></code>. Set it to <code class="docutils literal notranslate"><span class="pre">True</span></code> to escape backslashes, for example in Windows paths.
+The default, <code class="docutils literal notranslate"><span class="pre">False</span></code>, preserves the existing handling of backslashes and PostScript
+escape sequences.</p>
+</section>
+<section id="imageops-invert-posterize-and-solarize-of-p-images">
+<h3>ImageOps invert, posterize and solarize of P images<a class="headerlink" href="#imageops-invert-posterize-and-solarize-of-p-images" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="../reference/ImageOps.html#PIL.ImageOps.invert" title="PIL.ImageOps.invert"><code class="xref py py-func docutils literal notranslate"><span class="pre">invert()</span></code></a>, <a class="reference internal" href="../reference/ImageOps.html#PIL.ImageOps.posterize" title="PIL.ImageOps.posterize"><code class="xref py py-func docutils literal notranslate"><span class="pre">posterize()</span></code></a> and
+<a class="reference internal" href="../reference/ImageOps.html#PIL.ImageOps.solarize" title="PIL.ImageOps.solarize"><code class="xref py py-func docutils literal notranslate"><span class="pre">solarize()</span></code></a> now support P mode images. The operation is applied
+to the palette colors, leaving any alpha values in the palette unchanged. Previously,
+these functions raised <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#NotImplementedError" title="(in Python v3.15)"><code class="xref py py-exc docutils literal notranslate"><span class="pre">NotImplementedError</span></code></a> for P mode.</p>
+</section>
+<section id="path-like-objects-for-font-files">
+<h3>Path-like objects for font files<a class="headerlink" href="#path-like-objects-for-font-files" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="../reference/ImageFont.html#PIL.ImageFont.load" title="PIL.ImageFont.load"><code class="xref py py-func docutils literal notranslate"><span class="pre">load()</span></code></a>, <a class="reference internal" href="../reference/ImageFont.html#PIL.ImageFont.load_path" title="PIL.ImageFont.load_path"><code class="xref py py-func docutils literal notranslate"><span class="pre">load_path()</span></code></a> and
+<a class="reference internal" href="../PIL.html#PIL.FontFile.FontFile.save" title="PIL.FontFile.FontFile.save"><code class="xref py py-meth docutils literal notranslate"><span class="pre">save()</span></code></a> now accept <a class="reference external" href="https://docs.python.org/3/library/os.html#os.PathLike" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">os.PathLike</span></code></a> objects,
+such as <a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">pathlib.Path</span></code></a>, in addition to strings.</p>
+</section>
+</section>
+<section id="other-changes">
+<h2>Other changes<a class="headerlink" href="#other-changes" title="Link to this heading">¶</a></h2>
+<section id="python-3-15">
+<h3>Python 3.15<a class="headerlink" href="#python-3-15" title="Link to this heading">¶</a></h3>
+<p>Pillow 12.3.0 had wheels built against Python 3.15 beta, available as a preview
+to help projects prepare for 3.15, and to ensure Pillow could be used
+immediately at the release of 3.15.0 final (2026-10-01, <span class="target" id="index-10"></span><a class="pep reference external" href="https://peps.python.org/pep-0790/"><strong>PEP 790</strong></a>).</p>
+<p>Pillow 13.0.0 now officially supports Python 3.15.</p>
+</section>
+<section id="faster-import">
+<h3>Faster import<a class="headerlink" href="#faster-import" title="Link to this heading">¶</a></h3>
+<p>Importing Pillow takes around half the time it did in Pillow 12.3.0. <code class="docutils literal notranslate"><span class="pre">PIL.Image</span></code> no
+longer imports <code class="docutils literal notranslate"><span class="pre">logging</span></code>, modules that are only needed for some operations, such as
+<code class="docutils literal notranslate"><span class="pre">tempfile</span></code>, are now imported on first use, and on Python 3.15 Pillow also declares
+<code class="docutils literal notranslate"><span class="pre">__lazy_modules__</span></code> to defer its remaining standard library imports (<span class="target" id="index-11"></span><a class="pep reference external" href="https://peps.python.org/pep-0810/"><strong>PEP 810</strong></a>). On an
+Apple Silicon Mac, <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">PIL</span> <span class="pre">import</span> <span class="pre">Image</span></code> took 24 ms on Python 3.14 and 23 ms on
+Python 3.15 with Pillow 12.3.0, and now takes 12 ms and 10 ms.</p>
+</section>
+<section id="pypy-3-12">
+<h3>PyPy 3.12<a class="headerlink" href="#pypy-3-12" title="Link to this heading">¶</a></h3>
+<p>Wheels are now also built for PyPy 3.12, in addition to PyPy 3.11.</p>
+</section>
+<section id="faster-jpeg-2000-tiff-freetype-and-littlecms-in-macos-and-linux-wheels">
+<h3>Faster JPEG 2000, TIFF, FreeType and LittleCMS in macOS and Linux wheels<a class="headerlink" href="#faster-jpeg-2000-tiff-freetype-and-littlecms-in-macos-and-linux-wheels" title="Link to this heading">¶</a></h3>
+<p>Several of the libraries bundled in the macOS and Linux wheels were built without
+compiler optimisation. The Windows wheels were not affected.</p>
+<p>These libraries are now compiled with <code class="docutils literal notranslate"><span class="pre">-O2</span></code>. Compared to Pillow 12.3.0, the wheels</p>
+<ul class="simple">
+<li><p>decode JPEG 2000 images 2 to 3 times faster and encode them about twice as fast,</p></li>
+<li><p>read and write LZW-compressed TIFF images about twice as fast,</p></li>
+<li><p>render text with <a class="reference internal" href="../reference/ImageFont.html#module-PIL.ImageFont" title="PIL.ImageFont"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageFont</span></code></a> up to 3 times faster, and</p></li>
+<li><p>apply <a class="reference internal" href="../reference/ImageCms.html#module-PIL.ImageCms" title="PIL.ImageCms"><code class="xref py py-mod docutils literal notranslate"><span class="pre">ImageCms</span></code></a> transforms up to 3 times faster.</p></li>
+</ul>
+<p>PNG, JPEG, WebP and AVIF are unaffected, as those libraries were already built with
+optimisation.</p>
+</section>
+<section id="performance-improvements">
+<h3>Performance improvements<a class="headerlink" href="#performance-improvements" title="Link to this heading">¶</a></h3>
+<p>Building on the optimizations in Pillow 12.3.0, more of the C code has been
+restructured so that compilers can vectorize it. Compared to Pillow 12.3.0,
+<a class="reference internal" href="../reference/ImageChops.html#PIL.ImageChops.offset" title="PIL.ImageChops.offset"><code class="xref py py-func docutils literal notranslate"><span class="pre">offset()</span></code></a> is up to 46 times faster,
+<a class="reference internal" href="../reference/Image.html#PIL.Image.Image.getbbox" title="PIL.Image.Image.getbbox"><code class="xref py py-meth docutils literal notranslate"><span class="pre">getbbox()</span></code></a> up to 24 times faster,
+flipping and rotating by 180 degrees with
+<a class="reference internal" href="../reference/Image.html#PIL.Image.Image.transpose" title="PIL.Image.Image.transpose"><code class="xref py py-meth docutils literal notranslate"><span class="pre">transpose()</span></code></a> up to 10 times faster,
+<a class="reference internal" href="../reference/Image.html#PIL.Image.Image.filter" title="PIL.Image.Image.filter"><code class="xref py py-meth docutils literal notranslate"><span class="pre">filter()</span></code></a> up to 3.5 times faster,
+<a class="reference internal" href="../reference/ImageChops.html#PIL.ImageChops.difference" title="PIL.ImageChops.difference"><code class="xref py py-func docutils literal notranslate"><span class="pre">difference()</span></code></a> up to 3 times faster, and converting P and PA
+images to RGB and RGBA up to 2.5 times faster. Saving an optimized GIF with a shared
+palette is around 6 times faster and uses less memory.</p>
+</section>
+<section id="wheels-now-use-harfbuzz-for-hinting">
+<h3>Wheels now use HarfBuzz for hinting<a class="headerlink" href="#wheels-now-use-harfbuzz-for-hinting" title="Link to this heading">¶</a></h3>
+<p>FreeType can use HarfBuzz to work out which glyphs a script covers,
+so that its auto-hinter can derive hinting “Blue Zones” for scripts such as Arabic.</p>
+<p>Only the Windows wheels were actually built with this support.
+The macOS wheels disabled HarfBuzz interoperability outright,
+and the Linux wheels left it up to FreeType’s <code class="docutils literal notranslate"><span class="pre">configure</span></code>,
+which in turn fell back to loading HarfBuzz by its unversioned name at
+runtime.</p>
+<p>Since the bundled copy of HarfBuzz is renamed when the wheel is audited and repaired
+for distribution, that lookup only succeeded if a separate copy happened to be
+installed on the system with the expected name (e.g. <code class="docutils literal notranslate"><span class="pre">libharfbuzz.so.0</span></code>).</p>
+<p>All wheels are now linked against the HarfBuzz that Pillow ships,
+which may slightly change how text is rendered in scripts that rely on the auto-hinter.</p>
+</section>
+<section id="thread-safety-for-free-threaded-python">
+<h3>Thread safety for free-threaded Python<a class="headerlink" href="#thread-safety-for-free-threaded-python" title="Link to this heading">¶</a></h3>
+<p>Critical sections now protect most operations on core image objects, such as
+conversion, pasting, filtering and pixel access, improving thread safety in the
+free-threaded build of Python. AVIF decoding also no longer blocks other threads.</p>
+</section>
+<section id="resizing-images-with-alpha">
+<h3>Resizing images with alpha<a class="headerlink" href="#resizing-images-with-alpha" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">reducing_gap</span></code> argument to <a class="reference internal" href="../reference/Image.html#PIL.Image.Image.resize" title="PIL.Image.Image.resize"><code class="xref py py-meth docutils literal notranslate"><span class="pre">resize()</span></code></a> is now
+applied to RGBA and LA images. Previously, these modes ignored the argument,
+including when called by <a class="reference internal" href="../reference/Image.html#PIL.Image.Image.thumbnail" title="PIL.Image.Image.thumbnail"><code class="xref py py-meth docutils literal notranslate"><span class="pre">thumbnail()</span></code></a>, which uses
+<code class="docutils literal notranslate"><span class="pre">reducing_gap=2.0</span></code> by default.</p>
+</section>
+<section id="preserved-transparency-when-padding-or-expanding-images-in-imageops">
+<h3>Preserved transparency when padding or expanding images in ImageOps<a class="headerlink" href="#preserved-transparency-when-padding-or-expanding-images-in-imageops" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="../reference/ImageOps.html#PIL.ImageOps.pad" title="PIL.ImageOps.pad"><code class="xref py py-func docutils literal notranslate"><span class="pre">pad()</span></code></a> and <a class="reference internal" href="../reference/ImageOps.html#PIL.ImageOps.expand" title="PIL.ImageOps.expand"><code class="xref py py-func docutils literal notranslate"><span class="pre">expand()</span></code></a> now preserve the
+<code class="docutils literal notranslate"><span class="pre">transparency</span></code> value from the source image’s <code class="docutils literal notranslate"><span class="pre">info</span></code> dictionary. Transparent
+pixels in L, P and RGB images previously became opaque when a border was added.
+New palette colors are allocated without using reserved transparency entries.</p>
+</section>
+<section id="fixed-reading-fits-images-with-more-than-8-bits-per-pixel">
+<h3>Fixed reading FITS images with more than 8 bits per pixel<a class="headerlink" href="#fixed-reading-fits-images-with-more-than-8-bits-per-pixel" title="Link to this heading">¶</a></h3>
+<p>FITS data is big-endian, but Pillow was reading 16-bit and 32-bit integer data, and
+32-bit and 64-bit floating point data, in the native byte order. These images now
+load with the correct pixel values.</p>
+</section>
+<section id="fixed-accuracy-of-16-bit-image-filters-and-conversions">
+<h3>Fixed accuracy of 16-bit image filters and conversions<a class="headerlink" href="#fixed-accuracy-of-16-bit-image-filters-and-conversions" title="Link to this heading">¶</a></h3>
+<p>Applying a kernel filter to an <code class="docutils literal notranslate"><span class="pre">I;16</span></code> image gave incorrect results for pixel values
+above 255, and converting an <code class="docutils literal notranslate"><span class="pre">I;16N</span></code> image to <code class="docutils literal notranslate"><span class="pre">I</span></code> or <code class="docutils literal notranslate"><span class="pre">F</span></code> clipped values to 255.
+Both now preserve the full 16-bit range.</p>
+</section>
+<section id="saving-apng-frames-with-different-palettes">
+<h3>Saving APNG frames with different palettes<a class="headerlink" href="#saving-apng-frames-with-different-palettes" title="Link to this heading">¶</a></h3>
+<p>An APNG file can only contain a single palette. When saving P mode frames with
+different palettes, the image is now saved as RGB, or RGBA if any palette contains
+alpha, instead of writing the later frames with the wrong colors.</p>
+</section>
+<section id="fixed-imagestat-variance-rounding">
+<h3>Fixed ImageStat variance rounding<a class="headerlink" href="#fixed-imagestat-variance-rounding" title="Link to this heading">¶</a></h3>
+<p>Fixed a floating-point rounding error that may have produced a negative variance in
+<a class="reference internal" href="../reference/ImageStat.html#PIL.ImageStat.Stat.var" title="PIL.ImageStat.Stat.var"><code class="xref py py-attr docutils literal notranslate"><span class="pre">var</span></code></a>.</p>
+</section>
+<section id="fixed-imagechops-offset-for-16-bit-images">
+<h3>Fixed ImageChops.offset() for 16-bit images<a class="headerlink" href="#fixed-imagechops-offset-for-16-bit-images" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="../reference/ImageChops.html#PIL.ImageChops.offset" title="PIL.ImageChops.offset"><code class="xref py py-meth docutils literal notranslate"><span class="pre">offset()</span></code></a> now works correctly for 16-bit-per-channel images.</p>
+</section>
+<section id="fixed-drawing-on-i-16b-images">
+<h3>Fixed drawing on I;16B images<a class="headerlink" href="#fixed-drawing-on-i-16b-images" title="Link to this heading">¶</a></h3>
+<p>When drawing on an <code class="docutils literal notranslate"><span class="pre">I;16B</span></code> image, some drawing methods wrote in the wrong byte order.
+All drawing operations now use the byte order of the image mode.</p>
+</section>
+<section id="fixed-histograms-for-masked-la-la-and-pa-images">
+<h3>Fixed histograms for masked LA, La and PA images<a class="headerlink" href="#fixed-histograms-for-masked-la-la-and-pa-images" title="Link to this heading">¶</a></h3>
+<p>When <a class="reference internal" href="../reference/Image.html#PIL.Image.Image.histogram" title="PIL.Image.Image.histogram"><code class="xref py py-meth docutils literal notranslate"><span class="pre">histogram()</span></code></a> was given a mask for a two-band image (LA,
+La or PA), the second band was incorrectly derived from the first band of the input
+image, rather than the alpha band.</p>
+</section>
+<section id="fixed-exporting-arrow-arrays-from-images-with-non-contiguous-rows">
+<h3>Fixed exporting Arrow arrays from images with non-contiguous rows<a class="headerlink" href="#fixed-exporting-arrow-arrays-from-images-with-non-contiguous-rows" title="Link to this heading">¶</a></h3>
+<p>Exporting an image as an Arrow array assumed that its rows were contiguous. However,
+this was not the case for</p>
+<ul class="simple">
+<li><p>images whose rows were padded to an alignment returned incorrect data,</p></li>
+<li><p>empty images,</p></li>
+<li><p>images created by <a class="reference internal" href="../reference/Image.html#PIL.Image.frombuffer" title="PIL.Image.frombuffer"><code class="xref py py-func docutils literal notranslate"><span class="pre">frombuffer()</span></code></a>, and</p></li>
+<li><p>images memory-mapped from uncompressed files.</p></li>
+</ul>
+<p>These images crashed instead.</p>
+<p>Images with rows that are not contiguous now raise a <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><code class="xref py py-exc docutils literal notranslate"><span class="pre">ValueError</span></code></a>, and the
+others are exported correctly.</p>
+</section>
+<section id="fixed-combining-gif-frames-with-missing-durations">
+<h3>Fixed combining GIF frames with missing durations<a class="headerlink" href="#fixed-combining-gif-frames-with-missing-durations" title="Link to this heading">¶</a></h3>
+<p>Saving identical consecutive GIF frames no longer raises a <code class="docutils literal notranslate"><span class="pre">KeyError</span></code> when an earlier
+frame has no duration and a later frame does.</p>
+</section>
+<section id="png-palettes-are-no-longer-padded-when-saving-with-the-bits-argument">
+<h3>PNG palettes are no longer padded when saving with the <code class="docutils literal notranslate"><span class="pre">bits</span></code> argument<a class="headerlink" href="#png-palettes-are-no-longer-padded-when-saving-with-the-bits-argument" title="Link to this heading">¶</a></h3>
+<p>When saving a <code class="docutils literal notranslate"><span class="pre">P</span></code> mode image as a PNG with the <code class="docutils literal notranslate"><span class="pre">bits</span></code> argument, Pillow used to pad
+the <code class="docutils literal notranslate"><span class="pre">PLTE</span></code> chunk with zeroes up to <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">**</span> <span class="pre">bits</span></code> entries. The <code class="docutils literal notranslate"><span class="pre">PLTE</span></code> chunk now only
+contains as many entries as the image’s palette actually has, matching the behavior
+already used when <code class="docutils literal notranslate"><span class="pre">bits</span></code> is not specified.</p>
+</section>
+<section id="restore-image-position-if-imagesequence-all-frames-fails">
+<h3>Restore image position if ImageSequence.all_frames() fails<a class="headerlink" href="#restore-image-position-if-imagesequence-all-frames-fails" title="Link to this heading">¶</a></h3>
+<p>If processing a frame in <a class="reference internal" href="../reference/ImageSequence.html#PIL.ImageSequence.all_frames" title="PIL.ImageSequence.all_frames"><code class="xref py py-func docutils literal notranslate"><span class="pre">all_frames()</span></code></a> raises an exception,
+the given image will now seek back to its original frame.</p>
+</section>
+<section id="clean-up-tiff-encoders-before-closing-their-output-files">
+<h3>Clean up TIFF encoders before closing their output files<a class="headerlink" href="#clean-up-tiff-encoders-before-closing-their-output-files" title="Link to this heading">¶</a></h3>
+<p>TIFF saving now explicitly cleans up the libtiff encoder, including when saving
+raises an exception. Previously, delayed encoder destruction could access a closed
+file descriptor after it had been reused for another file, disturbing that file’s
+position or contents.</p>
+<p><a class="reference internal" href="../reference/Image.html#PIL.Image.Image.tobytes" title="PIL.Image.Image.tobytes"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tobytes()</span></code></a> also now explicitly cleans up its encoder on
+both success and failure, rather than relying on object destruction.</p>
+</section>
+<section id="fixed-reading-psd-layers-at-the-wrong-file-offset">
+<h3>Fixed reading PSD layers at the wrong file offset<a class="headerlink" href="#fixed-reading-psd-layers-at-the-wrong-file-offset" title="Link to this heading">¶</a></h3>
+<p>When seeking to a layer of a PSD image, the pixel data was read from the wrong
+position in the file, so <a class="reference internal" href="../reference/Image.html#PIL.Image.Image.seek" title="PIL.Image.Image.seek"><code class="xref py py-meth docutils literal notranslate"><span class="pre">seek()</span></code></a> returned unrelated
+bytes reinterpreted as image data instead of that layer’s actual content.</p>
+</section>
+<section id="fixed-opening-xbm-images-with-comments">
+<h3>Fixed opening XBM images with comments<a class="headerlink" href="#fixed-opening-xbm-images-with-comments" title="Link to this heading">¶</a></h3>
+<p>XBM images with C-style <code class="docutils literal notranslate"><span class="pre">/*</span> <span class="pre">...</span> <span class="pre">*/</span></code> comments in the header could not be identified.
+Comments on separate lines before the bits declaration are now skipped.</p>
+</section>
+<section id="clarified-fribidi-shim-license">
+<h3>Clarified FriBiDi shim license<a class="headerlink" href="#clarified-fribidi-shim-license" title="Link to this heading">¶</a></h3>
+<p>The SBOM published with Pillow 12.3.0 listed the vendored FriBiDi shim
+(<code class="docutils literal notranslate"><span class="pre">src/thirdparty/fribidi-shim/</span></code>) as LGPL-2.1-or-later. The shim was written for
+Pillow and is covered by Pillow’s MIT-CMU license. Its header declares the parts of
+FriBiDi’s public API needed to load FriBiDi at runtime, and contains no FriBiDi code.
+FriBiDi itself is not included in Pillow’s wheels.</p>
+<p>The shim’s source files now include SPDX license identifiers, and the SBOM has been
+corrected.</p>
+</section>
+<section id="imagepath-path-compact-on-an-empty-path">
+<h3>ImagePath.Path.compact() on an empty path<a class="headerlink" href="#imagepath-path-compact-on-an-empty-path" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="../reference/ImagePath.html#PIL.ImagePath.Path.compact" title="PIL.ImagePath.Path.compact"><code class="xref py py-meth docutils literal notranslate"><span class="pre">compact()</span></code></a> is documented to return the number of
+points removed. On a path with no points, it instead added a point whose
+y coordinate was read from uninitialized memory, and returned <code class="docutils literal notranslate"><span class="pre">-1</span></code>.
+<code class="docutils literal notranslate"><span class="pre">compact()</span></code> now leaves an empty path unchanged and returns <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+</section>
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="12.3.0.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">12.3.0 (2026-07-01)</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="versioning.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Versioning</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 1995-2011 Fredrik Lundh and contributors (PIL), 2010 Jeffrey &#39;Alex&#39; Clark and contributors (Pillow), Alexander Karpinsky and contributors (Pillow-SIMD), 2026 Matteo Ferrabone and contributors (Pillow-AllSIMD)
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">13.0.0 (2026-10-16)</a><ul>
+<li><a class="reference internal" href="#security">Security</a><ul>
+<li><a class="reference internal" href="#critical">Critical</a></li>
+<li><a class="reference internal" href="#high">High</a></li>
+<li><a class="reference internal" href="#medium">Medium</a></li>
+<li><a class="reference internal" href="#low">Low</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#backwards-incompatible-changes">Backwards incompatible changes</a><ul>
+<li><a class="reference internal" href="#python-3-10">Python 3.10</a></li>
+<li><a class="reference internal" href="#saving-i-mode-images-as-png">Saving I mode images as PNG</a></li>
+<li><a class="reference internal" href="#image-fromarray-mode-parameter">Image.fromarray mode parameter</a></li>
+<li><a class="reference internal" href="#image-image-get-child-images">Image.Image.get_child_images()</a></li>
+<li><a class="reference internal" href="#image-show">Image._show</a></li>
+<li><a class="reference internal" href="#imagecms-imagecmsprofile-product-name-and-product-info">ImageCms.ImageCmsProfile.product_name and .product_info</a></li>
+<li><a class="reference internal" href="#exiftags-ifd-makernote">ExifTags.IFD.Makernote</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#deprecations">Deprecations</a><ul>
+<li><a class="reference internal" href="#im-image-format">IM image format</a></li>
+<li><a class="reference internal" href="#jpegimagefile-load-djpeg">JpegImageFile.load_djpeg</a></li>
+<li><a class="reference internal" href="#imageqt-align8to32">ImageQt align8to32()</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#api-changes">API changes</a><ul>
+<li><a class="reference internal" href="#imagecolor-getcolor-with-premultiplied-alpha-modes">ImageColor.getcolor() with premultiplied alpha modes</a></li>
+<li><a class="reference internal" href="#duplicate-tiff-tags">Duplicate TIFF tags</a></li>
+<li><a class="reference internal" href="#saving-small-ico-images">Saving small ICO images</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#api-additions">API additions</a><ul>
+<li><a class="reference internal" href="#new-resizing-filters">New resizing filters</a></li>
+<li><a class="reference internal" href="#added-strip-namespaces-argument-to-image-getxmp">Added <code class="docutils literal notranslate"><span class="pre">strip_namespaces</span></code> argument to <code class="docutils literal notranslate"><span class="pre">Image.getxmp()</span></code></a></li>
+<li><a class="reference internal" href="#added-escape-argument-to-psdraw-text">Added <code class="docutils literal notranslate"><span class="pre">escape</span></code> argument to <code class="docutils literal notranslate"><span class="pre">PSDraw.text()</span></code></a></li>
+<li><a class="reference internal" href="#imageops-invert-posterize-and-solarize-of-p-images">ImageOps invert, posterize and solarize of P images</a></li>
+<li><a class="reference internal" href="#path-like-objects-for-font-files">Path-like objects for font files</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#other-changes">Other changes</a><ul>
+<li><a class="reference internal" href="#python-3-15">Python 3.15</a></li>
+<li><a class="reference internal" href="#faster-import">Faster import</a></li>
+<li><a class="reference internal" href="#pypy-3-12">PyPy 3.12</a></li>
+<li><a class="reference internal" href="#faster-jpeg-2000-tiff-freetype-and-littlecms-in-macos-and-linux-wheels">Faster JPEG 2000, TIFF, FreeType and LittleCMS in macOS and Linux wheels</a></li>
+<li><a class="reference internal" href="#performance-improvements">Performance improvements</a></li>
+<li><a class="reference internal" href="#wheels-now-use-harfbuzz-for-hinting">Wheels now use HarfBuzz for hinting</a></li>
+<li><a class="reference internal" href="#thread-safety-for-free-threaded-python">Thread safety for free-threaded Python</a></li>
+<li><a class="reference internal" href="#resizing-images-with-alpha">Resizing images with alpha</a></li>
+<li><a class="reference internal" href="#preserved-transparency-when-padding-or-expanding-images-in-imageops">Preserved transparency when padding or expanding images in ImageOps</a></li>
+<li><a class="reference internal" href="#fixed-reading-fits-images-with-more-than-8-bits-per-pixel">Fixed reading FITS images with more than 8 bits per pixel</a></li>
+<li><a class="reference internal" href="#fixed-accuracy-of-16-bit-image-filters-and-conversions">Fixed accuracy of 16-bit image filters and conversions</a></li>
+<li><a class="reference internal" href="#saving-apng-frames-with-different-palettes">Saving APNG frames with different palettes</a></li>
+<li><a class="reference internal" href="#fixed-imagestat-variance-rounding">Fixed ImageStat variance rounding</a></li>
+<li><a class="reference internal" href="#fixed-imagechops-offset-for-16-bit-images">Fixed ImageChops.offset() for 16-bit images</a></li>
+<li><a class="reference internal" href="#fixed-drawing-on-i-16b-images">Fixed drawing on I;16B images</a></li>
+<li><a class="reference internal" href="#fixed-histograms-for-masked-la-la-and-pa-images">Fixed histograms for masked LA, La and PA images</a></li>
+<li><a class="reference internal" href="#fixed-exporting-arrow-arrays-from-images-with-non-contiguous-rows">Fixed exporting Arrow arrays from images with non-contiguous rows</a></li>
+<li><a class="reference internal" href="#fixed-combining-gif-frames-with-missing-durations">Fixed combining GIF frames with missing durations</a></li>
+<li><a class="reference internal" href="#png-palettes-are-no-longer-padded-when-saving-with-the-bits-argument">PNG palettes are no longer padded when saving with the <code class="docutils literal notranslate"><span class="pre">bits</span></code> argument</a></li>
+<li><a class="reference internal" href="#restore-image-position-if-imagesequence-all-frames-fails">Restore image position if ImageSequence.all_frames() fails</a></li>
+<li><a class="reference internal" href="#clean-up-tiff-encoders-before-closing-their-output-files">Clean up TIFF encoders before closing their output files</a></li>
+<li><a class="reference internal" href="#fixed-reading-psd-layers-at-the-wrong-file-offset">Fixed reading PSD layers at the wrong file offset</a></li>
+<li><a class="reference internal" href="#fixed-opening-xbm-images-with-comments">Fixed opening XBM images with comments</a></li>
+<li><a class="reference internal" href="#clarified-fribidi-shim-license">Clarified FriBiDi shim license</a></li>
+<li><a class="reference internal" href="#imagepath-path-compact-on-an-empty-path">ImagePath.Path.compact() on an empty path</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../_static/documentation_options.js?v=457d1205"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/tabs.js?v=3ee01567"></script>
+    <script src="../_static/js/activate_tab.js?v=f8fe9d20"></script>
+    </body>
+</html>
