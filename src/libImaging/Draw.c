@@ -423,7 +423,12 @@ x_cmp(const void *x0, const void *x1) {
 /* Sorts the intersections of a scan line: a few, so an insertion sort,
    in place of qsort's call overhead and comparisons through a pointer,
    which took a large part of the time of filling polygons. The same order:
-   equal values are interchangeable. */
+   equal values are interchangeable.
+   No special case for two values, the count of every row of a wide line:
+   GCC makes the compare and swap one 8-byte load of the two floats that
+   were just stored one by one, which the store buffer cannot forward, and
+   the wide lines took twice as long for 6% fewer instructions
+   (design/ROUND_2026-11-05_PLAN.md). */
 static void
 sort_intersections(float *xx, int n) {
     int i, k;

@@ -275,3 +275,44 @@ Timing the phases showed why, and what to do instead.
 - The baseline is refreshed by the last commit of this round, after the
   items that change counts on purpose.
 
+### 8. Drawing: the evidence was wrong, and two changes that did not survive (2026-11-05)
+
+Profiled again before changing anything (callgrind by line, then cycles,
+instructions and branch misses per run with `perf_event_open`,
+`bench-results/followup/drawcyc.py`: 2,000 lines, 400 rectangles, 60
+polygons on 2560x1600).
+
+- `roundf` is called where two edges meet at a corner, a few times per
+  polygon, not per span; the per-shape `calloc`s are 0.3% of the
+  instructions of wide lines. Neither is worth touching. The plan's item
+  came from reading the source, not from a profile.
+- A wide line costs about 215 instructions per row, spread: the scan over
+  the four edges 75, the insertion sort of two values 32, the call to the
+  span function with its two roundings 28, the span function with its
+  clipping and a fill of five or six pixels 58. At 5.3 instructions per
+  cycle it is instruction-bound, with no single place to gain.
+- The wheel runs 13% more instructions than the AVX-VNNI build on wide
+  lines (255 against 225 million; 48.7 against 42.4 million cycles) and
+  none more on one-pixel lines: baseline encoding over the whole scanner,
+  not a missing kernel. The 9% that the first comparison showed on
+  `draw/lines` is this.
+- Tried, measured, reverted:
+  - a two-value case in `sort_intersections()`: 6% fewer instructions
+    and **twice the time** (85 against 43 million cycles, 2.5
+    instructions per cycle). GCC loads the two floats with one 8-byte
+    load right after they were stored one by one, and a load wider than
+    the stores it overlaps is not forwarded. A comment in the function
+    now says so.
+  - rounding the intersections in `float` instead of through `double`:
+    the same cycles within 1% in both builds.
+  - `ImagingFill()` as one row and copies of it: `Image.new()` with a
+    colour takes 0.63 ms for 2560x1600 in every build either way; it is
+    bound by the memory.
+- Not done, a candidate: the scanner compiled per tier and called once
+  per polygon, which is enough work per call. It would give the wheel
+  the 13% on wide lines and move about 150 lines of `Draw.c` into a
+  header; polygons, bound by their fills and branch misses (1.6
+  instructions per cycle), would gain less.
+- The same pixels throughout: the random-shape hash (9,000 shapes,
+  three modes) is the same in all builds measured.
+
