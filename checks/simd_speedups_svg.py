@@ -12,21 +12,18 @@ Each bar is Pillow 13.0.0's best time over the branch build's, in fast mode
 
 from __future__ import annotations
 
-import json
 import math
 import sys
 from html import escape
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from simd_results import load as load_results
+
 MACHINES = [
-    (
-        "x86-core-ultra-9-285h.json",
-        "branch-avx2-fast",
-        "x86-64, AVX2 (Intel Core Ultra 9 285H)",
-    ),
-    ("arm64-jetson-orin.json", "branch-neon-fast", "arm64, NEON (NVIDIA Jetson Orin)"),
+    ("x86", "branch-avx2-fast", "x86-64, AVX2 (Intel Core Ultra 9 285H)"),
+    ("arm64", "branch-neon-fast", "arm64, NEON (NVIDIA Jetson Orin)"),
 ]
-BASE = "pillow-13.0.0"
 ROWS = [
     ("scale/RGB/320x200/bicubic", "Resize to 320×200, bicubic"),
     ("scale/RGBA/2048x1280/lanczos", "Resize RGBA to 2048×1280, Lanczos"),
@@ -76,16 +73,15 @@ text { font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
 
 def load(data_dir: Path) -> list[dict[str, float]]:
     """Speed-ups per case, one dict per machine, with "geomean" over all cases."""
+    machines = load_results(data_dir)
     out = []
-    for file, variant, _ in MACHINES:
-        d = json.loads((data_dir / file).read_text())
-        base = d["variants"][BASE]["results"]
-        res = d["variants"][variant]["results"]
-        speedups = {c: base[c]["best"] / res[c]["best"] for c in base if c in res}
-        speedups["geomean"] = math.exp(
-            sum(math.log(s) for s in speedups.values()) / len(speedups)
-        )
-        speedups["count"] = len(base)
+    for name, variant, _ in MACHINES:
+        m = machines[name]
+        speedups = {
+            c: m.speedup(variant, c) for c in m.cases if c in m.results(variant)
+        }
+        speedups["geomean"], _ = m.geomean(variant)
+        speedups["count"] = len(m.cases)
         out.append(speedups)
     return out
 

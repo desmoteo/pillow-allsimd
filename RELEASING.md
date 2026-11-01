@@ -81,3 +81,21 @@ Released as needed privately to individual vendors for critical security-related
   cd docker-images
   ./update-pillow-tag.sh [[release tag]]
   ```
+
+## Pillow-AllSIMD
+
+The fork's releases are tagged `allsimd-<version>` (`-linux` or `-macos` for
+one platform's files); the release workflow builds, tests and uploads them
+(`design/PLAN.md`). Before tagging:
+
+* [ ] If the kernels changed, rerun the benchmark
+  ([pillow-allsimd-perf](https://github.com/desmoteo/pillow-allsimd-perf),
+  `run.sh`, both machines), publish its results, then regenerate the tables
+  and the chart of the documentation from them and commit:
+  ```bash
+  make tables PERF=../pillow-allsimd-perf
+  ```
+  The generated regions name the benchmark commit their numbers come from,
+  and the lint workflow checks them against it.
+* [ ] Update the version in `src/PIL/_version.py` and `README.md`, and head
+  the entry in `CHANGES.SIMD.rst`.

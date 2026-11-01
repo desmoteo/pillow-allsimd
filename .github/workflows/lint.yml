@@ -30,3 +30,7 @@ jobs:
         run: uvx --with tox-uv tox -e lint
       - name: Mypy
         run: uvx --with tox-uv tox -e mypy
+      # The benchmark tables of the documentation against the data of the
+      # benchmark repository at the commit each table names
+      - name: Generated tables
+        run: python3 checks/simd_tables.py --check

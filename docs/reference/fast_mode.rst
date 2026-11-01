@@ -67,36 +67,29 @@ Pillow, or cache or deduplicate images by their content across versions.
 Operations with a fast kernel
 -----------------------------
 
-Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
-285H (AVX2) and an NVIDIA Jetson Orin (NEON).
-
 .. list-table::
    :header-rows: 1
 
    * - Operation
      - Fast kernel
-     - Speed-up (x86-64, arm64)
      - Difference from the exact result
    * - :py:class:`~PIL.ImageFilter.GaussianBlur` and
        :py:class:`~PIL.ImageFilter.UnsharpMask`, radius up to 6, 8-bit
        modes (L, LA, La, RGB, RGBA, RGBa, RGBX, CMYK)
      - Pillow's three box passes as one kernel with 8-bit weights, in one
        pass over the image; the bands near the edges are the exact result
-     - radius 0.5: 4.0x, 4.4x; 1: 3.3x, 3.2x; 2: 2.5x, 2.6x; 4: 1.5x, 2.3x
      - at most 3 levels, 0.1 to 0.7 on average; closer to a true Gaussian
        than the exact result
    * - :py:meth:`~PIL.Image.Image.convert` RGB, RGBA, RGBX → YCbCr and
        YCbCr → RGB
      - JPEG's formulas with 14-bit coefficients and one rounding, in place
        of tables that floor each term
-     - to YCbCr: 1.5x, 2.2x; to RGB: 1.3x, 2.6x
      - at most 1 level; against the float formulas 0.3% and 0.06% of values
        off by one, against 47% and 32% for the exact result
    * - :py:meth:`~PIL.Image.Image.convert` RGB, RGBA, RGBX → HSV
      - the same formulas, truncated exactly: one division in 32-bit floats
        per channel (arm64: for the hue, with the saturation from a table of
        its 65,536 values)
-     - 2.9x, 3.3x
      - hue 1 above the exact result for 0.3% of colours; saturation and value
        the same
    * - :py:meth:`~PIL.Image.Image.transform` (affine, extent, perspective,
@@ -104,8 +97,6 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
        bicubic, modes L, RGB, RGBA, RGBa, RGBX, CMYK
      - positions in fixed point (1/256 pixel), integer filters with one
        rounding
-     - rotate bilinear: 2.7x, 2.6x; bicubic: 2.9x, 3.4x; perspective: 2.1x,
-       2.3x; L rotate bilinear: 2.8x, 1.9x
      - at most 2 levels, 1 on photos (RGBA: more where alpha is low, from
        the premultiplication), but for the few pixels whose source position
        is on the image's edge, which may fall inside in one result and
@@ -113,7 +104,6 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
        by one, against 41% for the exact result
    * - :py:func:`~PIL.Image.blend`, alpha between 0 and 1
      - integer interpolation with alpha in 2^-15 units, rounded
-     - 1.7x, 4.1x
      - at most 1 level; the float result rounded, but within 0.004 of a
        half; the exact result is truncated
    * - :py:meth:`~PIL.Image.Image.resize` of 8-bit images with 4-byte
@@ -122,9 +112,6 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
      - the two passes fused through a ring of rows; the horizontal sums
        kept to 2^-6 levels instead of whole ones; the vertical pass in
        16-bit products
-     - upscale to 5478x3424: bilinear 1.17x, 1.43x; bicubic 1.28x, 1.47x;
-       RGBA bilinear 1.17x, 1.31x; downscale to 2048x1280 bicubic: 0.96x,
-       1.20x
      - at most 1 level (RGBA and LA: 2, premultiplied); against a float
        resize 0.4% to 1.5% of values off by one, against 8% to 25% for the
        exact result
@@ -133,12 +120,75 @@ Speed-ups are for 2560x1600 RGB images on one core of an Intel Core Ultra 9
        modes
      - ``reducing_gap=3.0``: an integer shrink with
        :py:meth:`~PIL.Image.Image.reduce` first
-     - 1/8 Lanczos: 1.9x, 2.5x; 1/16: 2.0x, 4.5x
      - at most 2 levels at photo sizes; more for small results (32x32:
        4, 9 at the edges)
 
 Other operations, and other arguments of these, use the exact kernels in
 fast mode too.
+
+How much faster the fast kernels are than the exact ones, for 2560×1600 RGB
+images on one core of an Intel Core Ultra 9 285H (AVX2) and an NVIDIA Jetson
+Orin (NEON), from the published benchmark (the exact kernels' own speed over
+Pillow is on the :doc:`kernels page </allsimd-kernels>`):
+
+.. generated: fast-mode-speedups (checks/simd_tables.py, pillow-allsimd-perf@0d7d352f2d047c9ff9daffe99d7314c197cd2ab2)
+
+.. list-table::
+   :header-rows: 1
+
+   * - Operation
+     - x86-64 (AVX2)
+     - arm64 (NEON)
+   * - Gaussian blur, radius 1
+     - 2.96x
+     - 3.18x
+   * - Unsharp mask, radius 2
+     - 1.68x
+     - 1.82x
+   * - RGB to YCbCr
+     - 1.62x
+     - 2.23x
+   * - YCbCr to RGB
+     - 1.25x
+     - 2.60x
+   * - RGB to HSV
+     - 3.00x
+     - 3.35x
+   * - rotate 30°, bilinear
+     - 2.97x
+     - 1.84x
+   * - rotate 30°, bicubic
+     - 3.10x
+     - 2.54x
+   * - rotate 30°, bicubic, RGBA
+     - 2.68x
+     - 2.23x
+   * - perspective, bilinear
+     - 2.30x
+     - 1.85x
+   * - blend, 50%
+     - 1.64x
+     - 4.20x
+   * - resize to 5478×3424, bilinear
+     - 1.17x
+     - 1.43x
+   * - resize to 5478×3424, bicubic
+     - 1.28x
+     - 1.47x
+   * - resize RGBA to 5478×3424, bilinear
+     - 1.17x
+     - 1.31x
+   * - resize to 2048×1280, bicubic
+     - 0.96x
+     - 1.20x
+   * - resize to 320×200, Lanczos (``reducing_gap``)
+     - 1.72x
+     - 2.61x
+   * - resize to 26×16, Lanczos (``reducing_gap``)
+     - 2.97x
+     - 5.75x
+
+.. generated-end
 
 Functions
 ---------
