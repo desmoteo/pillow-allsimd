@@ -394,7 +394,7 @@ Numbers
 own time in milliseconds for scale. The arm64 column is the NEON build
 on the Jetson Orin.
 
-.. generated: kernels-resize (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-resize (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -409,38 +409,38 @@ on the Jetson Orin.
      - 11.9
      - 6.9x
      - 10.8x
-     - 15.4
-     - 2.3x
+     - 15.5
+     - 2.6x
    * - To 320×200, bicubic
      - 22.3
      - 7.0x
      - 10.8x
-     - 30.5
-     - 2.5x
+     - 30.3
+     - 2.7x
    * - To 320×200, Lanczos
-     - 33.0
+     - 33.1
      - 6.7x
      - 10.0x
-     - 46.5
-     - 2.5x
+     - 46.4
+     - 2.6x
    * - To 2048×1280, bicubic
      - 46.4
      - 5.5x
      - 8.2x
      - 58.8
-     - 2.0x
+     - 2.1x
    * - To 5478×3424, bicubic
-     - 227
-     - 4.6x
-     - 6.2x
-     - 261
-     - 2.0x
+     - 226
+     - 4.5x
+     - 6.1x
+     - 262
+     - 2.1x
    * - RGBA to 320×200, bicubic
-     - 38.0
-     - 7.5x
-     - 12.5x
-     - 44.9
-     - 2.9x
+     - 38.4
+     - 7.7x
+     - 12.8x
+     - 44.7
+     - 3.0x
    * - L to 320×200, bicubic
      - 10.8
      - 9.4x
@@ -713,7 +713,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-blur (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-blur (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -725,16 +725,16 @@ milliseconds shown.
      - Pillow 13 (arm64, ms)
      - NEON
    * - Gaussian RGB, σ 1
-     - 122
-     - 4.4x
-     - 7.2x
+     - 121
+     - 4.3x
+     - 6.9x
      - 163
-     - 3.1x
+     - 3.0x
    * - Gaussian RGB, σ 10
      - 122
-     - 2.7x
-     - 4.7x
-     - 163
+     - 2.6x
+     - 4.6x
+     - 165
      - 1.8x
    * - Gaussian RGB, σ 30
      - 122
@@ -749,32 +749,32 @@ milliseconds shown.
      - 163
      - 1.8x
    * - Gaussian L, σ 10
-     - 37.4
+     - 37.1
      - 3.5x
-     - 6.3x
-     - 54.5
+     - 6.2x
+     - 54.3
      - 1.9x
    * - Box RGB, radius 2
-     - 55.3
+     - 54.8
      - 8.2x
-     - 14.1x
+     - 14.5x
      - 66.4
      - 4.6x
    * - Box RGB, radius 10
-     - 55.0
-     - 4.0x
-     - 7.4x
-     - 66.3
-     - 2.3x
+     - 54.6
+     - 5.6x
+     - 9.9x
+     - 66.9
+     - 3.2x
    * - Unsharp mask RGB
      - 198
      - 5.0x
-     - 7.4x
+     - 7.2x
      - 237
      - 3.2x
    * - Unsharp mask L
-     - 54.8
-     - 5.9x
+     - 54.9
+     - 6.0x
      - 8.9x
      - 70.1
      - 4.0x
@@ -1050,7 +1050,7 @@ Numbers
 2560×1600, times faster than Pillow 13.0.0, which took the milliseconds
 shown.
 
-.. generated: kernels-filters (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-filters (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -1065,16 +1065,16 @@ shown.
    * - RGB 3×3 SMOOTH
      - 51.4
      - 8.0x
-     - 12.2x
+     - 12.3x
      - 16.4x
      - 98.5
      - 3.6x
    * - RGB 3×3 SHARPEN
-     - 53.0
+     - 52.9
      - 8.2x
-     - 12.5x
+     - 12.6x
      - 16.9x
-     - 99.3
+     - 99.2
      - 6.7x
    * - RGB 3×3 EDGE_ENHANCE
      - 56.0
@@ -1086,7 +1086,7 @@ shown.
    * - RGB 3×3 FIND_EDGES
      - 147
      - 21.4x
-     - 33.4x
+     - 33.6x
      - 42.9x
      - 146
      - 9.9x
@@ -1102,13 +1102,13 @@ shown.
      - 5.8x
      - 12.1x
      - 14.8x
-     - 33.2
+     - 33.1
      - 8.3x
    * - L 5×5 SMOOTH_MORE
      - 42.5
      - 5.6x
      - 12.6x
-     - 14.3x
+     - 14.4x
      - 75.3
      - 4.5x
 
@@ -1313,7 +1313,7 @@ Numbers
 shown. The "portable" column is the fork's build without SIMD, where
 the compiler vectorizes the networks.
 
-.. generated: kernels-rank (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-rank (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -1327,39 +1327,39 @@ the compiler vectorizes the networks.
      - NEON
    * - Median 3×3 RGB
      - 1,182
-     - 52x
-     - 217x
-     - 419x
-     - 1,263
+     - 51x
+     - 216x
+     - 421x
+     - 1,262
      - 153x
    * - Median 5×5 RGB
-     - 4,020
-     - 55x
+     - 4,018
+     - 52x
      - 127x
      - 250x
-     - 3,940
+     - 3,942
      - 83x
    * - Median 3×3 L
      - 384
-     - 94x
+     - 87x
      - 281x
-     - 542x
-     - 410
+     - 541x
+     - 411
      - 191x
    * - Minimum 3×3 RGB
-     - 818
-     - 265x
-     - 433x
-     - 456x
+     - 817
+     - 269x
+     - 440x
+     - 463x
      - 886
-     - 246x
+     - 253x
    * - Maximum 3×3 RGB
-     - 815
-     - 254x
-     - 425x
-     - 458x
+     - 811
+     - 252x
+     - 439x
+     - 462x
      - 881
-     - 254x
+     - 253x
 
 .. generated-end
 
@@ -1539,7 +1539,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-conversions (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-conversions (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -1551,13 +1551,13 @@ milliseconds shown.
      - Pillow 13 (arm64, ms)
      - NEON
    * - RGB to L
-     - 2.2
-     - 1.9x
+     - 2.1
+     - 1.8x
      - 1.9x
      - 2.6
      - 1.1x
    * - L to RGB
-     - 2.6
+     - 2.7
      - 3.5x
      - 3.5x
      - 0.9
@@ -1565,19 +1565,19 @@ milliseconds shown.
    * - RGB to RGBA
      - 5.6
      - 4.6x
-     - 4.7x
-     - 1.7
+     - 4.6x
+     - 1.8
      - 1.0x
    * - RGB to CMYK
-     - 7.9
-     - 6.6x
-     - 6.7x
+     - 7.4
+     - 6.1x
+     - 6.2x
      - 1.8
      - 1.0x
    * - RGBA to RGBa
      - 9.0
-     - 5.1x
-     - 6.8x
+     - 5.0x
+     - 6.7x
      - 3.4
      - 1.1x
    * - RGBa to RGBA
@@ -1590,7 +1590,7 @@ milliseconds shown.
      - 59.7
      - 3.7x
      - 6.7x
-     - 81.5
+     - 81.6
      - 2.3x
    * - RGB to YCbCr
      - 9.2
@@ -1601,7 +1601,7 @@ milliseconds shown.
    * - YCbCr to RGB
      - 10.8
      - 3.0x
-     - 5.8x
+     - 5.7x
      - 14.3
      - 1.2x
 
@@ -1838,7 +1838,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-compositing (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-compositing (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -1852,7 +1852,7 @@ milliseconds shown.
    * - alpha_composite RGBA
      - 19.6
      - 3.8x
-     - 6.7x
+     - 6.8x
      - 22.1
      - 1.2x
    * - blend RGB, 50%
@@ -1862,43 +1862,43 @@ milliseconds shown.
      - 13.0
      - 1.0x
    * - composite RGB, L mask
-     - 11.8
-     - 1.2x
-     - 1.8x
+     - 11.7
+     - 3.0x
+     - 4.0x
      - 11.1
-     - 1.0x
+     - 1.8x
    * - ImageChops.multiply RGB
      - 14.7
-     - 6.4x
-     - 7.4x
+     - 6.6x
+     - 7.5x
      - 14.0
      - 3.8x
    * - ImageChops.screen RGB
      - 18.5
-     - 8.0x
-     - 9.2x
-     - 17.9
+     - 8.3x
+     - 9.4x
+     - 17.8
      - 4.9x
    * - ImageChops.add RGB
      - 10.4
-     - 5.5x
-     - 5.5x
+     - 5.4x
+     - 5.6x
      - 15.6
      - 4.9x
    * - ImageChops.lighter RGB
      - 5.3
      - 2.8x
-     - 2.8x
-     - 6.5
+     - 2.9x
+     - 6.4
      - 2.0x
    * - ImageOps.invert RGB
      - 4.1
-     - 3.1x
+     - 3.2x
      - 3.3x
      - 10.0
-     - 5.2x
+     - 5.3x
    * - point() RGB, a table
-     - 4.2
+     - 4.1
      - 1.1x
      - 1.1x
      - 10.0
@@ -1910,17 +1910,17 @@ milliseconds shown.
      - 3.7
      - 2.0x
    * - Color3DLUT RGB, 16³
-     - 80.1
-     - 5.2x
+     - 79.9
+     - 5.1x
      - 8.0x
      - 103
-     - 2.0x
+     - 3.2x
    * - Color3DLUT RGBA, 16³
-     - 98.7
+     - 97.9
      - 6.4x
-     - 10.2x
-     - 118
-     - 2.3x
+     - 10.1x
+     - 119
+     - 3.7x
 
 .. generated-end
 
@@ -2094,7 +2094,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-geometry (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-geometry (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -2112,44 +2112,44 @@ milliseconds shown.
      - 2.1
      - 1.2x
    * - ROTATE_180 RGB
-     - 2.1
-     - 1.6x
-     - 1.6x
+     - 2.0
+     - 1.5x
+     - 1.5x
      - 2.1
      - 1.2x
    * - ROTATE_90 RGB
-     - 3.8
-     - 2.0x
-     - 1.9x
-     - 5.9
+     - 3.6
+     - 1.8x
+     - 1.8x
+     - 6.0
      - 1.2x
    * - ROTATE_270 RGB
-     - 4.3
+     - 4.1
      - 2.1x
-     - 2.1x
-     - 7.9
-     - 1.6x
-   * - TRANSPOSE RGB
-     - 3.8
      - 2.0x
+     - 7.7
+     - 1.5x
+   * - TRANSPOSE RGB
+     - 3.6
      - 1.9x
-     - 6.3
-     - 1.3x
+     - 1.9x
+     - 6.1
+     - 1.2x
    * - ROTATE_90 L
-     - 2.8
-     - 6.5x
-     - 6.4x
-     - 5.5
-     - 3.3x
-   * - rotate 30°, nearest, RGB
-     - 11.1
-     - 2.4x
-     - 2.4x
-     - 40.3
+     - 2.7
+     - 6.3x
+     - 6.3x
+     - 5.4
      - 3.5x
+   * - rotate 30°, nearest, RGB
+     - 10.1
+     - 2.2x
+     - 2.2x
+     - 40.5
+     - 3.6x
    * - rotate 30°, bilinear, RGB
-     - 76.0
-     - 1.6x
+     - 75.9
+     - 1.7x
      - 2.1x
      - 128
      - 1.7x
@@ -2164,9 +2164,9 @@ milliseconds shown.
      - 1.8x
      - 2.9x
      - 390
-     - 1.9x
+     - 1.8x
    * - perspective, bilinear, RGB
-     - 83.6
+     - 83.5
      - 1.8x
      - 2.6x
      - 147
@@ -2358,7 +2358,7 @@ Numbers
 shown. The "portable" column is the build without SIMD: most of these
 gains are algorithmic.
 
-.. generated: kernels-drawing (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-drawing (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -2371,26 +2371,26 @@ gains are algorithmic.
      - Pillow 13 (arm64, ms)
      - NEON
    * - 200 filled polygons
-     - 62.0
+     - 61.7
      - 2.3x
      - 2.4x
      - 2.4x
-     - 89.4
+     - 87.4
      - 1.5x
    * - 200 filled ellipses
-     - 3.4
+     - 3.3
      - 1.5x
      - 1.5x
      - 1.5x
-     - 6.1
-     - 1.0x
+     - 5.9
+     - 0.9x
    * - 500 filled rectangles
      - 5.6
      - 1.7x
      - 1.7x
      - 1.8x
-     - 11.3
-     - 1.2x
+     - 11.2
+     - 1.1x
    * - 500 lines, 5 px wide
      - 3.1
      - 1.4x
@@ -2403,22 +2403,22 @@ gains are algorithmic.
      - 1.7x
      - 1.7x
      - 1.7x
-     - 3.8
+     - 3.7
      - 1.0x
    * - 100 ROI polygons, 2 px outline
-     - 19.8
-     - 7.7x
+     - 19.4
+     - 7.6x
      - 8.0x
-     - 8.1x
-     - 22.2
-     - 5.7x
+     - 8.0x
+     - 22.1
+     - 5.6x
    * - 100 lines of text
      - 57.0
-     - 7.1x
-     - 17.4x
-     - 17.2x
+     - 7.2x
+     - 17.6x
+     - 17.5x
      - 113
-     - 18.4x
+     - 18.3x
 
 .. generated-end
 
@@ -2620,7 +2620,7 @@ Numbers
 2560×1600 RGB, times faster than Pillow 13.0.0, which took the
 milliseconds shown; the "portable" column is the build without SIMD.
 
-.. generated: kernels-codecs (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-codecs (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -2633,40 +2633,40 @@ milliseconds shown; the "portable" column is the build without SIMD.
      - Pillow 13 (arm64, ms)
      - NEON
    * - Encode PNG, level 6
-     - 789
+     - 792
      - 1.8x
      - 5.1x
-     - 5.1x
-     - 1,021
-     - 4.4x
+     - 5.0x
+     - 1,020
+     - 4.3x
    * - Decode PNG
-     - 99.6
-     - 1.0x
-     - 1.0x
-     - 1.0x
-     - 109
-     - 1.1x
+     - 100
+     - 1.5x
+     - 1.6x
+     - 1.6x
+     - 110
+     - 1.4x
    * - Decode WebP
-     - 115
+     - 112
      - 1.5x
      - 1.5x
      - 1.5x
-     - 108
-     - 1.1x
+     - 109
+     - 1.2x
    * - Decode JPEG
-     - 15.5
+     - 16.4
      - 1.0x
      - 1.0x
      - 1.0x
-     - 28.6
+     - 28.4
      - 1.0x
    * - Median cut, 256 colours
-     - 2,930
-     - 8.3x
-     - 8.4x
-     - 8.2x
-     - 6,528
-     - 9.8x
+     - 2,762
+     - 7.8x
+     - 7.8x
+     - 7.7x
+     - 6,570
+     - 9.6x
 
 .. generated-end
 
@@ -3014,7 +3014,7 @@ Geometric means over the benchmark's 111 cases, times faster than Pillow
 the sections above and on the `benchmark page
 <https://desmoteo.github.io/pillow-allsimd-perf/>`_):
 
-.. generated: kernels-appendix-a (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-appendix-a (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -3023,32 +3023,32 @@ the sections above and on the `benchmark page
      - x86-64 (Core Ultra 9 285H)
      - arm64 (Jetson Orin)
    * - Portable (no SIMD)
-     - 1.71x
-     - 1.54x
+     - 1.74x
+     - 1.56x
    * - SSE4
-     - 4.26x
+     - 4.34x
      -
    * - AVX2
-     - 5.54x
+     - 5.62x
      -
    * - AVX-VNNI
-     - 5.65x
+     - 5.75x
      -
    * - NEON
      -
-     - 2.60x
+     - 2.71x
    * - Fast mode (AVX2, NEON)
-     - 6.24x
-     - 3.16x
+     - 6.34x
+     - 3.32x
    * - Pillow-SIMD 12.1.1 (AVX2)
-     - 2.11x
+     - 2.13x
      -
    * - OpenCV 5.0 (single-threaded)
      - 3.61x
-     - 2.17x
+     - 2.16x
    * - libvips 8.16
      - 1.18x
-     - 0.69x
+     - 0.70x
 
 .. generated-end
 

@@ -1,14 +1,14 @@
-.. generated: pypi-figures (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: pypi-figures (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
-.. |fast-x86| replace:: 6.2
-.. |fast-arm64| replace:: 3.2
+.. |fast-x86| replace:: 6.3
+.. |fast-arm64| replace:: 3.3
 .. |cases| replace:: 111
 .. |vs-pillow-simd| replace:: 3.0
 .. |opencv-cases| replace:: 104
-.. |opencv-x86| replace:: 76
-.. |opencv-arm64| replace:: 66
-.. |exact-x86| replace:: 5.5
-.. |exact-arm64| replace:: 2.6
+.. |opencv-x86| replace:: 77
+.. |opencv-arm64| replace:: 69
+.. |exact-x86| replace:: 5.6
+.. |exact-arm64| replace:: 2.7
 .. |date| replace:: 2026-11-05
 
 .. generated-end
@@ -16,7 +16,7 @@
 Pillow-AllSIMD
 ==============
 
-.. generated: pypi-headline (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: pypi-headline (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 **Pillow, 6 times as fast on x86-64 and 3 times as fast on arm64.**
 
@@ -59,27 +59,27 @@ Benchmarks
 Selected operations, one thread, a 2560×1600 RGB image. Each cell shows
 Pillow 13.0.0's time, then Pillow-AllSIMD's, then the speed-up:
 
-.. generated: pypi-benchmarks (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: pypi-benchmarks (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 =====================================  =========================  ========================
 Operation                              x86-64, AVX2               arm64, NEON
 =====================================  =========================  ========================
-Resize to 320×200, bicubic             22.3 → 1.40 ms, **16.0×**  30.5 → 5.10 ms, **6.0×**
-Resize RGBA to 2048×1280, Lanczos      120 → 9.85 ms, **12.2×**   145 → 40.5 ms, **3.6×**
-Enlarge to 5478×3424, bicubic          227 → 27.2 ms, **8.3×**    261 → 87.5 ms, **3.0×**
-Gaussian blur, radius 1                122 → 5.78 ms, **21.2×**   163 → 17.6 ms, **9.3×**
-Gaussian blur, radius 10               122 → 26.6 ms, **4.6×**    163 → 91.1 ms, **1.8×**
-Unsharp mask                           198 → 16.2 ms, **12.2×**   237 → 41.4 ms, **5.7×**
-SHARPEN filter                         53.0 → 4.21 ms, **12.6×**  99.3 → 14.7 ms, **6.7×**
-Median filter, 3×3                     1182 → 2.82 ms, **419×**   1263 → 8.28 ms, **153×**
-RGB to HSV                             59.7 → 2.99 ms, **20.0×**  81.5 → 10.6 ms, **7.7×**
-Unpremultiply alpha                    26.6 → 2.18 ms, **12.2×**  38.9 → 7.25 ms, **5.4×**
-Rotate 30°, bicubic                    187 → 30.2 ms, **6.2×**    290 → 81.3 ms, **3.6×**
-Alpha composite                        19.6 → 2.94 ms, **6.7×**   22.1 → 17.8 ms, **1.2×**
-Draw 100 lines of text                 57.0 → 3.25 ms, **17.5×**  113 → 6.21 ms, **18.2×**
-Decode JPEG                            15.5 → 15.3 ms, **1.0×**   28.6 → 28.7 ms, **1.0×**
-Encode PNG                             789 → 154 ms, **5.1×**     1021 → 231 ms, **4.4×**
-JPEG load, rotate, resize, blur, save  87.3 → 29.8 ms, **2.9×**   113 → 66.9 ms, **1.7×**
+Resize to 320×200, bicubic             22.3 → 1.40 ms, **16.0×**  30.3 → 4.71 ms, **6.4×**
+Resize RGBA to 2048×1280, Lanczos      121 → 9.87 ms, **12.3×**   145 → 36.8 ms, **4.0×**
+Enlarge to 5478×3424, bicubic          226 → 27.9 ms, **8.1×**    262 → 76.6 ms, **3.4×**
+Gaussian blur, radius 1                121 → 5.77 ms, **21.0×**   163 → 17.3 ms, **9.4×**
+Gaussian blur, radius 10               122 → 26.3 ms, **4.6×**    165 → 91.0 ms, **1.8×**
+Unsharp mask                           198 → 16.3 ms, **12.2×**   237 → 41.5 ms, **5.7×**
+SHARPEN filter                         52.9 → 4.21 ms, **12.6×**  99.2 → 14.7 ms, **6.7×**
+Median filter, 3×3                     1182 → 2.81 ms, **420×**   1262 → 8.27 ms, **153×**
+RGB to HSV                             59.7 → 2.99 ms, **20.0×**  81.6 → 10.6 ms, **7.7×**
+Unpremultiply alpha                    26.6 → 2.21 ms, **12.0×**  38.9 → 7.04 ms, **5.5×**
+Rotate 30°, bicubic                    187 → 30.1 ms, **6.2×**    290 → 81.7 ms, **3.6×**
+Alpha composite                        19.6 → 2.89 ms, **6.8×**   22.1 → 17.8 ms, **1.2×**
+Draw 100 lines of text                 57.0 → 3.24 ms, **17.6×**  113 → 6.14 ms, **18.5×**
+Decode JPEG                            16.4 → 15.6 ms, **1.0×**   28.4 → 28.7 ms, **1.0×**
+Encode PNG                             792 → 156 ms, **5.1×**     1020 → 236 ms, **4.3×**
+JPEG load, rotate, resize, blur, save  87.0 → 30.6 ms, **2.8×**   113 → 66.0 ms, **1.7×**
 =====================================  =========================  ========================
 
 .. generated-end

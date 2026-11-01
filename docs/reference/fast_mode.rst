@@ -131,7 +131,7 @@ images on one core of an Intel Core Ultra 9 285H (AVX2) and an NVIDIA Jetson
 Orin (NEON), from the published benchmark (the exact kernels' own speed over
 Pillow is on the :doc:`kernels page </allsimd-kernels>`):
 
-.. generated: fast-mode-speedups (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: fast-mode-speedups (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -140,53 +140,53 @@ Pillow is on the :doc:`kernels page </allsimd-kernels>`):
      - x86-64 (AVX2)
      - arm64 (NEON)
    * - Gaussian blur, radius 1
-     - 2.94x
-     - 3.04x
+     - 3.02x
+     - 3.11x
    * - Unsharp mask, radius 2
-     - 1.65x
+     - 1.69x
      - 1.79x
    * - RGB to YCbCr
-     - 1.62x
+     - 1.61x
      - 2.15x
    * - YCbCr to RGB
-     - 1.21x
-     - 2.63x
+     - 1.20x
+     - 2.62x
    * - RGB to HSV
      - 3.00x
-     - 3.34x
+     - 3.36x
    * - rotate 30°, bilinear
      - 2.82x
-     - 1.85x
+     - 1.84x
    * - rotate 30°, bicubic
-     - 3.04x
-     - 2.49x
+     - 3.03x
+     - 2.48x
    * - rotate 30°, bicubic, RGBA
      - 2.64x
-     - 2.21x
+     - 2.24x
    * - perspective, bilinear
-     - 2.29x
-     - 1.80x
+     - 2.31x
+     - 1.79x
    * - blend, 50%
-     - 1.63x
-     - 4.14x
+     - 1.65x
+     - 4.13x
    * - resize to 5478×3424, bilinear
-     - 1.18x
-     - 1.46x
+     - 1.19x
+     - 1.72x
    * - resize to 5478×3424, bicubic
-     - 1.35x
-     - 1.47x
+     - 1.32x
+     - 1.64x
    * - resize RGBA to 5478×3424, bilinear
-     - 1.21x
-     - 1.31x
+     - 1.18x
+     - 1.43x
    * - resize to 2048×1280, bicubic
      - 1.00x
-     - 1.20x
+     - 1.29x
    * - resize to 320×200, Lanczos (``reducing_gap``)
      - 1.76x
-     - 2.63x
+     - 2.62x
    * - resize to 26×16, Lanczos (``reducing_gap``)
-     - 2.98x
-     - 5.31x
+     - 2.97x
+     - 5.28x
 
 .. generated-end
 
