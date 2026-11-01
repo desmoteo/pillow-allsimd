@@ -193,7 +193,11 @@ the outputs; raw results in `bench-results/baseline-2026-11-04/` and
   libdeflate 1.26 (`wheels-dependencies.sh`, before libtiff, which picks
   it up on Linux), the SBOM lists it, the wheel check expects the
   feature. The benchmark's output check reports the encode cases as
-  different, which is the bytes, not the pixels.
+  different, which is the bytes, not the pixels. The wheel build checked
+  end to end with cibuildwheel from a clean clone (cp312 manylinux
+  x86_64): libdeflate 1.26 built and bundled (`pillow_allsimd.libs/`),
+  `HAVE_LIBDEFLATE` in the compile, the wheel checks (features and tiers)
+  and the suite inside the wheel passed (8,224 passed, 106 skipped).
 - **P3, the quantizer's colour hash (2026-11-04).** Three changes, each
   keeping the table's chains, merge points and iteration order as they
   were, so the palettes and indices are bit-identical (one hash over
