@@ -1,13 +1,12 @@
 # Plan: a detailed explanation of the Pillow-AllSIMD optimizations (x86-64 and arm64)
 
-Status: being written as `docs/allsimd-kernels.rst`, a page of the API
-documentation ("How the kernels work"), section by section in the order
-below (ground rules and resampling 2026-11-03; the blurs, the kernel
-filters, the rank filters, the colour conversions, compositing and the
-channel operations, geometry, drawing and text, and codecs and packing
-2026-11-04). The reader is as
-proposed; the location is the documentation site rather than a Markdown
-file, so that it is published with the API reference.
+Status: written, as `docs/allsimd-kernels.rst`, a page of the API
+documentation ("How the kernels work"), in the order below: the ground
+rules and resampling on 2026-11-03, the other sections and the appendices
+on 2026-11-04. The reader is as proposed; the location is the
+documentation site rather than a Markdown file, so that it is published
+with the API reference. The page is kept up to date with the kernels:
+when a kernel changes, its section does.
 
 ## What it is for
 

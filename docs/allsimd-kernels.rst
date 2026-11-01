@@ -19,12 +19,12 @@ Ultra 9 285H (x86-64, GCC 14) and an NVIDIA Jetson Orin (arm64,
 Cortex-A78AE, GCC 14). Unless a section says "fast mode", they are for
 exact mode, Pillow's arithmetic.
 
-The page is written section by section. Written so far: the ground rules,
-resampling, the blurs, the kernel filters, the rank filters, the colour
-conversions, compositing and the channel operations, geometry, drawing
-and text, and codecs and packing. To come: what was tried and dropped, where OpenCV and
-libvips are still faster, and the fast-mode kernels (meanwhile,
-``design/SIMD_FAST_KERNELS.md`` in the repository describes those).
+The sections: the ground rules; then, operation by operation, resampling,
+the blurs, the kernel filters, the rank filters, the colour conversions,
+compositing and the channel operations, geometry, drawing and text, and
+codecs and packing; then what was tried and dropped, where OpenCV and
+libvips are still faster, the fast-mode kernels, and three appendices:
+the overall numbers, a file map and the tools.
 
 Ground rules
 ------------
@@ -2401,3 +2401,350 @@ Paeth as libpng does lost to the scalar loops; writing JPEG from
 measured and dropped; and the four-table histogram, a clear gain over
 Pillow 12.3, was matched by Pillow 13's own rewrite, so it is kept
 where it still wins and not where it doesn't.
+
+What was tried and dropped
+--------------------------
+
+Reviewers ask about these first. Each was measured on the machine named
+and dropped for the reason given; the sections above tell the rest.
+
+On both architectures:
+
+* **Column strips** for the blur's and the resize's vertical passes, to
+  keep their accumulators in L1: 0.90 to 1.11x on the blur, and on the
+  resize 1.14 to 1.45x on some upscales but 11 to 21% slower on others.
+  Valgrind's cache model counted L1 misses that the hardware prefetcher
+  serves from L2.
+* **A different resize pass order per build** (vertical first for every
+  downscale): faster, but the result would then depend on the build.
+  The order is Pillow 13's.
+* **Fusing the two exact resize passes** (an 8-bit intermediate in a
+  ring): done only in fast mode, where the intermediate keeps 2⁻⁶ levels;
+  the exact version is still open (below).
+* **The horizontal resize pass in 16-bit products** for fast mode: faster
+  on the Jetson, 2.5 to 2.9x slower than the exact AVX2 kernel on x86;
+  one result on both machines rules out a kernel per architecture.
+* **A sampled Gaussian** for fast mode, in place of Pillow's three boxes
+  convolved: under-blurs at small σ (σ 0.3 is nearly the identity, where
+  Pillow blurs) and differs by up to 25 levels at edges and 30 at corners.
+* **``reducing_gap`` 2.0** for fast mode's large downscales: up to 6 levels
+  from the exact result at 16x; 3.0 stays within 2 on photos.
+* **Per-pixel PNG unfiltering** for Sub, Average and Paeth, as libpng does
+  it: 1.4 to 2.2x slower than the scalar loops, whose byte positions run
+  as independent chains. **JPEG encoding from 4-byte pixels**: 3 to 7%
+  slower than packing first. **WebP encoding through libwebp's
+  importers**: 0.5%. **zlib-ng**: the same time as Debian's zlib on this
+  data.
+* **ModeFilter variants**: keeping the highest count up to date was 2x
+  faster on noise and slower wherever modes occur; searching the counts
+  in blocks of 16 was slower than the plain loop.
+* **FP16** for any kernel: the exact paths must keep their float
+  arithmetic, fast mode's divisions need more than 11 bits, and x86 has
+  no FP16 arithmetic before AVX-512, so a kernel that gives the same
+  result everywhere would emulate it.
+* **Tiling transforms only when a row spans many source rows**, and other
+  tile shapes: no change, or slower (256×32 up to 3x slower than 64×64).
+
+On x86:
+
+* **Eight consecutive pixels per AVX2 step** for the integer 4-byte
+  kernel filters: 0.93 and 1.02x with AVX2, 0.89 and 0.46x with
+  AVX-VNNI; the duplicated lanes already make two pixels per
+  multiply-add. **AVX2 5×5 float kernels**: no gain (4-byte) and 0.57x
+  (1-byte). **Force-inlining the filter kernel per size** for its own
+  sake: 4% and 0%.
+* **Two rows per AVX2 vector** in the horizontal blur, the first time
+  (Gaussian 1.08x, unsharp 0.84x); adopted once the passes kept rows in
+  cache.
+* **``vpdpwssd`` in the horizontal resize pass**, where each pixel is one
+  long chain of additions: 1.55x slower than AVX2 on extreme downscales;
+  the pair instructions stay there, ``vpdpwssd`` in the vertical pass
+  and the filters.
+* **A reciprocal in place of the divisions** in the exact HSV: not exact.
+  **A multiplication by 1/6**: exact, no faster. **``pshufb`` table
+  lookups** for ``point()``: slower than the scalar lookup. **An SSE4
+  blend kernel** and **an SSE4 merge kernel**: no gain over GCC's code.
+* **Huge pages**: without ``madvise`` the AVX2 build was 2x slower on big
+  resizes and the box blur, so the advice stays.
+
+On arm64 (Cortex-A78AE, GCC 11, 12 and 14):
+
+* **NEON float filters for 1-byte images**: 1.5x slower than GCC's
+  vectorization of the generic loop. **NEON transform filters converting
+  each byte to double**, as x86 does: slower than the scalar filters;
+  the integer-differences form replaced them.
+* **The 12-bit weight split** for the blur's direct passes: slower than
+  the 32-bit multiply. **The 1-byte blur's four-row interleave**: 1 to
+  5% slower than the compiler's 1-byte loop.
+* **A corrected reciprocal** for the alpha composite and for
+  unpremultiplication, **a vector division** for the alpha composite,
+  **a 16-bit integer unpremultiplication**: all slower than the table
+  (alpha composite) or the float division (unpremultiplication). **A
+  reciprocal with a Newton step** for fast mode's HSV: 24.1 against 17.8
+  ms.
+* **Whole-pixel conversion loops** (the x86 form): 3.4x slower than the
+  byte loops with GCC 14 and faster with another GCC; the NEON loops
+  replaced both. **The NEON vertical blur pass** and **the first NEON
+  alpha composite**: 5% and 15% slower than the compiler's code.
+* **Reloading the ``point()`` tables per 16 pixels** instead of splitting
+  the row into planes: no gain.
+
+Where OpenCV and libvips are still faster
+-----------------------------------------
+
+Over the benchmark's 111 cases, against Pillow 13.0.0: on x86 the AVX2
+build is 5.44x (geometric mean), the AVX-VNNI build 5.56x, fast mode
+6.13x, the SSE4 build 4.18x and the portable build 1.71x, where
+Pillow-SIMD 12.1.1 with AVX2 is 2.13x and OpenCV 3.60x; on arm64 the
+NEON build is 2.52x, fast mode 3.08x, the portable build 1.49x and
+OpenCV 2.17x (libvips 1.18x and 0.70x, ImageMagick 0.28x and 0.20x). The
+cases where OpenCV or libvips are ahead fall into a few classes
+(``design/PERFORMANCE_GAPS.md`` has the per-case accounting over four
+rounds, ``design/OTHER_LIBRARIES_KERNELS.md`` the study of their code).
+
+Structural, and left alone because closing them would change Pillow's
+pixels or its layout:
+
+* **Four bytes per RGB pixel.** Pillow stores RGB as RGBX; OpenCV as
+  three bytes. Every bandwidth-bound operation moves 4/3 of the bytes
+  and runs at the same gigabytes per second (26 GB/s on the x86
+  machine, both libraries), so takes 4/3 of the time: the chops, flips
+  and rotate 180, invert, L to RGB, RGB to and from RGBA, YCbCr; and
+  every per-channel kernel does a third more work, which the 3×3 and 5×5
+  filters, the rank filters and the warps pay.
+* **Precision.** OpenCV's HSV divides by 12-bit reciprocal tables, its
+  Gaussian runs in 8.8 fixed point (KleidiCV's, behind the approximate
+  hint, in 8-bit weights with an 8-bit intermediate), Carotene's bilinear
+  resize uses 7-bit weights, the warps compute in single precision and
+  ``addWeighted`` in floats rounded once. Pillow's results are defined
+  by 22-bit (resize), 24-bit (blur) and double (transforms) arithmetic.
+  Fast mode takes the ones where a single rounding is both faster and
+  closer to the formula; the exact kernels keep Pillow's.
+* **Algorithms.** A true Gaussian kernel against three extended box
+  passes (OpenCV wins at small σ, Pillow at large); ``INTER_AREA``, a
+  box average, against an antialiasing convolution for downscales;
+  polygonal ellipses; Hershey stroke text against FreeType glyphs; a
+  centred stroke for polygon outlines against Pillow's rule that a wide
+  outline stays inside the polygon.
+* **Vendor kernels.** On x86, IPP's flips and 180° rotation and its RGBA
+  bicubic upscale (OpenCV's own code is 1.9x slower than Pillow's there);
+  on arm64, KleidiCV's transpose on L images and its median, Carotene's
+  erode and dilate.
+
+Closable without changing a pixel, in the order the gaps document lists
+them: fusing the two exact resize passes through a ring of horizontally
+resampled rows, with the RGBA premultiplication folded into the loads
+and its removal into the stores (the largest single gap on arm64, the
+RGBA upscale, 157 against 44 ms; done for fast mode, not yet for the
+exact kernels); 16-bit running vertical sums for the box blur's integer
+radii, with the 16-bit division checked at start-up as the direct passes
+do; sharing the middle rows' minimum or maximum between two output rows
+of the 3×3 rank filters; the NEON horizontal resample kernel for long
+filters (an 8x Lanczos downscale is 18 ms on the Jetson against 3.2 on
+x86, a wider ratio than elsewhere); and an integer form of YCbCr to RGB
+on NEON proven equal to the tables on all 256 values per term.
+
+What remains otherwise is the libraries' own: PNG decoding is 60% inflate
+and the rest the scalar Paeth and Sub filters; WebP encoding and
+decoding on arm64 are libwebp's, Debian's build against OpenCV's bundled
+one; ``point()`` with a table on x86 has no 256-entry byte shuffle below
+AVX-512 VBMI.
+
+Exact and fast modes
+--------------------
+
+Everything above is exact mode, Pillow's arithmetic, and it is what
+``PILLOW_ALLSIMD_FAST=0`` or ``Image.set_fast(False)`` selects. Fast
+mode, on by default, lets seven operations use kernels whose results
+differ from Pillow's by small documented amounts; :ref:`fast-mode` is the
+user documentation (the switch, the guarantees, the table of operations)
+and ``design/SIMD_FAST_KERNELS.md`` the full description of each kernel.
+This section gives the shape of each kernel and the rule they share.
+
+The rule: a fast kernel sits beside the exact path, in its own function
+that the operation's entry point calls when the thread's or the
+process's setting says so, read once per call; a portable C function
+defines its result, and the SSE4, AVX2 and NEON versions compute the
+same integers, so every build on every architecture gives the same
+pixels (each kernel has a ``fast:`` area in ``checks/simd_hashes.py``,
+one hash on x86 and arm64); its largest difference from the exact
+result and its error against a float reference are measured and
+asserted by ``Tests/test_fast_mode.py`` on six image shapes as noise and
+as photographs; arguments it doesn't take go to the exact path, which
+also raises the errors; and the output's mode, size and edge handling
+are the exact path's. The kernels, with their speed-ups over the exact
+kernels (x86 AVX2, arm64 NEON) and their difference from the exact
+result:
+
+* **Gaussian blur and unsharp mask**, σ up to 6, 8-bit modes
+  (``GaussianFast.c``): Pillow's three extended boxes, built with the
+  exact path's radius and weights, convolved into one kernel whose
+  weights are rounded to 1/256, applied in one sweep (vertical taps into
+  one row, then horizontal, every sum in 16 bits); the bands within the
+  kernel's reach of the edges are taken from the exact blur of strips
+  twice as wide, so that the exact path's per-pass clamping is
+  reproduced there. 3.3x and 3.2x at σ 1, 1.5x and 2.3x at σ 4; at most
+  3 levels, and closer to a true Gaussian than the exact result (one
+  rounding instead of three).
+* **RGB to and from YCbCr** (``ConvertYCbCr.c``): JPEG's formulas with
+  14-bit coefficients and one rounding, as OpenCV computes them, with
+  ``pmaddwd`` and ``phaddd`` or 16 pixels per NEON step. 1.5x and 2.2x
+  to YCbCr, 1.3x and 1.7x back; at most 1 level, and 0.3% and 0.06% of
+  values off by one against the float formulas where the exact tables
+  have 47% and 32%.
+* **RGB to HSV** (``rgb2hsv_fast()``): the same formulas truncated
+  exactly, ``floor(255 n / 6d)`` and ``floor(255 d / max)``, each one
+  single-precision division, which gives the floor exactly because a
+  non-integer quotient is at least 1/1530 from an integer; on arm64 the
+  saturation comes from a 64 KB table and the hue's division takes
+  16-bit lanes. 2.9x and 3.3x; hue 1 above the exact result for 0.3% of
+  colours, saturation and value the same.
+* **Affine, perspective and quad transforms and ``rotate()``**, bilinear
+  and bicubic, L and the 4-byte modes (``TransformFast.c``): positions in
+  exact integer arithmetic rounded to 1/256 pixel (perspective's two
+  divisions as one IEEE division per pixel in single precision below
+  32,768 pixels a side, four or eight lanes), the bilinear filter
+  vertical-first in 16-bit lanes with one rounding, the bicubic as a
+  table of 256 weight sets at 12 fractional bits; four pixels per AVX2
+  step. Rotate bilinear 2.7x and 2.6x, bicubic 2.9x and 3.4x; at most 2
+  levels (1 on photos), 0.6% of values off by one against float
+  interpolation where the exact path's truncation has 41%; the pixels
+  whose source position falls exactly on the image's edge may count as
+  inside in one result and outside in the other.
+* **Blend**, 0 < alpha < 1 (``blend_fast_row()``): alpha in 2⁻¹⁵ units,
+  ``in1 + ((in2 - in1) a + 2¹⁴) >> 15``, which is what ``pmulhrsw`` and
+  ``vqrdmulh`` compute. 1.7x and 4.1x; at most 1 level, the float result
+  rounded rather than truncated.
+* **Resize** of 8-bit images with 4-byte pixels, any filter but nearest,
+  when the vertical pass comes second (``ResampleFast.c``): the two
+  passes fused through a ring of ``ksize + 3`` rows, the horizontal
+  kernels compiled a second time to keep 2⁻⁶ levels instead of whole
+  ones (``RESAMPLE_OUT16``), the vertical pass in 16-bit products with
+  ``pmulhrsw``/``vqrdmulh``. 1.2 to 1.3x on x86 upscales, 1.3 to 1.5x on
+  arm64, 2 to 4% slower on moderate x86 downscales; at most 1 level (2
+  for RGBA and LA, premultiplied), 0.4 to 1.5% of values off by one
+  against a float resize where the exact result has 8 to 25%.
+* **Large downscales** with the bicubic, Lanczos and MKS filters
+  (``Image.resize()``): ``reducing_gap=3.0``, so a downscale of 6x or
+  more first shrinks by an integer factor with ``reduce()``, exact box
+  averages, and convolves the last 3x to 6x; a different algorithm, not a
+  rounding, so bounded by measurement. 1/8 Lanczos 1.9x and 2.5x, 1/16
+  2.0x and 4.5x; at most 2 levels at photo sizes, more at very small
+  sizes, where ``reduce()`` averages partial boxes at the edges.
+
+With fast mode on, the 320×200 bicubic downscale of the resampling
+section is 15.8x and 6.0x, the σ 1 Gaussian 21.6x and 9.7x, HSV 20x and
+7.7x, the 30° bicubic rotation 6.3x and 3.7x; the benchmark page shows
+both modes side by side.
+
+Appendix A: the numbers in one place
+------------------------------------
+
+Geometric means over the benchmark's 111 cases, times faster than Pillow
+13.0.0, the published run of 2026-10-31 (the per-operation tables are in
+the sections above and on the `benchmark page
+<https://desmoteo.github.io/pillow-allsimd-perf/>`_):
+
+.. list-table::
+   :header-rows: 1
+
+   * - Build
+     - x86-64 (Core Ultra 9 285H)
+     - arm64 (Jetson Orin)
+   * - Portable (no SIMD)
+     - 1.71x
+     - 1.49x
+   * - SSE4
+     - 4.18x
+     -
+   * - AVX2
+     - 5.44x
+     -
+   * - AVX-VNNI
+     - 5.56x
+     -
+   * - NEON
+     -
+     - 2.52x
+   * - Fast mode (AVX2, NEON)
+     - 6.13x
+     - 3.08x
+   * - Pillow-SIMD 12.1.1 (AVX2)
+     - 2.13x
+     -
+   * - OpenCV 5.0 (single-threaded)
+     - 3.60x
+     - 2.17x
+   * - libvips 8.16
+     - 1.18x
+     - 0.70x
+
+The portable build's gain is the share of the algorithmic changes: the
+pass orders, the rings, the sorting networks, the caches. The arm64
+factors are smaller than the x86 ones for two reasons the sections
+explain: Pillow 13's own code is already vectorized by GCC on arm64 for
+many loops that stay scalar on x86, and NEON's 128-bit lanes and
+instruction mix gain less over that than AVX2 does.
+
+Appendix B: file map
+--------------------
+
+Where the kernels live, by file; each has an SSE4 version with AVX2
+blocks inside, a NEON version and a portable one, unless noted.
+
+* ``ImagingSIMD.h``: the ISA macros, ``SIMD_FORCE_INLINE``, ``mm_dpwssd``
+  and ``mm256_dpwssd``, ``mm_madd_add``, ``permute4()``, the widening
+  loads; ``ImagingPx4.h``: one pixel as four 32-bit lanes.
+* Resampling: ``Resample.c`` (the drivers),
+  ``ResampleSIMDHorizontalConv.c``, ``ResampleSIMDVerticalConv.c``,
+  ``ResampleSIMD32bpc.c`` (I, F, I;16), ``ResampleFast.c`` (fast mode),
+  ``Reduce.c`` and ``ReduceSIMD.c``.
+* Blurs: ``BoxBlur.c``, ``GaussianFast.c`` (fast mode), ``UnsharpMask.c``.
+* Kernel filters: ``Filter.c`` with ``FilterSIMD_3x3i_4u8.c``,
+  ``FilterSIMD_5x5i_4u8.c``, ``FilterSIMD_3x3f_4u8.c``,
+  ``FilterSIMD_5x5f_4u8.c``, ``FilterSIMD_3x3f_u8.c``,
+  ``FilterSIMD_5x5f_u8.c`` (x86), ``FilterSIMD_NxNi.c`` (x86 and NEON),
+  ``FilterSIMD_NxNf.c`` (NEON).
+* Rank filters: ``RankFilter.c``; ``ModeFilter.c`` (portable).
+* Conversions: ``Convert.c``, ``ConvertYCbCr.c``.
+* Compositing and channels: ``AlphaComposite.c``, ``Blend.c``, ``Paste.c``,
+  ``Chops.c``, ``Point.c`` (byte operations; NEON lookups), ``ColorLUT.c``,
+  ``Bands.c``.
+* Geometry: ``Geometry.c``, ``TransformFast.c`` (fast mode).
+* Drawing and text: ``Draw.c``, ``Paste.c`` (masked fills),
+  ``_imagingft.c`` (the glyph cache, portable).
+* Codecs and packing: ``ZipEncode.c``, ``ZipDecode.c``, ``Pack.c``,
+  ``Unpack.c``, ``_webp.c``, ``JpegDecode.c``; ``Quant.c`` (the nearest
+  search), ``QuantHash.c`` and ``Histo.c`` (portable).
+* ``Fast.c``: the fast-mode setting, process-wide and per thread.
+
+Appendix C: the tools
+---------------------
+
+* ``checks/simd_hashes.py``: one hash per kernel area over many sizes
+  and modes; run with each build on ``PYTHONPATH`` and compare. The areas
+  agree on every build except where this page says so.
+* ``Tests/test_simd_consistency.py`` and ``Tests/simd_shapes.py``: the
+  vector loops and their scalar tails give the same pixels, on six image
+  shapes; ``Tests/test_fast_mode.py``: the fast kernels' bounds;
+  ``Tests/conftest.py``'s ``EXACT_KERNEL_TESTS``: the Pillow tests that
+  compare with Pillow's own pixels and so run with the exact kernels
+  (an entry that matches no test fails the collection, so a renamed
+  test can't slip through).
+* ``checks/simd_test_remote.sh``: the test suite per SIMD build in a
+  container, on this machine or over SSH, with its own Python and
+  libraries, for other platforms too (QEMU);
+  ``checks/simd_bench_remote.sh``: builds and benchmarks a git ref on a
+  remote x86 or arm64 machine.
+* ``checks/simd_bench.py``: times operations across several builds, each
+  in its own process; ``checks/simd_callgrind.py`` and
+  ``checks/simd_allocs.py``: instructions, cache misses and allocations
+  per operation; ``checks/simd_profile_report.py``: the three combined
+  into a report that ranks operations by the kind of work left in them
+  (``design/PROFILE_ASSESSMENT.md`` came from it).
+* The benchmark repository, `pillow-allsimd-perf
+  <https://github.com/desmoteo/pillow-allsimd-perf>`_: 111 cases against
+  Pillow, Pillow-SIMD, OpenCV, libvips and ImageMagick in Docker, with
+  ``analysis/`` scripts for accuracy against references;
+  ``checks/simd_speedups_svg.py`` draws the chart of the PyPI description
+  from its results.
