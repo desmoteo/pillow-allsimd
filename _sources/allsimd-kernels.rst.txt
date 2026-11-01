@@ -100,6 +100,27 @@ build is the common files' portable code compiled for x86-64. On arm64,
 NEON is part of the baseline, so the wheels have it and the build has
 one tier.
 
+**Plain loops compiled per tier (2026-11-05).** A dispatch build compiles
+the common files for baseline x86-64, and some of their loops, with no
+kernel of their own, were fast in a build for AVX2 only because the
+compiler vectorized them there: timing all 216 operations of
+``checks/simd_bench.py`` in the wheel against the AVX-VNNI build found
+them, 1.6 to 3.4 times slower in the wheel. Those loops are now in
+``PlainLoops.h``, in plain C, and compiled several times: by the file
+that owns the operation, for the scalar table, and by ``SIMDKernels.c``
+for each tier, whose companions put them in the kernel table, called
+once per row. They are soft light, hard light and overlay (three integer
+divisions per byte: 24.5 to 7.0 ms and 26.5 to 7.7 ms on a 2560x1600 RGB
+image in the wheel), the exact and the extrapolating blend (float per
+byte; ``ImageEnhance.Color`` 13.1 to 7.7 ms, ``Sharpness`` 13.8 to
+8.4 ms), the colour matrix's rows (4.4 to 2.3 ms to L), L to I and I to
+L (2.4 to 1.6 ms), and the sorting network of the general rank filter,
+whose minima and maxima are twice as wide in AVX2 (a 7x7 rank on L:
+53.6 to 31.1 ms). The wheel now runs each at the AVX2 build's speed. It
+is the same C in every tier and no tier is compiled with FMA, so the
+results are the same, which ``Tests/test_simd_tiers.py`` checks for
+each.
+
 ``ImagingSIMD.h`` also holds the helpers the kernels share:
 ``SIMD_FORCE_INLINE`` for kernels that must see a shift count as a
 constant; ``mm_dpwssd`` and ``mm256_dpwssd``, one ``vpdpwssd`` with
@@ -274,19 +295,32 @@ NEON has no pair-summing multiply, so the horizontal kernel takes one tap
 per instruction and four channels per lane group:
 ``neon_resample_horiz_px()`` loads 16 bytes, widens them to two vectors of
 eight 16-bit values (``vmovl_u8``), and multiply-accumulates each pixel's
-four channels by its weight as a scalar (``vmlal_n_s16``), alternating
-between two accumulators so that the two chains of dependent adds run in
-parallel:
+four channels by its weight, a lane of the four weights loaded together
+(``vmlal_lane_s16``), alternating between two accumulators so that the
+two chains of dependent adds run in parallel:
 
 .. code-block:: c
 
-    uint8x16_t source = vld1q_u8(in + x * 4);
-    int16x8_t lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(source)));
-    int16x8_t hi = vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(source)));
-    sss = vmlal_n_s16(sss, vget_low_s16(lo), k[x]);
-    sss1 = vmlal_n_s16(sss1, vget_high_s16(lo), k[x + 1]);
-    sss = vmlal_n_s16(sss, vget_low_s16(hi), k[x + 2]);
-    sss1 = vmlal_n_s16(sss1, vget_high_s16(hi), k[x + 3]);
+    for (; end - k >= 4; k += 4, in += 16) {
+        uint8x16_t source = vld1q_u8(in);
+        int16x4_t kv = vld1_s16(k);
+        int16x8_t lo = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(source)));
+        int16x8_t hi = vreinterpretq_s16_u16(vmovl_high_u8(source));
+        sss = vmlal_lane_s16(sss, vget_low_s16(lo), kv, 0);
+        sss1 = vmlal_high_lane_s16(sss1, lo, kv, 1);
+        sss = vmlal_lane_s16(sss, vget_low_s16(hi), kv, 2);
+        sss1 = vmlal_high_lane_s16(sss1, hi, kv, 3);
+    }
+
+The pointers that advance are the point (2026-11-05). The loop had an
+``int`` index and a weight per multiply (``vmlal_n_s16(sss, …, k[x])``),
+and GCC made of it four sign-extended address computations and four
+scalar loads beside the pixels' one: 17 instructions for four taps, in a
+loop that ran at four instructions per cycle. As above it is 10. A 1/4
+bicubic resize of 2560x1600 RGB went from 108.6 to 80.0 million
+instructions and from 27.0 to 25.3 million cycles on the Cortex-A78:
+less than the instructions, because the loop now waits for the one
+vector multiplier, a ``smlal`` per tap and pixel.
 
 The sums are added at the end, shifted (``vshlq_s32`` by a negative
 count) and narrowed with saturation to 16 bits and to bytes
@@ -295,6 +329,16 @@ count) and narrowed with saturation to 16 bits and to bytes
 kernel widens 32 bytes of each source row and accumulates them in eight
 vectors, 32 bytes of output per step, with a 16-byte and a 4-byte tail.
 Rows are read in order, as on x86.
+
+Fast mode's vertical kernel (``resample_fast_vrow_simd()``, 16-bit rows
+and weights, ``sqrdmulh``) is compiled for each tap count from 2 to 16
+as a constant (``resample_fast_vrow_taps()``): the general loop loaded a
+row pointer and a weight for every tap of every 16 bytes, 11
+instructions per tap and step, and with the count known both stay in
+registers, 6. Enlarging by 1.5 with Lanczos, where the vertical pass is
+a third of the time: 116.8 to 104.3 million cycles. With the horizontal
+change, RGB and RGBA resizes take 8 to 15% fewer cycles, the same
+pixels.
 
 The portable vertical kernel is written to be vectorized at ``-O2``: it
 sums chunks of 64 bytes into a fixed array of 32-bit sums, and GCC turns
@@ -350,7 +394,7 @@ Numbers
 own time in milliseconds for scale. The arm64 column is the NEON build
 on the Jetson Orin.
 
-.. generated: kernels-resize (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-resize (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -365,38 +409,38 @@ on the Jetson Orin.
      - 11.9
      - 6.9x
      - 10.8x
-     - 15.4
-     - 2.3x
+     - 15.5
+     - 2.6x
    * - To 320×200, bicubic
      - 22.3
      - 7.0x
      - 10.8x
-     - 30.5
-     - 2.5x
+     - 30.3
+     - 2.7x
    * - To 320×200, Lanczos
-     - 33.0
+     - 33.1
      - 6.7x
      - 10.0x
-     - 46.5
-     - 2.5x
+     - 46.4
+     - 2.6x
    * - To 2048×1280, bicubic
      - 46.4
      - 5.5x
      - 8.2x
      - 58.8
-     - 2.0x
+     - 2.1x
    * - To 5478×3424, bicubic
-     - 227
-     - 4.6x
-     - 6.2x
-     - 261
-     - 2.0x
+     - 226
+     - 4.5x
+     - 6.1x
+     - 262
+     - 2.1x
    * - RGBA to 320×200, bicubic
-     - 38.0
-     - 7.5x
-     - 12.5x
-     - 44.9
-     - 2.9x
+     - 38.4
+     - 7.7x
+     - 12.8x
+     - 44.7
+     - 3.0x
    * - L to 320×200, bicubic
      - 10.8
      - 9.4x
@@ -573,6 +617,21 @@ packed to bytes. ``packssdw`` and ``packuswb`` pack within 128-bit lanes,
 so the AVX2 version ends with a ``vpermd`` that puts the four groups back
 in order.
 
+*The far weight of zero (2026-11-05).* Each output byte is two products,
+the box's sum by ``ww`` and the two bytes just outside the box by ``fw``,
+which is what the integer weight leaves of 2²⁴, halved: 0 whenever 2²⁴
+is 0 or 1 modulo the box, as for the radii 1 to 4, 6, 7, 8, 10 and 17.
+The running sums, horizontal and vertical, then skip the second product
+(``BOX_STEP_WHOLE``, the ``whole`` argument of ``box_columns_body()``):
+it was half of the multiplies, and on the Cortex-A78, with one vector
+multiplier, the blur at radius 10 went from 57.1 to 42.3 million cycles
+on a 2560x1600 RGB image (1.35x); on x86, where ``pmulld`` is two µops,
+from 7.5 to 5.5 ms with AVX2 and 13.8 to 9.8 ms with SSE4.1. Adding
+zero changes no byte. Radii with a far weight (5, 9, 12, any fraction)
+run as before; taking the difference of the entering and leaving pixels
+first, to shorten the sum's chain to one addition, measured the same
+there.
+
 *Direct passes* (``box_direct()``) sum the inner sources in 16-bit lanes
 (``pmovzxbw``, ``paddw``), 32 bytes per step with AVX2, 16 with SSE4.
 The exact form then needs ``acc * ww + e * fw`` with 24-bit weights,
@@ -654,7 +713,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-blur (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-blur (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -666,16 +725,16 @@ milliseconds shown.
      - Pillow 13 (arm64, ms)
      - NEON
    * - Gaussian RGB, σ 1
-     - 122
-     - 4.4x
-     - 7.2x
+     - 121
+     - 4.3x
+     - 6.9x
      - 163
-     - 3.1x
+     - 3.0x
    * - Gaussian RGB, σ 10
      - 122
-     - 2.7x
-     - 4.7x
-     - 163
+     - 2.6x
+     - 4.6x
+     - 165
      - 1.8x
    * - Gaussian RGB, σ 30
      - 122
@@ -690,32 +749,32 @@ milliseconds shown.
      - 163
      - 1.8x
    * - Gaussian L, σ 10
-     - 37.4
+     - 37.1
      - 3.5x
-     - 6.3x
-     - 54.5
+     - 6.2x
+     - 54.3
      - 1.9x
    * - Box RGB, radius 2
-     - 55.3
+     - 54.8
      - 8.2x
-     - 14.1x
+     - 14.5x
      - 66.4
      - 4.6x
    * - Box RGB, radius 10
-     - 55.0
-     - 4.0x
-     - 7.4x
-     - 66.3
-     - 2.3x
+     - 54.6
+     - 5.6x
+     - 9.9x
+     - 66.9
+     - 3.2x
    * - Unsharp mask RGB
      - 198
      - 5.0x
-     - 7.4x
+     - 7.2x
      - 237
      - 3.2x
    * - Unsharp mask L
-     - 54.8
-     - 5.9x
+     - 54.9
+     - 6.0x
      - 8.9x
      - 70.1
      - 4.0x
@@ -991,7 +1050,7 @@ Numbers
 2560×1600, times faster than Pillow 13.0.0, which took the milliseconds
 shown.
 
-.. generated: kernels-filters (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-filters (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -1006,16 +1065,16 @@ shown.
    * - RGB 3×3 SMOOTH
      - 51.4
      - 8.0x
-     - 12.2x
+     - 12.3x
      - 16.4x
      - 98.5
      - 3.6x
    * - RGB 3×3 SHARPEN
-     - 53.0
+     - 52.9
      - 8.2x
-     - 12.5x
+     - 12.6x
      - 16.9x
-     - 99.3
+     - 99.2
      - 6.7x
    * - RGB 3×3 EDGE_ENHANCE
      - 56.0
@@ -1027,7 +1086,7 @@ shown.
    * - RGB 3×3 FIND_EDGES
      - 147
      - 21.4x
-     - 33.4x
+     - 33.6x
      - 42.9x
      - 146
      - 9.9x
@@ -1043,13 +1102,13 @@ shown.
      - 5.8x
      - 12.1x
      - 14.8x
-     - 33.2
+     - 33.1
      - 8.3x
    * - L 5×5 SMOOTH_MORE
      - 42.5
      - 5.6x
      - 12.6x
-     - 14.3x
+     - 14.4x
      - 75.3
      - 4.5x
 
@@ -1254,7 +1313,7 @@ Numbers
 shown. The "portable" column is the fork's build without SIMD, where
 the compiler vectorizes the networks.
 
-.. generated: kernels-rank (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-rank (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -1268,39 +1327,39 @@ the compiler vectorizes the networks.
      - NEON
    * - Median 3×3 RGB
      - 1,182
-     - 52x
-     - 217x
-     - 419x
-     - 1,263
+     - 51x
+     - 216x
+     - 421x
+     - 1,262
      - 153x
    * - Median 5×5 RGB
-     - 4,020
-     - 55x
+     - 4,018
+     - 52x
      - 127x
      - 250x
-     - 3,940
+     - 3,942
      - 83x
    * - Median 3×3 L
      - 384
-     - 94x
+     - 87x
      - 281x
-     - 542x
-     - 410
+     - 541x
+     - 411
      - 191x
    * - Minimum 3×3 RGB
-     - 818
-     - 265x
-     - 433x
-     - 456x
+     - 817
+     - 269x
+     - 440x
+     - 463x
      - 886
-     - 246x
+     - 253x
    * - Maximum 3×3 RGB
-     - 815
-     - 254x
-     - 425x
-     - 458x
+     - 811
+     - 252x
+     - 439x
+     - 462x
      - 881
-     - 254x
+     - 253x
 
 .. generated-end
 
@@ -1480,7 +1539,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-conversions (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-conversions (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -1492,13 +1551,13 @@ milliseconds shown.
      - Pillow 13 (arm64, ms)
      - NEON
    * - RGB to L
-     - 2.2
-     - 1.9x
+     - 2.1
+     - 1.8x
      - 1.9x
      - 2.6
      - 1.1x
    * - L to RGB
-     - 2.6
+     - 2.7
      - 3.5x
      - 3.5x
      - 0.9
@@ -1506,19 +1565,19 @@ milliseconds shown.
    * - RGB to RGBA
      - 5.6
      - 4.6x
-     - 4.7x
-     - 1.7
+     - 4.6x
+     - 1.8
      - 1.0x
    * - RGB to CMYK
-     - 7.9
-     - 6.6x
-     - 6.7x
+     - 7.4
+     - 6.1x
+     - 6.2x
      - 1.8
      - 1.0x
    * - RGBA to RGBa
      - 9.0
-     - 5.1x
-     - 6.8x
+     - 5.0x
+     - 6.7x
      - 3.4
      - 1.1x
    * - RGBa to RGBA
@@ -1531,7 +1590,7 @@ milliseconds shown.
      - 59.7
      - 3.7x
      - 6.7x
-     - 81.5
+     - 81.6
      - 2.3x
    * - RGB to YCbCr
      - 9.2
@@ -1542,7 +1601,7 @@ milliseconds shown.
    * - YCbCr to RGB
      - 10.8
      - 3.0x
-     - 5.8x
+     - 5.7x
      - 14.3
      - 1.2x
 
@@ -1715,6 +1774,18 @@ The idea
   colour channels of transparent pixels taking a mask of 255 as the
   scalar expression gives; the SSE4 and NEON kernels exist, AVX2 uses
   SSE4's. The drawing section returns to it.
+* **Pasting through a mask (2026-11-05).** ``paste(im, box, mask)`` with
+  an L mask, which is also ``Image.composite()``, and with an RGBA mask,
+  which is how an RGBA image is pasted over another through its own
+  alpha, blended a byte at a time; a compiler given AVX2 made vectors of
+  the loop, and the wheel's baseline did not. ``paste_mask_L_simd()``
+  and ``paste_mask_RGBA_simd()`` are the masked fill's blend with the
+  source row in place of the ink, 32 bytes or eight pixels at a time in
+  AVX2, the mask byte spread to its pixel's four bytes with one shuffle.
+  Mask composite on 2560x1600 RGB: 11.7 ms in the wheel and 6.3 ms in
+  the AVX2 build before, 3.0 ms in both now; RGBA over RGB 12.0 and
+  5.8 ms before, 2.9 ms now. The rows of an image pasted into itself
+  overlap, and those go to the scalar loop.
 * **The 3D colour LUT.** Pillow-SIMD's kernel on x86: the index and the
   interpolation weight of each axis in one 16-bit value (6 bits of
   index, 9 of weight), the eight entries interpolated with ``pmaddwd``
@@ -1724,7 +1795,20 @@ The idea
   build's by up to two levels in about 10% of the bytes for a random
   table (none for a smooth one), the other exception the ground rules
   list. The NEON kernel computes Pillow's arithmetic instead, one pixel
-  as four 32-bit lanes, and gives the scalar pixels.
+  as four 32-bit lanes, and gives the scalar pixels. That is seven
+  32-bit multiplies a pixel on a core with one vector multiplier, so
+  (2026-11-05) where every value of the table is within −16384..16383,
+  about twice the range of the colours 0..1 and the case of every
+  table that does not extrapolate far, ``neon_lut_pair()`` interpolates
+  two pixels at once in 16-bit lanes: the weight is 15 bits, the
+  difference of two entries fits 16, and ``sqdmulh`` gives
+  ((*b* − *a*) · *s*) >> 15 exactly, so the seven multiplies serve two
+  pixels, and one narrowing shift does the rounding and the clipping.
+  103.4 to 63.5 million cycles on a 2560x1600 image (1.63x, 52 to
+  32 ms), the same pixels as the scalar code; other tables keep the
+  32-bit kernel. Tables of each channel's cell offset and weight, in
+  place of computing them for every pixel, measured 2% and were not
+  kept.
 * **Bands.** ``split()`` and ``getchannel()`` transpose four pixels into
   planes with one ``pshufb`` on x86 and ``vld4q`` on NEON; ``merge()``
   uses ``vst4q`` on NEON, and on x86 the compiler's code, since an
@@ -1754,7 +1838,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-compositing (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-compositing (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -1768,7 +1852,7 @@ milliseconds shown.
    * - alpha_composite RGBA
      - 19.6
      - 3.8x
-     - 6.7x
+     - 6.8x
      - 22.1
      - 1.2x
    * - blend RGB, 50%
@@ -1778,43 +1862,43 @@ milliseconds shown.
      - 13.0
      - 1.0x
    * - composite RGB, L mask
-     - 11.8
-     - 1.2x
-     - 1.8x
+     - 11.7
+     - 3.0x
+     - 4.0x
      - 11.1
-     - 1.0x
+     - 1.8x
    * - ImageChops.multiply RGB
      - 14.7
-     - 6.4x
-     - 7.4x
+     - 6.6x
+     - 7.5x
      - 14.0
      - 3.8x
    * - ImageChops.screen RGB
      - 18.5
-     - 8.0x
-     - 9.2x
-     - 17.9
+     - 8.3x
+     - 9.4x
+     - 17.8
      - 4.9x
    * - ImageChops.add RGB
      - 10.4
-     - 5.5x
-     - 5.5x
+     - 5.4x
+     - 5.6x
      - 15.6
      - 4.9x
    * - ImageChops.lighter RGB
      - 5.3
      - 2.8x
-     - 2.8x
-     - 6.5
+     - 2.9x
+     - 6.4
      - 2.0x
    * - ImageOps.invert RGB
      - 4.1
-     - 3.1x
+     - 3.2x
      - 3.3x
      - 10.0
-     - 5.2x
+     - 5.3x
    * - point() RGB, a table
-     - 4.2
+     - 4.1
      - 1.1x
      - 1.1x
      - 10.0
@@ -1826,17 +1910,17 @@ milliseconds shown.
      - 3.7
      - 2.0x
    * - Color3DLUT RGB, 16³
-     - 80.1
-     - 5.2x
+     - 79.9
+     - 5.1x
      - 8.0x
      - 103
-     - 2.0x
+     - 3.2x
    * - Color3DLUT RGBA, 16³
-     - 98.7
+     - 97.9
      - 6.4x
-     - 10.2x
-     - 118
-     - 2.3x
+     - 10.1x
+     - 119
+     - 3.7x
 
 .. generated-end
 
@@ -1866,8 +1950,9 @@ Code map
 * ``Chops.c``: ``chop_multiply_row()``, ``chop_saturate_row()``,
   ``chop_add_subtract()``, with ``ChopsSIMD.c`` (the ``chops`` group);
   ``Blend.c``: ``blend_fast_row()`` and Pillow's loops, with
-  ``BlendSIMD.c``; ``Paste.c`` with ``PasteSIMD.c``: ``fill_blend16()``
-  and ``fill_mask_L_simd()``.
+  ``BlendSIMD.c``; ``Paste.c`` with ``PasteSIMD.c``: ``fill_blend16()``,
+  ``fill_blend32()``, ``fill_mask_L_simd()``, ``paste_mask_L_simd()``
+  and ``paste_mask_RGBA_simd()``.
 * ``Point.c``: ``point_byte_op()`` and ``point_byte_row()``;
   ``PointSIMD.c`` (the ``point`` group): the byte operations' loops,
   ``neon_lut16()``, ``neon_lut_row()`` and NEON's whole-image lookups;
@@ -2009,7 +2094,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-geometry (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-geometry (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -2027,44 +2112,44 @@ milliseconds shown.
      - 2.1
      - 1.2x
    * - ROTATE_180 RGB
-     - 2.1
-     - 1.6x
-     - 1.6x
+     - 2.0
+     - 1.5x
+     - 1.5x
      - 2.1
      - 1.2x
    * - ROTATE_90 RGB
-     - 3.8
-     - 2.0x
-     - 1.9x
-     - 5.9
+     - 3.6
+     - 1.8x
+     - 1.8x
+     - 6.0
      - 1.2x
    * - ROTATE_270 RGB
-     - 4.3
+     - 4.1
      - 2.1x
-     - 2.1x
-     - 7.9
-     - 1.6x
-   * - TRANSPOSE RGB
-     - 3.8
      - 2.0x
+     - 7.7
+     - 1.5x
+   * - TRANSPOSE RGB
+     - 3.6
      - 1.9x
-     - 6.3
-     - 1.3x
+     - 1.9x
+     - 6.1
+     - 1.2x
    * - ROTATE_90 L
-     - 2.8
-     - 6.5x
-     - 6.4x
-     - 5.5
-     - 3.3x
-   * - rotate 30°, nearest, RGB
-     - 11.1
-     - 2.4x
-     - 2.4x
-     - 40.3
+     - 2.7
+     - 6.3x
+     - 6.3x
+     - 5.4
      - 3.5x
+   * - rotate 30°, nearest, RGB
+     - 10.1
+     - 2.2x
+     - 2.2x
+     - 40.5
+     - 3.6x
    * - rotate 30°, bilinear, RGB
-     - 76.0
-     - 1.6x
+     - 75.9
+     - 1.7x
      - 2.1x
      - 128
      - 1.7x
@@ -2079,9 +2164,9 @@ milliseconds shown.
      - 1.8x
      - 2.9x
      - 390
-     - 1.9x
+     - 1.8x
    * - perspective, bilinear, RGB
-     - 83.6
+     - 83.5
      - 1.8x
      - 2.6x
      - 147
@@ -2273,7 +2358,7 @@ Numbers
 shown. The "portable" column is the build without SIMD: most of these
 gains are algorithmic.
 
-.. generated: kernels-drawing (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-drawing (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -2286,26 +2371,26 @@ gains are algorithmic.
      - Pillow 13 (arm64, ms)
      - NEON
    * - 200 filled polygons
-     - 62.0
+     - 61.7
      - 2.3x
      - 2.4x
      - 2.4x
-     - 89.4
+     - 87.4
      - 1.5x
    * - 200 filled ellipses
-     - 3.4
+     - 3.3
      - 1.5x
      - 1.5x
      - 1.5x
-     - 6.1
-     - 1.0x
+     - 5.9
+     - 0.9x
    * - 500 filled rectangles
      - 5.6
      - 1.7x
      - 1.7x
      - 1.8x
-     - 11.3
-     - 1.2x
+     - 11.2
+     - 1.1x
    * - 500 lines, 5 px wide
      - 3.1
      - 1.4x
@@ -2318,22 +2403,22 @@ gains are algorithmic.
      - 1.7x
      - 1.7x
      - 1.7x
-     - 3.8
+     - 3.7
      - 1.0x
    * - 100 ROI polygons, 2 px outline
-     - 19.8
-     - 7.7x
+     - 19.4
+     - 7.6x
      - 8.0x
-     - 8.1x
-     - 22.2
-     - 5.7x
+     - 8.0x
+     - 22.1
+     - 5.6x
    * - 100 lines of text
      - 57.0
-     - 7.1x
-     - 17.4x
-     - 17.2x
+     - 7.2x
+     - 17.6x
+     - 17.5x
      - 113
-     - 18.4x
+     - 18.3x
 
 .. generated-end
 
@@ -2387,7 +2472,7 @@ mapping (``Quant.c``, ``QuantHash.c``) and the histogram (``Histo.c``).
 The codecs themselves (zlib, libjpeg-turbo, libwebp) are untouched;
 what changed is what Pillow does around them, with one exception: a
 build with libdeflate (the wheels) compresses the PNG encoder's output
-with it instead of zlib, as below.
+and inflates the decoder's input with it instead of zlib, as below.
 
 What Pillow computes
 ~~~~~~~~~~~~~~~~~~~~
@@ -2472,6 +2557,38 @@ The idea
   box. Chains, merge points and iteration order are unchanged, so the
   palettes are bit-identical: median cut 2.1x, the adaptive conversion
   1.7x on a 2560×1600 photo.
+* **The fast octree from the image's rows (2026-11-05).**
+  ``quantize(method=FASTOCTREE)`` is two passes over the pixels, one
+  adding each to its bucket of a colour cube and one looking each up,
+  around a short computation of the palette. The quantizers' common
+  interface takes the pixels as an array and returns the indices as
+  another, four bytes a pixel each: for an RGB or RGBA image
+  ``quantize_octree_rows()`` reads the image's rows and writes the P
+  image's instead, so two 16 MB arrays, their page faults and two
+  copies are gone (15.6 to 15.3 ms: the passes themselves were the
+  time, 11.1 ms the first). A bucket of the cube is a count and four
+  64-bit sums, five additions to memory per pixel in 160 KB of buckets;
+  for RGB the first pass now keeps the sums of r, g and b and the count
+  as four 32-bit numbers per bucket, 64 KB in all, which one vector
+  addition per pixel maintains (the pixel's bytes widened to four lanes,
+  the fourth replaced by 1), and moves them to the buckets every 2²⁴
+  pixels, before 255 times that could overflow; the second pass reads
+  the palette index from a table of the lookup cube's buckets, 16 KB
+  instead of 160: 10.0 ms. The cube of an RGB image always has four
+  bits of each channel, and with that a constant a pixel's bucket is
+  three shifts by constants instead of six by variables, which on x86
+  without BMI2 are three micro-operations each: 7.9 ms, against 15.6 ms
+  before in the AVX2 build and 25.1 ms in the wheel (and in Pillow 13),
+  whose compiler had not vectorized the lookup. Two tables of sums for
+  alternate pixels, so that neighbours in one bucket would not wait for
+  each other's store, measured the same and were dropped. RGBA keeps
+  the 64-bit buckets, its rows up to the first fully transparent pixel
+  through the same loop; Pillow recolours every transparent pixel as
+  the first one before quantizing, and both passes do that as they go.
+  The palettes and indices are those of Pillow 13
+  (``Tests/test_image_quantize_octree.py``: an image through the rows
+  against the same pixels as a P image through the array, and digests
+  taken from Pillow 13).
 * **The histogram in four tables.** On x86, neighbouring pixels count
   into four separate tables, so that the increments of equal bytes
   don't serialize, and the padding bytes of 2- and 3-band images are
@@ -2503,7 +2620,7 @@ Numbers
 2560×1600 RGB, times faster than Pillow 13.0.0, which took the
 milliseconds shown; the "portable" column is the build without SIMD.
 
-.. generated: kernels-codecs (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-codecs (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -2516,40 +2633,40 @@ milliseconds shown; the "portable" column is the build without SIMD.
      - Pillow 13 (arm64, ms)
      - NEON
    * - Encode PNG, level 6
-     - 789
+     - 792
      - 1.8x
      - 5.1x
-     - 5.1x
-     - 1,021
-     - 4.4x
+     - 5.0x
+     - 1,020
+     - 4.3x
    * - Decode PNG
-     - 99.6
-     - 1.0x
-     - 1.0x
-     - 1.0x
-     - 109
-     - 1.1x
+     - 100
+     - 1.5x
+     - 1.6x
+     - 1.6x
+     - 110
+     - 1.4x
    * - Decode WebP
-     - 115
+     - 112
      - 1.5x
      - 1.5x
      - 1.5x
-     - 108
-     - 1.1x
+     - 109
+     - 1.2x
    * - Decode JPEG
-     - 15.5
+     - 16.4
      - 1.0x
      - 1.0x
      - 1.0x
-     - 28.6
+     - 28.4
      - 1.0x
    * - Median cut, 256 colours
-     - 2,930
-     - 8.3x
-     - 8.4x
-     - 8.2x
-     - 6,528
-     - 9.8x
+     - 2,762
+     - 7.8x
+     - 7.8x
+     - 7.7x
+     - 6,570
+     - 9.6x
 
 .. generated-end
 
@@ -2575,8 +2692,41 @@ zlib-ng build's already did. zlib is still used for a preset
 dictionary, an explicit ``compress_type`` (a zlib strategy), images
 whose filtered rows exceed 256 MB (the one-piece path holds them and
 the output bound in memory; ``PILLOW_LIBDEFLATE_MAX`` moves the cap)
-and builds without the library. Decoding is unchanged: zlib's inflate
-and the vector unfiltering above. JPEG encoding
+and builds without the library.
+
+**Decoding with libdeflate (2026-11-05).** Inflating was 67 of the 97 ms
+of decoding the benchmark's 2560x1600 RGB photo (7.5 MB of ``IDAT``),
+and libdeflate inflates the same stream in 28 ms, but only in one piece.
+The plugin therefore walks the headers of the consecutive ``IDAT``
+chunks before decoding, which costs a seek and an 8-byte read per chunk,
+and tells the decoder the stream's length; the decoder gathers the
+stream, computes the size the image's rows must decompress to (the
+filter bytes and, for interlaced images, the seven passes included),
+decompresses into a buffer of exactly that size and unfilters and
+unpacks the rows where they lie, each with the row above it as its
+predecessor. Both buffers get the huge-page advice of the image blocks:
+mapped afresh on every decode, their page faults were 6 ms of the 69 ms
+the path first measured. The decode is 62 ms, 1.56x; on a noisier
+2560x1600 image 1.60x for RGB (119 to 74 ms), 1.67x for RGBA, 1.40x for
+L and 4.0x for P (15.1 to 3.8 ms), 1.6x at 512x512, 1.8x at 128x128 and
+level at 16x16. What remains is the filters themselves, a byte at a
+time for Sub, Average and Paeth (29 ms of the 62; their vector forms
+measured slower, as the list below has it).
+
+The one-piece path is taken only when it cannot change a result. The
+stream decoder is used, as before, for the frames of an animation after
+the first, with ``LOAD_TRUNCATED_IMAGES`` (which must return the rows
+that arrived), for a file whose chunk headers cannot be walked or end
+early, and above the cap; and when libdeflate refuses the stream, or
+the stream does not hold exactly the image's rows, the gathered bytes
+go through the stream decoder from the first one, so that a damaged
+file raises the error, and leaves the rows, that it did. The test
+suite's PNG files, whole, cut at random offsets and with single bits
+flipped (15,666 cases, from a path and from memory, with and without
+``LOAD_TRUNCATED_IMAGES``) give the same pixels or the same error text
+with the path, without it (``PILLOW_LIBDEFLATE_MAX=0``) and in the
+build before it; Memcheck reports nothing on the 10,518 cases of the
+small files. JPEG encoding
 and decoding, WebP encoding and JPEG thumbnails are the libraries' own
 time, 1.0x; WebP decoding is 1.5x on x86 and 1.2x on arm64 from the
 copies saved, now ahead of OpenCV. The histogram is 1.0x against Pillow
@@ -2602,7 +2752,11 @@ Code map
   ``QuantSIMD.c`` (the ``quant`` group): ``nearest_entry_simd()``;
   ``QuantNearest.h``: ``NearestPalette``; ``QuantHash.c``: the node
   blocks, ``_hashtable_find()`` and ``hashtable_order_by_hash()``;
-  ``Quant.c``: ``sum_box_leaves()``, ``build_box_map()``. ``Histo.c``:
+  ``Quant.c``: ``sum_box_leaves()``, ``build_box_map()``;
+  ``QuantOctree.c``: ``quantize_octree_rows()``, ``octree_build()``,
+  ``add_sums_to_color_cube()``, with ``plain_octree_count_rgb()``,
+  ``plain_octree_map_rgb()`` and the general pair in ``PlainLoops.h``
+  and ``octree_count_rgb_simd()`` in ``QuantSIMD.c``. ``Histo.c``:
   ``histogram_u8()``, two versions, and ``histogram_u8_masked()``.
 * Tests: ``Tests/test_codecs_simd.py``.
 
@@ -2860,7 +3014,7 @@ Geometric means over the benchmark's 111 cases, times faster than Pillow
 the sections above and on the `benchmark page
 <https://desmoteo.github.io/pillow-allsimd-perf/>`_):
 
-.. generated: kernels-appendix-a (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
+.. generated: kernels-appendix-a (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
 
 .. list-table::
    :header-rows: 1
@@ -2869,32 +3023,32 @@ the sections above and on the `benchmark page
      - x86-64 (Core Ultra 9 285H)
      - arm64 (Jetson Orin)
    * - Portable (no SIMD)
-     - 1.71x
-     - 1.54x
+     - 1.74x
+     - 1.56x
    * - SSE4
-     - 4.26x
+     - 4.34x
      -
    * - AVX2
-     - 5.54x
+     - 5.62x
      -
    * - AVX-VNNI
-     - 5.65x
+     - 5.75x
      -
    * - NEON
      -
-     - 2.60x
+     - 2.71x
    * - Fast mode (AVX2, NEON)
-     - 6.24x
-     - 3.16x
+     - 6.34x
+     - 3.32x
    * - Pillow-SIMD 12.1.1 (AVX2)
-     - 2.11x
+     - 2.13x
      -
    * - OpenCV 5.0 (single-threaded)
      - 3.61x
-     - 2.17x
+     - 2.16x
    * - libvips 8.16
      - 1.18x
-     - 0.69x
+     - 0.70x
 
 .. generated-end
 
@@ -2923,7 +3077,11 @@ has all three of SSE4, AVX2 and NEON.
   detection, ``ImagingSIMDInit()`` and ``ImagingSIMDSelect()``;
   ``ImagingSIMD.h``: the tier and ISA macros, ``SIMD_FORCE_INLINE``,
   ``mm_dpwssd`` and ``mm256_dpwssd``, ``mm_madd_add``, the widening loads;
-  ``ImagingPx4.h``: one pixel as four 32-bit lanes.
+  ``ImagingPx4.h``: one pixel as four 32-bit lanes; ``PlainLoops.h``:
+  the loops in plain C that every tier compiles for itself (soft and
+  hard light, the exact and extrapolating blend, the colour matrix, L
+  and I, the rank filter's network), with a wrapper in the area's
+  companion.
 * Resampling: ``Resample.c`` (the drivers) and ``ResampleHorizontal.c``
   (the portable horizontal kernels); ``ResampleSIMD.c``, which includes
   ``ResampleSIMDHorizontalConv.c``, ``ResampleSIMDVerticalConv.c``,

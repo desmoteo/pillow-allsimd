@@ -1336,6 +1336,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">__prepare_idat</span> <span class="o">=</span> <span class="n">length</span> <span class="o">-</span> <span class="mi">4</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">__prepare_idat</span> <span class="o">=</span> <span class="n">length</span>  <span class="c1"># used by load_prepare()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">__idat_first</span> <span class="o">=</span> <span class="n">cid</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">&quot;IDAT&quot;</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">png</span><span class="o">.</span><span class="n">im_n_frames</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_close_exclusive_fp_after_loading</span> <span class="o">=</span> <span class="kc">False</span>
@@ -1509,12 +1510,60 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">load_prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;internal: prepare to read PNG file&quot;&quot;&quot;</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;interlace&quot;</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">decoderconfig</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoderconfig</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)</span>
+        <span class="c1"># Pillow-AllSIMD: the decoder is told the length of the compressed</span>
+        <span class="c1"># stream when it can be known, and then inflates it in one piece.</span>
+        <span class="c1"># Set, not appended: every frame of an animation comes through here.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">decoderconfig</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="mi">1</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;interlace&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_idat_stream_size</span><span class="p">(),</span>
+        <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">__idat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__prepare_idat</span>  <span class="c1"># used by load_read()</span>
         <span class="n">ImageFile</span><span class="o">.</span><span class="n">ImageFile</span><span class="o">.</span><span class="n">load_prepare</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span></div>
 
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_idat_stream_size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;internal: the total length of the image&#39;s consecutive IDAT chunks,</span>
+<span class="sd">        found by walking their headers, or 0 when it is not to be used: a</span>
+<span class="sd">        frame of an animation, a file that cannot be walked or ends early,</span>
+<span class="sd">        and LOAD_TRUNCATED_IMAGES, which decodes what there is.&quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">ImageFile</span><span class="o">.</span><span class="n">LOAD_TRUNCATED_IMAGES</span>
+            <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">__idat_first</span>
+            <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">__frame</span> <span class="o">!=</span> <span class="mi">0</span>
+            <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tile</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span>
+            <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="p">):</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="n">fp</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fp</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">pos</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tile</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">offset</span>
+            <span class="n">length</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">__prepare_idat</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">total</span> <span class="o">+=</span> <span class="n">length</span>
+                <span class="n">fp</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="n">pos</span> <span class="o">+</span> <span class="n">length</span> <span class="o">+</span> <span class="mi">4</span><span class="p">)</span>  <span class="c1"># the data and its CRC</span>
+                <span class="n">head</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">head</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">8</span><span class="p">:</span>
+                    <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># truncated: the stream decoder reports it</span>
+                    <span class="k">break</span>
+                <span class="k">if</span> <span class="n">head</span><span class="p">[</span><span class="mi">4</span><span class="p">:]</span> <span class="o">!=</span> <span class="sa">b</span><span class="s2">&quot;IDAT&quot;</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="n">length</span> <span class="o">=</span> <span class="n">i32</span><span class="p">(</span><span class="n">head</span><span class="p">)</span>
+                <span class="n">pos</span> <span class="o">=</span> <span class="n">fp</span><span class="o">.</span><span class="n">tell</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+            <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">fp</span><span class="o">.</span><span class="n">seek</span><span class="p">(</span><span class="n">start</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+                <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">total</span>
 
 <div class="viewcode-block" id="PngImageFile.load_read">
 <a class="viewcode-back" href="../../reference/plugins.html#PIL.PngImagePlugin.PngImageFile.load_read">[docs]</a>

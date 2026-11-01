@@ -482,6 +482,26 @@ checks through <code class="docutils literal notranslate"><span class="pre">Imag
 build is the common files’ portable code compiled for x86-64. On arm64,
 NEON is part of the baseline, so the wheels have it and the build has
 one tier.</p>
+<p><strong>Plain loops compiled per tier (2026-11-05).</strong> A dispatch build compiles
+the common files for baseline x86-64, and some of their loops, with no
+kernel of their own, were fast in a build for AVX2 only because the
+compiler vectorized them there: timing all 216 operations of
+<code class="docutils literal notranslate"><span class="pre">checks/simd_bench.py</span></code> in the wheel against the AVX-VNNI build found
+them, 1.6 to 3.4 times slower in the wheel. Those loops are now in
+<code class="docutils literal notranslate"><span class="pre">PlainLoops.h</span></code>, in plain C, and compiled several times: by the file
+that owns the operation, for the scalar table, and by <code class="docutils literal notranslate"><span class="pre">SIMDKernels.c</span></code>
+for each tier, whose companions put them in the kernel table, called
+once per row. They are soft light, hard light and overlay (three integer
+divisions per byte: 24.5 to 7.0 ms and 26.5 to 7.7 ms on a 2560x1600 RGB
+image in the wheel), the exact and the extrapolating blend (float per
+byte; <code class="docutils literal notranslate"><span class="pre">ImageEnhance.Color</span></code> 13.1 to 7.7 ms, <code class="docutils literal notranslate"><span class="pre">Sharpness</span></code> 13.8 to
+8.4 ms), the colour matrix’s rows (4.4 to 2.3 ms to L), L to I and I to
+L (2.4 to 1.6 ms), and the sorting network of the general rank filter,
+whose minima and maxima are twice as wide in AVX2 (a 7x7 rank on L:
+53.6 to 31.1 ms). The wheel now runs each at the AVX2 build’s speed. It
+is the same C in every tier and no tier is compiled with FMA, so the
+results are the same, which <code class="docutils literal notranslate"><span class="pre">Tests/test_simd_tiers.py</span></code> checks for
+each.</p>
 <p><code class="docutils literal notranslate"><span class="pre">ImagingSIMD.h</span></code> also holds the helpers the kernels share:
 <code class="docutils literal notranslate"><span class="pre">SIMD_FORCE_INLINE</span></code> for kernels that must see a shift count as a
 constant; <code class="docutils literal notranslate"><span class="pre">mm_dpwssd</span></code> and <code class="docutils literal notranslate"><span class="pre">mm256_dpwssd</span></code>, one <code class="docutils literal notranslate"><span class="pre">vpdpwssd</span></code> with
@@ -642,18 +662,30 @@ vertical pass serves L images unchanged, since it works on bytes.</p>
 per instruction and four channels per lane group:
 <code class="docutils literal notranslate"><span class="pre">neon_resample_horiz_px()</span></code> loads 16 bytes, widens them to two vectors of
 eight 16-bit values (<code class="docutils literal notranslate"><span class="pre">vmovl_u8</span></code>), and multiply-accumulates each pixel’s
-four channels by its weight as a scalar (<code class="docutils literal notranslate"><span class="pre">vmlal_n_s16</span></code>), alternating
-between two accumulators so that the two chains of dependent adds run in
-parallel:</p>
-<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">uint8x16_t</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vld1q_u8</span><span class="p">(</span><span class="n">in</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
-<span class="n">int16x8_t</span><span class="w"> </span><span class="n">lo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vreinterpretq_s16_u16</span><span class="p">(</span><span class="n">vmovl_u8</span><span class="p">(</span><span class="n">vget_low_u8</span><span class="p">(</span><span class="n">source</span><span class="p">)));</span>
-<span class="n">int16x8_t</span><span class="w"> </span><span class="n">hi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vreinterpretq_s16_u16</span><span class="p">(</span><span class="n">vmovl_u8</span><span class="p">(</span><span class="n">vget_high_u8</span><span class="p">(</span><span class="n">source</span><span class="p">)));</span>
-<span class="n">sss</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vmlal_n_s16</span><span class="p">(</span><span class="n">sss</span><span class="p">,</span><span class="w"> </span><span class="n">vget_low_s16</span><span class="p">(</span><span class="n">lo</span><span class="p">),</span><span class="w"> </span><span class="n">k</span><span class="p">[</span><span class="n">x</span><span class="p">]);</span>
-<span class="n">sss1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vmlal_n_s16</span><span class="p">(</span><span class="n">sss1</span><span class="p">,</span><span class="w"> </span><span class="n">vget_high_s16</span><span class="p">(</span><span class="n">lo</span><span class="p">),</span><span class="w"> </span><span class="n">k</span><span class="p">[</span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">]);</span>
-<span class="n">sss</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vmlal_n_s16</span><span class="p">(</span><span class="n">sss</span><span class="p">,</span><span class="w"> </span><span class="n">vget_low_s16</span><span class="p">(</span><span class="n">hi</span><span class="p">),</span><span class="w"> </span><span class="n">k</span><span class="p">[</span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="p">]);</span>
-<span class="n">sss1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vmlal_n_s16</span><span class="p">(</span><span class="n">sss1</span><span class="p">,</span><span class="w"> </span><span class="n">vget_high_s16</span><span class="p">(</span><span class="n">hi</span><span class="p">),</span><span class="w"> </span><span class="n">k</span><span class="p">[</span><span class="n">x</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">3</span><span class="p">]);</span>
+four channels by its weight, a lane of the four weights loaded together
+(<code class="docutils literal notranslate"><span class="pre">vmlal_lane_s16</span></code>), alternating between two accumulators so that the
+two chains of dependent adds run in parallel:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">for</span><span class="w"> </span><span class="p">(;</span><span class="w"> </span><span class="n">end</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">k</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span><span class="w"> </span><span class="n">k</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="mi">16</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">uint8x16_t</span><span class="w"> </span><span class="n">source</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vld1q_u8</span><span class="p">(</span><span class="n">in</span><span class="p">);</span>
+<span class="w">    </span><span class="n">int16x4_t</span><span class="w"> </span><span class="n">kv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vld1_s16</span><span class="p">(</span><span class="n">k</span><span class="p">);</span>
+<span class="w">    </span><span class="n">int16x8_t</span><span class="w"> </span><span class="n">lo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vreinterpretq_s16_u16</span><span class="p">(</span><span class="n">vmovl_u8</span><span class="p">(</span><span class="n">vget_low_u8</span><span class="p">(</span><span class="n">source</span><span class="p">)));</span>
+<span class="w">    </span><span class="n">int16x8_t</span><span class="w"> </span><span class="n">hi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vreinterpretq_s16_u16</span><span class="p">(</span><span class="n">vmovl_high_u8</span><span class="p">(</span><span class="n">source</span><span class="p">));</span>
+<span class="w">    </span><span class="n">sss</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vmlal_lane_s16</span><span class="p">(</span><span class="n">sss</span><span class="p">,</span><span class="w"> </span><span class="n">vget_low_s16</span><span class="p">(</span><span class="n">lo</span><span class="p">),</span><span class="w"> </span><span class="n">kv</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="n">sss1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vmlal_high_lane_s16</span><span class="p">(</span><span class="n">sss1</span><span class="p">,</span><span class="w"> </span><span class="n">lo</span><span class="p">,</span><span class="w"> </span><span class="n">kv</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="n">sss</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vmlal_lane_s16</span><span class="p">(</span><span class="n">sss</span><span class="p">,</span><span class="w"> </span><span class="n">vget_low_s16</span><span class="p">(</span><span class="n">hi</span><span class="p">),</span><span class="w"> </span><span class="n">kv</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<span class="w">    </span><span class="n">sss1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">vmlal_high_lane_s16</span><span class="p">(</span><span class="n">sss1</span><span class="p">,</span><span class="w"> </span><span class="n">hi</span><span class="p">,</span><span class="w"> </span><span class="n">kv</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">);</span>
+<span class="p">}</span>
 </pre></div>
 </div>
+<p>The pointers that advance are the point (2026-11-05). The loop had an
+<code class="docutils literal notranslate"><span class="pre">int</span></code> index and a weight per multiply (<code class="docutils literal notranslate"><span class="pre">vmlal_n_s16(sss,</span> <span class="pre">…,</span> <span class="pre">k[x])</span></code>),
+and GCC made of it four sign-extended address computations and four
+scalar loads beside the pixels’ one: 17 instructions for four taps, in a
+loop that ran at four instructions per cycle. As above it is 10. A 1/4
+bicubic resize of 2560x1600 RGB went from 108.6 to 80.0 million
+instructions and from 27.0 to 25.3 million cycles on the Cortex-A78:
+less than the instructions, because the loop now waits for the one
+vector multiplier, a <code class="docutils literal notranslate"><span class="pre">smlal</span></code> per tap and pixel.</p>
 <p>The sums are added at the end, shifted (<code class="docutils literal notranslate"><span class="pre">vshlq_s32</span></code> by a negative
 count) and narrowed with saturation to 16 bits and to bytes
 (<code class="docutils literal notranslate"><span class="pre">vqmovn_s32</span></code>, <code class="docutils literal notranslate"><span class="pre">vqmovun_s16</span></code>), the same clip as <code class="docutils literal notranslate"><span class="pre">packs</span></code> and
@@ -661,6 +693,15 @@ count) and narrowed with saturation to 16 bits and to bytes
 kernel widens 32 bytes of each source row and accumulates them in eight
 vectors, 32 bytes of output per step, with a 16-byte and a 4-byte tail.
 Rows are read in order, as on x86.</p>
+<p>Fast mode’s vertical kernel (<code class="docutils literal notranslate"><span class="pre">resample_fast_vrow_simd()</span></code>, 16-bit rows
+and weights, <code class="docutils literal notranslate"><span class="pre">sqrdmulh</span></code>) is compiled for each tap count from 2 to 16
+as a constant (<code class="docutils literal notranslate"><span class="pre">resample_fast_vrow_taps()</span></code>): the general loop loaded a
+row pointer and a weight for every tap of every 16 bytes, 11
+instructions per tap and step, and with the count known both stay in
+registers, 6. Enlarging by 1.5 with Lanczos, where the vertical pass is
+a third of the time: 116.8 to 104.3 million cycles. With the horizontal
+change, RGB and RGBA resizes take 8 to 15% fewer cycles, the same
+pixels.</p>
 <p>The portable vertical kernel is written to be vectorized at <code class="docutils literal notranslate"><span class="pre">-O2</span></code>: it
 sums chunks of 64 bytes into a fixed array of 32-bit sums, and GCC turns
 the inner loop into vector code since its trip count is fixed. The
@@ -725,43 +766,43 @@ on the Jetson Orin.</p>
 <td><p>11.9</p></td>
 <td><p>6.9x</p></td>
 <td><p>10.8x</p></td>
-<td><p>15.4</p></td>
-<td><p>2.3x</p></td>
+<td><p>15.5</p></td>
+<td><p>2.6x</p></td>
 </tr>
 <tr class="row-odd"><td><p>To 320×200, bicubic</p></td>
 <td><p>22.3</p></td>
 <td><p>7.0x</p></td>
 <td><p>10.8x</p></td>
-<td><p>30.5</p></td>
-<td><p>2.5x</p></td>
+<td><p>30.3</p></td>
+<td><p>2.7x</p></td>
 </tr>
 <tr class="row-even"><td><p>To 320×200, Lanczos</p></td>
-<td><p>33.0</p></td>
+<td><p>33.1</p></td>
 <td><p>6.7x</p></td>
 <td><p>10.0x</p></td>
-<td><p>46.5</p></td>
-<td><p>2.5x</p></td>
+<td><p>46.4</p></td>
+<td><p>2.6x</p></td>
 </tr>
 <tr class="row-odd"><td><p>To 2048×1280, bicubic</p></td>
 <td><p>46.4</p></td>
 <td><p>5.5x</p></td>
 <td><p>8.2x</p></td>
 <td><p>58.8</p></td>
-<td><p>2.0x</p></td>
+<td><p>2.1x</p></td>
 </tr>
 <tr class="row-even"><td><p>To 5478×3424, bicubic</p></td>
-<td><p>227</p></td>
-<td><p>4.6x</p></td>
-<td><p>6.2x</p></td>
-<td><p>261</p></td>
-<td><p>2.0x</p></td>
+<td><p>226</p></td>
+<td><p>4.5x</p></td>
+<td><p>6.1x</p></td>
+<td><p>262</p></td>
+<td><p>2.1x</p></td>
 </tr>
 <tr class="row-odd"><td><p>RGBA to 320×200, bicubic</p></td>
-<td><p>38.0</p></td>
-<td><p>7.5x</p></td>
-<td><p>12.5x</p></td>
-<td><p>44.9</p></td>
-<td><p>2.9x</p></td>
+<td><p>38.4</p></td>
+<td><p>7.7x</p></td>
+<td><p>12.8x</p></td>
+<td><p>44.7</p></td>
+<td><p>3.0x</p></td>
 </tr>
 <tr class="row-even"><td><p>L to 320×200, bicubic</p></td>
 <td><p>10.8</p></td>
@@ -932,6 +973,20 @@ row per step with AVX2, 16 with SSE4: four groups of 8 bytes of <code class="doc
 packed to bytes. <code class="docutils literal notranslate"><span class="pre">packssdw</span></code> and <code class="docutils literal notranslate"><span class="pre">packuswb</span></code> pack within 128-bit lanes,
 so the AVX2 version ends with a <code class="docutils literal notranslate"><span class="pre">vpermd</span></code> that puts the four groups back
 in order.</p>
+<p><em>The far weight of zero (2026-11-05).</em> Each output byte is two products,
+the box’s sum by <code class="docutils literal notranslate"><span class="pre">ww</span></code> and the two bytes just outside the box by <code class="docutils literal notranslate"><span class="pre">fw</span></code>,
+which is what the integer weight leaves of 2²⁴, halved: 0 whenever 2²⁴
+is 0 or 1 modulo the box, as for the radii 1 to 4, 6, 7, 8, 10 and 17.
+The running sums, horizontal and vertical, then skip the second product
+(<code class="docutils literal notranslate"><span class="pre">BOX_STEP_WHOLE</span></code>, the <code class="docutils literal notranslate"><span class="pre">whole</span></code> argument of <code class="docutils literal notranslate"><span class="pre">box_columns_body()</span></code>):
+it was half of the multiplies, and on the Cortex-A78, with one vector
+multiplier, the blur at radius 10 went from 57.1 to 42.3 million cycles
+on a 2560x1600 RGB image (1.35x); on x86, where <code class="docutils literal notranslate"><span class="pre">pmulld</span></code> is two µops,
+from 7.5 to 5.5 ms with AVX2 and 13.8 to 9.8 ms with SSE4.1. Adding
+zero changes no byte. Radii with a far weight (5, 9, 12, any fraction)
+run as before; taking the difference of the entering and leaving pixels
+first, to shorten the sum’s chain to one addition, measured the same
+there.</p>
 <p><em>Direct passes</em> (<code class="docutils literal notranslate"><span class="pre">box_direct()</span></code>) sum the inner sources in 16-bit lanes
 (<code class="docutils literal notranslate"><span class="pre">pmovzxbw</span></code>, <code class="docutils literal notranslate"><span class="pre">paddw</span></code>), 32 bytes per step with AVX2, 16 with SSE4.
 The exact form then needs <code class="docutils literal notranslate"><span class="pre">acc</span> <span class="pre">*</span> <span class="pre">ww</span> <span class="pre">+</span> <span class="pre">e</span> <span class="pre">*</span> <span class="pre">fw</span></code> with 24-bit weights,
@@ -1017,17 +1072,17 @@ milliseconds shown.</p>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>Gaussian RGB, σ 1</p></td>
-<td><p>122</p></td>
-<td><p>4.4x</p></td>
-<td><p>7.2x</p></td>
+<td><p>121</p></td>
+<td><p>4.3x</p></td>
+<td><p>6.9x</p></td>
 <td><p>163</p></td>
-<td><p>3.1x</p></td>
+<td><p>3.0x</p></td>
 </tr>
 <tr class="row-odd"><td><p>Gaussian RGB, σ 10</p></td>
 <td><p>122</p></td>
-<td><p>2.7x</p></td>
-<td><p>4.7x</p></td>
-<td><p>163</p></td>
+<td><p>2.6x</p></td>
+<td><p>4.6x</p></td>
+<td><p>165</p></td>
 <td><p>1.8x</p></td>
 </tr>
 <tr class="row-even"><td><p>Gaussian RGB, σ 30</p></td>
@@ -1045,36 +1100,36 @@ milliseconds shown.</p>
 <td><p>1.8x</p></td>
 </tr>
 <tr class="row-even"><td><p>Gaussian L, σ 10</p></td>
-<td><p>37.4</p></td>
+<td><p>37.1</p></td>
 <td><p>3.5x</p></td>
-<td><p>6.3x</p></td>
-<td><p>54.5</p></td>
+<td><p>6.2x</p></td>
+<td><p>54.3</p></td>
 <td><p>1.9x</p></td>
 </tr>
 <tr class="row-odd"><td><p>Box RGB, radius 2</p></td>
-<td><p>55.3</p></td>
+<td><p>54.8</p></td>
 <td><p>8.2x</p></td>
-<td><p>14.1x</p></td>
+<td><p>14.5x</p></td>
 <td><p>66.4</p></td>
 <td><p>4.6x</p></td>
 </tr>
 <tr class="row-even"><td><p>Box RGB, radius 10</p></td>
-<td><p>55.0</p></td>
-<td><p>4.0x</p></td>
-<td><p>7.4x</p></td>
-<td><p>66.3</p></td>
-<td><p>2.3x</p></td>
+<td><p>54.6</p></td>
+<td><p>5.6x</p></td>
+<td><p>9.9x</p></td>
+<td><p>66.9</p></td>
+<td><p>3.2x</p></td>
 </tr>
 <tr class="row-odd"><td><p>Unsharp mask RGB</p></td>
 <td><p>198</p></td>
 <td><p>5.0x</p></td>
-<td><p>7.4x</p></td>
+<td><p>7.2x</p></td>
 <td><p>237</p></td>
 <td><p>3.2x</p></td>
 </tr>
 <tr class="row-even"><td><p>Unsharp mask L</p></td>
-<td><p>54.8</p></td>
-<td><p>5.9x</p></td>
+<td><p>54.9</p></td>
+<td><p>6.0x</p></td>
 <td><p>8.9x</p></td>
 <td><p>70.1</p></td>
 <td><p>4.0x</p></td>
@@ -1353,17 +1408,17 @@ shown.</p>
 <tr class="row-even"><td><p>RGB 3×3 SMOOTH</p></td>
 <td><p>51.4</p></td>
 <td><p>8.0x</p></td>
-<td><p>12.2x</p></td>
+<td><p>12.3x</p></td>
 <td><p>16.4x</p></td>
 <td><p>98.5</p></td>
 <td><p>3.6x</p></td>
 </tr>
 <tr class="row-odd"><td><p>RGB 3×3 SHARPEN</p></td>
-<td><p>53.0</p></td>
+<td><p>52.9</p></td>
 <td><p>8.2x</p></td>
-<td><p>12.5x</p></td>
+<td><p>12.6x</p></td>
 <td><p>16.9x</p></td>
-<td><p>99.3</p></td>
+<td><p>99.2</p></td>
 <td><p>6.7x</p></td>
 </tr>
 <tr class="row-even"><td><p>RGB 3×3 EDGE_ENHANCE</p></td>
@@ -1377,7 +1432,7 @@ shown.</p>
 <tr class="row-odd"><td><p>RGB 3×3 FIND_EDGES</p></td>
 <td><p>147</p></td>
 <td><p>21.4x</p></td>
-<td><p>33.4x</p></td>
+<td><p>33.6x</p></td>
 <td><p>42.9x</p></td>
 <td><p>146</p></td>
 <td><p>9.9x</p></td>
@@ -1395,14 +1450,14 @@ shown.</p>
 <td><p>5.8x</p></td>
 <td><p>12.1x</p></td>
 <td><p>14.8x</p></td>
-<td><p>33.2</p></td>
+<td><p>33.1</p></td>
 <td><p>8.3x</p></td>
 </tr>
 <tr class="row-even"><td><p>L 5×5 SMOOTH_MORE</p></td>
 <td><p>42.5</p></td>
 <td><p>5.6x</p></td>
 <td><p>12.6x</p></td>
-<td><p>14.3x</p></td>
+<td><p>14.4x</p></td>
 <td><p>75.3</p></td>
 <td><p>4.5x</p></td>
 </tr>
@@ -1615,43 +1670,43 @@ the compiler vectorizes the networks.</p>
 <tbody>
 <tr class="row-even"><td><p>Median 3×3 RGB</p></td>
 <td><p>1,182</p></td>
-<td><p>52x</p></td>
-<td><p>217x</p></td>
-<td><p>419x</p></td>
-<td><p>1,263</p></td>
+<td><p>51x</p></td>
+<td><p>216x</p></td>
+<td><p>421x</p></td>
+<td><p>1,262</p></td>
 <td><p>153x</p></td>
 </tr>
 <tr class="row-odd"><td><p>Median 5×5 RGB</p></td>
-<td><p>4,020</p></td>
-<td><p>55x</p></td>
+<td><p>4,018</p></td>
+<td><p>52x</p></td>
 <td><p>127x</p></td>
 <td><p>250x</p></td>
-<td><p>3,940</p></td>
+<td><p>3,942</p></td>
 <td><p>83x</p></td>
 </tr>
 <tr class="row-even"><td><p>Median 3×3 L</p></td>
 <td><p>384</p></td>
-<td><p>94x</p></td>
+<td><p>87x</p></td>
 <td><p>281x</p></td>
-<td><p>542x</p></td>
-<td><p>410</p></td>
+<td><p>541x</p></td>
+<td><p>411</p></td>
 <td><p>191x</p></td>
 </tr>
 <tr class="row-odd"><td><p>Minimum 3×3 RGB</p></td>
-<td><p>818</p></td>
-<td><p>265x</p></td>
-<td><p>433x</p></td>
-<td><p>456x</p></td>
+<td><p>817</p></td>
+<td><p>269x</p></td>
+<td><p>440x</p></td>
+<td><p>463x</p></td>
 <td><p>886</p></td>
-<td><p>246x</p></td>
+<td><p>253x</p></td>
 </tr>
 <tr class="row-even"><td><p>Maximum 3×3 RGB</p></td>
-<td><p>815</p></td>
-<td><p>254x</p></td>
-<td><p>425x</p></td>
-<td><p>458x</p></td>
+<td><p>811</p></td>
+<td><p>252x</p></td>
+<td><p>439x</p></td>
+<td><p>462x</p></td>
 <td><p>881</p></td>
-<td><p>254x</p></td>
+<td><p>253x</p></td>
 </tr>
 </tbody>
 </table>
@@ -1840,14 +1895,14 @@ milliseconds shown.</p>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>RGB to L</p></td>
-<td><p>2.2</p></td>
-<td><p>1.9x</p></td>
+<td><p>2.1</p></td>
+<td><p>1.8x</p></td>
 <td><p>1.9x</p></td>
 <td><p>2.6</p></td>
 <td><p>1.1x</p></td>
 </tr>
 <tr class="row-odd"><td><p>L to RGB</p></td>
-<td><p>2.6</p></td>
+<td><p>2.7</p></td>
 <td><p>3.5x</p></td>
 <td><p>3.5x</p></td>
 <td><p>0.9</p></td>
@@ -1856,21 +1911,21 @@ milliseconds shown.</p>
 <tr class="row-even"><td><p>RGB to RGBA</p></td>
 <td><p>5.6</p></td>
 <td><p>4.6x</p></td>
-<td><p>4.7x</p></td>
-<td><p>1.7</p></td>
+<td><p>4.6x</p></td>
+<td><p>1.8</p></td>
 <td><p>1.0x</p></td>
 </tr>
 <tr class="row-odd"><td><p>RGB to CMYK</p></td>
-<td><p>7.9</p></td>
-<td><p>6.6x</p></td>
-<td><p>6.7x</p></td>
+<td><p>7.4</p></td>
+<td><p>6.1x</p></td>
+<td><p>6.2x</p></td>
 <td><p>1.8</p></td>
 <td><p>1.0x</p></td>
 </tr>
 <tr class="row-even"><td><p>RGBA to RGBa</p></td>
 <td><p>9.0</p></td>
-<td><p>5.1x</p></td>
-<td><p>6.8x</p></td>
+<td><p>5.0x</p></td>
+<td><p>6.7x</p></td>
 <td><p>3.4</p></td>
 <td><p>1.1x</p></td>
 </tr>
@@ -1885,7 +1940,7 @@ milliseconds shown.</p>
 <td><p>59.7</p></td>
 <td><p>3.7x</p></td>
 <td><p>6.7x</p></td>
-<td><p>81.5</p></td>
+<td><p>81.6</p></td>
 <td><p>2.3x</p></td>
 </tr>
 <tr class="row-odd"><td><p>RGB to YCbCr</p></td>
@@ -1898,7 +1953,7 @@ milliseconds shown.</p>
 <tr class="row-even"><td><p>YCbCr to RGB</p></td>
 <td><p>10.8</p></td>
 <td><p>3.0x</p></td>
-<td><p>5.8x</p></td>
+<td><p>5.7x</p></td>
 <td><p>14.3</p></td>
 <td><p>1.2x</p></td>
 </tr>
@@ -2068,6 +2123,18 @@ an L mask one byte at a time; <code class="docutils literal notranslate"><span c
 colour channels of transparent pixels taking a mask of 255 as the
 scalar expression gives; the SSE4 and NEON kernels exist, AVX2 uses
 SSE4’s. The drawing section returns to it.</p></li>
+<li><p><strong>Pasting through a mask (2026-11-05).</strong> <code class="docutils literal notranslate"><span class="pre">paste(im,</span> <span class="pre">box,</span> <span class="pre">mask)</span></code> with
+an L mask, which is also <code class="docutils literal notranslate"><span class="pre">Image.composite()</span></code>, and with an RGBA mask,
+which is how an RGBA image is pasted over another through its own
+alpha, blended a byte at a time; a compiler given AVX2 made vectors of
+the loop, and the wheel’s baseline did not. <code class="docutils literal notranslate"><span class="pre">paste_mask_L_simd()</span></code>
+and <code class="docutils literal notranslate"><span class="pre">paste_mask_RGBA_simd()</span></code> are the masked fill’s blend with the
+source row in place of the ink, 32 bytes or eight pixels at a time in
+AVX2, the mask byte spread to its pixel’s four bytes with one shuffle.
+Mask composite on 2560x1600 RGB: 11.7 ms in the wheel and 6.3 ms in
+the AVX2 build before, 3.0 ms in both now; RGBA over RGB 12.0 and
+5.8 ms before, 2.9 ms now. The rows of an image pasted into itself
+overlap, and those go to the scalar loop.</p></li>
 <li><p><strong>The 3D colour LUT.</strong> Pillow-SIMD’s kernel on x86: the index and the
 interpolation weight of each axis in one 16-bit value (6 bits of
 index, 9 of weight), the eight entries interpolated with <code class="docutils literal notranslate"><span class="pre">pmaddwd</span></code>
@@ -2077,7 +2144,20 @@ own precision, not Pillow’s: the output differs from the scalar
 build’s by up to two levels in about 10% of the bytes for a random
 table (none for a smooth one), the other exception the ground rules
 list. The NEON kernel computes Pillow’s arithmetic instead, one pixel
-as four 32-bit lanes, and gives the scalar pixels.</p></li>
+as four 32-bit lanes, and gives the scalar pixels. That is seven
+32-bit multiplies a pixel on a core with one vector multiplier, so
+(2026-11-05) where every value of the table is within −16384..16383,
+about twice the range of the colours 0..1 and the case of every
+table that does not extrapolate far, <code class="docutils literal notranslate"><span class="pre">neon_lut_pair()</span></code> interpolates
+two pixels at once in 16-bit lanes: the weight is 15 bits, the
+difference of two entries fits 16, and <code class="docutils literal notranslate"><span class="pre">sqdmulh</span></code> gives
+((<em>b</em> − <em>a</em>) · <em>s</em>) &gt;&gt; 15 exactly, so the seven multiplies serve two
+pixels, and one narrowing shift does the rounding and the clipping.
+103.4 to 63.5 million cycles on a 2560x1600 image (1.63x, 52 to
+32 ms), the same pixels as the scalar code; other tables keep the
+32-bit kernel. Tables of each channel’s cell offset and weight, in
+place of computing them for every pixel, measured 2% and were not
+kept.</p></li>
 <li><p><strong>Bands.</strong> <code class="docutils literal notranslate"><span class="pre">split()</span></code> and <code class="docutils literal notranslate"><span class="pre">getchannel()</span></code> transpose four pixels into
 planes with one <code class="docutils literal notranslate"><span class="pre">pshufb</span></code> on x86 and <code class="docutils literal notranslate"><span class="pre">vld4q</span></code> on NEON; <code class="docutils literal notranslate"><span class="pre">merge()</span></code>
 uses <code class="docutils literal notranslate"><span class="pre">vst4q</span></code> on NEON, and on x86 the compiler’s code, since an
@@ -2120,7 +2200,7 @@ milliseconds shown.</p>
 <tr class="row-even"><td><p>alpha_composite RGBA</p></td>
 <td><p>19.6</p></td>
 <td><p>3.8x</p></td>
-<td><p>6.7x</p></td>
+<td><p>6.8x</p></td>
 <td><p>22.1</p></td>
 <td><p>1.2x</p></td>
 </tr>
@@ -2132,49 +2212,49 @@ milliseconds shown.</p>
 <td><p>1.0x</p></td>
 </tr>
 <tr class="row-even"><td><p>composite RGB, L mask</p></td>
-<td><p>11.8</p></td>
-<td><p>1.2x</p></td>
-<td><p>1.8x</p></td>
+<td><p>11.7</p></td>
+<td><p>3.0x</p></td>
+<td><p>4.0x</p></td>
 <td><p>11.1</p></td>
-<td><p>1.0x</p></td>
+<td><p>1.8x</p></td>
 </tr>
 <tr class="row-odd"><td><p>ImageChops.multiply RGB</p></td>
 <td><p>14.7</p></td>
-<td><p>6.4x</p></td>
-<td><p>7.4x</p></td>
+<td><p>6.6x</p></td>
+<td><p>7.5x</p></td>
 <td><p>14.0</p></td>
 <td><p>3.8x</p></td>
 </tr>
 <tr class="row-even"><td><p>ImageChops.screen RGB</p></td>
 <td><p>18.5</p></td>
-<td><p>8.0x</p></td>
-<td><p>9.2x</p></td>
-<td><p>17.9</p></td>
+<td><p>8.3x</p></td>
+<td><p>9.4x</p></td>
+<td><p>17.8</p></td>
 <td><p>4.9x</p></td>
 </tr>
 <tr class="row-odd"><td><p>ImageChops.add RGB</p></td>
 <td><p>10.4</p></td>
-<td><p>5.5x</p></td>
-<td><p>5.5x</p></td>
+<td><p>5.4x</p></td>
+<td><p>5.6x</p></td>
 <td><p>15.6</p></td>
 <td><p>4.9x</p></td>
 </tr>
 <tr class="row-even"><td><p>ImageChops.lighter RGB</p></td>
 <td><p>5.3</p></td>
 <td><p>2.8x</p></td>
-<td><p>2.8x</p></td>
-<td><p>6.5</p></td>
+<td><p>2.9x</p></td>
+<td><p>6.4</p></td>
 <td><p>2.0x</p></td>
 </tr>
 <tr class="row-odd"><td><p>ImageOps.invert RGB</p></td>
 <td><p>4.1</p></td>
-<td><p>3.1x</p></td>
+<td><p>3.2x</p></td>
 <td><p>3.3x</p></td>
 <td><p>10.0</p></td>
-<td><p>5.2x</p></td>
+<td><p>5.3x</p></td>
 </tr>
 <tr class="row-even"><td><p>point() RGB, a table</p></td>
-<td><p>4.2</p></td>
+<td><p>4.1</p></td>
 <td><p>1.1x</p></td>
 <td><p>1.1x</p></td>
 <td><p>10.0</p></td>
@@ -2188,18 +2268,18 @@ milliseconds shown.</p>
 <td><p>2.0x</p></td>
 </tr>
 <tr class="row-even"><td><p>Color3DLUT RGB, 16³</p></td>
-<td><p>80.1</p></td>
-<td><p>5.2x</p></td>
+<td><p>79.9</p></td>
+<td><p>5.1x</p></td>
 <td><p>8.0x</p></td>
 <td><p>103</p></td>
-<td><p>2.0x</p></td>
+<td><p>3.2x</p></td>
 </tr>
 <tr class="row-odd"><td><p>Color3DLUT RGBA, 16³</p></td>
-<td><p>98.7</p></td>
+<td><p>97.9</p></td>
 <td><p>6.4x</p></td>
-<td><p>10.2x</p></td>
-<td><p>118</p></td>
-<td><p>2.3x</p></td>
+<td><p>10.1x</p></td>
+<td><p>119</p></td>
+<td><p>3.7x</p></td>
 </tr>
 </tbody>
 </table>
@@ -2230,8 +2310,9 @@ definition, <code class="docutils literal notranslate"><span class="pre">Imaging
 <li><p><code class="docutils literal notranslate"><span class="pre">Chops.c</span></code>: <code class="docutils literal notranslate"><span class="pre">chop_multiply_row()</span></code>, <code class="docutils literal notranslate"><span class="pre">chop_saturate_row()</span></code>,
 <code class="docutils literal notranslate"><span class="pre">chop_add_subtract()</span></code>, with <code class="docutils literal notranslate"><span class="pre">ChopsSIMD.c</span></code> (the <code class="docutils literal notranslate"><span class="pre">chops</span></code> group);
 <code class="docutils literal notranslate"><span class="pre">Blend.c</span></code>: <code class="docutils literal notranslate"><span class="pre">blend_fast_row()</span></code> and Pillow’s loops, with
-<code class="docutils literal notranslate"><span class="pre">BlendSIMD.c</span></code>; <code class="docutils literal notranslate"><span class="pre">Paste.c</span></code> with <code class="docutils literal notranslate"><span class="pre">PasteSIMD.c</span></code>: <code class="docutils literal notranslate"><span class="pre">fill_blend16()</span></code>
-and <code class="docutils literal notranslate"><span class="pre">fill_mask_L_simd()</span></code>.</p></li>
+<code class="docutils literal notranslate"><span class="pre">BlendSIMD.c</span></code>; <code class="docutils literal notranslate"><span class="pre">Paste.c</span></code> with <code class="docutils literal notranslate"><span class="pre">PasteSIMD.c</span></code>: <code class="docutils literal notranslate"><span class="pre">fill_blend16()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">fill_blend32()</span></code>, <code class="docutils literal notranslate"><span class="pre">fill_mask_L_simd()</span></code>, <code class="docutils literal notranslate"><span class="pre">paste_mask_L_simd()</span></code>
+and <code class="docutils literal notranslate"><span class="pre">paste_mask_RGBA_simd()</span></code>.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">Point.c</span></code>: <code class="docutils literal notranslate"><span class="pre">point_byte_op()</span></code> and <code class="docutils literal notranslate"><span class="pre">point_byte_row()</span></code>;
 <code class="docutils literal notranslate"><span class="pre">PointSIMD.c</span></code> (the <code class="docutils literal notranslate"><span class="pre">point</span></code> group): the byte operations’ loops,
 <code class="docutils literal notranslate"><span class="pre">neon_lut16()</span></code>, <code class="docutils literal notranslate"><span class="pre">neon_lut_row()</span></code> and NEON’s whole-image lookups;
@@ -2389,50 +2470,50 @@ milliseconds shown.</p>
 <td><p>1.2x</p></td>
 </tr>
 <tr class="row-odd"><td><p>ROTATE_180 RGB</p></td>
-<td><p>2.1</p></td>
-<td><p>1.6x</p></td>
-<td><p>1.6x</p></td>
+<td><p>2.0</p></td>
+<td><p>1.5x</p></td>
+<td><p>1.5x</p></td>
 <td><p>2.1</p></td>
 <td><p>1.2x</p></td>
 </tr>
 <tr class="row-even"><td><p>ROTATE_90 RGB</p></td>
-<td><p>3.8</p></td>
-<td><p>2.0x</p></td>
-<td><p>1.9x</p></td>
-<td><p>5.9</p></td>
+<td><p>3.6</p></td>
+<td><p>1.8x</p></td>
+<td><p>1.8x</p></td>
+<td><p>6.0</p></td>
 <td><p>1.2x</p></td>
 </tr>
 <tr class="row-odd"><td><p>ROTATE_270 RGB</p></td>
-<td><p>4.3</p></td>
+<td><p>4.1</p></td>
 <td><p>2.1x</p></td>
-<td><p>2.1x</p></td>
-<td><p>7.9</p></td>
-<td><p>1.6x</p></td>
+<td><p>2.0x</p></td>
+<td><p>7.7</p></td>
+<td><p>1.5x</p></td>
 </tr>
 <tr class="row-even"><td><p>TRANSPOSE RGB</p></td>
-<td><p>3.8</p></td>
-<td><p>2.0x</p></td>
+<td><p>3.6</p></td>
 <td><p>1.9x</p></td>
-<td><p>6.3</p></td>
-<td><p>1.3x</p></td>
+<td><p>1.9x</p></td>
+<td><p>6.1</p></td>
+<td><p>1.2x</p></td>
 </tr>
 <tr class="row-odd"><td><p>ROTATE_90 L</p></td>
-<td><p>2.8</p></td>
-<td><p>6.5x</p></td>
-<td><p>6.4x</p></td>
-<td><p>5.5</p></td>
-<td><p>3.3x</p></td>
-</tr>
-<tr class="row-even"><td><p>rotate 30°, nearest, RGB</p></td>
-<td><p>11.1</p></td>
-<td><p>2.4x</p></td>
-<td><p>2.4x</p></td>
-<td><p>40.3</p></td>
+<td><p>2.7</p></td>
+<td><p>6.3x</p></td>
+<td><p>6.3x</p></td>
+<td><p>5.4</p></td>
 <td><p>3.5x</p></td>
 </tr>
+<tr class="row-even"><td><p>rotate 30°, nearest, RGB</p></td>
+<td><p>10.1</p></td>
+<td><p>2.2x</p></td>
+<td><p>2.2x</p></td>
+<td><p>40.5</p></td>
+<td><p>3.6x</p></td>
+</tr>
 <tr class="row-odd"><td><p>rotate 30°, bilinear, RGB</p></td>
-<td><p>76.0</p></td>
-<td><p>1.6x</p></td>
+<td><p>75.9</p></td>
+<td><p>1.7x</p></td>
 <td><p>2.1x</p></td>
 <td><p>128</p></td>
 <td><p>1.7x</p></td>
@@ -2449,10 +2530,10 @@ milliseconds shown.</p>
 <td><p>1.8x</p></td>
 <td><p>2.9x</p></td>
 <td><p>390</p></td>
-<td><p>1.9x</p></td>
+<td><p>1.8x</p></td>
 </tr>
 <tr class="row-even"><td><p>perspective, bilinear, RGB</p></td>
-<td><p>83.6</p></td>
+<td><p>83.5</p></td>
 <td><p>1.8x</p></td>
 <td><p>2.6x</p></td>
 <td><p>147</p></td>
@@ -2655,28 +2736,28 @@ gains are algorithmic.</p>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>200 filled polygons</p></td>
-<td><p>62.0</p></td>
+<td><p>61.7</p></td>
 <td><p>2.3x</p></td>
 <td><p>2.4x</p></td>
 <td><p>2.4x</p></td>
-<td><p>89.4</p></td>
+<td><p>87.4</p></td>
 <td><p>1.5x</p></td>
 </tr>
 <tr class="row-odd"><td><p>200 filled ellipses</p></td>
-<td><p>3.4</p></td>
+<td><p>3.3</p></td>
 <td><p>1.5x</p></td>
 <td><p>1.5x</p></td>
 <td><p>1.5x</p></td>
-<td><p>6.1</p></td>
-<td><p>1.0x</p></td>
+<td><p>5.9</p></td>
+<td><p>0.9x</p></td>
 </tr>
 <tr class="row-even"><td><p>500 filled rectangles</p></td>
 <td><p>5.6</p></td>
 <td><p>1.7x</p></td>
 <td><p>1.7x</p></td>
 <td><p>1.8x</p></td>
-<td><p>11.3</p></td>
-<td><p>1.2x</p></td>
+<td><p>11.2</p></td>
+<td><p>1.1x</p></td>
 </tr>
 <tr class="row-odd"><td><p>500 lines, 5 px wide</p></td>
 <td><p>3.1</p></td>
@@ -2691,24 +2772,24 @@ gains are algorithmic.</p>
 <td><p>1.7x</p></td>
 <td><p>1.7x</p></td>
 <td><p>1.7x</p></td>
-<td><p>3.8</p></td>
+<td><p>3.7</p></td>
 <td><p>1.0x</p></td>
 </tr>
 <tr class="row-odd"><td><p>100 ROI polygons, 2 px outline</p></td>
-<td><p>19.8</p></td>
-<td><p>7.7x</p></td>
+<td><p>19.4</p></td>
+<td><p>7.6x</p></td>
 <td><p>8.0x</p></td>
-<td><p>8.1x</p></td>
-<td><p>22.2</p></td>
-<td><p>5.7x</p></td>
+<td><p>8.0x</p></td>
+<td><p>22.1</p></td>
+<td><p>5.6x</p></td>
 </tr>
 <tr class="row-even"><td><p>100 lines of text</p></td>
 <td><p>57.0</p></td>
-<td><p>7.1x</p></td>
-<td><p>17.4x</p></td>
-<td><p>17.2x</p></td>
+<td><p>7.2x</p></td>
+<td><p>17.6x</p></td>
+<td><p>17.5x</p></td>
 <td><p>113</p></td>
-<td><p>18.4x</p></td>
+<td><p>18.3x</p></td>
 </tr>
 </tbody>
 </table>
@@ -2763,7 +2844,7 @@ mapping (<code class="docutils literal notranslate"><span class="pre">Quant.c</s
 The codecs themselves (zlib, libjpeg-turbo, libwebp) are untouched;
 what changed is what Pillow does around them, with one exception: a
 build with libdeflate (the wheels) compresses the PNG encoder’s output
-with it instead of zlib, as below.</p>
+and inflates the decoder’s input with it instead of zlib, as below.</p>
 <section id="id39">
 <h3>What Pillow computes<a class="headerlink" href="#id39" title="Link to this heading">¶</a></h3>
 <p>The PNG encoder tries the None, Up, Sub and Paeth filters on every row
@@ -2846,6 +2927,38 @@ colours) or, with a scaled table, from a direct map of scaled cell to
 box. Chains, merge points and iteration order are unchanged, so the
 palettes are bit-identical: median cut 2.1x, the adaptive conversion
 1.7x on a 2560×1600 photo.</p></li>
+<li><p><strong>The fast octree from the image’s rows (2026-11-05).</strong>
+<code class="docutils literal notranslate"><span class="pre">quantize(method=FASTOCTREE)</span></code> is two passes over the pixels, one
+adding each to its bucket of a colour cube and one looking each up,
+around a short computation of the palette. The quantizers’ common
+interface takes the pixels as an array and returns the indices as
+another, four bytes a pixel each: for an RGB or RGBA image
+<code class="docutils literal notranslate"><span class="pre">quantize_octree_rows()</span></code> reads the image’s rows and writes the P
+image’s instead, so two 16 MB arrays, their page faults and two
+copies are gone (15.6 to 15.3 ms: the passes themselves were the
+time, 11.1 ms the first). A bucket of the cube is a count and four
+64-bit sums, five additions to memory per pixel in 160 KB of buckets;
+for RGB the first pass now keeps the sums of r, g and b and the count
+as four 32-bit numbers per bucket, 64 KB in all, which one vector
+addition per pixel maintains (the pixel’s bytes widened to four lanes,
+the fourth replaced by 1), and moves them to the buckets every 2²⁴
+pixels, before 255 times that could overflow; the second pass reads
+the palette index from a table of the lookup cube’s buckets, 16 KB
+instead of 160: 10.0 ms. The cube of an RGB image always has four
+bits of each channel, and with that a constant a pixel’s bucket is
+three shifts by constants instead of six by variables, which on x86
+without BMI2 are three micro-operations each: 7.9 ms, against 15.6 ms
+before in the AVX2 build and 25.1 ms in the wheel (and in Pillow 13),
+whose compiler had not vectorized the lookup. Two tables of sums for
+alternate pixels, so that neighbours in one bucket would not wait for
+each other’s store, measured the same and were dropped. RGBA keeps
+the 64-bit buckets, its rows up to the first fully transparent pixel
+through the same loop; Pillow recolours every transparent pixel as
+the first one before quantizing, and both passes do that as they go.
+The palettes and indices are those of Pillow 13
+(<code class="docutils literal notranslate"><span class="pre">Tests/test_image_quantize_octree.py</span></code>: an image through the rows
+against the same pixels as a P image through the array, and digests
+taken from Pillow 13).</p></li>
 <li><p><strong>The histogram in four tables.</strong> On x86, neighbouring pixels count
 into four separate tables, so that the increments of equal bytes
 don’t serialize, and the padding bytes of 2- and 3-band images are
@@ -2889,44 +3002,44 @@ milliseconds shown; the “portable” column is the build without SIMD.</p>
 </thead>
 <tbody>
 <tr class="row-even"><td><p>Encode PNG, level 6</p></td>
-<td><p>789</p></td>
+<td><p>792</p></td>
 <td><p>1.8x</p></td>
 <td><p>5.1x</p></td>
-<td><p>5.1x</p></td>
-<td><p>1,021</p></td>
-<td><p>4.4x</p></td>
+<td><p>5.0x</p></td>
+<td><p>1,020</p></td>
+<td><p>4.3x</p></td>
 </tr>
 <tr class="row-odd"><td><p>Decode PNG</p></td>
-<td><p>99.6</p></td>
-<td><p>1.0x</p></td>
-<td><p>1.0x</p></td>
-<td><p>1.0x</p></td>
-<td><p>109</p></td>
-<td><p>1.1x</p></td>
+<td><p>100</p></td>
+<td><p>1.5x</p></td>
+<td><p>1.6x</p></td>
+<td><p>1.6x</p></td>
+<td><p>110</p></td>
+<td><p>1.4x</p></td>
 </tr>
 <tr class="row-even"><td><p>Decode WebP</p></td>
-<td><p>115</p></td>
+<td><p>112</p></td>
 <td><p>1.5x</p></td>
 <td><p>1.5x</p></td>
 <td><p>1.5x</p></td>
-<td><p>108</p></td>
-<td><p>1.1x</p></td>
+<td><p>109</p></td>
+<td><p>1.2x</p></td>
 </tr>
 <tr class="row-odd"><td><p>Decode JPEG</p></td>
-<td><p>15.5</p></td>
+<td><p>16.4</p></td>
 <td><p>1.0x</p></td>
 <td><p>1.0x</p></td>
 <td><p>1.0x</p></td>
-<td><p>28.6</p></td>
+<td><p>28.4</p></td>
 <td><p>1.0x</p></td>
 </tr>
 <tr class="row-even"><td><p>Median cut, 256 colours</p></td>
-<td><p>2,930</p></td>
-<td><p>8.3x</p></td>
-<td><p>8.4x</p></td>
-<td><p>8.2x</p></td>
-<td><p>6,528</p></td>
-<td><p>9.8x</p></td>
+<td><p>2,762</p></td>
+<td><p>7.8x</p></td>
+<td><p>7.8x</p></td>
+<td><p>7.7x</p></td>
+<td><p>6,570</p></td>
+<td><p>9.6x</p></td>
 </tr>
 </tbody>
 </table>
@@ -2952,8 +3065,39 @@ zlib-ng build’s already did. zlib is still used for a preset
 dictionary, an explicit <code class="docutils literal notranslate"><span class="pre">compress_type</span></code> (a zlib strategy), images
 whose filtered rows exceed 256 MB (the one-piece path holds them and
 the output bound in memory; <code class="docutils literal notranslate"><span class="pre">PILLOW_LIBDEFLATE_MAX</span></code> moves the cap)
-and builds without the library. Decoding is unchanged: zlib’s inflate
-and the vector unfiltering above. JPEG encoding
+and builds without the library.</p>
+<p><strong>Decoding with libdeflate (2026-11-05).</strong> Inflating was 67 of the 97 ms
+of decoding the benchmark’s 2560x1600 RGB photo (7.5 MB of <code class="docutils literal notranslate"><span class="pre">IDAT</span></code>),
+and libdeflate inflates the same stream in 28 ms, but only in one piece.
+The plugin therefore walks the headers of the consecutive <code class="docutils literal notranslate"><span class="pre">IDAT</span></code>
+chunks before decoding, which costs a seek and an 8-byte read per chunk,
+and tells the decoder the stream’s length; the decoder gathers the
+stream, computes the size the image’s rows must decompress to (the
+filter bytes and, for interlaced images, the seven passes included),
+decompresses into a buffer of exactly that size and unfilters and
+unpacks the rows where they lie, each with the row above it as its
+predecessor. Both buffers get the huge-page advice of the image blocks:
+mapped afresh on every decode, their page faults were 6 ms of the 69 ms
+the path first measured. The decode is 62 ms, 1.56x; on a noisier
+2560x1600 image 1.60x for RGB (119 to 74 ms), 1.67x for RGBA, 1.40x for
+L and 4.0x for P (15.1 to 3.8 ms), 1.6x at 512x512, 1.8x at 128x128 and
+level at 16x16. What remains is the filters themselves, a byte at a
+time for Sub, Average and Paeth (29 ms of the 62; their vector forms
+measured slower, as the list below has it).</p>
+<p>The one-piece path is taken only when it cannot change a result. The
+stream decoder is used, as before, for the frames of an animation after
+the first, with <code class="docutils literal notranslate"><span class="pre">LOAD_TRUNCATED_IMAGES</span></code> (which must return the rows
+that arrived), for a file whose chunk headers cannot be walked or end
+early, and above the cap; and when libdeflate refuses the stream, or
+the stream does not hold exactly the image’s rows, the gathered bytes
+go through the stream decoder from the first one, so that a damaged
+file raises the error, and leaves the rows, that it did. The test
+suite’s PNG files, whole, cut at random offsets and with single bits
+flipped (15,666 cases, from a path and from memory, with and without
+<code class="docutils literal notranslate"><span class="pre">LOAD_TRUNCATED_IMAGES</span></code>) give the same pixels or the same error text
+with the path, without it (<code class="docutils literal notranslate"><span class="pre">PILLOW_LIBDEFLATE_MAX=0</span></code>) and in the
+build before it; Memcheck reports nothing on the 10,518 cases of the
+small files. JPEG encoding
 and decoding, WebP encoding and JPEG thumbnails are the libraries’ own
 time, 1.0x; WebP decoding is 1.5x on x86 and 1.2x on arm64 from the
 copies saved, now ahead of OpenCV. The histogram is 1.0x against Pillow
@@ -2979,7 +3123,11 @@ vector loops, and the decoder’s <code class="docutils literal notranslate"><sp
 <code class="docutils literal notranslate"><span class="pre">QuantSIMD.c</span></code> (the <code class="docutils literal notranslate"><span class="pre">quant</span></code> group): <code class="docutils literal notranslate"><span class="pre">nearest_entry_simd()</span></code>;
 <code class="docutils literal notranslate"><span class="pre">QuantNearest.h</span></code>: <code class="docutils literal notranslate"><span class="pre">NearestPalette</span></code>; <code class="docutils literal notranslate"><span class="pre">QuantHash.c</span></code>: the node
 blocks, <code class="docutils literal notranslate"><span class="pre">_hashtable_find()</span></code> and <code class="docutils literal notranslate"><span class="pre">hashtable_order_by_hash()</span></code>;
-<code class="docutils literal notranslate"><span class="pre">Quant.c</span></code>: <code class="docutils literal notranslate"><span class="pre">sum_box_leaves()</span></code>, <code class="docutils literal notranslate"><span class="pre">build_box_map()</span></code>. <code class="docutils literal notranslate"><span class="pre">Histo.c</span></code>:
+<code class="docutils literal notranslate"><span class="pre">Quant.c</span></code>: <code class="docutils literal notranslate"><span class="pre">sum_box_leaves()</span></code>, <code class="docutils literal notranslate"><span class="pre">build_box_map()</span></code>;
+<code class="docutils literal notranslate"><span class="pre">QuantOctree.c</span></code>: <code class="docutils literal notranslate"><span class="pre">quantize_octree_rows()</span></code>, <code class="docutils literal notranslate"><span class="pre">octree_build()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">add_sums_to_color_cube()</span></code>, with <code class="docutils literal notranslate"><span class="pre">plain_octree_count_rgb()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">plain_octree_map_rgb()</span></code> and the general pair in <code class="docutils literal notranslate"><span class="pre">PlainLoops.h</span></code>
+and <code class="docutils literal notranslate"><span class="pre">octree_count_rgb_simd()</span></code> in <code class="docutils literal notranslate"><span class="pre">QuantSIMD.c</span></code>. <code class="docutils literal notranslate"><span class="pre">Histo.c</span></code>:
 <code class="docutils literal notranslate"><span class="pre">histogram_u8()</span></code>, two versions, and <code class="docutils literal notranslate"><span class="pre">histogram_u8_masked()</span></code>.</p></li>
 <li><p>Tests: <code class="docutils literal notranslate"><span class="pre">Tests/test_codecs_simd.py</span></code>.</p></li>
 </ul>
@@ -3239,40 +3387,40 @@ the sections above and on the <a class="reference external" href="https://desmot
 </thead>
 <tbody>
 <tr class="row-even"><td><p>Portable (no SIMD)</p></td>
-<td><p>1.71x</p></td>
-<td><p>1.54x</p></td>
+<td><p>1.74x</p></td>
+<td><p>1.56x</p></td>
 </tr>
 <tr class="row-odd"><td><p>SSE4</p></td>
-<td><p>4.26x</p></td>
+<td><p>4.34x</p></td>
 <td></td>
 </tr>
 <tr class="row-even"><td><p>AVX2</p></td>
-<td><p>5.54x</p></td>
+<td><p>5.62x</p></td>
 <td></td>
 </tr>
 <tr class="row-odd"><td><p>AVX-VNNI</p></td>
-<td><p>5.65x</p></td>
+<td><p>5.75x</p></td>
 <td></td>
 </tr>
 <tr class="row-even"><td><p>NEON</p></td>
 <td></td>
-<td><p>2.60x</p></td>
+<td><p>2.71x</p></td>
 </tr>
 <tr class="row-odd"><td><p>Fast mode (AVX2, NEON)</p></td>
-<td><p>6.24x</p></td>
-<td><p>3.16x</p></td>
+<td><p>6.34x</p></td>
+<td><p>3.32x</p></td>
 </tr>
 <tr class="row-even"><td><p>Pillow-SIMD 12.1.1 (AVX2)</p></td>
-<td><p>2.11x</p></td>
+<td><p>2.13x</p></td>
 <td></td>
 </tr>
 <tr class="row-odd"><td><p>OpenCV 5.0 (single-threaded)</p></td>
 <td><p>3.61x</p></td>
-<td><p>2.17x</p></td>
+<td><p>2.16x</p></td>
 </tr>
 <tr class="row-even"><td><p>libvips 8.16</p></td>
 <td><p>1.18x</p></td>
-<td><p>0.69x</p></td>
+<td><p>0.70x</p></td>
 </tr>
 </tbody>
 </table>
@@ -3301,7 +3449,11 @@ compile it once per tier in a dispatch build, each with its own flags;
 detection, <code class="docutils literal notranslate"><span class="pre">ImagingSIMDInit()</span></code> and <code class="docutils literal notranslate"><span class="pre">ImagingSIMDSelect()</span></code>;
 <code class="docutils literal notranslate"><span class="pre">ImagingSIMD.h</span></code>: the tier and ISA macros, <code class="docutils literal notranslate"><span class="pre">SIMD_FORCE_INLINE</span></code>,
 <code class="docutils literal notranslate"><span class="pre">mm_dpwssd</span></code> and <code class="docutils literal notranslate"><span class="pre">mm256_dpwssd</span></code>, <code class="docutils literal notranslate"><span class="pre">mm_madd_add</span></code>, the widening loads;
-<code class="docutils literal notranslate"><span class="pre">ImagingPx4.h</span></code>: one pixel as four 32-bit lanes.</p></li>
+<code class="docutils literal notranslate"><span class="pre">ImagingPx4.h</span></code>: one pixel as four 32-bit lanes; <code class="docutils literal notranslate"><span class="pre">PlainLoops.h</span></code>:
+the loops in plain C that every tier compiles for itself (soft and
+hard light, the exact and extrapolating blend, the colour matrix, L
+and I, the rank filter’s network), with a wrapper in the area’s
+companion.</p></li>
 <li><p>Resampling: <code class="docutils literal notranslate"><span class="pre">Resample.c</span></code> (the drivers) and <code class="docutils literal notranslate"><span class="pre">ResampleHorizontal.c</span></code>
 (the portable horizontal kernels); <code class="docutils literal notranslate"><span class="pre">ResampleSIMD.c</span></code>, which includes
 <code class="docutils literal notranslate"><span class="pre">ResampleSIMDHorizontalConv.c</span></code>, <code class="docutils literal notranslate"><span class="pre">ResampleSIMDVerticalConv.c</span></code>,
