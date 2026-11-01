@@ -206,6 +206,9 @@ describe:
 - [OPTIMIZATION_METHOD.md](design/OPTIMIZATION_METHOD.md): how the next
   optimization is found, made and verified, in stages, with the fork's
   tools mapped onto each stage and the tooling left out.
+- [BASELINE_2026-11-04.md](design/BASELINE_2026-11-04.md): tests,
+  timings, hardware counters and the full-API profile of the branch
+  after the dispatch build, and what they suggest for the next round.
 
 
 ## Benchmarks
