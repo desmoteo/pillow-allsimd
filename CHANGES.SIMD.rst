@@ -197,6 +197,14 @@ Based on Pillow 13.0.0
   1.4x NEON)
 - Box blur radii 1 to 4 without running sums: the sum's sources unrolled
   per radius (radius 2 RGB: 1.46x AVX2 at -O3)
+- 32-bit x86: the SIMD builds do floating point in SSE registers
+  (``-mfpmath=sse``); on the x87 unit a transform's pixels could depend on
+  the code around them. ``-C simd=native`` passes ``-mcpu=native`` on POWER
+  and is refused on RISC-V with a hint. The portable build passes the test
+  suite on riscv64, ppc64le, s390x, armv7 and 32-bit x86
+  (``OTHER_ARCHITECTURES.md``); ``checks/simd_test_remote.sh`` takes those
+  platforms, and ``checks/simd_hashes.py`` hashes I and F pixels
+  little-endian, so big-endian builds compare
 - Fast mode: resize() of 8-bit images with 4-byte pixels fuses the two
   passes through a ring of rows, keeps the horizontal sums to 2^-6 levels
   and multiplies in 16 bits in the vertical pass (pmulhrsw, vqrdmulh): within
