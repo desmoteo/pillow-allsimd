@@ -96,7 +96,8 @@ transforms, colour lookup tables, channel operations, point tables, palette
 mapping, drawing fills, PNG row filters and pixel packing, each with the
 instruction sets the
 `readme <https://github.com/desmoteo/pillow-allsimd#what-is-accelerated>`_
-lists.
+lists. :ref:`allsimd-kernels` explains how they work, operation by
+operation.
 
 Credits
 -------

@@ -35,6 +35,7 @@ The core image library is designed for fast access to data stored in a few basic
    :maxdepth: 2
 
    allsimd.rst
+   allsimd-kernels.rst
    installation/index.rst
    handbook/index.rst
    reference/index.rst

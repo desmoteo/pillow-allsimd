@@ -1,7 +1,10 @@
 # Plan: a detailed explanation of the Pillow-AllSIMD optimizations (x86-64 and arm64)
 
-Status: proposal. The reader and the location below are proposed, to be
-confirmed before writing.
+Status: being written as `docs/allsimd-kernels.rst`, a page of the API
+documentation ("How the kernels work"), section by section in the order
+below (ground rules and resampling first, 2026-11-03). The reader is as
+proposed; the location is the documentation site rather than a Markdown
+file, so that it is published with the API reference.
 
 ## What it is for
 

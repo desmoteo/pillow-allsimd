@@ -18,6 +18,10 @@ Unreleased
   (``Tests/conftest.py``, the upstream tests that need the exact kernels)
   names no test of a collected file, so a test renamed upstream can't run
   with the fast kernels unnoticed
+- Documentation: "How the kernels work" (``docs/allsimd-kernels.rst``),
+  the explanation of the SIMD kernels for contributors planned in
+  ``design/SIMD_EXPLAINER_PLAN.md``, written section by section: so far
+  the ground rules and resampling
 
 13.0.0.post2 (2026-11-03)
 -------------------------
