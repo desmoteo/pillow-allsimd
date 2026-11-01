@@ -2506,6 +2506,38 @@ The idea
   box. Chains, merge points and iteration order are unchanged, so the
   palettes are bit-identical: median cut 2.1x, the adaptive conversion
   1.7x on a 2560×1600 photo.
+* **The fast octree from the image's rows (2026-11-05).**
+  ``quantize(method=FASTOCTREE)`` is two passes over the pixels, one
+  adding each to its bucket of a colour cube and one looking each up,
+  around a short computation of the palette. The quantizers' common
+  interface takes the pixels as an array and returns the indices as
+  another, four bytes a pixel each: for an RGB or RGBA image
+  ``quantize_octree_rows()`` reads the image's rows and writes the P
+  image's instead, so two 16 MB arrays, their page faults and two
+  copies are gone (15.6 to 15.3 ms: the passes themselves were the
+  time, 11.1 ms the first). A bucket of the cube is a count and four
+  64-bit sums, five additions to memory per pixel in 160 KB of buckets;
+  for RGB the first pass now keeps the sums of r, g and b and the count
+  as four 32-bit numbers per bucket, 64 KB in all, which one vector
+  addition per pixel maintains (the pixel's bytes widened to four lanes,
+  the fourth replaced by 1), and moves them to the buckets every 2²⁴
+  pixels, before 255 times that could overflow; the second pass reads
+  the palette index from a table of the lookup cube's buckets, 16 KB
+  instead of 160: 10.0 ms. The cube of an RGB image always has four
+  bits of each channel, and with that a constant a pixel's bucket is
+  three shifts by constants instead of six by variables, which on x86
+  without BMI2 are three micro-operations each: 7.9 ms, against 15.6 ms
+  before in the AVX2 build and 25.1 ms in the wheel (and in Pillow 13),
+  whose compiler had not vectorized the lookup. Two tables of sums for
+  alternate pixels, so that neighbours in one bucket would not wait for
+  each other's store, measured the same and were dropped. RGBA keeps
+  the 64-bit buckets, its rows up to the first fully transparent pixel
+  through the same loop; Pillow recolours every transparent pixel as
+  the first one before quantizing, and both passes do that as they go.
+  The palettes and indices are those of Pillow 13
+  (``Tests/test_image_quantize_octree.py``: an image through the rows
+  against the same pixels as a P image through the array, and digests
+  taken from Pillow 13).
 * **The histogram in four tables.** On x86, neighbouring pixels count
   into four separate tables, so that the increments of equal bytes
   don't serialize, and the padding bytes of 2- and 3-band images are
@@ -2669,7 +2701,11 @@ Code map
   ``QuantSIMD.c`` (the ``quant`` group): ``nearest_entry_simd()``;
   ``QuantNearest.h``: ``NearestPalette``; ``QuantHash.c``: the node
   blocks, ``_hashtable_find()`` and ``hashtable_order_by_hash()``;
-  ``Quant.c``: ``sum_box_leaves()``, ``build_box_map()``. ``Histo.c``:
+  ``Quant.c``: ``sum_box_leaves()``, ``build_box_map()``;
+  ``QuantOctree.c``: ``quantize_octree_rows()``, ``octree_build()``,
+  ``add_sums_to_color_cube()``, with ``plain_octree_count_rgb()``,
+  ``plain_octree_map_rgb()`` and the general pair in ``PlainLoops.h``
+  and ``octree_count_rgb_simd()`` in ``QuantSIMD.c``. ``Histo.c``:
   ``histogram_u8()``, two versions, and ``histogram_u8_masked()``.
 * Tests: ``Tests/test_codecs_simd.py``.
 
