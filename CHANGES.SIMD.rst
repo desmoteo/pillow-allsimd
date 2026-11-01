@@ -8,6 +8,13 @@ Unreleased
 
 Based on Pillow 13.0.0
 
+- Building from source on RHEL 9, CentOS Stream 9 and their relatives
+  works again: their GCC 11 accepts ``-mavxvnni`` and their assembler
+  (binutils 2.35) rejects the instructions, so the default build of
+  13.0.0.post3 failed there. The build now tries the toolchain first and
+  leaves the AVX-VNNI kernels out where it cannot make them; SSE4.1 and
+  AVX2 are chosen at run time as elsewhere. ``-C simd=avxvnni`` says what
+  it needs instead of failing in the assembler
 - Cygwin, and MinGW with an unpatched GCC: the AVX2 and AVX-VNNI kernels
   no longer crash. GCC for 64-bit Windows keeps 256-bit values in stack
   slots that it takes to be 32-byte aligned on a stack the ABI aligns to
