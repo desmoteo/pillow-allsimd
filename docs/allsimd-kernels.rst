@@ -19,8 +19,8 @@ Ultra 9 285H (x86-64, GCC 14) and an NVIDIA Jetson Orin (arm64,
 Cortex-A78AE, GCC 14). Unless a section says "fast mode", they are for
 exact mode, Pillow's arithmetic.
 
-The page is written section by section. Written so far: the ground rules
-and resampling. To come: blurs, kernel and rank filters, colour
+The page is written section by section. Written so far: the ground rules,
+resampling and the blurs. To come: kernel and rank filters, colour
 conversions, compositing and channel operations, geometry, drawing and
 text, codecs and packing, what was tried and dropped, where OpenCV and
 libvips are still faster, and the fast-mode kernels (meanwhile,
@@ -413,3 +413,330 @@ not adopted, because the result would then depend on the build; and the
 horizontal kernel file is compiled twice, so a change to the 8-bit
 kernels changes fast mode's 16-bit ones with it, which is intended, and
 their tests cover both.
+
+Box blur, Gaussian blur and unsharp mask
+----------------------------------------
+
+``ImageFilter.BoxBlur``, ``ImageFilter.GaussianBlur`` and
+``ImageFilter.UnsharpMask`` (``BoxBlur.c``, ``UnsharpMask.c``). All three
+are box blurs underneath: a Gaussian blur is three box passes, and an
+unsharp mask is a Gaussian blur followed by one pass over the pixels. The
+speed-up here comes as much from the order the passes run in as from the
+vector code.
+
+What Pillow computes
+~~~~~~~~~~~~~~~~~~~~
+
+A box blur of radius *R* (a float) averages, along one axis, the 2\ *R* +
+1 pixels around each pixel: the 2\ *r* + 1 whole pixels, *r* = ⌊\ *R*\ ⌋,
+with the weight ``ww`` = ⌊2²⁴ / (2\ *R* + 1)⌋, and the two pixels just
+beyond them with the fractional weight ``fw`` = (2²⁴ − (2\ *r* + 1)
+``ww``) / 2, so that the weights add up to 2²⁴ (less a rounding). With
+``acc`` the sum of the whole pixels and ``left`` and ``right`` the two
+beyond, each channel is::
+
+    out = (acc * ww + (left + right) * fw + (1 << 23)) >> 24
+
+in 32-bit unsigned arithmetic (``acc * ww`` is at most 255 · 2²⁴, so
+nothing wraps). Pixels beyond the edges repeat the edge pixel. A blur is
+*n* such passes along x, then *n* along y (``BoxBlur`` takes one each;
+the C function takes any number).
+
+``GaussianBlur(radius)``, whose radius is the standard deviation σ, runs
+three box passes per axis, with the box radius that makes three boxes
+approximate the Gaussian (Gwosdek et al., *Theoretical foundations of
+Gaussian convolution by extended box filtering*, 2011, in
+``_gaussian_blur_radius()``): for σ = 1 each pass has radius 0.25, three
+taps with the weights 1/6, 2/3, 1/6; for σ = 10, 9.475. The passes cost
+the same for any radius, so the Gaussian's cost doesn't grow with σ.
+
+``UnsharpMask(radius, percent, threshold)`` blurs the image with that
+Gaussian, then, for every byte with ``diff = in - blurred``, writes
+``clip(in + diff * percent / 100)`` where ``|diff| > threshold`` and
+``in`` elsewhere, with C's integer division (truncating toward zero).
+
+Pillow 13 runs every pass over the whole image, one pixel at a time, with
+the running sum in scalar variables (four of them for a 4-byte pixel),
+and blurs vertically by transposing the image, blurring rows and
+transposing back: three horizontal passes, a transpose, three passes and
+a transpose for a Gaussian, each a full read and write of the image.
+
+The idea
+~~~~~~~~
+
+Four changes, each keeping the arithmetic above:
+
+* **Vertical passes on rows.** The vertical pass keeps one 32-bit running
+  sum per *byte of the row* (``linesize`` of them), adds the row entering
+  the window and subtracts the one leaving it, and applies the weights to
+  the whole row at once: ``acc[b] += add[b] - sub[b]`` for every byte,
+  then the formula. It is the horizontal pass's arithmetic with the loop
+  over pixels turned into a loop over rows, so it gives the pixels of the
+  transposed computation (``test_vertical_matches_transposed_horizontal``
+  checks this), without the transposes, and it is as wide as the row.
+* **The passes of a direction together.** Horizontally, all *n* passes run
+  on one row before the next, alternating between two row buffers, so
+  the row stays in cache. Vertically, the passes form a cascade: pass *k*
+  keeps its last 2\ *r* + 3 output rows in a ring, which is all pass
+  *k* + 1 reads, and ``BoxBlurEnsure()`` computes each pass's rows as the
+  next needs them; one sweep down the image writes the output. The
+  intermediate images are gone: a Gaussian reads and writes the image
+  twice instead of six times plus two transposes. Rings above 8 MB (very
+  large radii) fall back to one pass at a time.
+* **One pass each way, fused.** ``BoxBlur``'s default, one pass per axis,
+  fuses further: each row is blurred horizontally into a ring of
+  2\ *r* + 4 rows just before the vertical pass first reads it
+  (``box_fused_row()``), so there is no temporary image at all, 16 MB to
+  allocate, write and read for a 2560×1600 RGB image. Rings up to 4 MB.
+* **Small radii without running sums.** A running sum is a serial
+  dependency, each pixel waiting for the previous one, and in the
+  horizontal pass it is four lanes wide at most. For radii below 2, and
+  for the integer radii 1 to 4, the box is summed directly from its 2\ *r*
+  + 3 sources, 16 or 32 bytes of the row per step: the sources are rows
+  (vertical pass) or the row shifted by whole pixels (horizontal pass,
+  with the edge pixels repeated in a padded copy of the row's ends). For
+  the integer radii 1 to 4 ``fw`` is 0 (2²⁴ − 1 is divisible by 3, 5, 7
+  and 9) and the division by ``ww`` is done in 16 bits:
+  ``(((c << s) + k) * m >> 16) >> t`` with constants per radius found by
+  a search around *m* = ``ww`` · 2\ :sup:`t − s − 8`. ``BoxDirectInit()``
+  checks the 16-bit form against the 24-bit one for every possible sum
+  *c* (at most 255 · 9 of them) at the start of each blur, and uses it
+  only if they all agree. The radii between (2.5, say) take the running
+  sums.
+
+Two more things decide the speed: 1-byte images are blurred four rows at
+a time on x86, the bytes of rows *y* to *y* + 3 interleaved into one row
+of 4-byte pixels, blurred with the 4-byte kernel (the same arithmetic
+per byte) and de-interleaved, the rows left over taking the scalar
+1-byte running sum (``test_l_matches_rgb_band``); and the vertical pass,
+which touches rows 2\ *r* + 3 rows apart, is the one that gained 1.5x from
+transparent huge pages.
+
+x86-64
+~~~~~~
+
+*Horizontal running sums* (``ImagingLineBoxBlur32``) are the form
+Pillow-SIMD has had since 2015: one pixel as four 32-bit lanes
+(``ImagingPx4.h``: ``pmovzxbd`` to load, ``paddd`` and ``psubd`` for the
+sum, ``pmulld`` by the weights, a shift and a ``pshufb`` to pack the four
+bytes). The loop body is one macro, ``BOX_LINE_BLUR``, that takes the
+vector type's operations as macros; with AVX2 the same macro runs on two
+rows at once, one per 128-bit half (``ImagingLineBoxBlur32x2``), so two
+rows cost the instructions of one; 1-byte images then take eight rows
+per step.
+
+*Vertical running sums* (``ImagingBoxBlurColumns``) take 32 bytes of the
+row per step with AVX2, 16 with SSE4: four groups of 8 bytes of ``add``,
+``sub`` and the far row widened to 32 bits, the sums updated and stored,
+``pmulld`` by ``ww`` and ``fw``, the rounding shift, then the four results
+packed to bytes. ``packssdw`` and ``packuswb`` pack within 128-bit lanes,
+so the AVX2 version ends with a ``vpermd`` that puts the four groups back
+in order.
+
+*Direct passes* (``box_direct()``) sum the inner sources in 16-bit lanes
+(``pmovzxbw``, ``paddw``), 32 bytes per step with AVX2, 16 with SSE4.
+The exact form then needs ``acc * ww + e * fw`` with 24-bit weights,
+which ``pmulld`` would compute in 32 bits at two µops and 10 cycles of
+latency each; instead the weights are split into 12-bit halves, ``ww`` =
+``wh`` · 2¹² + ``wl``, and ``pmaddwd`` on the pairs (``c``, ``e``)
+against (``wh``, ``fh``) and (``wl``, ``fl``) gives::
+
+    ww * c + fw * e = ((wh * c + fh * e) << 12) + (wl * c + fl * e)
+
+two ``pmaddwd``, a shift and an add, with nothing above 2³² (``c`` is at
+most 765 here, the weights at most 2¹²). The 16-bit form for the integer
+radii stays in 16-bit lanes throughout, its multiply-high being
+``pmulhuw``. The number of sources is a compile-time constant for each
+radius (``ImagingBoxBlurDirect()`` is a ``switch`` into an
+``always_inline`` function), so the sum unrolls and the source pointers
+stay in registers: 1.46x at radius 2 over the loop that reloaded them.
+
+*Unsharp mask* (``ImagingUnsharpMaskRow``): 16 bytes per step, widened to
+32 bits; ``diff * percent`` in 32 bits, converted to float, divided by
+100 and truncated with ``cvttps2dq``, which equals C's integer division
+as long as ``diff * percent`` is below 2²⁴ in magnitude, so the vector
+loop takes ``percent`` between −65535 and 65535 only; ``|diff| > threshold`` as a mask for
+``pblendvb``; and the signed and unsigned saturating packs are
+``clip8()``.
+
+arm64
+~~~~~
+
+The arm64 version is a different mix, decided by measurement against
+GCC's own vectorization of the portable loops, and it has changed with
+the compiler.
+
+*Horizontal running sums*: the ``px4`` NEON version (``vmovl`` widenings,
+``vmulq_u32``, ``vmovn`` narrowings). It is 1.27x faster than the
+compiler's code for the portable loop with GCC 12 and 14 and was slower
+with GCC 11, so it was removed for a while and restored. 1-byte images
+keep the scalar running sum: the four-row interleave was 1 to 5% slower
+than the compiler's 1-byte loop on the Cortex-A78AE.
+
+*Vertical running sums*: the portable loop. GCC vectorizes it at ``-O3``,
+with a run-time check that the rows don't alias, and leaves it scalar at
+``-O2``; a NEON version was measured slower than the compiler's code.
+
+*Direct passes*: 16 bytes per step. The sum uses the widening adds
+(``vaddw_u8``), and the exact form multiplies in 32 bits with
+``vmulq_u32`` and ``vmlaq_u32``, one instruction each on arm64, where the
+12-bit split was slower; ``vaddhn_u32`` adds 2²³ and keeps the high 16
+bits of each sum, which is the ``>> 16`` of the rounding, and ``vshrn``
+by 8 completes the ``>> 24``. The 16-bit form has no multiply-high
+instruction: ``vmull_u16`` makes the 32-bit products and ``vuzp2q`` keeps
+their high halves.
+
+*Unsharp mask*: the same steps as x86 with ``vdivq_f32``, a real vector
+division, cheap on this core; 1.31x over the compiler's multiply-high
+loop with GCC 12 and 14, not with GCC 11.
+
+Why the builds agree
+~~~~~~~~~~~~~~~~~~~~
+
+Everything is integer arithmetic modulo 2³², and every path computes the
+same integers: a running sum and a direct sum of the same box are the
+same number; the weights come from one float expression, evaluated the
+same way on every build; the 16-bit form of the direct passes is checked
+against the 24-bit form at run time, for every sum it can meet, before it
+is used; the cascade and the fused pass change where the intermediate
+rows live, not their values (``test_box_blur_fused_matches_passes``
+compares the fused blur with the two passes run separately); and each
+vector loop leaves the end of the row to the scalar loop with the same
+formula (``Tests/test_simd_consistency.py``). The unsharp mask's float
+division is exact against the integer division in the range the vector
+loop accepts. ``checks/simd_hashes.py``'s ``blur/unsharp`` area agrees on
+every build, and so does Pillow's ``Tests/test_box_blur.py``, extended
+with the channel-order, one-pixel-line and transposition checks.
+
+Numbers
+~~~~~~~
+
+2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
+milliseconds shown.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Blur
+     - Pillow 13 (x86, ms)
+     - SSE4
+     - AVX2
+     - Pillow 13 (arm64, ms)
+     - NEON
+   * - Gaussian RGB, σ 1
+     - 120.8
+     - 4.4x
+     - 7.3x
+     - 162.2
+     - 3.1x
+   * - Gaussian RGB, σ 10
+     - 120.9
+     - 2.7x
+     - 4.6x
+     - 162.5
+     - 1.8x
+   * - Gaussian RGB, σ 30
+     - 120.7
+     - 2.7x
+     - 4.6x
+     - 162.6
+     - 1.8x
+   * - Gaussian RGBA, σ 10
+     - 120.9
+     - 2.7x
+     - 4.7x
+     - 162.6
+     - 1.8x
+   * - Gaussian L, σ 10
+     - 37.0
+     - 3.5x
+     - 6.2x
+     - 53.5
+     - 1.9x
+   * - Box RGB, radius 2
+     - 53.8
+     - 8.1x
+     - 14.2x
+     - 65.6
+     - 4.4x
+   * - Box RGB, radius 10
+     - 53.6
+     - 3.9x
+     - 7.1x
+     - 65.7
+     - 2.3x
+   * - Unsharp mask RGB
+     - 197.0
+     - 5.0x
+     - 7.4x
+     - 236.2
+     - 3.2x
+   * - Unsharp mask L
+     - 54.4
+     - 6.0x
+     - 8.9x
+     - 69.6
+     - 4.0x
+
+The portable build alone is 1.4 to 2.1x Pillow 13 on x86 and 1.4 to 2.7x
+on arm64: that is the share of the passes' order. The σ 1 Gaussian and
+the radius-2 box take the direct passes, the others the running sums,
+which is why they gain more; and σ 10 and σ 30 cost the same. Gaussian L
+on arm64 gains nothing from NEON (the scalar build is 1.9x too): its
+horizontal pass is the scalar 1-byte running sum and its vertical pass is
+the compiler's code. Against Pillow-SIMD 12.1.1 with AVX2, the σ 1
+Gaussian is 3.1x faster, the radius-2 box 8.2x and the unsharp mask 5.0x.
+AVX-VNNI changes nothing here: there is no ``pmaddwd`` chain to fuse.
+
+Against OpenCV on x86, a true Gaussian with one kernel of about 6σ + 1
+taps per axis: OpenCV is 2.1x faster at σ 1 (7 taps against three passes of 3),
+and the AVX2 build 3.3x faster at σ 10 and 13x at σ 30, where OpenCV's
+kernel keeps growing. On the box blur OpenCV's radius 2 is 1.2x faster
+(it keeps 16-bit running column sums; a 16-bit vertical sum would be an
+exact-compatible change here, listed in ``design/PERFORMANCE_GAPS.md``),
+and its radius 10 is 1.16x slower. On arm64 OpenCV is ahead on the small
+radii (1.2x at σ 1, 1.4 to 1.5x on the box blur) and 4.5x behind at
+σ 10. Fast mode
+(the default) replaces the three passes with one kernel for σ up to 6:
+the σ 1 Gaussian 21.6x on x86 and 9.7x on arm64 (3.0x and 3.2x over the
+exact kernels, and ahead of OpenCV on both), the RGB unsharp mask 12.5x
+and 5.9x; see :ref:`fast-mode` and, until the fast-mode section is
+written, ``design/SIMD_FAST_KERNELS.md``.
+
+Code map
+~~~~~~~~
+
+* ``BoxBlur.c``: ``BOX_LINE_BLUR`` and ``ImagingLineBoxBlur32``,
+  ``ImagingLineBoxBlur32x2`` (AVX2) and ``ImagingLineBoxBlur8``, the
+  horizontal running sums; ``BoxDirectInit()``, ``box_direct()``,
+  ``ImagingBoxBlurDirect()`` and ``ImagingLineBoxBlurDirect()``, the direct
+  passes; ``interleave4()`` and ``deinterleave4()``;
+  ``ImagingHorizontalBoxBlur()``; ``ImagingBoxBlurColumns()`` and
+  ``ImagingVerticalBoxBlur()``; the cascade (``BoxBlurCascade``,
+  ``BoxBlurEnsure()``, ``ImagingVerticalBoxBlurPasses()``); the fused pass
+  (``BoxFusedRows``, ``box_fused_row()``, ``ImagingBoxBlurFused()``);
+  ``ImagingBoxBlur()``, which chooses between them;
+  ``_gaussian_blur_radius()`` and ``ImagingGaussianBlur()``, the fast-mode
+  entry.
+* ``ImagingPx4.h``: one pixel as four 32-bit lanes, SSE4, NEON and
+  portable.
+* ``GaussianFast.c``: fast mode's one-kernel Gaussian.
+* ``UnsharpMask.c``.
+* Tests: the end of ``Tests/test_box_blur.py``,
+  ``test_box_blur_fused_matches_passes`` in
+  ``Tests/test_simd_consistency.py``, the ``blur/unsharp`` and ``fast:
+  gaussian`` areas of ``checks/simd_hashes.py``.
+
+Pitfalls met on the way: Pillow-SIMD's SSE4 store mask wrote lane 3 to
+byte 0, which a two-axis blur reversed twice and hid, so that
+``BoxBlur((r, 0))`` swapped the channels (``test_channel_order``); the
+old kernel read past the end of 1-pixel lines; two rows per AVX2 vector
+were measured and dropped once (Gaussian 1.08x, unsharp 0.84x, with
+``pmulld`` costing as much per element at 256 bits as at 128 and the
+packing of two rows adding work) and adopted after the passes were
+restructured, when the rows were in cache and the AVX2 vertical kernel
+came with them (Gaussian 57 to 28 ms); column strips to keep the vertical
+pass's accumulators in L1 measured 0.90 to 1.11x, because the misses the
+cache model counted are served by the hardware prefetcher, and were
+dropped; and the NEON decisions above each went the other way with
+another GCC, so they are re-measured when the compiler changes.
