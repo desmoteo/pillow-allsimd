@@ -22,6 +22,17 @@ Unreleased
   conversion of the portable one) indexed its rows with ``x * 4``, which GCC
   can't vectorize under ``-fno-strict-overflow``: the portable build was
   0.32x Pillow 13 on arm64. Pointer increments, as in Pillow; same pixels
+- The SIMD code of every operation now lives in a companion file,
+  ``<Area>SIMD.c`` next to Pillow's own file, and the companions are
+  compiled into one translation unit, ``SIMDKernels.c``, whose only
+  export is a table of kernel pointers; Pillow's files keep the portable
+  code and call the kernels through the table of the tier chosen when
+  ``_imaging`` loads (``SIMDDispatch.c``). No file of Pillow's own carries
+  an instruction-set guard any more, so merging a Pillow release no
+  longer conflicts on them, and one build can later hold several tiers
+  (``design/SIMD_DISPATCH_PLAN.md``, phase A). The same kernels, the same
+  pixels: the hashes of every area are unchanged on the SSE4, AVX2 and
+  scalar builds. ``_imaging.simd_kernels`` names the active tier
 - Documentation: "How the kernels work" (``docs/allsimd-kernels.rst``),
   the explanation of the SIMD kernels for contributors planned in
   ``design/SIMD_EXPLAINER_PLAN.md``: the ground rules, then each

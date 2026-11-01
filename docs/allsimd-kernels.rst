@@ -60,26 +60,38 @@ exhaustive checks cover the conversions whose input space is small enough
 (every RGB value for HSV, every colour and alpha for unpremultiplication);
 and Pillow's test suite runs on every build.
 
-**Compile-time instruction sets, no run-time dispatch.** The build picks
-the kernels with ``-C simd=`` (``sse4``, ``avx2``, ``avxvnni``, ``neon``,
-``native``, ``disable``; :ref:`allsimd-install`), and ``ImagingSIMD.h``
-turns the compiler's macros into ``IMAGING_SIMD_SSE4``,
-``IMAGING_SIMD_AVX2``, ``IMAGING_SIMD_AVXVNNI`` and ``IMAGING_SIMD_NEON``.
-Every kernel file is one ``#if`` ladder: the SSE4 version, with ``#if
-defined(IMAGING_SIMD_AVX2)`` blocks inside it where 256-bit code exists;
-the NEON version; and the portable version under ``#else``. A wheel can't
-carry an AVX2 build, since pip would install it on a CPU without AVX2
-(the plan for run-time dispatch is in ``design/PLAN.md``). On arm64, NEON
-is part of the baseline, so the wheels have it.
+**One instruction set per build, through a table of kernels.** The build
+picks the instruction set with ``-C simd=`` (``sse4``, ``avx2``,
+``avxvnni``, ``neon``, ``native``, ``disable``; :ref:`allsimd-install`),
+and ``ImagingSIMD.h`` turns the compiler's macros into
+``IMAGING_SIMD_SSE4``, ``IMAGING_SIMD_AVX2``, ``IMAGING_SIMD_AVXVNNI`` and
+``IMAGING_SIMD_NEON``. The SIMD code of each operation lives in a
+companion file, ``<Area>SIMD.c``, one ``#if`` ladder: the SSE4 version,
+with ``#if defined(IMAGING_SIMD_AVX2)`` blocks inside it where 256-bit
+code exists, and the NEON version. Every companion is compiled into one
+translation unit, ``SIMDKernels.c``, whose only export is a table of
+kernel pointers (``SIMDKernels.h``, one group per area); Pillow's own
+files keep the portable code and call a kernel through ``ImagingSIMD``,
+the table of the tier chosen when ``_imaging`` loads (``SIMDDispatch.c``;
+a scalar table, every pointer NULL, for ``disable`` and for
+architectures without kernels). A row kernel does the pixels its vector
+loop can and returns how many, and the scalar file finishes the row; a
+kernel for a whole operation returns 1 when it did the work. The call
+is once per row or per operation, never per pixel: the fast transforms
+were first called per tile row of 64 pixels, and the SSE4 build lost
+14% to the calls and the vector constants set up on each, so they take
+the whole region. A build has one tier today; run-time dispatch between
+SSE4, AVX2 and AVX-VNNI tiers in one build, for x86 wheels, is the next
+phase of ``design/SIMD_DISPATCH_PLAN.md``. On arm64, NEON is part of the
+baseline, so the wheels have it.
 
 ``ImagingSIMD.h`` also holds the helpers the kernels share:
 ``SIMD_FORCE_INLINE`` for kernels that must see a shift count as a
 constant; ``mm_dpwssd`` and ``mm256_dpwssd``, one ``vpdpwssd`` with
 AVX-VNNI and ``pmaddwd`` plus ``paddd`` without, and ``mm_madd_add``,
 always the pair, for sums that are one long dependency chain (below);
-``permute4``, which shuffles the bytes of 4-byte pixels with constant
-indices; and ``ImagingPx4.h``, one pixel as four 32-bit lanes with the
-same modulo-2³² arithmetic in SSE4, NEON and plain C.
+and ``ImagingPx4.h``, one pixel as four 32-bit lanes with the same
+modulo-2³² arithmetic in SSE4, NEON and plain C.
 
 **Pillow's memory layout.** An image is an array of row pointers
 (``im->image[y]``). Modes of one 8-bit band (L, P) are stored as bytes
@@ -401,14 +413,20 @@ Code map
   (``_ImagingResampleHorizontal_8bpc`` and friends),
   ``ImagingResampleInner()`` with the pass order and the fast-mode entry,
   ``ImagingResampleAlpha()``.
-* ``ResampleSIMDHorizontalConv.c``: the horizontal kernels for 4-byte and
-  1-byte pixels, SSE4/AVX2, NEON and portable, included twice by
-  ``Resample.c`` (the second time with ``RESAMPLE_OUT16`` for fast mode's
-  16-bit intermediate rows).
-* ``ResampleSIMDVerticalConv.c``: the vertical kernel, three versions.
-* ``ResampleSIMD32bpc.c``: I, F and I;16 in vectors of doubles.
-* ``ResampleFast.c``: fast mode's fused resize.
-* ``Reduce.c`` and ``ReduceSIMD.c``.
+* ``ResampleSIMD.c``, the companion: it includes
+  ``ResampleSIMDHorizontalConv.c`` (the horizontal kernels for 4-byte
+  and 1-byte pixels, SSE4/AVX2 and NEON) twice, the second time with
+  ``RESAMPLE_OUT16`` for fast mode's 16-bit intermediate rows,
+  ``ResampleSIMDVerticalConv.c`` (the vertical kernel),
+  ``ResampleSIMD32bpc.c`` (I, F and I;16 in vectors of doubles) and
+  ``ResampleFastSIMD.c`` (fast mode's vertical row), and defines the
+  table's ``resample`` group.
+* ``ResampleHorizontal.c``: the portable horizontal kernels, included
+  twice by ``Resample.c`` the same way; the portable vertical kernel is
+  in ``Resample.c`` itself.
+* ``ResampleFast.c``: fast mode's fused resize; ``ResampleFast.h``: the
+  constants it shares with its SIMD loop.
+* ``Reduce.c`` and ``ReduceSIMD.c`` (the ``reduce`` group).
 
 Pitfalls met on the way: ``vpdpwssd`` in a single dependency chain
 (above); a vertical-first pass order for every downscale was measured and
@@ -709,22 +727,26 @@ written, ``design/SIMD_FAST_KERNELS.md``.
 Code map
 ~~~~~~~~
 
-* ``BoxBlur.c``: ``BOX_LINE_BLUR`` and ``ImagingLineBoxBlur32``,
-  ``ImagingLineBoxBlur32x2`` (AVX2) and ``ImagingLineBoxBlur8``, the
+* ``BoxBlur.c``: ``line_blur32()`` and ``ImagingLineBoxBlur8``, the
   horizontal running sums; ``BoxDirectInit()``, ``box_direct()``,
   ``ImagingBoxBlurDirect()`` and ``ImagingLineBoxBlurDirect()``, the direct
-  passes; ``interleave4()`` and ``deinterleave4()``;
-  ``ImagingHorizontalBoxBlur()``; ``ImagingBoxBlurColumns()`` and
+  passes; ``ImagingHorizontalBoxBlur()``; ``ImagingBoxBlurColumns()`` and
   ``ImagingVerticalBoxBlur()``; the cascade (``BoxBlurCascade``,
   ``BoxBlurEnsure()``, ``ImagingVerticalBoxBlurPasses()``); the fused pass
   (``BoxFusedRows``, ``box_fused_row()``, ``ImagingBoxBlurFused()``);
   ``ImagingBoxBlur()``, which chooses between them;
   ``_gaussian_blur_radius()`` and ``ImagingGaussianBlur()``, the fast-mode
   entry.
-* ``ImagingPx4.h``: one pixel as four 32-bit lanes, SSE4, NEON and
-  portable.
-* ``GaussianFast.c``: fast mode's one-kernel Gaussian.
-* ``UnsharpMask.c``.
+* ``BoxBlur.h``: ``BOX_LINE_BLUR`` and its px4 instance
+  ``box_line_blur32()``, ``BoxDirect``; ``ImagingPx4.h``: one pixel as four
+  32-bit lanes, SSE4, NEON and portable.
+* ``BoxBlurSIMD.c``, the ``blur`` group: the row blur in SIMD lanes and
+  ``box_line_blur32x2()`` (AVX2), ``box_direct_simd()`` with the source
+  count a constant per radius, ``box_interleave4()`` and
+  ``box_deinterleave4()``, ``box_columns_simd()``.
+* ``GaussianFast.c``: fast mode's one-kernel Gaussian;
+  ``GaussianFastSIMD.c``: its taps (the ``gauss`` group).
+* ``UnsharpMask.c``; ``UnsharpMaskSIMD.c`` (the ``unsharp`` group).
 * Tests: the end of ``Tests/test_box_blur.py``,
   ``test_box_blur_fused_matches_passes`` in
   ``Tests/test_simd_consistency.py``, the ``blur/unsharp`` and ``fast:
@@ -992,8 +1014,10 @@ Code map
 
 * ``Filter.c``: Pillow's ``ImagingFilter3x3()`` and ``ImagingFilter5x5()``
   (the definition, and the I, I;16 and portable paths),
-  ``filter_int_kernel()`` and the precision search in
-  ``ImagingFilterSIMD()``, which chooses the kernel.
+  ``filter_int_kernel()`` and the precision search in ``filter_simd()``,
+  which picks the kernel from the active tier's table.
+* ``FilterSIMD.c``, the companion: it includes the eight files below and
+  defines the ``filter`` group.
 * ``FilterSIMD_3x3i_4u8.c``, ``FilterSIMD_5x5i_4u8.c``: the x86 integer
   kernels for 4-byte pixels, SSE4 and AVX2.
 * ``FilterSIMD_NxNi.c``: the integer kernel for 1-byte pixels on x86 (and
@@ -1219,12 +1243,14 @@ Code map
 
 * ``RankFilter.c``: ``RankNetworkBatcher()`` and ``RankNetworkPrune()``,
   ``RankFilterNetwork_u8()`` (any rank, sizes 3 to 11),
-  ``RankFilterMedianVec_u8()`` with the two networks and the
-  ``RankFilterMedian3_u8()``/``Median5`` entries, ``RankMinMaxLine()`` and
-  ``RankFilterMinMax_u8()``, ``ImagingRankFilter()`` (Pillow's entry, on an
-  expanded image), ``ImagingRankFilterAllBands()`` and
-  ``ImagingRankFilterSameSize()`` (the fast paths on the image itself,
-  1-byte and 4-byte pixels).
+  ``rank_minmax_line()`` and ``RankFilterMinMax_u8()``,
+  ``ImagingRankFilter()`` (Pillow's entry, on an expanded image),
+  ``ImagingRankFilterAllBands()`` and ``ImagingRankFilterSameSize()`` (the
+  fast paths on the image itself, 1-byte and 4-byte pixels);
+  ``RankFilter.h``: ``RankFillPixels()``.
+* ``RankFilterSIMD.c``, the ``rank`` group: ``RankFilterMedianVec_u8()``
+  with the two networks and the ``RankFilterMedian3_u8()``/``Median5``
+  entries, ``rank_minmax_line_simd()``.
 * ``ModeFilter.c``.
 * ``src/PIL/ImageFilter.py``: ``RankFilter.filter()`` and
   ``RankFilter._filter_bands()``; ``Image.filter()`` in
@@ -1467,17 +1493,22 @@ Code map
 ~~~~~~~~
 
 * ``Convert.c``: ``CONVERT_PIXELS`` and the ``*_pixel`` functions (whole
-  pixels); ``rgb2l_4px()`` and ``rgb2l_8px()`` with the ``rgb2l``,
-  ``rgb2la``, ``rgb2i`` and ``rgba2la`` kernels; ``UNPREMULTIPLY`` and
-  ``rgba2rgbA_4()``/``_8()``, ``neon_unpremultiply_16()``, the
-  ``unpremultiply_table`` and ``unpremultiply_lookup()``, ``rgba2rgbA()``;
-  ``rgbA2rgba()`` (premultiply) and ``neon_muldiv255()``; ``rgb2hsv_row()``
-  and ``rgb2hsv_4()``/``_8()``/``_neon4()``, ``rgb2hsv_fast()``;
+  pixels); the scalar ``rgb2l``, ``rgb2la``, ``rgb2i``, ``rgba2la``,
+  ``rgb2hsv_row()`` and ``rgb2hsv_fast_pixel()``, ``rgbA2rgba()``
+  (premultiply) and ``rgba2rgbA()``, each calling the table's ``convert``
+  group first.
+* ``ConvertSIMD.c``, the companion: ``rgb2l_4px()`` and ``rgb2l_8px()``
+  with the ``rgb2l``, ``rgb2la``, ``rgb2i`` and ``rgba2la`` kernels;
+  ``UNPREMULTIPLY`` and ``rgba2rgbA_4()``/``_8()``,
+  ``neon_unpremultiply_16()``, the ``unpremultiply_table`` and
+  ``unpremultiply_lookup()``; ``neon_muldiv255()``;
+  ``rgb2hsv_4()``/``_8()``/``_neon4()`` and fast mode's loops;
   ``CONVERT_ROW``, which runs a kernel over a row with the zero-padded
   tail; ``convert_mask16()`` for the NEON and/or loops.
-* ``ConvertYCbCr.c``: the tables, ``ycc_term()`` and the exact kernels
-  in ``ImagingConvertRGB2YCbCr()`` and ``ImagingConvertYCbCr2RGB()``; the
-  fast-mode kernels after them.
+* ``ConvertYCbCr.c``: the tables and the scalar loops of
+  ``ImagingConvertRGB2YCbCr()`` and ``ImagingConvertYCbCr2RGB()`` and of
+  the fast-mode conversions; ``ConvertYCbCrSIMD.c``: ``ycc_term()`` and
+  the four vector loops; ``ConvertYCbCr.h``: the constants both use.
 * Tests: ``test_convert`` in ``Tests/test_simd_consistency.py``;
   ``test_unpremultiply_exact`` and ``test_ycbcr_conversions_exact`` in
   ``Tests/test_image_convert.py``; ``test_unpremultiply_every_value``.
@@ -1724,22 +1755,28 @@ equal; ``multiply`` is 6.3x faster, ``add`` 9x and invert 3.3x.
 Code map
 ~~~~~~~~
 
-* ``AlphaComposite.c``: ``alpha_composite_4px()`` and ``_8px()`` (x86),
-  ``ac_coef1_table`` and ``alpha_composite_16px_neon()``,
-  ``alpha_composite_row()`` with the scalar definition,
-  ``ImagingAlphaCompositeOnto()``.
+* ``AlphaComposite.c``: ``alpha_composite_row()`` with the scalar
+  definition, ``ImagingAlphaCompositeOnto()``; ``AlphaCompositeSIMD.c``
+  (the ``composite`` group): ``alpha_composite_4px()`` and ``_8px()``
+  (x86), ``ac_coef1_table`` and ``alpha_composite_16px_neon()``;
+  ``AlphaComposite.h``: the pixel and the precision.
 * ``Chops.c``: ``chop_multiply_row()``, ``chop_saturate_row()``,
-  ``chop_add_subtract()``; ``Blend.c``: ``blend_fast_row()`` and
-  Pillow's loops; ``Paste.c``: ``fill_blend16()`` and
-  ``fill_mask_L_simd()``.
-* ``Point.c``: ``point_byte_op()`` and ``point_byte_row()``,
-  ``neon_lut16()`` and ``neon_lut_row()``; ``src/PIL/ImageEnhance.py``:
+  ``chop_add_subtract()``, with ``ChopsSIMD.c`` (the ``chops`` group);
+  ``Blend.c``: ``blend_fast_row()`` and Pillow's loops, with
+  ``BlendSIMD.c``; ``Paste.c`` with ``PasteSIMD.c``: ``fill_blend16()``
+  and ``fill_mask_L_simd()``.
+* ``Point.c``: ``point_byte_op()`` and ``point_byte_row()``;
+  ``PointSIMD.c`` (the ``point`` group): the byte operations' loops,
+  ``neon_lut16()``, ``neon_lut_row()`` and NEON's whole-image lookups;
+  ``Point.h``: the operation enum; ``src/PIL/ImageEnhance.py``:
   ``_Enhance._lut()`` and ``_levels()``.
-* ``ColorLUT.c``: ``mm_lut_pixel()`` and ``mm256_lut_pixel()`` with the
-  x86 ``ImagingColorLUT3D_linear()``; the portable one with
-  ``neon_lut_pixel()`` after ``#else``.
+* ``ColorLUT.c``: the portable ``ImagingColorLUT3D_linear()``;
+  ``ColorLUTSIMD.c`` (the ``colorlut`` group): ``mm_lut_pixel()`` and
+  ``mm256_lut_pixel()`` with the x86 lookup, ``neon_lut_pixel()`` with the
+  NEON one; ``ColorLUT.h``: the portable layout.
 * ``Bands.c``: ``ImagingGetBand()``, ``SPLIT_LOAD``/``SPLIT_STORE``,
-  ``ImagingMerge()``.
+  ``ImagingMerge()``; ``BandsSIMD.c`` (the ``bands`` group): the band
+  extraction, split and NEON merge of a row.
 * Tests: ``test_alpha_composite``, ``test_alpha_composite_every_alpha``
   and ``test_point_table`` in ``Tests/test_simd_consistency.py``;
   ``test_multiply_screen_exact`` in ``Tests/test_imagechops.py``;
@@ -1968,19 +2005,26 @@ written, ``design/SIMD_FAST_KERNELS.md``.
 Code map
 ~~~~~~~~
 
-* ``Geometry.c``: ``transpose_4x4_32()``, ``transpose_8x8_8()`` and the
-  ``TRANSPOSE_BLOCKS`` driver, ``flip_rows()``, and the six
-  ``Imaging*`` entries that use them (with Pillow's loops for the other
-  types); ``affine_transform()``, ``perspective_transform()`` and
-  ``quad_transform()``; the scalar filters (``bilinear_filter*``,
-  ``bicubic_filter*``); the x86 vector filters (``transform_vec``,
-  ``tv_bilinear()``, ``tv_bicubic()``, ``bilinear_filter32RGB_simd()``,
-  ``bicubic_filter32RGB_simd()``) and the NEON ones (``tn_*``, the
-  ``*_simd2`` pair filters); ``perspective_row()``;
-  ``ImagingGenericTransform()`` with ``TRANSFORM_TILES``,
-  ``PERSPECTIVE_TILES`` and the arm64 ``TRANSFORM_PAIRS``; the tiled
-  ``affine_fixed()``; the fast-mode entry.
-* ``TransformFast.c``: fast mode's transforms.
+* ``Geometry.c``: the six ``Imaging*`` transpose and flip entries, which
+  call the table's ``geometry`` group first and keep Pillow's loops for
+  the other types; the scalar filters (``bilinear_filter*``,
+  ``bicubic_filter*``); ``ImagingGenericTransform()`` with the tile loops;
+  the tiled ``affine_fixed()``; the fast-mode entry.
+* ``GeometryTransform.h``: ``affine_transform()``,
+  ``perspective_transform()`` and ``quad_transform()``,
+  ``perspective_row()``, ``TRANSFORM_TILES`` and ``PERSPECTIVE_TILES``,
+  the clamps; shared with the companion so the filters inline.
+* ``GeometrySIMD.c``: ``transpose_4x4_32()``, ``transpose_8x8_8()`` and the
+  ``TRANSPOSE_BLOCKS`` driver, ``flip_rows()``; the x86 vector filters
+  (``transform_vec``, ``tv_bilinear()``, ``tv_bicubic()``,
+  ``bilinear_filter32RGB_simd()``, ``bicubic_filter32RGB_simd()``) and the
+  NEON ones (``tn_*``, the ``*_simd2`` pair filters);
+  ``geometry_transform_simd()``, the tile loops with those filters and
+  the arm64 ``TRANSFORM_PAIRS``.
+* ``TransformFast.c``: fast mode's map and tables; ``TransformFast.h``:
+  the tile loops, ``tf_row()`` and the pixel kernels, instantiated
+  twice, scalar in ``TransformFast.c`` and with the vector loops in
+  ``TransformFastSIMD.c`` (the ``transform_fast`` group).
 * Tests: ``test_rotations_match_columns`` and ``test_flips_match_rows``
   in ``Tests/test_image_transpose.py``;
   ``test_multiband_matches_single_band`` in
@@ -2194,8 +2238,9 @@ Code map
   ``hline_record()``, ``span_mask_build()``, ``hline_spans()`` and
   ``ImagingDrawPolygonInside()``; the clipping tree's fixed arrays
   (``event_list``, ``clip_tree_do_clip()``); ``ImagingFloodFill()``.
-* ``Paste.c``: ``fill_blend16()`` and ``fill_mask_L_simd()`` (text and
-  ``bitmap()``).
+  ``DrawSIMD.c`` (the ``draw`` group): the fill and the RGBA blend loops.
+* ``Paste.c`` and ``PasteSIMD.c``: ``fill_blend16()`` and
+  ``fill_mask_L_simd()`` (text and ``bitmap()``).
 * ``_imagingft.c``: ``GlyphCacheEntry``, ``glyph_cache_slot()``,
   ``glyph_advance()``, ``glyph_cache_clear()``.
 * ``src/PIL/ImageDraw.py``: ``polygon()``'s call to
@@ -2380,19 +2425,23 @@ copies saved, now ahead of OpenCV. The histogram is 1.0x against Pillow
 Code map
 ~~~~~~~~
 
-* ``ZipEncode.c``: ``png_cost16()``, ``png_cost_none()``,
-  ``png_filter_diff()`` (Up and Sub), ``png_filter_average()``,
-  ``png_filter_paeth()``; ``ZipDecode.c``: ``png_unfilter_up()``.
+* ``ZipEncode.c``: ``png_cost_none()``, ``png_filter_diff()`` (Up and
+  Sub), ``png_filter_average()``, ``png_filter_paeth()``;
+  ``ZipEncodeSIMD.c`` (the ``zip`` group): ``png_cost16()`` and their
+  vector loops, and the decoder's ``png_unfilter_up_simd()``;
+  ``ZipEncode.h``: the cost; ``ZipDecode.c``.
 * ``Pack.c``: ``ImagingPackRGB()``, ``ImagingPackBGR()`` and the
-  ``permute4()`` callers; ``Unpack.c``: the RGB and BGR unpackers and the
-  ``permute4()`` callers; ``ImagingSIMD.h``: ``permute4()``;
+  ``permute4`` callers; ``Unpack.c``: the RGB and BGR unpackers and the
+  ``permute4`` callers; ``PackSIMD.c`` (the ``pack`` group, with
+  ``pack_permute4_simd()``) and ``UnpackSIMD.c``;
   ``src/PIL/Image.py``: ``tobytes()``'s one-chunk path.
 * ``_webp.c``: ``_anim_decoder_decode_still()``;
   ``src/PIL/WebPImagePlugin.py``; ``JpegDecode.c`` and
   ``src/PIL/JpegImagePlugin.py`` (``_EXT_RGBX``).
-* ``Quant.c``: ``NearestPalette``, ``nearest_entry()``,
-  ``nearest_palette_new()`` and the colour cache; ``QuantHash.c``: the
-  node blocks. ``Histo.c``: ``histogram_u8()``, two versions.
+* ``Quant.c``: ``nearest_palette_new()`` and the colour cache;
+  ``QuantSIMD.c`` (the ``quant`` group): ``nearest_entry_simd()``;
+  ``QuantNearest.h``: ``NearestPalette``; ``QuantHash.c``: the node
+  blocks. ``Histo.c``: ``histogram_u8()``, two versions.
 * Tests: ``Tests/test_codecs_simd.py``.
 
 Pitfalls met on the way: vectorizing the PNG decoder's Sub, Average and
@@ -2689,33 +2738,54 @@ instruction mix gain less over that than AVX2 does.
 Appendix B: file map
 --------------------
 
-Where the kernels live, by file; each has an SSE4 version with AVX2
-blocks inside, a NEON version and a portable one, unless noted.
+Where the kernels live. Pillow's own files hold the portable code and
+the drivers; each area's SIMD code is in a companion, ``<Area>SIMD.c``,
+with the SSE4 version (AVX2 blocks inside it), the NEON version, and
+the area's group of the kernel table at the end. Unless noted, an area
+has all three of SSE4, AVX2 and NEON.
 
-* ``ImagingSIMD.h``: the ISA macros, ``SIMD_FORCE_INLINE``, ``mm_dpwssd``
-  and ``mm256_dpwssd``, ``mm_madd_add``, ``permute4()``, the widening
-  loads; ``ImagingPx4.h``: one pixel as four 32-bit lanes.
-* Resampling: ``Resample.c`` (the drivers),
+* ``SIMDKernels.h``: the table of kernel groups and ``IMAGING_SIMD_CALL``;
+  ``SIMDKernels.c``: the one translation unit, which includes every
+  companion and defines the tier's table; ``SIMDDispatch.c``: the scalar
+  table, ``ImagingSIMD`` and ``ImagingSIMDInit()``; ``ImagingSIMD.h``: the
+  ISA macros, ``SIMD_FORCE_INLINE``, ``mm_dpwssd`` and ``mm256_dpwssd``,
+  ``mm_madd_add``, the widening loads; ``ImagingPx4.h``: one pixel as four
+  32-bit lanes.
+* Resampling: ``Resample.c`` (the drivers) and ``ResampleHorizontal.c``
+  (the portable horizontal kernels); ``ResampleSIMD.c``, which includes
   ``ResampleSIMDHorizontalConv.c``, ``ResampleSIMDVerticalConv.c``,
-  ``ResampleSIMD32bpc.c`` (I, F, I;16), ``ResampleFast.c`` (fast mode),
-  ``Reduce.c`` and ``ReduceSIMD.c``.
-* Blurs: ``BoxBlur.c``, ``GaussianFast.c`` (fast mode), ``UnsharpMask.c``.
-* Kernel filters: ``Filter.c`` with ``FilterSIMD_3x3i_4u8.c``,
-  ``FilterSIMD_5x5i_4u8.c``, ``FilterSIMD_3x3f_4u8.c``,
-  ``FilterSIMD_5x5f_4u8.c``, ``FilterSIMD_3x3f_u8.c``,
-  ``FilterSIMD_5x5f_u8.c`` (x86), ``FilterSIMD_NxNi.c`` (x86 and NEON),
-  ``FilterSIMD_NxNf.c`` (NEON).
-* Rank filters: ``RankFilter.c``; ``ModeFilter.c`` (portable).
-* Conversions: ``Convert.c``, ``ConvertYCbCr.c``.
-* Compositing and channels: ``AlphaComposite.c``, ``Blend.c``, ``Paste.c``,
-  ``Chops.c``, ``Point.c`` (byte operations; NEON lookups), ``ColorLUT.c``,
-  ``Bands.c``.
-* Geometry: ``Geometry.c``, ``TransformFast.c`` (fast mode).
-* Drawing and text: ``Draw.c``, ``Paste.c`` (masked fills),
-  ``_imagingft.c`` (the glyph cache, portable).
-* Codecs and packing: ``ZipEncode.c``, ``ZipDecode.c``, ``Pack.c``,
-  ``Unpack.c``, ``_webp.c``, ``JpegDecode.c``; ``Quant.c`` (the nearest
-  search), ``QuantHash.c`` and ``Histo.c`` (portable).
+  ``ResampleSIMD32bpc.c`` (I, F, I;16) and ``ResampleFastSIMD.c``;
+  ``ResampleFast.c`` and ``ResampleFast.h`` (fast mode); ``Reduce.c`` and
+  ``ReduceSIMD.c``.
+* Blurs: ``BoxBlur.c``, ``BoxBlur.h`` and ``BoxBlurSIMD.c``;
+  ``GaussianFast.c`` and ``GaussianFastSIMD.c`` (fast mode);
+  ``UnsharpMask.c`` and ``UnsharpMaskSIMD.c``.
+* Kernel filters: ``Filter.c``; ``FilterSIMD.c``, which includes
+  ``FilterSIMD_3x3i_4u8.c``, ``FilterSIMD_5x5i_4u8.c``,
+  ``FilterSIMD_3x3f_4u8.c``, ``FilterSIMD_5x5f_4u8.c``,
+  ``FilterSIMD_3x3f_u8.c``, ``FilterSIMD_5x5f_u8.c`` (x86),
+  ``FilterSIMD_NxNi.c`` (x86 and NEON) and ``FilterSIMD_NxNf.c`` (NEON).
+* Rank filters: ``RankFilter.c``, ``RankFilter.h`` and
+  ``RankFilterSIMD.c``; ``ModeFilter.c`` (portable).
+* Conversions: ``Convert.c`` and ``ConvertSIMD.c``; ``ConvertYCbCr.c``,
+  ``ConvertYCbCr.h`` and ``ConvertYCbCrSIMD.c``.
+* Compositing and channels: ``AlphaComposite.c``, ``AlphaComposite.h``
+  and ``AlphaCompositeSIMD.c``; ``Blend.c`` and ``BlendSIMD.c``;
+  ``Paste.c`` and ``PasteSIMD.c``; ``Chops.c`` and ``ChopsSIMD.c``;
+  ``Point.c``, ``Point.h`` and ``PointSIMD.c`` (byte operations; NEON
+  lookups); ``ColorLUT.c``, ``ColorLUT.h`` and ``ColorLUTSIMD.c``;
+  ``Bands.c`` and ``BandsSIMD.c``.
+* Geometry: ``Geometry.c``, ``GeometryTransform.h`` and
+  ``GeometrySIMD.c``; ``TransformFast.c``, ``TransformFast.h`` and
+  ``TransformFastSIMD.c`` (fast mode).
+* Drawing and text: ``Draw.c`` and ``DrawSIMD.c``, ``Paste.c`` and
+  ``PasteSIMD.c`` (masked fills), ``_imagingft.c`` (the glyph cache,
+  portable).
+* Codecs and packing: ``ZipEncode.c``, ``ZipEncode.h``, ``ZipDecode.c``
+  and ``ZipEncodeSIMD.c``; ``Pack.c`` and ``PackSIMD.c``; ``Unpack.c`` and
+  ``UnpackSIMD.c``; ``_webp.c``, ``JpegDecode.c``; ``Quant.c``,
+  ``QuantNearest.h`` and ``QuantSIMD.c`` (the nearest search),
+  ``QuantHash.c`` and ``Histo.c`` (portable).
 * ``Fast.c``: the fast-mode setting, process-wide and per thread.
 
 Appendix C: the tools
