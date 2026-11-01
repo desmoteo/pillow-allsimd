@@ -51,27 +51,6 @@ ImagingGetBand(Imaging imIn, int band) {
         return NULL;
     }
 
-#if defined(IMAGING_SIMD_SSE4)
-    __m128i shuffle_mask = _mm_set_epi8(
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        12 + band,
-        8 + band,
-        4 + band,
-        0 + band
-    );
-#endif
-
     /* Extract band from image */
     // restrict safe: imIn is read-only, imOut is a fresh allocation.
     int xsize = imIn->xsize;
@@ -81,27 +60,14 @@ ImagingGetBand(Imaging imIn, int band) {
     for (y = 0; y < ysize; y++) {
         UINT8 *restrict in = (UINT8 *)imIn->image[y];
         UINT8 *restrict out = imOut->image8[y];
-        x = 0;
-#if defined(IMAGING_SIMD_SSE4)
-        for (; x < xsize - 3; x += 4) {
-            __m128i source = _mm_loadu_si128((__m128i *)in);
-            UINT32 v = _mm_cvtsi128_si32(_mm_shuffle_epi8(source, shuffle_mask));
-            memcpy(out + x, &v, sizeof(v));
-            in += 16;
-        }
-#elif defined(IMAGING_SIMD_NEON)
-        for (; x < xsize - 15; x += 16) {
-            uint8x16x4_t source = vld4q_u8(in);
-            vst1q_u8(out + x, source.val[band]);
-            in += 64;
-        }
-#else
+        /* the active tier's kernel does the pixels it can (BandsSIMD.c) */
+        x = IMAGING_SIMD_CALL(bands->get_band, out, in, xsize, band);
+        in += x * 4;
         for (; x < xsize - 3; x += 4) {
             UINT32 v = MAKE_UINT32(in[band], in[4 + band], in[8 + band], in[12 + band]);
             memcpy(out + x, &v, sizeof(v));
             in += 16;
         }
-#endif
         for (; x < xsize; x++) {
             out[x] = *(in + band);
             in += 4;
@@ -113,23 +79,6 @@ ImagingGetBand(Imaging imIn, int band) {
 }
 
 /* Copies four 4-byte pixels of one or more bands into separate planes. */
-#if defined(IMAGING_SIMD_SSE4)
-#define SPLIT_STEP 4
-#define SPLIT_LOAD(in)                                                     \
-    __m128i source = _mm_shuffle_epi8(                                     \
-        _mm_loadu_si128((__m128i *)(in)),                                  \
-        _mm_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0) \
-    );
-#define SPLIT_STORE(out, band)                                          \
-    {                                                                   \
-        UINT32 v = _mm_cvtsi128_si32(_mm_srli_si128(source, 4 * band)); \
-        memcpy(out, &v, sizeof(v));                                     \
-    }
-#elif defined(IMAGING_SIMD_NEON)
-#define SPLIT_STEP 16
-#define SPLIT_LOAD(in) uint8x16x4_t source = vld4q_u8(in);
-#define SPLIT_STORE(out, band) vst1q_u8(out, source.val[band]);
-#else
 #define SPLIT_STEP 4
 #define SPLIT_LOAD(in)
 #define SPLIT_STORE(out, band)                                                       \
@@ -137,7 +86,6 @@ ImagingGetBand(Imaging imIn, int band) {
         UINT32 v = MAKE_UINT32(in[band], in[4 + band], in[8 + band], in[12 + band]); \
         memcpy(out, &v, sizeof(v));                                                  \
     }
-#endif
 
 /**
  * Splits imIn into its component bands.
@@ -188,7 +136,9 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             UINT8 *restrict in = (UINT8 *)imIn->image[y];
             UINT8 *restrict out0 = bands[0]->image8[y];
             UINT8 *restrict out1 = bands[1]->image8[y];
-            x = 0;
+            /* the active tier's kernel does the pixels it can (BandsSIMD.c) */
+            x = IMAGING_SIMD_CALL(bands->split, out0, NULL, NULL, out1, in, xsize);
+            in += x * 4;
             for (; x < xsize - (SPLIT_STEP - 1); x += SPLIT_STEP) {
                 SPLIT_LOAD(in);
                 SPLIT_STORE(out0 + x, 0);
@@ -207,7 +157,8 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             UINT8 *restrict out0 = bands[0]->image8[y];
             UINT8 *restrict out1 = bands[1]->image8[y];
             UINT8 *restrict out2 = bands[2]->image8[y];
-            x = 0;
+            x = IMAGING_SIMD_CALL(bands->split, out0, out1, out2, NULL, in, xsize);
+            in += x * 4;
             for (; x < xsize - (SPLIT_STEP - 1); x += SPLIT_STEP) {
                 SPLIT_LOAD(in);
                 SPLIT_STORE(out0 + x, 0);
@@ -229,7 +180,8 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             UINT8 *restrict out1 = bands[1]->image8[y];
             UINT8 *restrict out2 = bands[2]->image8[y];
             UINT8 *restrict out3 = bands[3]->image8[y];
-            x = 0;
+            x = IMAGING_SIMD_CALL(bands->split, out0, out1, out2, out3, in, xsize);
+            in += x * 4;
             for (; x < xsize - (SPLIT_STEP - 1); x += SPLIT_STEP) {
                 SPLIT_LOAD(in);
                 SPLIT_STORE(out0 + x, 0);
@@ -407,15 +359,10 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             UINT8 *restrict in0 = bands[0]->image8[y];
             UINT8 *restrict in1 = bands[1]->image8[y];
             UINT32 *restrict out = (UINT32 *)imOut->image32[y];
-            x = 0;
-#if defined(IMAGING_SIMD_NEON)
-            for (; x < xsize - 15; x += 16) {
-                uint8x16x4_t px = {
-                    {vld1q_u8(in0 + x), vdupq_n_u8(0), vdupq_n_u8(0), vld1q_u8(in1 + x)}
-                };
-                vst4q_u8((UINT8 *)&out[x], px);
-            }
-#endif
+            /* the active tier's kernel does the pixels it can (BandsSIMD.c) */
+            x = IMAGING_SIMD_CALL(
+                bands->merge, (UINT8 *)out, in0, NULL, NULL, in1, xsize
+            );
             for (; x < xsize; x++) {
                 out[x] = MAKE_UINT32(in0[x], 0, 0, in1[x]);
             }
@@ -426,18 +373,9 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             UINT8 *restrict in1 = bands[1]->image8[y];
             UINT8 *restrict in2 = bands[2]->image8[y];
             UINT32 *restrict out = (UINT32 *)imOut->image32[y];
-            x = 0;
-#if defined(IMAGING_SIMD_NEON)
-            for (; x < xsize - 15; x += 16) {
-                uint8x16x4_t px = {
-                    {vld1q_u8(in0 + x),
-                     vld1q_u8(in1 + x),
-                     vld1q_u8(in2 + x),
-                     vdupq_n_u8(0)}
-                };
-                vst4q_u8((UINT8 *)&out[x], px);
-            }
-#endif
+            x = IMAGING_SIMD_CALL(
+                bands->merge, (UINT8 *)out, in0, in1, in2, NULL, xsize
+            );
             for (; x < xsize; x++) {
                 out[x] = MAKE_UINT32(in0[x], in1[x], in2[x], 0);
             }
@@ -449,18 +387,9 @@ ImagingMerge(const ModeID mode, Imaging bands[4]) {
             UINT8 *restrict in2 = bands[2]->image8[y];
             UINT8 *restrict in3 = bands[3]->image8[y];
             UINT32 *restrict out = (UINT32 *)imOut->image32[y];
-            x = 0;
-#if defined(IMAGING_SIMD_NEON)
-            for (; x < xsize - 15; x += 16) {
-                uint8x16x4_t px = {
-                    {vld1q_u8(in0 + x),
-                     vld1q_u8(in1 + x),
-                     vld1q_u8(in2 + x),
-                     vld1q_u8(in3 + x)}
-                };
-                vst4q_u8((UINT8 *)&out[x], px);
-            }
-#endif
+            x = IMAGING_SIMD_CALL(
+                bands->merge, (UINT8 *)out, in0, in1, in2, in3, xsize
+            );
             for (; x < xsize; x++) {
                 out[x] = MAKE_UINT32(in0[x], in1[x], in2[x], in3[x]);
             }

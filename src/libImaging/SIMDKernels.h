@@ -356,6 +356,46 @@ typedef struct {
     int (*bgr)(UINT8 *out, const UINT8 *in, int pixels);
 } ImagingSIMDUnpackKernels;
 
+/* Point operations (PointSIMD.c): table lookups of whole 8-bit images
+   (one band, or 3 or 4 bands with a table per band; 0 if out of memory)
+   and the byte operations of Point.c's point_byte_op for the bytes the
+   vector loop can, their count back. Bands (BandsSIMD.c): one band out
+   of a 4-byte row, the split of a row into planes (NULL skips a band),
+   the merge of planes into pixels (NULL is a band of zeros); pixels done
+   back. Paste (PasteSIMD.c): ink blended through an L mask. Drawing
+   (DrawSIMD.c): a fill with an ink, and an RGBA ink blended into a row. */
+typedef struct {
+    int (*lut_8_8)(Imaging imOut, Imaging imIn, const UINT8 *table);
+    int (*lut_nx8)(Imaging imOut, Imaging imIn, const UINT8 *table, int bands);
+    int (*byte_row)(UINT8 *out, const UINT8 *in, int n, int op, UINT8 arg);
+} ImagingSIMDPointKernels;
+
+typedef struct {
+    int (*get_band)(UINT8 *out, const UINT8 *in, int xsize, int band);
+    int (*split)(
+        UINT8 *out0, UINT8 *out1, UINT8 *out2, UINT8 *out3, const UINT8 *in, int xsize
+    );
+    int (*merge)(
+        UINT8 *out,
+        const UINT8 *in0,
+        const UINT8 *in1,
+        const UINT8 *in2,
+        const UINT8 *in3,
+        int xsize
+    );
+} ImagingSIMDBandsKernels;
+
+typedef struct {
+    int (*fill_mask_L)(
+        UINT8 *out, const UINT8 *mask, const UINT8 *ink, int n, int pixelsize, int alpha
+    );
+} ImagingSIMDPasteKernels;
+
+typedef struct {
+    int (*fill32)(INT32 *p, int n, INT32 ink);
+    int (*hline_rgba)(UINT8 *out, int n, const UINT8 *ink);
+} ImagingSIMDDrawKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -377,6 +417,10 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDZipKernels *zip;
     const ImagingSIMDPackKernels *pack;
     const ImagingSIMDUnpackKernels *unpack;
+    const ImagingSIMDPointKernels *point;
+    const ImagingSIMDBandsKernels *bands;
+    const ImagingSIMDPasteKernels *paste;
+    const ImagingSIMDDrawKernels *draw;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */

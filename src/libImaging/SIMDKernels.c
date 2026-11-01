@@ -28,6 +28,10 @@
 #include "ZipEncodeSIMD.c"
 #include "PackSIMD.c"
 #include "UnpackSIMD.c"
+#include "PointSIMD.c"
+#include "BandsSIMD.c"
+#include "PasteSIMD.c"
+#include "DrawSIMD.c"
 
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
@@ -47,6 +51,10 @@ const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .zip = &zip_simd_kernels,
     .pack = &pack_simd_kernels,
     .unpack = &unpack_simd_kernels,
+    .point = &point_simd_kernels,
+    .bands = &bands_simd_kernels,
+    .paste = &paste_simd_kernels,
+    .draw = &draw_simd_kernels,
 };
 
 #endif
