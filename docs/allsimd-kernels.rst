@@ -21,8 +21,8 @@ exact mode, Pillow's arithmetic.
 
 The page is written section by section. Written so far: the ground rules,
 resampling, the blurs, the kernel filters, the rank filters, the colour
-conversions, compositing and the channel operations, geometry, and
-drawing and text. To come: codecs and packing, what was tried and dropped, where OpenCV and
+conversions, compositing and the channel operations, geometry, drawing
+and text, and codecs and packing. To come: what was tried and dropped, where OpenCV and
 libvips are still faster, and the fast-mode kernels (meanwhile,
 ``design/SIMD_FAST_KERNELS.md`` in the repository describes those).
 
@@ -2212,3 +2212,192 @@ benchmark's small ROIs (2.0 to 1.8 ms), because the scan and the twelve
 wide lines remain, and more on large polygons; and the glyph cache had
 to keep FreeType's unsupported pixel modes as such, so that they still
 raise where they did.
+
+Codecs and packing
+------------------
+
+The PNG encoder's row filters and the decoder's unfiltering
+(``ZipEncode.c``, ``ZipDecode.c``), the raw codec's packing and
+unpacking (``Pack.c``, ``Unpack.c``), ``tobytes()``, WebP and JPEG
+decoding (``_webp.c``, ``JpegDecode.c``), and two neighbours: palette
+mapping (``Quant.c``, ``QuantHash.c``) and the histogram (``Histo.c``).
+The codecs themselves (zlib, libjpeg-turbo, libwebp) are untouched;
+what changed is what Pillow does around them.
+
+What Pillow computes
+~~~~~~~~~~~~~~~~~~~~
+
+The PNG encoder tries the None, Up, Sub and Paeth filters on every row
+(Average too with ``optimize``), keeps the one whose bytes have the
+smallest sum of absolute values as signed bytes, libpng's heuristic,
+and hands it to zlib; the decoder undoes the row's filter byte by byte.
+The raw codec moves pixels between Pillow's layout and a "raw mode":
+``RGB`` is three bytes per pixel, ``BGRX``, ``ABGR`` and the like are
+four in another order, and each has a packer and an unpacker.
+``tobytes()`` ran the encoder in 64 KB chunks and joined them. Every
+WebP file went through libwebp's animation decoder, which decodes into
+its own canvas, and from there through a ``bytes`` object into the
+image. JPEG RGB rows came out of libjpeg-turbo as three bytes per
+pixel, expanded to four by Pillow. Palette mapping (``quantize()`` and
+``convert("P")`` with an adaptive palette) builds the palette with
+median cut or maximum coverage, then maps each pixel to its nearest
+entry, remembering each colour's entry in a hash table and searching
+the palette from entry 0 in the order of the entries' distance from it,
+as far as one can still be nearer. The histogram counts each byte.
+
+The idea
+~~~~~~~~
+
+* **PNG filters 16 bytes at a time.** When encoding, each predictor reads
+  only original bytes, so the filters vectorize across the row: Up and
+  Sub are a byte subtraction; Average's ``(a + b) / 2`` rounded down is
+  ``pavgb``, which rounds up, minus ``(a ^ b) & 1`` (NEON's ``vhadd``
+  rounds down); Paeth computes its three distances in 16-bit lanes
+  (``|a + b - 2c|`` doesn't fit a byte) and picks ``a``, ``b`` or ``c``
+  with masks in the same order of preference; and the cost is ``min(v,
+  -v)`` as unsigned bytes, summed with ``psadbw`` (NEON: widening
+  pairwise adds). The bytes and the costs are the scalar loops', so the
+  same filter is chosen and the file is byte for byte the same: PNG at
+  level 1 89 to 51 ms at 1280×800, at the default level 436 to 399,
+  zlib's matching being most of the rest. Decoding undoes only the Up
+  filter in vectors: Sub, Average and Paeth depend on the pixel to the
+  left, and one pixel per step, libpng's way, was 1.4 to 2.2x slower
+  than the scalar loops, whose three or four byte positions run as
+  independent chains (Paeth 80 to 152 ms).
+* **Byte-order shuffles.** RGBX to RGB and back are one ``pshufb`` per
+  four pixels (the 16-byte store writes four bytes past them, so the
+  loop stops six pixels early) or ``vld4q``/``vst3q`` on NEON; the eight
+  4-byte reorderings (BGRX, XRGB, XBGR, BGXR, BGRA, ABGR, ARGB, BGAR) go
+  through one helper, ``permute4()``, which builds the shuffle mask and
+  the fill of 0 or 255 from the permutation at run time. ``tobytes()``
+  with the image's own raw mode knows its size, so the encoder gets room
+  for all of it: one chunk, which ``join`` returns as it is, 1.9x.
+* **WebP stills straight into the image.** A one-frame file whose frame
+  covers the canvas is what the animation decoder decodes into a cleared
+  canvas without blending; ``decode_still()`` calls ``WebPDecode`` into
+  the image's own memory (when its rows are in one block), without the
+  canvas and the two copies: 105 to 76 ms for a 2560×1600 RGB file.
+  Animations and the other cases keep the frame decoder.
+* **JPEG to 4-byte pixels.** With libjpeg-turbo, RGB images are read with
+  the raw mode ``RGBX`` (``JCS_EXT_RGBX``), so its SIMD colour conversion
+  writes Pillow's layout itself, 16.7 to 15.9 ms; ``draft()`` takes it.
+  Writing from RGBX was 3 to 7% slower than packing to RGB first, so
+  saving is unchanged.
+* **Palette mapping.** Three changes, each keeping the palette and the
+  pixels: the colour hash table's nodes come from 4,096-node blocks
+  instead of one ``malloc`` each (a fifth of the time; the chains, table
+  sizes and iteration order are the same); a direct-mapped cache of 2¹⁸
+  (colour, entry) words replaces the memo hash table; and with maximum
+  coverage the search from entry 0 is a vector scan of every entry for
+  the smallest of ``dist * 512 + rank``, ``rank`` being an entry's place
+  in the scalar search's order, so that ties go where they did (the
+  keys fit 27 bits), eight entries per AVX2 step, four per SSE4 or NEON
+  step. The median-box search stays scalar: it starts near the answer,
+  and a full scan was slower with many colours.
+* **The histogram in four tables.** On x86, neighbouring pixels count
+  into four separate tables, so that the increments of equal bytes
+  don't serialize, and the padding bytes of 2- and 3-band images are
+  skipped: 13.8 to 5.8 ms against Pillow 12.3. Pillow 13 then rewrote
+  its own loops, which are level with the tables on x86 and 1.1x faster
+  on arm64, where they are used.
+
+Why the builds agree
+~~~~~~~~~~~~~~~~~~~~
+
+The PNG files are identical because the filters' bytes and costs are:
+the ``png filters`` area of ``checks/simd_hashes.py`` hashes the files
+of six modes at two levels, and ``test_png_every_filter`` decodes every
+filter type on the six test shapes against a byte-by-byte reference.
+``test_webp_still_matches_the_frame_decoder`` and
+``test_jpeg_rgbx_decode_matches_rgb`` compare the new decoder paths with
+the old; the ``pack/unpack`` area hashes every raw mode at every width
+from 1 to 69 and at 1,280; the ``quantize`` area hashes the palettes and
+pixels of five images at six colour counts with both methods and the
+adaptive conversion, and agrees on every build, the vector search
+included (``Tests/test_codecs_simd.py`` holds the codec tests).
+
+Numbers
+~~~~~~~
+
+2560×1600 RGB, times faster than Pillow 13.0.0, which took the
+milliseconds shown; the "portable" column is the build without SIMD.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Operation
+     - Pillow 13 (x86, ms)
+     - Portable
+     - SSE4
+     - AVX2
+     - Pillow 13 (arm64, ms)
+     - NEON
+   * - Encode PNG, level 6
+     - 789
+     - 1.2x
+     - 1.6x
+     - 1.6x
+     - 1,015
+     - 1.5x
+   * - Decode PNG
+     - 100
+     - 1.0x
+     - 1.0x
+     - 1.0x
+     - 109
+     - 1.1x
+   * - Decode WebP
+     - 112
+     - 1.5x
+     - 1.5x
+     - 1.5x
+     - 108
+     - 1.2x
+   * - Decode JPEG
+     - 16.2
+     - 1.0x
+     - 1.0x
+     - 1.0x
+     - 28.4
+     - 1.0x
+   * - Median cut, 256 colours
+     - 2,603
+     - 4.2x
+     - 4.2x
+     - 4.2x
+     - 5,898
+     - 5.1x
+
+PNG encoding at level 6 is zlib's: the filters are 1.2x in the portable
+build (the arithmetic alone) and 1.6x in vectors, and the encoder is
+now level with OpenCV's and ahead of libvips', which use libpng; at
+level 1 the filters are a larger share and the gain 1.7x. JPEG encoding
+and decoding, WebP encoding and JPEG thumbnails are the libraries' own
+time, 1.0x; WebP decoding is 1.5x on x86 and 1.2x on arm64 from the
+copies saved, now ahead of OpenCV. The histogram is 1.0x against Pillow
+13 (above). Pillow-SIMD is 1.0x on all of these.
+
+Code map
+~~~~~~~~
+
+* ``ZipEncode.c``: ``png_cost16()``, ``png_cost_none()``,
+  ``png_filter_diff()`` (Up and Sub), ``png_filter_average()``,
+  ``png_filter_paeth()``; ``ZipDecode.c``: ``png_unfilter_up()``.
+* ``Pack.c``: ``ImagingPackRGB()``, ``ImagingPackBGR()`` and the
+  ``permute4()`` callers; ``Unpack.c``: the RGB and BGR unpackers and the
+  ``permute4()`` callers; ``ImagingSIMD.h``: ``permute4()``;
+  ``src/PIL/Image.py``: ``tobytes()``'s one-chunk path.
+* ``_webp.c``: ``_anim_decoder_decode_still()``;
+  ``src/PIL/WebPImagePlugin.py``; ``JpegDecode.c`` and
+  ``src/PIL/JpegImagePlugin.py`` (``_EXT_RGBX``).
+* ``Quant.c``: ``NearestPalette``, ``nearest_entry()``,
+  ``nearest_palette_new()`` and the colour cache; ``QuantHash.c``: the
+  node blocks. ``Histo.c``: ``histogram_u8()``, two versions.
+* Tests: ``Tests/test_codecs_simd.py``.
+
+Pitfalls met on the way: vectorizing the PNG decoder's Sub, Average and
+Paeth as libpng does lost to the scalar loops; writing JPEG from
+4-byte pixels lost to packing first; a build against zlib-ng was
+measured and dropped; and the four-table histogram, a clear gain over
+Pillow 12.3, was matched by Pillow 13's own rewrite, so it is kept
+where it still wins and not where it doesn't.
