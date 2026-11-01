@@ -383,3 +383,34 @@ was not the four-row structure that cost.
   coefficients between rows; the coefficients' loads were a small part
   of what this found.
 
+### 7. Loop alignment on the Cortex-A78: not the cause (2026-11-05)
+
+- Cycle counts for nearest rotation and the 3x3 minimum over five builds
+  whose code for them is identical: 34.4 to 35.7 and 6.8 to 7.1 million,
+  a spread of 4 to 5%, not the 10 to 20% of the wall-clock runs.
+- Three of those trees rebuilt with `-falign-functions=64
+  -falign-loops=32 -falign-jumps=16`: no case moved consistently (YCbCr
+  15.95 to 15.99 over all six builds, soft light 41.07 to 41.09, the
+  octree 22.72 to 22.84, box blur at radius 5 56.44 to 56.62).
+- In that second run the same default builds gave the rotation 21.9 to
+  22.7 million cycles, where an hour earlier they had given 34 to 35:
+  the variation is between runs of one binary, not between builds. Eight
+  runs of one build (`thpcheck.py`): 20.6 to 24.7 million cycles, with
+  40 to 44 MB of its 46 MB of images in huge pages each time. The Orin
+  has transparent huge pages on `always` with `defrag` on `madvise` and
+  1.2 GB free under other people's containers, so whether a block gets
+  huge pages, and which physical pages, depends on the moment; the 35
+  million were most likely a run without them. Asking for them with
+  `madvise` there adds synchronous compaction, measured 10% slower on
+  2026-10-31 (`Storage.c`), so nothing changes in the library.
+- No flags adopted. For this machine: compare cycle counts in one run,
+  with old and new interleaved, and distrust a single reading of the
+  memory-bound cases.
+
+## At the end of the round
+
+- `checks/simd_ir_baseline.json` refreshed with the last commit: the one
+  count that moved on purpose after the gate was built is the box blur
+  at radius 2 in the scalar tier, 25.7 to 19.0 million instructions (the
+  far weight's product, skipped).
+
