@@ -2342,6 +2342,10 @@ _resize_impl(ImagingObject *self, PyObject *args) {
     float box[4] = {0, 0, 0, 0};
     // Pillow-AllSIMD: an RGBA or LA image, resized premultiplied by alpha
     int alpha = 0;
+    // Pillow-AllSIMD: Image.resize() read the fast mode setting for its
+    // reducing_gap default, and passes it so that this call sees the same
+    // one; -1 reads it here
+    int fast = -1, previous_fast = -1;
 
     imIn = self->image;
     box[2] = imIn->xsize;
@@ -2349,7 +2353,7 @@ _resize_impl(ImagingObject *self, PyObject *args) {
 
     if (!PyArg_ParseTuple(
             args,
-            "(ii)|i(ffff)i",
+            "(ii)|i(ffff)ii",
             &xsize,
             &ysize,
             &filter,
@@ -2357,7 +2361,8 @@ _resize_impl(ImagingObject *self, PyObject *args) {
             &box[1],
             &box[2],
             &box[3],
-            &alpha
+            &alpha,
+            &fast
         )) {
         return NULL;
     }
@@ -2378,6 +2383,9 @@ _resize_impl(ImagingObject *self, PyObject *args) {
         return ImagingError_ValueError("box can't be empty");
     }
 
+    if (fast >= 0) {
+        previous_fast = ImagingSetFastThread(fast ? IMAGING_FAST_ALL : 0);
+    }
     if (alpha && filter != IMAGING_TRANSFORM_NEAREST) {
         imOut = ImagingResampleAlpha(imIn, xsize, ysize, filter, box);
     } else if (
@@ -2396,20 +2404,20 @@ _resize_impl(ImagingObject *self, PyObject *args) {
         a[5] = box[1];
 
         imOut = ImagingNewDirty(imIn->mode, xsize, ysize);
-        if (!imOut) {
-            return NULL;
-        }
-
-        if (ImagingTransform(
+        if (imOut &&
+            ImagingTransform(
                 imOut, imIn, IMAGING_TRANSFORM_AFFINE, 0, 0, xsize, ysize, a, filter, 1
             )) {
             ImagingDelete(imOut);
-            return NULL;
+            imOut = NULL;
         }
     } else {
         imOut = ImagingResample(imIn, xsize, ysize, filter, box);
     }
 
+    if (fast >= 0) {
+        ImagingSetFastThread(previous_fast);
+    }
     return PyImagingNew(imOut);
 }
 static PyObject *
@@ -4888,6 +4896,18 @@ _set_fast(PyObject *self, PyObject *args) {
     Py_RETURN_NONE;
 }
 
+/* This thread's fast mode for Image.fast_mode() blocks: 1, 0, or -1 for
+   the process default; returns the previous value. */
+static PyObject *
+_set_fast_thread(PyObject *self, PyObject *args) {
+    int flags;
+    if (!PyArg_ParseTuple(args, "i:set_fast_thread", &flags)) {
+        return NULL;
+    }
+    flags = ImagingSetFastThread(flags < 0 ? -1 : flags ? IMAGING_FAST_ALL : 0);
+    return PyLong_FromLong(flags < 0 ? -1 : flags != 0);
+}
+
 static PyObject *
 _get_fast(PyObject *self, PyObject *args) {
     return PyBool_FromLong(ImagingGetFast() != 0);
@@ -5106,6 +5126,7 @@ static PyMethodDef functions[] = {
     {"clear_cache", (PyCFunction)_clear_cache, METH_VARARGS},
     {"get_fast", (PyCFunction)_get_fast, METH_NOARGS},
     {"set_fast", (PyCFunction)_set_fast, METH_VARARGS},
+    {"set_fast_thread", (PyCFunction)_set_fast_thread, METH_VARARGS},
 
     {NULL, NULL} /* sentinel */
 };

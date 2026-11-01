@@ -43,7 +43,7 @@ Two findings shape the design:
 |---|---|---|
 | Environment | `PILLOW_ALLSIMD_FAST` | `1`, `true`, `on`, `yes` enable; `0`, `false`, `off`, `no` and the empty string disable; anything else warns and is ignored. Read once when `PIL.Image` is imported, in `_apply_env_variables()`, like `PILLOW_BLOCKS_MAX`. |
 | Python | `PIL.Image.set_fast(enabled: bool = True) -> None`, `PIL.Image.get_fast() -> bool` | Process-wide. |
-| Python | `PIL.Image.fast_mode(enabled: bool = True)` | Context manager: sets the flag, restores the previous value on exit. Documented as process-wide (it changes the flag for every thread while active). |
+| Python | `PIL.Image.fast_mode(enabled: bool = True)` | Context manager: sets the flag, restores the previous value on exit. Documented as process-wide (it changes the flag for every thread while active). Since 2026-11-03 it sets the calling thread's mode instead, with `set_fast()` the process-wide default ([REVIEW_2026-11.md](REVIEW_2026-11.md), finding 1). |
 | Feature test | `PIL.features.check_feature("fast")` | True in Pillow-AllSIMD builds that have the switch (`_imaging.HAVE_FAST`), so code can detect it without catching AttributeError under upstream Pillow. |
 | C core | `_imaging.set_fast(int)`, `_imaging.get_fast()` | What the Python functions call. |
 | libImaging | `ImagingSetFast(int)`, `ImagingGetFast(void)` | A global word, written with release semantics and read with acquire (GCC/Clang `__atomic`, MSVC interlocked intrinsics), safe under free-threaded Python. |

@@ -3,6 +3,22 @@ Changelog (Pillow-AllSIMD)
 
 Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
+Unreleased
+----------
+
+- ``Image.fast_mode()`` sets the mode of the thread it runs in, and
+  restores that thread's previous setting: before, it set the process-wide
+  flag, so two threads' blocks could restore it in the wrong order.
+  ``set_fast()`` and the environment variable still set the process-wide
+  default, which threads outside a block use; ``get_fast()`` returns the
+  calling thread's effective setting. ``resize()`` passes the setting it
+  read for its ``reducing_gap`` default to the C resize, so a change from
+  another thread meanwhile can't mix the exact and fast kernels
+- The test suite fails if an entry of ``EXACT_KERNEL_TESTS``
+  (``Tests/conftest.py``, the upstream tests that need the exact kernels)
+  names no test of a collected file, so a test renamed upstream can't run
+  with the fast kernels unnoticed
+
 13.0.0.post2 (2026-11-03)
 -------------------------
 

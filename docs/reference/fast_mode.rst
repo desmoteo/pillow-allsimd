@@ -37,9 +37,12 @@ Or call :py:func:`~PIL.Image.set_fast`, or use the
     with Image.fast_mode(False):
         blurred = im.filter(ImageFilter.GaussianBlur(2))
 
-The setting is process-wide: it applies to every thread, including while a
-``fast_mode()`` block runs. Each operation reads it once, when the operation
-starts, so a call never mixes exact and fast kernels.
+The environment variable and ``set_fast()`` set the process-wide default,
+for every thread. A ``fast_mode()`` block sets the mode of the thread it
+runs in, and restores it on exit: other threads keep their own blocks or
+the default, blocks nest, and threads started inside a block don't inherit
+it. Each operation reads the setting once, when it starts, so a call never
+mixes exact and fast kernels.
 
 What it guarantees
 ------------------

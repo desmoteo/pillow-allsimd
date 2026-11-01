@@ -126,6 +126,75 @@ def test_context_manager_restores_after_exception() -> None:
     assert Image.get_fast() is False
 
 
+def test_context_manager_per_thread() -> None:
+    # A block sets its own thread's mode; the others keep the process-wide
+    # setting, and set_fast() inside a block changes that, not the block
+    Image.set_fast(False)
+    inside = threading.Event()
+    done = threading.Event()
+    seen: list[bool] = []
+
+    def other() -> None:
+        inside.wait()
+        seen.append(Image.get_fast())
+        Image.set_fast(True)
+        seen.append(Image.get_fast())
+        done.set()
+
+    t = threading.Thread(target=other)
+    t.start()
+    with Image.fast_mode(False):
+        inside.set()
+        done.wait()
+        assert Image.get_fast() is False
+        with Image.fast_mode():
+            assert Image.get_fast() is True
+        assert Image.get_fast() is False
+    t.join()
+    assert seen == [False, True]
+    assert Image.get_fast() is True
+
+    def started_inside() -> None:
+        seen.append(Image.get_fast())
+
+    with Image.fast_mode(False):
+        t = threading.Thread(target=started_inside)
+        t.start()
+        t.join()
+    assert seen[-1] is True
+
+
+def test_context_manager_nested_across_threads() -> None:
+    # Blocks that overlap in two threads each restore their own thread
+    Image.set_fast(True)
+    a_in, b_in, b_out = threading.Event(), threading.Event(), threading.Event()
+    result: dict[str, bool] = {}
+
+    def b() -> None:
+        a_in.wait()
+        with Image.fast_mode(False):
+            b_in.set()
+            b_out.wait()
+            result["b inside"] = Image.get_fast()
+        result["b after"] = Image.get_fast()
+
+    t = threading.Thread(target=b)
+    t.start()
+    with Image.fast_mode(False):
+        a_in.set()
+        b_in.wait()
+        result["a inside"] = Image.get_fast()
+    result["a after"] = Image.get_fast()
+    b_out.set()
+    t.join()
+    assert result == {
+        "a inside": False,
+        "a after": True,
+        "b inside": False,
+        "b after": True,
+    }
+
+
 def test_toggle_while_processing() -> None:
     # The flag is read once per operation; toggling it from another thread
     # while operations run must neither crash nor leave it in a bad state.
@@ -149,6 +218,34 @@ def test_toggle_while_processing() -> None:
         stop.set()
         t.join()
     assert Image.get_fast() in (True, False)
+
+
+def test_resize_reads_the_flag_once() -> None:
+    # resize() reads the setting for its reducing_gap default and passes it
+    # to the C resize: toggled from another thread meanwhile, a downscale
+    # is either the exact result or the fast one, never a mix
+    im = hopper("RGB").resize((640, 400), Image.Resampling.BILINEAR)
+    size = (64, 40)
+    with Image.fast_mode(False):
+        exact = im.resize(size, Image.Resampling.LANCZOS).tobytes()
+    with Image.fast_mode():
+        fast = im.resize(size, Image.Resampling.LANCZOS).tobytes()
+    assert exact != fast
+    stop = threading.Event()
+
+    def toggle() -> None:
+        while not stop.is_set():
+            Image.set_fast(True)
+            Image.set_fast(False)
+
+    t = threading.Thread(target=toggle)
+    t.start()
+    try:
+        for _ in range(50):
+            assert im.resize(size, Image.Resampling.LANCZOS).tobytes() in (exact, fast)
+    finally:
+        stop.set()
+        t.join()
 
 
 # Every kernel below is tested on the six shapes of simd_shapes (two
