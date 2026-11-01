@@ -134,14 +134,19 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       which updates those libraries (`.github/dependencies.json`,
       `.github/workflows/wheels-dependencies.sh`).
 
-### Later: x86 and Windows wheels
+### Next: x86 and Windows wheels
 
-- [ ] One build that chooses SSE4.1 or AVX2 kernels at run time, before
-      any x86 wheel (or per-CPU wheels, if the wheel variants proposal
-      lands in pip: uploadcare/pillow-simd#156).
-- [ ] A check when `_imaging` loads, so a CPU without SSE4.1 gets a clear
-      error instead of an illegal instruction.
-- [ ] Windows x64 wheels: building from source is hardest there. Windows
+Planned in [SIMD_DISPATCH_PLAN.md](SIMD_DISPATCH_PLAN.md) (2026-11-04),
+which also moves the inline SIMD code into companion files first.
+
+- [ ] One build that chooses SSE4.1, AVX2 or AVX-VNNI kernels at run time
+      (the plan's phase B), before any x86 wheel (or per-CPU wheels, if
+      the wheel variants proposal lands in pip: uploadcare/pillow-simd#156).
+- [ ] A check when `_imaging` loads, so a CPU without the single-tier
+      build's instruction set gets a clear error instead of an illegal
+      instruction (phase B3; the dispatch build runs everywhere).
+- [ ] x86 Linux wheels (phase C), then macOS x86_64 and Windows x64
+      (phase D): building from source is hardest on Windows. Windows
       arm64 with MSVC is untested.
 
 ## Issues and reports on the fork
