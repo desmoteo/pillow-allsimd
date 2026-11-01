@@ -15,6 +15,7 @@ static const ImagingSIMDResampleKernels no_resample_kernels = {0};
 static const ImagingSIMDConvertKernels no_convert_kernels = {0};
 static const ImagingSIMDColorLUTKernels no_colorlut_kernels = {0};
 static const ImagingSIMDGeometryKernels no_geometry_kernels = {0};
+static const ImagingSIMDTransformFastKernels no_transform_fast_kernels = {0};
 
 const ImagingSIMDKernels ImagingSIMDKernels_scalar = {
     .name = "scalar",
@@ -24,6 +25,7 @@ const ImagingSIMDKernels ImagingSIMDKernels_scalar = {
     .convert = &no_convert_kernels,
     .colorlut = &no_colorlut_kernels,
     .geometry = &no_geometry_kernels,
+    .transform_fast = &no_transform_fast_kernels,
 };
 
 const ImagingSIMDKernels *ImagingSIMD = &ImagingSIMDKernels_scalar;
