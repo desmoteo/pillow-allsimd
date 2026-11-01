@@ -20,8 +20,8 @@ Cortex-A78AE, GCC 14). Unless a section says "fast mode", they are for
 exact mode, Pillow's arithmetic.
 
 The page is written section by section. Written so far: the ground rules,
-resampling, the blurs, the kernel filters and the rank filters. To come:
-colour conversions, compositing and channel operations, geometry, drawing and
+resampling, the blurs, the kernel filters, the rank filters and the
+colour conversions. To come: compositing and channel operations, geometry, drawing and
 text, codecs and packing, what was tried and dropped, where OpenCV and
 libvips are still faster, and the fast-mode kernels (meanwhile,
 ``design/SIMD_FAST_KERNELS.md`` in the repository describes those).
@@ -1239,3 +1239,254 @@ results in a whole-image buffer cost page faults on every call; and a
 rank filter size set after ``__init__`` must still raise from
 ``expand()`` as Pillow's does, so ``filter()`` checks the size again
 before taking the path without the copy.
+
+Colour conversions
+------------------
+
+``Image.convert()`` between the 8-bit modes (``Convert.c``,
+``ConvertYCbCr.c``): the whole-pixel conversions (L to RGB, RGB to and
+from RGBA, RGB to CMYK), RGB to L, LA and I, premultiplying and
+unpremultiplying alpha (RGBA to and from RGBa, which every resize,
+rotation and transform of an RGBA image goes through), RGB to HSV, and
+RGB to and from YCbCr. Each is a row function that ``ImagingConvert()``
+runs over the image.
+
+What Pillow computes
+~~~~~~~~~~~~~~~~~~~~
+
+The whole-pixel conversions copy bytes and set the padding or alpha byte
+(CMYK is the bitwise inverse of RGB, with no undercolour removal). RGB
+to L is ITU-R 601-2 luma in 16-bit fixed point, ``(r * 19595 + g * 38470
++ b * 7471 + 0x8000) >> 16``. Premultiplying is ``c * a / 255`` rounded
+(``MULDIV255``, an exact ``/ 255`` as ``(x + 128 + ((x + 128) >> 8)) >>
+8``); unpremultiplying is ``255 * c / a`` in C's integer division,
+clipped to 255, and ``c`` unchanged where ``a`` is 0 or 255. RGB to HSV
+follows ``colorsys.py`` in single-precision floats, with a few steps in
+double, and truncates ``h * 255`` and ``s * 255``. RGB to and from YCbCr
+are JPEG's BT.601 formulas through twelve tables of 16-bit terms at 6
+fractional bits, ``T[v] = (int)(v * K * 64 + 0.5)`` truncated toward
+zero, each sum of three terms shifted right by 6 (a floor); to RGB the
+result is clipped, to YCbCr it is taken modulo 256 as a ``(UINT8)`` cast
+does. Pillow 13's loops are scalar on x86; on arm64 GCC vectorizes the
+byte loops of the whole-pixel conversions, which matters below.
+
+The idea
+~~~~~~~~
+
+Most of these are bandwidth-bound: a 2560×1600 RGB image is 16 MB in
+and 16 MB out, and the AVX2 build and OpenCV both run L to RGB and RGBA
+to RGB at about 26 GB/s on the x86 machine (``design/PERFORMANCE_GAPS.md``).
+The work is to make every loop vectorize, and for the four that compute
+something (luma, unpremultiplication, HSV, YCbCr), to reproduce Pillow's
+arithmetic in lanes.
+
+* **Loops that vectorize under Python's flags.** The whole-pixel
+  conversions are one ``pixel(out, in)`` function each, run by
+  ``CONVERT_PIXELS``: chunks of 16 pixels with ``restrict`` pointers,
+  which GCC vectorizes at ``-O2`` with no alias check and no remainder
+  loop, and pointer increments rather than ``in + x * 4``, which
+  ``-fno-strict-overflow`` lets wrap and GCC then refuses at any level.
+  On arm64 the compiler's code for these loops changed with the
+  optimization level (whole pixels built with widening multiplies, byte
+  loops stored with ``st4`` at one level and scalar at the other), so
+  the NEON build has explicit loops instead: ``vst4q`` of four planes
+  for L to RGB, a vector and/or over whole pixels for RGB to RGBA and
+  CMYK; and the arm64 portable build keeps Pillow's byte loop for L to
+  RGB, which GCC does vectorize at ``-O3`` (the whole-pixel form was
+  0.79x there).
+* **Luma with 15-bit weights.** Pillow-SIMD's ``pmaddwd`` kernel needs
+  signed 16-bit coefficients, and 38470 doesn't fit, so RGB to L, LA and
+  I use ``(r * 9798 + g * 19235 + b * 3735 + 0x4000) >> 15``, which
+  rounds one level away from Pillow's in a few pixels (an exception the
+  ground rules list). The NEON kernel computes the same formula with the
+  coefficients split into bytes (9798 = 38 · 256 + 70), so that
+  ``vmull_u8``/``vmlal_u8`` products fit 16 bits: ``(hi * 256 + lo +
+  0x4000) >> 15`` equals ``(hi + (lo >> 8) + 64) >> 7`` for every input,
+  and the three builds give the same bytes.
+* **Exact unpremultiplication.** Pillow-SIMD divided with a reciprocal
+  estimate and was wrong at the edges: colour above alpha, which bicubic
+  and Lanczos overshoot produce in every RGBA resize, overflowed to 0
+  where Pillow clips to 255 (nearly transparent pixels went black), alpha
+  0 gave colour 0, and other values were off by one. The x86 kernel now
+  clips ``c`` to ``a`` first (which gives 255 where Pillow's clip would),
+  takes ``rcpps`` of alpha scaled to a 16-bit factor, the quotient with
+  ``pmulhuw``, and corrects it by one step from the remainder ``255 * c
+  - q * a`` (the estimate is within one of the exact quotient); every
+  value fits 16 bits, four pixels per SSE4 step, eight per AVX2 step. On
+  arm64 one real division per pixel, ``(255 + 2⁻¹²) / a`` times ``c``,
+  truncated, is exact for every pair (the two roundings stay within
+  2⁻²² of the product, and a non-integer quotient is at least ``1 / a``
+  from an integer), and faster still, 1.7x, is a 64 KB table of the
+  scalar code's results, built on first use and read two pixels per
+  64-bit word; the float kernel finishes rows while another thread
+  builds it. On x86 the table is slower than the vector kernel.
+  Exactness cost 1.6x against Pillow-SIMD's approximate kernel.
+* **HSV lane for lane.** The scalar code's float and double steps are
+  repeated per lane in the same order (``rgb2hsv_4``, ``rgb2hsv_8``,
+  ``rgb2hsv_neon4``): three float divisions, the hue case selected with
+  blends in the scalar code's priority, the ``2.0 + rc - bc`` terms in
+  double and back, and ``fmod(h / 6 + 1, 1)``, which has no vector form,
+  replaced by ``hd >= 1 ? hd - 1 : hd``, exact because ``h`` lies in
+  [−1, 5]. No step is a multiply followed by an add, so arm64's fused
+  multiply-adds can't change a result, and all 16.7 million RGB values
+  give the same bytes on SSE4, AVX2, NEON and the portable build (which
+  the ``fmod`` replacement alone made 2x Pillow 13). A reciprocal in place
+  of the divisions was not exact; a multiplication by 1/6 was exact but
+  no faster.
+* **YCbCr without lookups.** A vector can't index twelve tables cheaply,
+  but it can compute the entries: ``T[v] = (int)(v * K * 64 + 0.5)`` in
+  32-bit floats gives every entry of every table (checked for all 256
+  values, with or without a fused multiply-add), so the kernels convert
+  the channels to floats, compute the three terms, sum them as 32-bit
+  integers and shift, as the tables do. To RGB, the saturating packs are
+  the clip; to YCbCr, masking to a byte is the ``(UINT8)`` cast. Four
+  pixels per SSE4 step, eight per AVX2 step; on NEON 16 pixels as planes
+  (``vld4q``), in four quarters of 4 lanes. Also the premultiply, four,
+  eight or 16 pixels per step with ``MULDIV255`` in 16-bit lanes (NEON's
+  ``vraddhn`` does the ``+ 128 >> 8`` twice in two instructions).
+
+Why the builds agree, and where they don't
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Unpremultiplication and YCbCr are integer results, exact on every path:
+``test_unpremultiply_exact`` and ``test_unpremultiply_every_value`` run
+all 65,536 (colour, alpha) pairs at several row widths, including colour
+above alpha, and ``test_ycbcr_conversions_exact`` checks the three
+pixels-at-a-time paths against the table formula in Python. HSV is
+checked for all 2²⁴ colours when a kernel changes, and the ``chops/convert``
+and ``ycbcr`` areas of ``checks/simd_hashes.py`` agree on every build,
+YCbCr input outside the RGB range (which clips) included. RGB to L, LA
+and I are the exception: the SIMD builds, which agree with each other,
+round with 15-bit weights where Pillow and the portable build use 16,
+one level apart in a few pixels; the hash tool makes its inputs with
+``frombytes`` for that reason, and ``test_consistency_i16`` builds its
+reference from the same conversion. Each vector kernel's leftover
+pixels go through the same kernel on a zero-padded buffer
+(``CONVERT_ROW``), so a pixel's result doesn't depend on its position in
+the row (``test_convert`` in ``Tests/test_simd_consistency.py``).
+
+Numbers
+~~~~~~~
+
+2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
+milliseconds shown.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Conversion
+     - Pillow 13 (x86, ms)
+     - SSE4
+     - AVX2
+     - Pillow 13 (arm64, ms)
+     - NEON
+   * - RGB to L
+     - 2.1
+     - 1.9x
+     - 1.9x
+     - 2.6
+     - 1.1x
+   * - L to RGB
+     - 2.7
+     - 3.5x
+     - 3.5x
+     - 0.9
+     - 1.0x
+   * - RGB to RGBA
+     - 5.6
+     - 4.6x
+     - 4.7x
+     - 1.7
+     - 1.0x
+   * - RGB to CMYK
+     - 7.4
+     - 6.1x
+     - 6.2x
+     - 1.7
+     - 1.0x
+   * - RGBA to RGBa
+     - 8.9
+     - 4.9x
+     - 6.7x
+     - 3.4
+     - 1.1x
+   * - RGBa to RGBA
+     - 26.6
+     - 6.4x
+     - 12.1x
+     - 38.8
+     - 5.4x
+   * - RGB to HSV
+     - 59.7
+     - 3.8x
+     - 6.7x
+     - 81.4
+     - 2.3x
+   * - RGB to YCbCr
+     - 9.2
+     - 1.6x
+     - 3.1x
+     - 19.0
+     - 1.1x
+   * - YCbCr to RGB
+     - 10.8
+     - 3.0x
+     - 5.7x
+     - 14.1
+     - 1.2x
+
+The arm64 column shows what the x86 one hides: on arm64 Pillow 13's
+whole-pixel loops already ran vectorized (its L to RGB takes 0.9 ms
+there against 2.7 on the faster x86 machine), so the gain is in writing
+loops that vectorize *on x86 under Python's flags*; the gain on arm64 is
+nil, and both are at the memory's speed. The portable build is 3.5 to 6x
+on the whole-pixel conversions on x86, 2x on HSV and 1.0 to 1.3x on the
+others. On the benchmark revision it was 0.32x on RGBA to RGBa on arm64: the
+tail loop of that conversion, which is the whole loop in the portable
+build, indexed with ``x * 4``, the pattern the first bullet describes;
+it has pointer increments now, as Pillow's.
+
+Against Pillow-SIMD 12.1.1 with AVX2: the whole-pixel conversions 2.9
+to 3.5x faster, HSV 6.7x and YCbCr 2.8x and 4.9x (it has no kernels
+there), and RGBa to RGBA 0.64x, the price of the exact division (its
+kernel takes 1.4 ms, the exact one 2.2). Against OpenCV, the whole-pixel
+conversions and RGB to L are within 1.3x either way, the difference
+being Pillow's 4 bytes per RGB pixel against OpenCV's 3; RGB to HSV is 2.5x slower on x86 and 2.6x on arm64 (OpenCV divides by 12-bit
+reciprocal tables, a different result, half of its hues one level from
+the true value as half of Pillow's are); RGB to YCbCr is 1.2x slower on
+x86 and 1.7x on arm64, YCbCr to RGB 1.3x faster on x86 and 2.1x slower
+on arm64 (OpenCV uses 14-bit integer coefficients with one rounding,
+where the exact kernels reproduce Pillow's tables in floats). Fast mode
+(the default) computes HSV and YCbCr with one rounding instead: HSV 20x
+on x86 and 7.7x on arm64, RGB to YCbCr 5.0x and 2.4x, YCbCr to RGB 7.2x
+and 3.0x, all ahead of OpenCV; see :ref:`fast-mode` and, until the
+fast-mode section is written, ``design/SIMD_FAST_KERNELS.md``.
+
+Code map
+~~~~~~~~
+
+* ``Convert.c``: ``CONVERT_PIXELS`` and the ``*_pixel`` functions (whole
+  pixels); ``rgb2l_4px()`` and ``rgb2l_8px()`` with the ``rgb2l``,
+  ``rgb2la``, ``rgb2i`` and ``rgba2la`` kernels; ``UNPREMULTIPLY`` and
+  ``rgba2rgbA_4()``/``_8()``, ``neon_unpremultiply_16()``, the
+  ``unpremultiply_table`` and ``unpremultiply_lookup()``, ``rgba2rgbA()``;
+  ``rgbA2rgba()`` (premultiply) and ``neon_muldiv255()``; ``rgb2hsv_row()``
+  and ``rgb2hsv_4()``/``_8()``/``_neon4()``, ``rgb2hsv_fast()``;
+  ``CONVERT_ROW``, which runs a kernel over a row with the zero-padded
+  tail; ``convert_mask16()`` for the NEON and/or loops.
+* ``ConvertYCbCr.c``: the tables, ``ycc_term()`` and the exact kernels
+  in ``ImagingConvertRGB2YCbCr()`` and ``ImagingConvertYCbCr2RGB()``; the
+  fast-mode kernels after them.
+* Tests: ``test_convert`` in ``Tests/test_simd_consistency.py``;
+  ``test_unpremultiply_exact`` and ``test_ycbcr_conversions_exact`` in
+  ``Tests/test_image_convert.py``; ``test_unpremultiply_every_value``.
+
+Pitfalls met on the way: Pillow-SIMD's unpremultiplication (above);
+results that depended on a pixel's position in the row, when the vector
+loop and its tail computed differently (fixed by ``CONVERT_ROW``'s
+padded tail); the AVX2 build's byte-by-byte CMYK being 15% slower than
+SSE4 until the loop worked on whole pixels; the whole-pixel loops being
+3.4x slower than byte loops on arm64 with one GCC and the reverse with
+another, so arm64 got its own loops; and the tail loop with ``x * 4``
+indexing that the benchmark caught after the page's own ground rules
+had described the problem.
