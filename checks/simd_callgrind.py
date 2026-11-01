@@ -124,8 +124,8 @@ def totals(out: str, name: str, op: str) -> dict[str, int] | None:
     return None
 
 
-def functions(out: str, name: str, op: str, top: int) -> list[dict[str, Any]]:
-    """The most expensive functions of a dump by their own (exclusive) cost."""
+def function_rows(out: str, name: str, op: str) -> list[dict[str, Any]]:
+    """Every function of a dump with its own (exclusive) cost, largest first."""
     files = glob.glob(os.path.join(out, name, slug(op) + ".*.1"))
     if not files:
         return []
@@ -155,9 +155,58 @@ def functions(out: str, name: str, op: str, top: int) -> list[dict[str, Any]]:
                 **costs,
             }
         )
-        if len(rows) == top:
-            break
     return rows
+
+
+def functions(out: str, name: str, op: str, top: int) -> list[dict[str, Any]]:
+    """The most expensive functions of a dump by their own (exclusive) cost."""
+    return function_rows(out, name, op)[:top]
+
+
+def object_instructions(out: str, name: str, op: str) -> dict[str, int]:
+    """The instructions of a dump by the object (program or library) whose
+    code executed them, read from the dump itself: callgrind_annotate names
+    no object for code inlined from another source file."""
+    files = glob.glob(os.path.join(out, name, slug(op) + ".*.1"))
+    if not files:
+        return {}
+    names: dict[str, str] = {}
+    counts: dict[str, int] = {}
+    current = ""
+    columns = 1  # position columns before the costs; Ir is the first cost
+    call = False
+    with open(files[0]) as fh:
+        for line in fh:
+            if line.startswith(("ob=", "cob=")):
+                # "(id) name" the first time an object is named, as the
+                # caller's object or as a callee's, then "(id)" alone
+                key, _, value = line.partition("=")
+                m = re.match(r"\((\d+)\)(?: (.*))?", value)
+                if m and m.group(2):
+                    names[m.group(1)] = os.path.basename(m.group(2).strip())
+                if key == "ob":
+                    current = names.get(m.group(1), "") if m else value.strip()
+            elif line.startswith("positions:"):
+                columns = len(line.split()) - 1
+            elif line.startswith("calls="):
+                call = True  # the next cost line is the callee's, inclusive
+            elif line[0].isdigit() or line[0] in "+-*":
+                if call:
+                    call = False
+                    continue
+                parts = line.split()
+                if len(parts) > columns:
+                    counts[current] = counts.get(current, 0) + int(parts[columns])
+    return counts
+
+
+def own_instructions(objects: dict[str, int]) -> int:
+    """The instructions executed in Pillow's own extension modules: the
+    part of an operation's count that the C library, Python and the codec
+    libraries of the machine do not move (simd_ir_gate.py compares it)."""
+    return sum(
+        ir for obj, ir in objects.items() if re.match(r"_(imaging|webp|avif)", obj)
+    )
 
 
 def derived(t: dict[str, int], pixels: int) -> dict[str, float]:
@@ -244,8 +293,9 @@ def main() -> None:
             t = totals(args.out, n, o)
             results[o][n] = t and {
                 **t,
+                "own": own_instructions(object_instructions(args.out, n, o)),
                 "derived": derived(t, w * h),
-                "functions": functions(args.out, n, o, args.top),
+                "functions": functions(args.out, n, o, args.top) if args.top else [],
             }
     with open(os.path.join(args.out, "totals.json"), "w") as fh:
         json.dump(results, fh, indent=1)

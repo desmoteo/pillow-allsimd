@@ -254,3 +254,24 @@ Timing the phases showed why, and what to do instead.
 - Not done: the median cut's two arrays. They are 2 x 16 MB of a 355 ms
   call, and its interface, shared with libimagequant, wants them.
 
+### 1 (second half). The instruction-count gate (2026-11-05)
+
+- `checks/simd_ir_gate.py`, `checks/simd_ir_baseline.json` and the
+  workflow `.github/workflows/simd-instructions.yml`, as planned, with
+  these differences. The list is 59 operations, not one per kernel:
+  three whose own count is some ten thousand instructions (JPEG and WebP
+  decoding, `getbbox`) were dropped, since 3% of that is an argument
+  check. The count of Pillow's own code comes from the callgrind dump
+  itself, per object: `callgrind_annotate` names no object for code
+  inlined from a header, and the first version of the gate counted 0.06
+  million instructions for a bicubic rotation that executes 290 million.
+  The tiers are scalar, SSE4.1 and AVX2: valgrind has no AVX-VNNI.
+- The job runs in `python:3.12-trixie` (GCC 14.2, Valgrind 3.24), where
+  the baseline was made; two runs in fresh containers gave 186 of 186
+  counts within 3%, and the whole job takes 1 min 40 s on ten cores.
+- What it would have caught: the octree in the wheel (the scalar tier's
+  count was the SIMD tiers' before item 4), a PNG that left libdeflate's
+  path (the whole count of the decode), the span fill through the table.
+- The baseline is refreshed by the last commit of this round, after the
+  items that change counts on purpose.
+
