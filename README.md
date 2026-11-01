@@ -217,6 +217,13 @@ describe:
   assessment of the above on a Jetson Orin, the drawing regression it
   found and its fix, the kernel filters with small coefficients, and
   the changes that measured slower and were dropped.
+- [ROUND_2026-11-05_PLAN.md](design/ROUND_2026-11-05_PLAN.md): eight
+  items and what came of each: the wheel build measured against a
+  single-tier build and the loops that differed, an instruction-count
+  gate in CI, PNG decoding with libdeflate, the fast octree from the
+  image's rows, the box blur's zero far weight, the NEON colour LUT and
+  resampling loops, and what the profiles of drawing and of the
+  Cortex-A78's unstable cases showed instead of what was expected.
 
 
 ## Benchmarks
