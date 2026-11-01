@@ -33,6 +33,22 @@ Unreleased
   (``design/SIMD_DISPATCH_PLAN.md``, phase A). The same kernels, the same
   pixels: the hashes of every area are unchanged on the SSE4, AVX2 and
   scalar builds. ``_imaging.simd_kernels`` names the active tier
+- Run-time dispatch on x86-64: ``-C simd=dispatch``, now what ``auto``
+  means there, compiles the kernels three times, for SSE4.1, AVX2 and
+  AVX-VNNI (SSE4.1 and AVX2 with MSVC), and the rest of ``_imaging`` for
+  plain x86-64; at import, ``cpuid`` picks the highest tier the CPU and
+  OS support, so one build runs on every x86-64 CPU, which is what the
+  x86 wheels need (``design/SIMD_DISPATCH_PLAN.md``, phase B). The
+  ``PILLOW_ALLSIMD_ISA`` environment variable (``scalar``, ``sse4``,
+  ``avx2``, ``avxvnni``) caps the tier, ``Image.core.set_simd(name)``
+  changes it, ``Image.core.simd_tiers`` lists the tiers built,
+  ``features.check("simd")`` is true when a SIMD tier is built in, and
+  ``python3 -m PIL`` prints ``--- SIMD kernels: avx2 (built: scalar, sse4,
+  avx2, avxvnni)``. A build for one instruction set now fails to import
+  with a message on a CPU without it, instead of an illegal instruction.
+  The tiers of one build give the same pixels (``Tests/test_simd_tiers.py``),
+  and each tier runs within noise of the single-tier build of the same
+  instruction set
 - The AVX2 build's 3x3 float kernel filters on 4-byte images (a
   ``Kernel`` whose coefficients don't fit 16 bits) use the SSE4 kernel:
   the AVX2 one was 1.6 times slower and rounded 0.2% of the bytes

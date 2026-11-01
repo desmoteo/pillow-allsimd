@@ -81,26 +81,34 @@ Pillow-AllSIMD is a source package, so pip compiles it on installation:
 install the libraries
 that `building Pillow from source
 <https://desmoteo.github.io/pillow-allsimd/installation/building-from-source.html>`_
-needs first. It installs the ``PIL`` package, as Pillow does. Install your
-other packages first, then replace Pillow with it::
+needs first. On x86-64 that build holds SSE4.1, AVX2 and AVX-VNNI kernels
+and picks the set the CPU has when Pillow loads, so no option is needed. It
+installs the ``PIL`` package, as Pillow does. Install your other packages
+first, then replace Pillow with it::
 
     python3 -m pip uninstall -y pillow pillow-simd
-    python3 -m pip install pillow-allsimd               # arm64: a wheel
-    python3 -m pip install -C simd=avx2 pillow-allsimd  # x86: built with AVX2
+    python3 -m pip install pillow-allsimd  # arm64: a wheel; x86-64: every set
 
 Uninstall Pillow before installing, not after: both own the files in
-``PIL``. The ``-C simd=`` options below apply to source builds only; to build
-from source on arm64 anyway, add ``--no-binary pillow-allsimd``. To rebuild
-with another ``simd`` option, add ``--no-cache-dir --force-reinstall``.
-Otherwise pip reuses the wheel it built the first time. With ``-v``, pip shows
-the line ``--- SIMD kernels: ...`` from the build, which names the kernels you
-got.
+``PIL``. ``python3 -m PIL`` shows the kernels in use (``--- SIMD kernels:
+avx2 (built: scalar, sse4, avx2, avxvnni)``). The ``-C simd=`` options below
+apply to source builds only; to build from source on arm64 anyway, add
+``--no-binary pillow-allsimd``. To rebuild with another ``simd`` option, add
+``--no-cache-dir --force-reinstall``. Otherwise pip reuses the wheel it built
+the first time.
 
 ====================  ==============================================================
 ``-C simd=``          Kernels
 ====================  ==============================================================
-``auto`` (default)    SSE4.1 on x86, NEON on arm64, portable C elsewhere
-``sse4``              SSE4.1
+``auto`` (default)    ``dispatch`` on x86-64, NEON on arm64, SSE4.1 on 32-bit
+                      x86, portable C elsewhere
+``dispatch``          SSE4.1, AVX2 and AVX-VNNI kernels in one build, the set
+                      the CPU supports chosen when Pillow loads (x86-64; with
+                      MSVC, SSE4.1 and AVX2). ``PILLOW_ALLSIMD_ISA=sse4`` (or
+                      ``scalar``, ``avx2``, ``avxvnni``) caps the choice
+``sse4``              SSE4.1 only, in every file; this and the next four build
+                      for one set, which the CPU must have, or Pillow fails to
+                      import with a message
 ``avx2``              SSE4.1 and AVX2: x86 CPUs since Intel Haswell and AMD
                       Excavator, except some Pentium, Celeron and Atom models
 ``avxvnni``           SSE4.1, AVX2 and AVX-VNNI, for faster integer filters and
