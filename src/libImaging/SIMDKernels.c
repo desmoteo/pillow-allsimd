@@ -13,10 +13,12 @@
 #if defined(IMAGING_SIMD_TABLE)
 
 #include "FilterSIMD.c"
+#include "ReduceSIMD.c"
 
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
     .filter = &filter_simd_kernels,
+    .reduce = &reduce_simd_kernels,
 };
 
 #endif

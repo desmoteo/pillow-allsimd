@@ -11,8 +11,6 @@ division_UINT32(int divider, int result_bits) {
     return (UINT32)(max_int / max_dividend);
 }
 
-#include "ReduceSIMD.c"
-
 void
 ImagingReduceNxN(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscale) {
     /* The most general implementation for any xscale and yscale
@@ -1473,18 +1471,17 @@ ImagingReduce(Imaging imIn, int xscale, int yscale, int box[4]) {
 
     switch (imIn->type) {
         case IMAGING_TYPE_UINT8:
-#if defined(REDUCE_SIMD)
-            if (!imIn->image8 && ImagingReduce_4u8(imOut, imIn, box, xscale, yscale)) {
+            /* The SIMD kernels of the active tier (ReduceSIMD.c) */
+            if (!imIn->image8 &&
+                IMAGING_SIMD_CALL(reduce->u8x4, imOut, imIn, box, xscale, yscale)) {
                 ImagingReduceCorners(imOut, imIn, box, xscale, yscale);
                 break;
             }
-#endif
-#if defined(REDUCE_SIMD_1U8)
-            if (imIn->image8 && ImagingReduce_1u8(imOut, imIn, box, xscale, yscale)) {
+            if (imIn->image8 &&
+                IMAGING_SIMD_CALL(reduce->u8x1, imOut, imIn, box, xscale, yscale)) {
                 ImagingReduceCorners(imOut, imIn, box, xscale, yscale);
                 break;
             }
-#endif
             if (xscale == 1) {
                 if (yscale == 2) {
                     ImagingReduce1x2(imOut, imIn, box);
