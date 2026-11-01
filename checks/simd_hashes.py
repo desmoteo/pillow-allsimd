@@ -351,6 +351,15 @@ def _(upd: Update) -> None:
             upd(im.filter(ImageFilter.MinFilter(size)).tobytes())
             upd(im.filter(ImageFilter.MaxFilter(size)).tobytes())
             upd(im.filter(ImageFilter.RankFilter(size, size * size // 3)).tobytes())
+        for size in (3, 5):
+            upd(im.filter(ImageFilter.ModeFilter(size)).tobytes())
+            # a flat region, so that counts above 2 and ties occur
+            upd(
+                im.quantize(6)
+                .convert("L")
+                .filter(ImageFilter.ModeFilter(size))
+                .tobytes()
+            )
 
 
 @section("transform")

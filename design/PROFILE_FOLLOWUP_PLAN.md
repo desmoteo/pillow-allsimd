@@ -214,3 +214,16 @@ the outputs; raw results in `bench-results/baseline-2026-11-04/` and
   362 to 171 ms (2.11x), convert RGB to P adaptive 689 to 400 ms (1.72x);
   the other quantizers unchanged. What remains in the adaptive case is
   the three linked-list merge sorts (12%) and the first pass's inserts.
+- **P4, the 3x3 mode filter as a kernel (2026-11-04).**
+  `ModeFilterSIMD.c` (the `mode` group, SSE4.1, AVX2 and NEON from one
+  source): nine loads, 36 pair compares subtracted into the nine counts,
+  nine packed keys (count above, inverted value below) and their maximum,
+  the centre pixel where the count is two or less. `mode 3 L` at
+  2560x1600: 62.7 to 4.5 ms (13.9x) on AVX2, outputs identical. The
+  scalar file keeps the borders and the other sizes through a per-pixel
+  count (`mode_window_pixel`). `Tests/test_simd_consistency.py` compares
+  widths 1 to 301 and heights 1 to 7 against a per-pixel definition
+  under every tier; the hash set's rank area now holds the mode filter
+  (sizes 3 and 5, noise and a flat-region image) and agrees across the
+  old build, the new build and the scalar tier; the NEON tier unit
+  compiles with zig for aarch64 (not run: the Jetson is loaded).

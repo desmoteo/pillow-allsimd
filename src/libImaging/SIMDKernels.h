@@ -416,6 +416,15 @@ typedef struct {
     int (*minmax_line)(UINT8 *out, const UINT8 **src, int count, int n, int is_max);
 } ImagingSIMDRankKernels;
 
+/* ModeFilter.c: the 3x3 mode of one row of an 8-bit image from its three
+   source rows, for the pixels x = 1 .. the return value - 1 (the rest, and
+   the first and last rows, are the scalar loop's). */
+typedef struct {
+    int (*mode3)(
+        UINT8 *out, const UINT8 *above, const UINT8 *row, const UINT8 *below, int xsize
+    );
+} ImagingSIMDModeKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -443,6 +452,7 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDDrawKernels *draw;
     const ImagingSIMDQuantKernels *quant;
     const ImagingSIMDRankKernels *rank;
+    const ImagingSIMDModeKernels *mode;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */
