@@ -30,7 +30,8 @@ State
 -----
 
 * Version |release|, on Pillow 13.0.0 (the ``simd/pillow-13`` branch).
-* Beta. On PyPI as a source package, compiled on installation (below).
+* Beta. On PyPI as wheels for arm64 Linux and macOS, and as a source
+  package, compiled on installation, everywhere else (below).
 * Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson Orin):
   Pillow's test suite on every build, the SIMD consistency tests, and output
   hashes per kernel that compare the builds (``checks/simd_hashes.py``). The
@@ -44,17 +45,22 @@ State
 Installing
 ----------
 
-Pillow-AllSIMD is on PyPI as a source package, which pip compiles on
-installation, so install the libraries that :doc:`building Pillow from source
+On arm64 Linux (glibc 2.28 or later, or musl) and macOS 11 or later, pip
+installs a wheel with the NEON kernels and the image libraries bundled, as
+Pillow's wheels have them. Elsewhere, x86 included, Pillow-AllSIMD is a
+source package, which pip compiles on installation, so install the
+libraries that :doc:`building Pillow from source
 <installation/building-from-source>` needs first. It installs the ``PIL``
 package, like Pillow: install your other packages first, then uninstall
 Pillow (or Pillow-SIMD) and install Pillow-AllSIMD, choosing the
-instruction set with the ``simd`` build option::
+instruction set of a source build with the ``simd`` build option::
 
     python3 -m pip uninstall -y pillow pillow-simd
-    python3 -m pip install -C simd=avx2 pillow-allsimd
+    python3 -m pip install pillow-allsimd               # arm64: a wheel
+    python3 -m pip install -C simd=avx2 pillow-allsimd  # x86: built with AVX2
 
-Uninstall Pillow before, not after: both own the files in ``PIL``. To
+Uninstall Pillow before, not after: both own the files in ``PIL``. To build
+from source on arm64 anyway, add ``--no-binary pillow-allsimd``. To
 rebuild with another ``simd`` option, add ``--no-cache-dir
 --force-reinstall``, or pip reuses the wheel it built first. The development
 branch installs with ``"pillow-allsimd @

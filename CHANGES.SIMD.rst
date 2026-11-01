@@ -3,6 +3,18 @@ Changelog (Pillow-AllSIMD)
 
 Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
+13.0.0.post2 (2026-11-03)
+-------------------------
+
+Based on Pillow 13.0.0; the code is that of 13.0.0.post0
+
+- Wheels for arm64: Linux aarch64 (manylinux_2_28 and musllinux_1_2) and
+  macOS 11 or later, for CPython 3.11 to 3.15 and the free-threaded 3.14t
+  and 3.15t. They have the NEON kernels and bundle the image libraries as
+  Pillow's wheels do, and each is tested with Pillow's wheel tests on its
+  platform. x86 and the other architectures install the source package, as
+  before (``-C simd=avx2`` on x86)
+
 13.0.0.post1 (2026-11-03)
 -------------------------
 
