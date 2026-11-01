@@ -21,6 +21,10 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
    Pillow-SIMD). No x86 wheel yet: pip would choose it over the source
    package without saying so, and x86 users would get SSE4.1, 4.18x
    Pillow 13 instead of AVX2's 5.44x (exact mode, x86 benchmark).
+3. **x86-64 wheels once one build has every tier** (2026-11-04): the
+   dispatch build of `SIMD_DISPATCH_PLAN.md` holds SSE4.1, AVX2 and
+   AVX-VNNI kernels and chooses at run time, within noise of a build for
+   one set, so an x86-64 wheel loses nothing against the source build.
 
 ### Step 1: the source package
 
@@ -139,15 +143,17 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 Planned in [SIMD_DISPATCH_PLAN.md](SIMD_DISPATCH_PLAN.md) (2026-11-04),
 which also moves the inline SIMD code into companion files first.
 
-- [ ] One build that chooses SSE4.1, AVX2 or AVX-VNNI kernels at run time
-      (the plan's phase B), before any x86 wheel (or per-CPU wheels, if
-      the wheel variants proposal lands in pip: uploadcare/pillow-simd#156).
-- [ ] A check when `_imaging` loads, so a CPU without the single-tier
-      build's instruction set gets a clear error instead of an illegal
-      instruction (phase B3; the dispatch build runs everywhere).
-- [ ] x86 Linux wheels (phase C), then macOS x86_64 and Windows x64
-      (phase D): building from source is hardest on Windows. Windows
-      arm64 with MSVC is untested.
+- [x] (2026-11-04) One build that chooses SSE4.1, AVX2 or AVX-VNNI
+      kernels at run time (the plan's phase B), before any x86 wheel (or
+      per-CPU wheels, if the wheel variants proposal lands in pip:
+      uploadcare/pillow-simd#156).
+- [x] (2026-11-04) A check when `_imaging` loads, so a CPU without the
+      single-tier build's instruction set gets a clear error instead of an
+      illegal instruction (phase B3; the dispatch build runs everywhere).
+- [ ] x86 Linux wheels (phase C): the release matrix has them from
+      13.0.0.post3; then macOS x86_64 and Windows x64 (phase D): building
+      from source is hardest on Windows. Windows arm64 with MSVC is
+      untested.
 
 ## Issues and reports on the fork
 

@@ -3,9 +3,17 @@ Changelog (Pillow-AllSIMD)
 
 Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
-Unreleased
-----------
+13.0.0.post3 (2026-11-04)
+-------------------------
 
+Based on Pillow 13.0.0
+
+- Wheels for x86-64 Linux (manylinux_2_28 and musllinux_1_2 x86_64), built
+  and tested as the arm64 ones are. Each holds the SSE4.1, AVX2 and
+  AVX-VNNI kernels and picks the set the CPU has when Pillow loads (the
+  dispatch build below), so pip installs a wheel on x86-64 Linux now and
+  ``-C simd=avx2`` is no longer needed; ``--no-binary pillow-allsimd``
+  still builds from source, with the same three sets
 - ``Image.fast_mode()`` sets the mode of the thread it runs in, and
   restores that thread's previous setting: before, it set the process-wide
   flag, so two threads' blocks could restore it in the wrong order.

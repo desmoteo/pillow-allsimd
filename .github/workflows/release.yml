@@ -1,10 +1,10 @@
 name: Release
 
-# Pillow-AllSIMD's source package and arm64 wheels, published with trusted
+# Pillow-AllSIMD's source package and wheels, published with trusted
 # publishing (no token): a tag named allsimd-* uploads them to PyPI, a
-# manual run to TestPyPI. No x86 wheels: pip would choose one over the
-# source package, and x86 users would get SSE4.1 instead of building AVX2
-# (design/PLAN.md).
+# manual run to TestPyPI. The x86-64 wheels hold the SSE4.1, AVX2 and
+# AVX-VNNI kernels and choose at run time (design/SIMD_DISPATCH_PLAN.md);
+# the arm64 wheels have NEON.
 #
 # The platforms built, and so the files uploaded, come from the tag's
 # suffix or the manual run's input: allsimd-<version> builds everything;
@@ -148,13 +148,15 @@ jobs:
           CIBW_ENVIRONMENT_PASS_LINUX: FORCE_COLOR
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macosx_deployment_target }}
 
-      - name: Check that every wheel has the NEON kernels
+      - name: Check that every wheel has the platform's SIMD kernels
         run: |
           wheels=$(ls wheelhouse/*.whl | wc -l)
-          neon=$(grep -c -- "--- SIMD kernels: NEON$" build.log || true)
-          echo "$wheels wheels, $neon NEON builds, $WHEELS_PER_PLATFORM expected"
-          [ "$wheels" -eq "$WHEELS_PER_PLATFORM" ] && [ "$neon" -eq "$wheels" ]
+          builds=$(grep -c -- "--- SIMD kernels: $KERNELS\$" build.log || true)
+          echo "$wheels wheels, $builds builds with '$KERNELS', $WHEELS_PER_PLATFORM expected"
+          [ "$wheels" -eq "$WHEELS_PER_PLATFORM" ] && [ "$builds" -eq "$wheels" ]
         shell: bash
+        env:
+          KERNELS: ${{ matrix.kernels }}
 
       - name: Download SBOM
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

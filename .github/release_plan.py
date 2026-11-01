@@ -24,8 +24,31 @@ from pathlib import Path
 
 WHEELS_PER_PLATFORM = 7  # pyproject.toml's [tool.cibuildwheel]
 
+# Each wheel's build log must end its configuration summary with
+# "--- SIMD kernels: <kernels>": the dispatch build on x86-64 (SSE4.1, AVX2
+# and AVX-VNNI kernels, chosen when _imaging loads), NEON on arm64.
+X86_64_KERNELS = "dispatch (SSE4.1, AVX2, AVX-VNNI)"
+
 PLATFORMS = {
     "linux": [
+        {
+            "name": "manylinux_2_28 x86_64",
+            "platform": "linux",
+            "os": "ubuntu-latest",
+            "cibw_arch": "x86_64",
+            "build": "*manylinux*",
+            "macosx_deployment_target": "",
+            "kernels": X86_64_KERNELS,
+        },
+        {
+            "name": "musllinux x86_64",
+            "platform": "linux",
+            "os": "ubuntu-latest",
+            "cibw_arch": "x86_64",
+            "build": "*musllinux*",
+            "macosx_deployment_target": "",
+            "kernels": X86_64_KERNELS,
+        },
         {
             "name": "manylinux_2_28 aarch64",
             "platform": "linux",
@@ -33,6 +56,7 @@ PLATFORMS = {
             "cibw_arch": "aarch64",
             "build": "*manylinux*",
             "macosx_deployment_target": "",
+            "kernels": "NEON",
         },
         {
             "name": "musllinux aarch64",
@@ -41,6 +65,7 @@ PLATFORMS = {
             "cibw_arch": "aarch64",
             "build": "*musllinux*",
             "macosx_deployment_target": "",
+            "kernels": "NEON",
         },
     ],
     "macos": [
@@ -51,6 +76,7 @@ PLATFORMS = {
             "cibw_arch": "arm64",
             "build": "",
             "macosx_deployment_target": "11.0",
+            "kernels": "NEON",
         },
     ],
 }

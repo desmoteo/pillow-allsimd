@@ -23,7 +23,20 @@ from .simd_shapes import SHAPES
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-TIERS: tuple[str, ...] = getattr(Image.core, "simd_tiers", ())
+
+def _usable(tier: str) -> bool:
+    """Whether this CPU can run the tier (a wheel holds tiers it may lack)."""
+    active = Image.core.simd_kernels
+    try:
+        Image.core.set_simd(tier)
+    except ValueError:
+        return False
+    finally:
+        Image.core.set_simd(active)
+    return True
+
+
+TIERS = tuple(t for t in getattr(Image.core, "simd_tiers", ()) if _usable(t))
 SIMD_TIERS = [t for t in TIERS if t != "scalar"]
 
 pytestmark = pytest.mark.skipif(
