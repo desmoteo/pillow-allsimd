@@ -225,13 +225,49 @@ clip8(int in, int precision) {
     return clip8_lookups[in >> precision];
 }
 
-#include "ResampleSIMDHorizontalConv.c"
+/* The portable kernels for 8-bit images; the SIMD ones are those of the
+   active tier's table (ResampleSIMD.c) */
+#include "ResampleHorizontal.c"
 /* again, with 16-bit results for fast mode (ResampleFast.c) */
 #define RESAMPLE_OUT16
-#include "ResampleSIMDHorizontalConv.c"
+#include "ResampleHorizontal.c"
 #undef RESAMPLE_OUT16
-#include "ResampleSIMDVerticalConv.c"
-#include "ResampleSIMD32bpc.c"
+
+/* The portable vertical kernel for 8-bit images, with the arithmetic of
+   the SIMD one (ResampleSIMDVerticalConv.c). Works on chunks of bytes so
+   rows are read sequentially. */
+static void
+resample_vertical_8u(
+    UINT32 *restrict lineOut,
+    Imaging imIn,
+    int xmin,
+    int xmax,
+    INT16 *k,
+    int coefs_precision,
+    int xsize
+) {
+    int x, xx, i, n;
+    int size = xsize * 4;
+    UINT8 *out = (UINT8 *)lineOut;
+    int ss[64];
+
+    for (xx = 0; xx < size; xx += n) {
+        n = size - xx < 64 ? size - xx : 64;
+        for (i = 0; i < n; i++) {
+            ss[i] = 1 << (coefs_precision - 1);
+        }
+        for (x = 0; x < xmax; x++) {
+            UINT8 *in = (UINT8 *)imIn->image[x + xmin] + xx;
+            int kx = k[x];
+            for (i = 0; i < n; i++) {
+                ss[i] += in[i] * kx;
+            }
+        }
+        for (i = 0; i < n; i++) {
+            out[xx + i] = clip8(ss[i], coefs_precision);
+        }
+    }
+}
 
 static int
 precompute_coeffs(
@@ -395,13 +431,16 @@ _ImagingResampleHorizontal_8bpc(
 
     ImagingSectionEnter(&cookie);
 
+    const ImagingSIMDResampleKernels *simd = ImagingSIMD->resample;
+
     if (imIn->image8) {
         // Verify caller allocated distinct buffers.
         assert(imIn->image8 != imOut->image8);
         yy = 0;
-#if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD)
-        for (; yy < ysize - 3; yy += 4) {
-            ImagingResampleHorizontalConvolution1u4x(
+        /* the SIMD kernels, four rows at a time, then one; the portable loop
+           below does the rest */
+        for (; simd->horizontal_1u4x && yy < ysize - 3; yy += 4) {
+            simd->horizontal_1u4x(
                 imOut->image8[yy],
                 imOut->image8[yy + 1],
                 imOut->image8[yy + 2],
@@ -417,10 +456,8 @@ _ImagingResampleHorizontal_8bpc(
                 coefs_precision
             );
         }
-#endif
-#if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD)
-        for (; yy < ysize; yy++) {
-            ImagingResampleHorizontalConvolution1u(
+        for (; simd->horizontal_1u && yy < ysize; yy++) {
+            simd->horizontal_1u(
                 imOut->image8[yy],
                 imIn->image8[yy + offset],
                 xsize,
@@ -430,7 +467,6 @@ _ImagingResampleHorizontal_8bpc(
                 coefs_precision
             );
         }
-#endif
         for (; yy < ysize; yy++) {
             // Restrict safe: imIn and imOut are distinct.
             UINT8 *restrict lineIn = imIn->image8[yy + offset];
@@ -449,11 +485,15 @@ _ImagingResampleHorizontal_8bpc(
     } else if (imIn->type == IMAGING_TYPE_UINT8) {
         // Verify caller allocated distinct buffers.
         assert(imIn->image != imOut->image);
+        ImagingResampleRow8uFn row =
+            simd->horizontal_8u ? simd->horizontal_8u : resample_horizontal_8u;
+        ImagingResampleRows8uFn rows4 =
+            simd->horizontal_8u4x ? simd->horizontal_8u4x : resample_horizontal_8u4x;
         yy = 0;
-#if defined(RESAMPLE_HORIZONTAL_3BANDS_PORTABLE)
-        if (imIn->bands == 3) {
+        if (imIn->bands == 3 && !simd->horizontal_8u4x) {
+            /* the portable kernels have one for 3 bands */
             for (; yy < ysize; yy++) {
-                ImagingResampleHorizontalConvolution8u3(
+                resample_horizontal_8u3(
                     (UINT32 *)imOut->image32[yy],
                     (UINT32 *)imIn->image32[yy + offset],
                     xsize,
@@ -464,7 +504,6 @@ _ImagingResampleHorizontal_8bpc(
                 );
             }
         }
-#endif
         // The source rows, or their premultiplied copies in the scratch rows
         UINT32 *in[4];
         int i, n;
@@ -479,7 +518,7 @@ _ImagingResampleHorizontal_8bpc(
                 }
             }
             if (n == 4) {
-                ImagingResampleHorizontalConvolution8u4x(
+                rows4(
                     (UINT32 *)imOut->image32[yy],
                     (UINT32 *)imOut->image32[yy + 1],
                     (UINT32 *)imOut->image32[yy + 2],
@@ -495,15 +534,13 @@ _ImagingResampleHorizontal_8bpc(
                     coefs_precision
                 );
             } else {
-                ImagingResampleHorizontalConvolution8u(
-                    (UINT32 *)imOut->image32[yy],
+                row((UINT32 *)imOut->image32[yy],
                     in[0],
                     xsize,
                     bounds,
                     kk,
                     ksize,
-                    coefs_precision
-                );
+                    coefs_precision);
             }
             if (alpha && alpha->unpremultiply) {
                 for (i = 0; i < n; i++) {
@@ -542,6 +579,10 @@ _ImagingResampleVertical_8bpc(
 
     // Sizes are invariant over the loop.
     int xsize = imOut->xsize, ysize = imOut->ysize;
+    /* the SIMD kernel of the active tier, or the portable one */
+    ImagingResampleVertical8uFn vertical = ImagingSIMD->resample->vertical_8u
+                                               ? ImagingSIMD->resample->vertical_8u
+                                               : resample_vertical_8u;
 
     ImagingSectionEnter(&cookie);
 
@@ -557,9 +598,7 @@ _ImagingResampleVertical_8bpc(
             k = &kk[yy * ksize];
             ymin = bounds[yy * 2 + 0];
             ymax = bounds[yy * 2 + 1];
-            ImagingResampleVerticalConvolution8u(
-                (UINT32 *)lineOut, imIn, ymin, ymax, k, coefs_precision, words
-            );
+            vertical((UINT32 *)lineOut, imIn, ymin, ymax, k, coefs_precision, words);
             for (xx = words * 4; xx < xsize; xx++) {
                 ss0 = 1 << (coefs_precision - 1);
                 for (y = 0; y < ymax; y++) {
@@ -575,7 +614,7 @@ _ImagingResampleVertical_8bpc(
             k = &kk[yy * ksize];
             ymin = bounds[yy * 2 + 0];
             ymax = bounds[yy * 2 + 1];
-            ImagingResampleVerticalConvolution8u(
+            vertical(
                 (UINT32 *)imOut->image32[yy],
                 imIn,
                 ymin,
@@ -628,15 +667,18 @@ _ImagingResampleHorizontal_16bpc(
     assert(imIn->image8 != imOut->image8);
 
     ImagingSectionEnter(&cookie);
-#if defined(RESAMPLE_WIDE)
-    if ((bigendian ? resample_horizontal_u16be : resample_horizontal_u16le)(
-            imOut, imIn, offset, ksize, bounds, kk
-        )) {
-        MUTEX_UNLOCK(&imIn->mutex);
-        ImagingSectionLeave(&cookie);
-        return;
+    /* The SIMD kernel of the active tier, unless it has none or runs out of
+       memory */
+    {
+        ImagingResampleWideHFn wide = bigendian
+                                          ? ImagingSIMD->resample->horizontal_u16be
+                                          : ImagingSIMD->resample->horizontal_u16le;
+        if (wide && wide(imOut, imIn, offset, ksize, bounds, kk)) {
+            MUTEX_UNLOCK(&imIn->mutex);
+            ImagingSectionLeave(&cookie);
+            return;
+        }
     }
-#endif
     for (yy = 0; yy < ysize; yy++) {
         // Restrict safe: imIn and imOut are distinct.
         UINT8 *restrict lineIn = imIn->image8[yy + offset];
@@ -694,15 +736,17 @@ _ImagingResampleVertical_16bpc(
     assert(imIn->image8 != imOut->image8);
 
     ImagingSectionEnter(&cookie);
-#if defined(RESAMPLE_WIDE)
+    /* The SIMD kernel of the active tier, if it has one */
     {
-        (bigendian ? resample_vertical_u16be
-                   : resample_vertical_u16le)(imOut, imIn, ksize, bounds, kk);
-        MUTEX_UNLOCK(&imIn->mutex);
-        ImagingSectionLeave(&cookie);
-        return;
+        ImagingResampleWideVFn wide = bigendian ? ImagingSIMD->resample->vertical_u16be
+                                                : ImagingSIMD->resample->vertical_u16le;
+        if (wide) {
+            wide(imOut, imIn, ksize, bounds, kk);
+            MUTEX_UNLOCK(&imIn->mutex);
+            ImagingSectionLeave(&cookie);
+            return;
+        }
     }
-#endif
 
     for (yy = 0; yy < ysize; yy++) {
         // imOut is a fresh allocation, so its row can be hoisted/restrict.
@@ -750,16 +794,19 @@ _ImagingResampleHorizontal_32bpc(
     assert(imIn->image32 != imOut->image32);
 
     ImagingSectionEnter(&cookie);
-#if defined(RESAMPLE_WIDE)
-    if (imIn->type == IMAGING_TYPE_FLOAT32
-            ? resample_horizontal_f32(imOut, imIn, offset, ksize, bounds, kk)
-            : imIn->type == IMAGING_TYPE_INT32 &&
-                  resample_horizontal_i32(imOut, imIn, offset, ksize, bounds, kk)) {
-        MUTEX_UNLOCK(&imIn->mutex);
-        ImagingSectionLeave(&cookie);
-        return;
+    /* The SIMD kernel of the active tier, unless it has none or runs out of
+       memory */
+    {
+        ImagingResampleWideHFn wide =
+            imIn->type == IMAGING_TYPE_FLOAT32 ? ImagingSIMD->resample->horizontal_f32
+            : imIn->type == IMAGING_TYPE_INT32 ? ImagingSIMD->resample->horizontal_i32
+                                               : NULL;
+        if (wide && wide(imOut, imIn, offset, ksize, bounds, kk)) {
+            MUTEX_UNLOCK(&imIn->mutex);
+            ImagingSectionLeave(&cookie);
+            return;
+        }
     }
-#endif
 
     switch (imIn->type) {
         case IMAGING_TYPE_INT32:
@@ -826,16 +873,19 @@ _ImagingResampleVertical_32bpc(
     assert(imIn->image32 != imOut->image32);
 
     ImagingSectionEnter(&cookie);
-#if defined(RESAMPLE_WIDE)
-    if (imIn->type == IMAGING_TYPE_FLOAT32 || imIn->type == IMAGING_TYPE_INT32) {
-        (imIn->type == IMAGING_TYPE_FLOAT32
-             ? resample_vertical_f32
-             : resample_vertical_i32)(imOut, imIn, ksize, bounds, kk);
-        MUTEX_UNLOCK(&imIn->mutex);
-        ImagingSectionLeave(&cookie);
-        return;
+    /* The SIMD kernel of the active tier, if it has one */
+    {
+        ImagingResampleWideVFn wide =
+            imIn->type == IMAGING_TYPE_FLOAT32 ? ImagingSIMD->resample->vertical_f32
+            : imIn->type == IMAGING_TYPE_INT32 ? ImagingSIMD->resample->vertical_i32
+                                               : NULL;
+        if (wide) {
+            wide(imOut, imIn, ksize, bounds, kk);
+            MUTEX_UNLOCK(&imIn->mutex);
+            ImagingSectionLeave(&cookie);
+            return;
+        }
     }
-#endif
 
     switch (imIn->type) {
         case IMAGING_TYPE_INT32:
