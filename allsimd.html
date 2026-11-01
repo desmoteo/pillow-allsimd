@@ -12,7 +12,7 @@
 <link rel="author" title="About these documents" href="about.html"><link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="How the kernels work" href="allsimd-kernels.html"><link rel="prev" title="Pillow-AllSIMD" href="index.html">
 
     <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
-        <title>About Pillow-AllSIMD - Pillow-AllSIMD 13.0.0.post3 documentation</title>
+        <title>About Pillow-AllSIMD - Pillow-AllSIMD 13.0.0.post4 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
@@ -174,7 +174,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post3 documentation</div></a>
+      <a href="index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post4 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -195,7 +195,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post3 documentation</span>
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post4 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -420,7 +420,7 @@ Pillow-SIMD are offered to it.</p></li>
 <section id="state">
 <h2>State<a class="headerlink" href="#state" title="Link to this heading">¶</a></h2>
 <ul class="simple">
-<li><p>Version 13.0.0.post3, on Pillow 13.0.0 (the <code class="docutils literal notranslate"><span class="pre">simd/pillow-13</span></code> branch).</p></li>
+<li><p>Version 13.0.0.post4, on Pillow 13.0.0 (the <code class="docutils literal notranslate"><span class="pre">simd/pillow-13</span></code> branch).</p></li>
 <li><p>Beta. On PyPI as wheels for Linux on x86-64 and arm64 (macOS to follow,
 when GitHub’s macOS runners build them), and as a source package,
 compiled on installation, everywhere else (below).</p></li>
@@ -465,7 +465,9 @@ branch installs with <code class="docutils literal notranslate"><span class="pre
 32-bit x86, portable C elsewhere.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">dispatch</span></code>: SSE4.1, AVX2 and AVX-VNNI kernels in one build, the set
 the CPU supports chosen when Pillow loads (x86-64 only; with MSVC,
-SSE4.1 and AVX2). The <code class="docutils literal notranslate"><span class="pre">PILLOW_ALLSIMD_ISA</span></code> environment variable
+and with a compiler or an assembler too old for AVX-VNNI, which needs
+GCC 11 or clang 12 and binutils 2.36, SSE4.1 and AVX2: RHEL 9 and its
+relatives have binutils 2.35). The <code class="docutils literal notranslate"><span class="pre">PILLOW_ALLSIMD_ISA</span></code> environment variable
 (<code class="docutils literal notranslate"><span class="pre">scalar</span></code>, <code class="docutils literal notranslate"><span class="pre">sse4</span></code>, <code class="docutils literal notranslate"><span class="pre">avx2</span></code>, <code class="docutils literal notranslate"><span class="pre">avxvnni</span></code>) caps the choice, to compare
 the tiers on one machine.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">sse4</span></code>: SSE4.1 only, in every file (x86 only). This and <code class="docutils literal notranslate"><span class="pre">avx2</span></code>,
@@ -598,7 +600,7 @@ kernels, the builds or fast mode go to
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=7285986f"></script>
+</div><script src="_static/documentation_options.js?v=b90c08a2"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>
