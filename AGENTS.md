@@ -93,3 +93,15 @@ Use fully qualified exception names: `Image.DecompressionBombError` and
 
 Do not embed specific numeric values for thresholds like `MAX_IMAGE_PIXELS` —
 they may be changed by the user at runtime. Reference the named constant instead.
+
+## Performance work (Pillow-AllSIMD)
+
+Follow `design/OPTIMIZATION_METHOD.md`, in its order: find where the time
+goes (timings, callgrind), read the hardware counters to learn whether the
+loop is memory-bound or core-bound, help the compiler (remarks, index
+arithmetic, `-O2` and `-O3`), and only then write SIMD, in the area's
+companion file through the kernel table (`design/SIMD_DISPATCH_PLAN.md`).
+A memory-bound loop does not get faster with wider vectors. Measure on
+`-O3` builds, pinned, old and new builds interleaved in one run, with the
+output hashes in the same run; the kernels page's tables come from the
+benchmark repository's data (`make tables`), never from hand-typed figures.
