@@ -3,8 +3,8 @@ Changelog (Pillow-AllSIMD)
 
 Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
-Unreleased
-----------
+13.0.0.post4 (2026-11-06)
+-------------------------
 
 Based on Pillow 13.0.0
 

@@ -30,7 +30,7 @@ For Pillow itself, please refer to its
 
 ## State
 
-- Version 13.0.0.post3, on Pillow 13.0.0 (the `simd/pillow-13` branch).
+- Version 13.0.0.post4, on Pillow 13.0.0 (the `simd/pillow-13` branch).
 - Beta. On PyPI as wheels for Linux on x86-64 and arm64 (macOS to follow,
   when GitHub's macOS runners build them), and as a source package,
   compiled on installation, everywhere else (below).

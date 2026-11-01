@@ -28,7 +28,7 @@ SIMD kernels for x86-64 (SSE4, AVX2, AVX-VNNI) and arm64 (NEON). It is a fork
 of `Pillow-SIMD <https://github.com/uploadcare/pillow-simd>`_, which brought
 SIMD to Pillow on x86.
 
-.. image:: https://raw.githubusercontent.com/desmoteo/pillow-allsimd/allsimd-13.0.0.post2/docs/resources/allsimd-speedups.svg
+.. image:: https://raw.githubusercontent.com/desmoteo/pillow-allsimd/allsimd-13.0.0.post4-linux/docs/resources/allsimd-speedups.svg
    :alt: Bar chart: how many times faster than Pillow 13.0.0 Pillow-AllSIMD
          runs ten operations, and the geometric mean of all, on x86-64 with
          AVX2 and on arm64 with NEON; the numbers are in the table below.

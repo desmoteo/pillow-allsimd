@@ -413,3 +413,13 @@ was not the four-row structure that cost.
   count that moved on purpose after the gate was built is the box blur
   at radius 2 in the scalar tier, 25.7 to 19.0 million instructions (the
   far weight's product, skipped).
+
+## Released as 13.0.0.post4 (2026-11-06)
+
+With the round, three fixes that CI found after the push: the octree's
+reference digests are glibc's (the order of `qsort` among equal counts),
+GCC on 64-bit Windows needs unaligned vector moves for 256-bit code
+(the Cygwin job had crashed since the dispatch build), and the AVX-VNNI
+tier is left out where the assembler cannot make it (RHEL 9: the
+default source build of 13.0.0.post3 failed there). The PyPI page's
+chart is the one of this tag.
