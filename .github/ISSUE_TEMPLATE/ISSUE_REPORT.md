@@ -1,39 +1,28 @@
 ---
 name: Issue report
-about: Create a report to help us improve Pillow
+about: Report a problem with Pillow-AllSIMD
 ---
 
 <!--
 Thank you for reporting an issue.
 
-Follow these guidelines to ensure your issue is handled properly.
+Pillow-AllSIMD is Pillow with SIMD kernels (SSE4, AVX2, NEON) and a fast
+mode. Problems that Pillow itself has belong to Pillow:
 
-If you have a ...
+    https://github.com/python-pillow/Pillow/issues
 
-1.  General question: consider asking the question on Stack Overflow
-    with the python-imaging-library tag:
+Three quick checks tell them apart:
 
-    * https://stackoverflow.com/questions/tagged/python-imaging-library
+* Does it happen in exact mode? Run with PILLOW_ALLSIMD_FAST=0 in the
+  environment, or call Image.set_fast(False) first.
+* Does it happen with a portable build (-C simd=disable)?
+* Does it happen with Pillow (python3 -m pip install pillow)?
 
-    Do not ask a question in both places.
+If it happens with Pillow too, please report it to Pillow.
 
-    If you think you have found a bug or have an unexplained exception
-    then file a bug report here.
-
-2.  Bug report: include a self-contained, copy-pastable example that
-    generates the issue if possible. Be concise with code posted.
-    Guidelines on how to provide a good bug report:
-
-    * https://stackoverflow.com/help/mcve
-
-    Bug reports which follow these guidelines are easier to diagnose,
-    and are often handled much more quickly.
-
-3.  Feature request: do a quick search of existing issues
-    to make sure this has not been asked before.
-
-We know asking good questions takes effort, and we appreciate your time.
-Thank you.
+Include a self-contained, copy-pastable example, and an image if the
+problem depends on one (upload it here, not to another site; zip it if
+needed).
 -->
 
 ### What did you do?
@@ -42,32 +31,28 @@ Thank you.
 
 ### What actually happened?
 
-### What are your OS, Python and Pillow versions?
+### Fast mode and exact mode
 
-* OS: 
-* Python: 
-* Pillow: 
+<!-- Does it also happen with PILLOW_ALLSIMD_FAST=0? -->
+
+### How did you install Pillow-AllSIMD?
+
+<!--
+The pip command, including any -C simd=... option or CC variable, and the
+commit or branch.
+-->
+
+### What are your CPU, OS and Python?
+
+* CPU (e.g. Intel Core i7-12700, Apple M2, Cortex-A78AE):
+* OS:
+* Python:
 
 ```text
 Please paste here the output of running:
 
-python3 -m PIL.report
-or
 python3 -m PIL --report
-
-Or the output of the following Python code:
-
-from PIL import report
-# or
-from PIL import features
-features.pilinfo(supported_formats=False)
 ```
-
-<!--
-Please include **code** that reproduces the issue and whenever possible, an **image** that demonstrates the issue. Please upload images to GitHub, not to third-party file hosting sites. If necessary, add the image to a zip or tar archive.
-
-The best reproductions are self-contained scripts with minimal dependencies. If you are using a framework such as Plone, Django, or Buildout, try to replicate the issue just using Pillow.
--->
 
 ```python
 code goes here
