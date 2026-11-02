@@ -599,4 +599,3 @@ to 3.08x. Fast mode behind OpenCV: 23 cases on x86, 30 on arm64.
   premultiply (here the premultiply and the table unpremultiply cost about
   a quarter of the time), and its bilinear kernel uses 11-bit weights on
   8-bit values.
-
