@@ -139,6 +139,17 @@ Performance (details in [PERFORMANCE_GAPS.md](PERFORMANCE_GAPS.md)):
 - [ ] Gaussian blur at small radii: OpenCV's direct convolution gives
       different output, so only a fast-mode version could match it.
 
+Python overhead (details in
+[PYTHON_TO_C_ASSESSMENT.md](PYTHON_TO_C_ASSESSMENT.md); no wholesale
+conversion to C):
+
+- [ ] Python fixes, also for Pillow: TIFF directories parsed three times
+      per page, `point()` rounding integer tables, `open()` probing order.
+- [ ] C: WebP stills opened without the animation decoder; `ImageStat` in
+      one C call; a `text()` fast path.
+- [ ] Kernels: `histogram()` (1.3 ms on 1080p RGB) and general-table
+      `point()` (1.1 ms).
+
 Correctness and upstream:
 
 - [ ] Resizing I;16B and I;16N images on little-endian machines reads the
