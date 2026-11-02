@@ -24,13 +24,15 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 
 ### Step 1: the source package
 
-- [ ] Run the test workflows on the current code: they last ran at
+- [x] (2026-11-02, at `da7a94ac6`: all pass except the font test below) Run the test workflows on the current code: they last ran at
       `1881401a5`, because every push since ended with a `[ci skip]`
       commit (`gh workflow run test.yml -R desmoteo/pillow-allsimd --ref
       simd/pillow-13`, and the same for `test-windows.yml`).
-- [ ] Fix or mark `Tests/test_imagefont.py::test_glyph_cache_variation[0]`.
-      It fails on Windows, on macOS with Python 3.15 and on Intel macOS
-      (at `1881401a5`); not SIMD code.
+- [x] `Tests/test_imagefont.py::test_glyph_cache_variation[0]` failed on
+      Windows and Intel macOS: FreeType 2.14 renders a named instance set
+      after axes and a render differently from one set on a new face
+      (stock Pillow 12.3 too). The test's fresh font now does the same
+      steps (2026-11-02).
 - [ ] Build and check the source package locally: `make sdist`,
       check-manifest, `twine check`, then install it in a clean venv with
       `-C simd=avx2`, with `CC="cc -mavx2"` and with the default.
@@ -89,7 +91,7 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 
 ## Issues and reports on the fork
 
-- [ ] Turn on issues: `gh repo edit desmoteo/pillow-allsimd
+- [x] Turn on issues (done 2026-11-02): `gh repo edit desmoteo/pillow-allsimd
       --enable-issues`. They are off, so problems can only be reported on
       uploadcare's tracker.
 - [ ] Issue template and contributing guide (`.github/ISSUE_TEMPLATE/`,
@@ -104,7 +106,7 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 
 ## Outreach
 
-- [ ] Reply on the ARM issues of uploadcare/pillow-simd: one comment on #43
+- [x] (2026-11-02: per-issue replies posted on #80, #116, #118, #123, #143; #43 not posted) Reply on the ARM issues of uploadcare/pillow-simd: one comment on #43
       mentioning everyone (recommended), or a reply in each of #80, #116,
       #118, #123 and #143. Drafts in `.pr-drafts/arm-issue-replies.md`
       (local, git-ignored). Before posting: the CI run above (the drafts
