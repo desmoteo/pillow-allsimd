@@ -25,6 +25,8 @@ on:
       - "winbuild/fribidi.cmake"
     tags:
       - "*"
+      # Pillow-AllSIMD's releases: release.yml
+      - "!allsimd-*"
   pull_request:
     paths: *paths
   workflow_dispatch:
