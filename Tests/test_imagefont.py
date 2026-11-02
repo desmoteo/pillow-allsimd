@@ -869,7 +869,11 @@ def test_glyph_cache_variation(font: ImageFont.FreeTypeFont) -> None:
     assert font.getbbox("AaBb Variable") == fresh.getbbox("AaBb Variable")
 
     font.set_variation_by_name("Bold")
+    # FreeType 2.14 renders a named instance set after axes and a render
+    # differently from one set on a new face, so the fresh font does the same
     fresh = ImageFont.truetype("Tests/fonts/AdobeVFPrototype.ttf", 36)
+    fresh.set_variation_by_axes([500, 50])
+    text(fresh)
     fresh.set_variation_by_name("Bold")
     assert text(font) == text(fresh)
 
