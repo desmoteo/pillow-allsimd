@@ -38,3 +38,4 @@ prune wheels
 prune winbuild/build
 prune winbuild/depends
 prune Tests
+prune docs/_build
