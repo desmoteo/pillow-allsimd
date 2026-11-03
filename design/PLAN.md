@@ -109,7 +109,7 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 
 ## Outreach
 
-- [x] (2026-11-02: per-issue replies posted on #80, #116, #118, #123, #143; #43 not posted) Reply on the ARM issues of uploadcare/pillow-simd: one comment on #43
+- [x] (2026-11-02: per-issue replies posted on #80, #116, #118, #123, #143; 2026-11-03: #43, mentioning bact, qhaas and AWSjswinney) Reply on the ARM issues of uploadcare/pillow-simd: one comment on #43
       mentioning everyone (recommended), or a reply in each of #80, #116,
       #118, #123 and #143. Drafts in `.pr-drafts/arm-issue-replies.md`
       (local, git-ignored). Before posting: the CI run above (the drafts
