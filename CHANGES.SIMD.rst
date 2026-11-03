@@ -3,6 +3,17 @@ Changelog (Pillow-AllSIMD)
 
 Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
+13.0.0.post1 (2026-11-03)
+-------------------------
+
+Based on Pillow 13.0.0; the code is that of 13.0.0.post0
+
+- The PyPI description shows the benchmarks: a chart of speed-ups over
+  Pillow 13.0.0 (``docs/resources/allsimd-speedups.svg``, drawn by
+  ``checks/simd_speedups_svg.py`` from the benchmark results) and a table of
+  selected operations on x86-64 and arm64. It also lists the ``simd`` build
+  options and how to choose exact mode
+
 13.0.0.post0 (2026-11-03)
 -------------------------
 

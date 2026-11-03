@@ -30,7 +30,7 @@ For Pillow itself, please refer to its
 
 ## State
 
-- Version 13.0.0.post0, on Pillow 13.0.0 (the `simd/pillow-13` branch).
+- Version 13.0.0.post1, on Pillow 13.0.0 (the `simd/pillow-13` branch).
 - Beta. On PyPI as a source package, compiled on installation (below).
 - Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson
   Orin): Pillow's test suite on every build (scalar, SSE4, AVX2, NEON),

@@ -15,7 +15,7 @@ authors:
 repository-code: https://github.com/desmoteo/pillow-allsimd
 url: https://desmoteo.github.io/pillow-allsimd/
 license: MIT-CMU
-version: 13.0.0.post0
+version: 13.0.0.post1
 keywords:
   - imaging
   - image processing
