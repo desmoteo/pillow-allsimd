@@ -43,6 +43,8 @@ def test_wheel_features() -> None:
         "libjpeg_turbo",
         "zlib_ng",
         "xcb",
+        # Pillow-AllSIMD's fast mode, in every build
+        "fast",
     }
 
     if sys.platform == "win32":

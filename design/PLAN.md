@@ -88,9 +88,23 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 
 ### Step 2: arm64 wheels
 
-- [ ] Wheel matrix: manylinux and musllinux aarch64, macOS arm64. Update
-      `EXPECTED_DISTS`.
+- [x] (2026-11-03, in `release.yml`, not run in CI yet) Wheel matrix:
+      manylinux and musllinux aarch64, macOS arm64, with cibuildwheel and
+      Pillow's `[tool.cibuildwheel]` settings: 7 CPython wheels each (3.11
+      to 3.15, 3.14t, 3.15t), so `EXPECTED_DISTS` is 22 with the source
+      package. A step fails a job unless every wheel's build log says
+      `--- SIMD kernels: NEON`. No SBOM yet: Pillow's
+      `.github/generate-sbom.py` describes Pillow (its name, purl and
+      URLs).
 - [ ] The tests that run in the wheel builds pass on those platforms.
+      Checked on the Orin (2026-11-03) with a cp312 manylinux_2_28 wheel
+      built as cibuildwheel does (the image it pins, Pillow's
+      `wheels-dependencies.sh`, `python -m build`, auditwheel): NEON, -O3;
+      the self-test, `checks/check_wheel.py` and the full suite pass (8,022
+      passed, 124 skipped), once `check_wheel.py` expects the `fast`
+      feature. Its times equal a source build of the same code within 1%
+      on 13 operations (PNG encoding 3% slower). Next: a manual run of
+      `release.yml` (TestPyPI) for all three platforms.
 - [ ] Install instructions: arm64 gets a wheel, x86 builds from source.
 - [ ] The ongoing duty: wheels bundle libjpeg, libwebp, libtiff, FreeType
       and others. When one of them has a security fix, rebuild and
