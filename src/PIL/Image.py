@@ -889,7 +889,7 @@ class Image:
             from . import ImageFile
 
             bufsize = max(ImageFile.MAXBLOCK, self.size[0] * 4)  # see RawEncode.c
-            if encoder_name == "raw" and encoder_args == self.mode != "1":
+            if encoder_name == "raw" and encoder_args == self.mode and self.mode != "1":
                 # Room for all the rows, so that there is one chunk and
                 # nothing to join
                 modedesc = ImageMode.getmode(self.mode)
@@ -2443,6 +2443,10 @@ class Image:
         if self.mode in ("1", "P"):
             resample = Resampling.NEAREST
 
+        # Pillow-AllSIMD: the fast mode setting, read once for this call and
+        # passed to the C resize, so a change from another thread meanwhile
+        # can't mix the exact and fast kernels
+        fast = get_fast()
         if (
             reducing_gap is None
             and resample
@@ -2455,7 +2459,7 @@ class Image:
             and self.mode not in ("I", "F")
             and not self.mode.startswith("I;16")
             and (box is None or len(box) == 4)
-            and get_fast()
+            and fast
         ):
             # Pillow-AllSIMD fast mode: downscales of 6x and more of 8-bit
             # images first shrink by an integer factor with reduce(); the
@@ -2475,7 +2479,7 @@ class Image:
             # Pillow-AllSIMD: the same pixels, premultiplied by alpha inside
             # the resize passes rather than by two whole-image conversions
             self.load()
-            return self._new(self.im.resize(size, resample, box, 1))
+            return self._new(self.im.resize(size, resample, box, 1, fast))
 
         self.load()
 
@@ -2497,7 +2501,7 @@ class Image:
                     (box[3] - reduce_box[1]) / factor_y,
                 )
 
-        return self._new(self.im.resize(size, resample, box))
+        return self._new(self.im.resize(size, resample, box, 0, fast))
 
     def reduce(
         self,
@@ -4126,10 +4130,11 @@ def set_fast(enabled: bool = True) -> None:
     which follow Pillow's arithmetic. On by default; the
     ``PILLOW_ALLSIMD_FAST`` environment variable (or ``PILLOW_SIMD_FAST``,
     its former name) sets it when :py:mod:`PIL.Image` is imported, so
-    ``PILLOW_ALLSIMD_FAST=0`` gives the exact kernels. The setting is
-    process-wide, and
-    each operation reads it once when it starts. The operations with a fast
-    kernel, and how far their results may differ, are listed in
+    ``PILLOW_ALLSIMD_FAST=0`` gives the exact kernels. The setting is the
+    process-wide default: it applies to every thread, except inside a
+    :py:class:`fast_mode` block, which sets its own thread's mode. Each
+    operation reads the setting once when it starts. The operations with a
+    fast kernel, and how far their results may differ, are listed in
     :ref:`fast-mode`.
 
     Check for the feature with ``features.check_feature("fast")``.
@@ -4141,36 +4146,38 @@ def set_fast(enabled: bool = True) -> None:
 
 def get_fast() -> bool:
     """
-    Whether operations may use the fast kernels; see :py:func:`set_fast`.
+    Whether operations in the current thread may use the fast kernels: the
+    setting of the innermost :py:class:`fast_mode` block the thread is in,
+    or else the process-wide one of :py:func:`set_fast`.
     """
     return core.get_fast()
 
 
 class fast_mode:
     """
-    Context manager that calls :py:func:`set_fast` on entry and restores the
-    previous setting on exit, for example to use the exact kernels in one
-    place::
+    Context manager that sets fast mode for the current thread on entry and
+    restores the thread's previous setting on exit, for example to use the
+    exact kernels in one place::
 
         with Image.fast_mode(False):
             im = im.filter(ImageFilter.GaussianBlur(2))
 
-    The setting is process-wide: it applies to every thread while the block
-    runs.
+    The block applies to the thread it runs in: other threads keep their
+    own blocks or the process-wide setting of :py:func:`set_fast`, and
+    blocks nest. Threads started inside a block don't inherit it.
 
     :param enabled: The setting inside the block.
     """
 
     def __init__(self, enabled: bool = True) -> None:
         self._enabled = enabled
-        self._previous = False
+        self._previous = -1
 
     def __enter__(self) -> None:
-        self._previous = get_fast()
-        set_fast(self._enabled)
+        self._previous = core.set_fast_thread(1 if self._enabled else 0)
 
     def __exit__(self, *args: object) -> None:
-        set_fast(self._previous)
+        core.set_fast_thread(self._previous)
 
 
 _apply_env_variables()

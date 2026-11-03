@@ -118,12 +118,35 @@ EXACT_KERNEL_TESTS = {
 }
 
 
+def _exact_kernel_pins(item: pytest.Item) -> set[str]:
+    """The entries of EXACT_KERNEL_TESTS that name a test: its file and
+    function, or its file and class."""
+    names = [item.path.name, *item.nodeid.split("[")[0].split("::")[1:]]
+    return {
+        "::".join(names[:i])
+        for i in range(2, len(names) + 1)
+        if "::".join(names[:i]) in EXACT_KERNEL_TESTS
+    }
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    # A pin that names no test of a collected file is stale (the test was
+    # renamed upstream): it would run with the fast kernels unnoticed
+    pinned = set().union(*(_exact_kernel_pins(item) for item in items))
+    collected_files = {item.path.name for item in items}
+    stale = sorted(
+        pin
+        for pin in EXACT_KERNEL_TESTS - pinned
+        if pin.split("::")[0] in collected_files
+    )
+    if stale:
+        msg = f"EXACT_KERNEL_TESTS names no collected test: {', '.join(stale)}"
+        raise pytest.UsageError(msg)
+
+
 @pytest.fixture(autouse=True)
 def exact_kernels_for_pillow_values(request: pytest.FixtureRequest) -> Generator[None]:
-    names = [request.node.path.name, *request.node.nodeid.split("[")[0].split("::")[1:]]
-    if not any(
-        "::".join(names[:i]) in EXACT_KERNEL_TESTS for i in range(2, len(names) + 1)
-    ):
+    if not _exact_kernel_pins(request.node):
         yield
         return
     with Image.fast_mode(False):
