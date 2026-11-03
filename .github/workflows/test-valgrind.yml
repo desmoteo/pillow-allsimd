@@ -6,6 +6,8 @@ on:
   push:
     branches:
       - "**"
+      # simd/master mirrors simd/pillow-13 (the same commits): one run per push
+      - "!simd/master"
     paths: &paths
       - ".github/workflows/test-valgrind.yml"
       - "**.c"

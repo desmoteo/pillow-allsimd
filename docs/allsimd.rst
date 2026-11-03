@@ -30,8 +30,9 @@ State
 -----
 
 * Version |release|, on Pillow 13.0.0 (the ``simd/pillow-13`` branch).
-* Beta. On PyPI as wheels for arm64 Linux and macOS, and as a source
-  package, compiled on installation, everywhere else (below).
+* Beta. On PyPI as wheels for arm64 Linux (macOS to follow, when GitHub's
+  macOS runners build them), and as a source package, compiled on
+  installation, everywhere else (below).
 * Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson Orin):
   Pillow's test suite on every build, the SIMD consistency tests, and output
   hashes per kernel that compare the builds (``checks/simd_hashes.py``). The
@@ -45,9 +46,11 @@ State
 Installing
 ----------
 
-On arm64 Linux (glibc 2.28 or later, or musl) and macOS 11 or later, pip
-installs a wheel with the NEON kernels and the image libraries bundled, as
-Pillow's wheels have them. Elsewhere, x86 included, Pillow-AllSIMD is a
+On arm64 Linux (glibc 2.28 or later, or musl), pip installs a wheel with
+the NEON kernels and the image libraries bundled, as Pillow's wheels have
+them (wheels for macOS 11 or later on Apple silicon follow; until then
+macOS builds from source, with the NEON kernels too). Elsewhere, x86
+included, Pillow-AllSIMD is a
 source package, which pip compiles on installation, so install the
 libraries that :doc:`building Pillow from source
 <installation/building-from-source>` needs first. It installs the ``PIL``

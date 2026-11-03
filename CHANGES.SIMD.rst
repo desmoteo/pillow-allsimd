@@ -8,12 +8,22 @@ Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
 Based on Pillow 13.0.0; the code is that of 13.0.0.post0
 
-- Wheels for arm64: Linux aarch64 (manylinux_2_28 and musllinux_1_2) and
-  macOS 11 or later, for CPython 3.11 to 3.15 and the free-threaded 3.14t
-  and 3.15t. They have the NEON kernels and bundle the image libraries as
-  Pillow's wheels do, and each is tested with Pillow's wheel tests on its
-  platform. x86 and the other architectures install the source package, as
-  before (``-C simd=avx2`` on x86)
+- Wheels for arm64 Linux (manylinux_2_28 and musllinux_1_2 aarch64), for
+  CPython 3.11 to 3.15 and the free-threaded 3.14t and 3.15t. They have the
+  NEON kernels and bundle the image libraries as Pillow's wheels do, each
+  carries a CycloneDX SBOM of them (PEP 770; ``.github/allsimd_sbom.py``,
+  Pillow's SBOM renamed for this package), and each is tested with Pillow's
+  wheel tests on its platform. Wheels for macOS 11 or later on Apple
+  silicon are built the same way and join this release when GitHub's macOS
+  arm64 runners are available (they weren't on the release day). x86 and
+  the other architectures install the source package, as before (``-C
+  simd=avx2`` on x86)
+- The release workflow builds the platforms its tag names
+  (``allsimd-<version>``, ``-linux`` or ``-macos``), so one platform's
+  runners can't block the others; the test workflows run once per push
+  (``simd/master`` mirrors ``simd/pillow-13``)
+- ``design/REVIEW_2026-11.md``: a review of the fork's code, documentation
+  and process, with the next work
 
 13.0.0.post1 (2026-11-03)
 -------------------------
