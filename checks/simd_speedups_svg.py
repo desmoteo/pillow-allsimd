@@ -127,7 +127,7 @@ def draw(speedups: list[dict[str, float]]) -> str:
         ),
     ]
     # legend
-    x = 24
+    x: float = 24
     for i, (_, _, name) in enumerate(MACHINES):
         parts.append(
             f'<rect class="s{i + 1}" x="{x}" y="72" width="12" height="12" rx="3"/>'
