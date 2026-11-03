@@ -9,7 +9,7 @@ SIMD kernels for x86-64 (SSE4, AVX2, AVX-VNNI) and arm64 (NEON). It is a fork
 of `Pillow-SIMD <https://github.com/uploadcare/pillow-simd>`_, which brought
 SIMD to Pillow on x86.
 
-.. image:: https://raw.githubusercontent.com/desmoteo/pillow-allsimd/allsimd-13.0.0.post1/docs/resources/allsimd-speedups.svg
+.. image:: https://raw.githubusercontent.com/desmoteo/pillow-allsimd/allsimd-13.0.0.post2/docs/resources/allsimd-speedups.svg
    :alt: Bar chart: Pillow-AllSIMD is 6.1 times as fast as Pillow 13.0.0 on
          x86-64 with AVX2 and 3.1 times on arm64 with NEON, as the geometric
          mean of 111 operations; resizes 3.6 to 15.8 times, Gaussian blur at
@@ -28,8 +28,8 @@ SIMD to Pillow on x86.
   build and CPU. Exact mode follows Pillow's arithmetic and is still 5.4
   times as fast on x86-64 and 2.5 times on arm64.
 - **arm64 too**: NEON kernels for resizes, blurs, filters, conversions,
-  transforms and more, tested on an NVIDIA Jetson Orin. Other CPUs build
-  portable C that compilers vectorize.
+  transforms and more, tested on an NVIDIA Jetson Orin, in wheels for Linux
+  and macOS. Other CPUs build portable C that compilers vectorize.
 
 Benchmarks
 ----------
@@ -71,17 +71,22 @@ differs.
 Installing
 ----------
 
-Pillow-AllSIMD is a source package, so pip compiles it on installation. Install
-the libraries that `building Pillow from source
+On arm64 Linux (glibc 2.28 or later, or musl) and macOS 11 or later, pip
+installs a wheel with the NEON kernels and the image libraries bundled, as
+Pillow's wheels have them. Elsewhere, x86 included, Pillow-AllSIMD is a
+source package, so pip compiles it on installation: install the libraries
+that `building Pillow from source
 <https://desmoteo.github.io/pillow-allsimd/installation/building-from-source.html>`_
 needs first. It installs the ``PIL`` package, as Pillow does. Install your
 other packages first, then replace Pillow with it::
 
     python3 -m pip uninstall -y pillow pillow-simd
-    python3 -m pip install -C simd=avx2 pillow-allsimd
+    python3 -m pip install pillow-allsimd               # arm64: a wheel
+    python3 -m pip install -C simd=avx2 pillow-allsimd  # x86: built with AVX2
 
-On arm64, leave out ``-C simd=avx2``: the default is NEON there. Uninstall
-Pillow before installing, not after: both own the files in ``PIL``. To rebuild
+Uninstall Pillow before installing, not after: both own the files in
+``PIL``. The ``-C simd=`` options below apply to source builds only; to build
+from source on arm64 anyway, add ``--no-binary pillow-allsimd``. To rebuild
 with another ``simd`` option, add ``--no-cache-dir --force-reinstall``.
 Otherwise pip reuses the wheel it built the first time. With ``-v``, pip shows
 the line ``--- SIMD kernels: ...`` from the build, which names the kernels you
@@ -134,11 +139,12 @@ differ.
 Testing
 -------
 
-Pillow's test suite runs on every build. Consistency tests check each SIMD
-kernel against the scalar code, and per-kernel output hashes compare the
-builds with each other. The hardware tests run on x86-64 (SSE4, AVX2,
-AVX-VNNI) and on arm64 (NEON). The portable build also passes the suite on
-riscv64, ppc64le, s390x, armv7 and 32-bit x86, under QEMU. Status: beta.
+Pillow's test suite runs on every build, and in every wheel on its own
+platform. Consistency tests check each SIMD kernel against the scalar code,
+and per-kernel output hashes compare the builds with each other. The
+hardware tests run on x86-64 (SSE4, AVX2, AVX-VNNI) and on arm64 (NEON). The
+portable build also passes the suite on riscv64, ppc64le, s390x, armv7 and
+32-bit x86, under QEMU. Status: beta.
 
 Links
 -----

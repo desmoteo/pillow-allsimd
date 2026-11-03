@@ -88,7 +88,7 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 
 ### Step 2: arm64 wheels
 
-- [x] (2026-11-03, in `release.yml`, not run in CI yet) Wheel matrix:
+- [x] (2026-11-03, in `release.yml`) Wheel matrix:
       manylinux and musllinux aarch64, macOS arm64, with cibuildwheel and
       Pillow's `[tool.cibuildwheel]` settings: 7 CPython wheels each (3.11
       to 3.15, 3.14t, 3.15t), so `EXPECTED_DISTS` is 22 with the source
@@ -96,16 +96,28 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       `--- SIMD kernels: NEON`. No SBOM yet: Pillow's
       `.github/generate-sbom.py` describes Pillow (its name, purl and
       URLs).
-- [ ] The tests that run in the wheel builds pass on those platforms.
-      Checked on the Orin (2026-11-03) with a cp312 manylinux_2_28 wheel
+- [x] (2026-11-03: run 41648749332, by hand, uploaded the 22 files of
+      13.0.0.post1 to TestPyPI) The tests that run in the wheel builds pass
+      on those platforms: all 21 wheels built with NEON, and the full suite
+      passes in each (8,119 to 8,141 tests). From TestPyPI, pip on the Orin
+      installs the wheel without compiling (NEON, libjpeg-turbo 3.2.0,
+      zlib-ng 2.3.3; the resize and blur times of a source build), and on
+      x86 finds no wheel. TestPyPI's simple index is cached for 10 minutes:
+      right after an upload, pip may not see the new files yet and take the
+      source package from pypi.org, the extra index. Before CI, checked on
+      the Orin with a cp312 manylinux_2_28 wheel
       built as cibuildwheel does (the image it pins, Pillow's
       `wheels-dependencies.sh`, `python -m build`, auditwheel): NEON, -O3;
       the self-test, `checks/check_wheel.py` and the full suite pass (8,022
       passed, 124 skipped), once `check_wheel.py` expects the `fast`
       feature. Its times equal a source build of the same code within 1%
-      on 13 operations (PNG encoding 3% slower). Next: a manual run of
-      `release.yml` (TestPyPI) for all three platforms.
-- [ ] Install instructions: arm64 gets a wheel, x86 builds from source.
+      on 13 operations (PNG encoding 3% slower).
+- [x] (2026-11-03) Install instructions (README, `PyPI.rst`,
+      `docs/allsimd.rst`): arm64 gets a wheel, x86 builds from source; `-C
+      simd=` applies to source builds, and `--no-binary pillow-allsimd`
+      builds from source on arm64.
+- [ ] 13.0.0.post2, the same code with the arm64 wheels: push the tag
+      `allsimd-13.0.0.post2`, then approve the upload.
 - [ ] The ongoing duty: wheels bundle libjpeg, libwebp, libtiff, FreeType
       and others. When one of them has a security fix, rebuild and
       release. In practice, release after merging each Pillow release,
