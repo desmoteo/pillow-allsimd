@@ -31,7 +31,7 @@ For Pillow itself, please refer to its
 ## State
 
 - Version 13.0.0.post0, on Pillow 13.0.0 (the `simd/pillow-13` branch).
-- Beta. Not on PyPI yet: install it from source (below).
+- Beta. On PyPI as a source package, compiled on installation (below).
 - Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson
   Orin): Pillow's test suite on every build (scalar, SSE4, AVX2, NEON),
   the SIMD consistency tests and per-kernel output hashes that compare the
@@ -241,18 +241,29 @@ So there is no easy way to compile such library, especially with setuptools.
 
 ## Installation
 
-Pillow-AllSIMD isn't on PyPI yet; it builds from source. It installs the
-`PIL` package, so remove Pillow (or Pillow-SIMD) first, and install the
-[build prerequisites][allsimd-build-deps] for your platform (those of
-Pillow). Then, with the instruction set chosen by the `simd` option:
+Pillow-AllSIMD is on PyPI as a source package: pip compiles it on
+installation, so install the [build prerequisites][allsimd-build-deps] for
+your platform first (those of Pillow). It installs the `PIL` package, like
+Pillow, so install your other packages first, then replace Pillow (or
+Pillow-SIMD) with it, choosing the instruction set with the `simd` option:
 
 ```bash
 python3 -m pip uninstall -y pillow pillow-simd
-python3 -m pip install -C simd=avx2 \
-    "pillow-allsimd @ git+https://github.com/desmoteo/pillow-allsimd@simd/pillow-13"
+python3 -m pip install -C simd=avx2 pillow-allsimd
 ```
 
 Without `-C simd=...` the build takes SSE4.1 on x86 and NEON on arm64.
+
+- Uninstall Pillow before installing, not after: both own the files in
+  `PIL`, so removing Pillow afterwards deletes Pillow-AllSIMD's files too.
+- A package that depends on `pillow` makes pip reinstall Pillow over it;
+  installing that package with `--no-deps`, or installing it first, avoids
+  that. `pip check` then reports Pillow as missing, which is expected.
+- To rebuild with another `simd` option, add `--no-cache-dir
+  --force-reinstall`: otherwise pip reuses the wheel it built the first time.
+- The development branch installs with
+  `"pillow-allsimd @ git+https://github.com/desmoteo/pillow-allsimd@simd/pillow-13"`
+  in place of `pillow-allsimd`.
 
 The `simd` option accepts:
 

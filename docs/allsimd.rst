@@ -44,14 +44,21 @@ State
 Installing
 ----------
 
-Pillow-AllSIMD builds from source. It installs the ``PIL`` package, so
-uninstall Pillow (or Pillow-SIMD) first, and install the libraries that
-:doc:`building Pillow from source <installation/building-from-source>` needs.
-Then choose the instruction set with the ``simd`` build option::
+Pillow-AllSIMD is on PyPI as a source package, which pip compiles on
+installation, so install the libraries that :doc:`building Pillow from source
+<installation/building-from-source>` needs first. It installs the ``PIL``
+package, like Pillow: install your other packages first, then uninstall
+Pillow (or Pillow-SIMD) and install Pillow-AllSIMD, choosing the
+instruction set with the ``simd`` build option::
 
     python3 -m pip uninstall -y pillow pillow-simd
-    python3 -m pip install -C simd=avx2 \
-        "pillow-allsimd @ git+https://github.com/desmoteo/pillow-allsimd@simd/pillow-13"
+    python3 -m pip install -C simd=avx2 pillow-allsimd
+
+Uninstall Pillow before, not after: both own the files in ``PIL``. To
+rebuild with another ``simd`` option, add ``--no-cache-dir
+--force-reinstall``, or pip reuses the wheel it built first. The development
+branch installs with ``"pillow-allsimd @
+git+https://github.com/desmoteo/pillow-allsimd@simd/pillow-13"``.
 
 The ``simd`` option takes:
 

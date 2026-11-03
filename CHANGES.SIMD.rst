@@ -3,10 +3,14 @@ Changelog (Pillow-AllSIMD)
 
 Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
-13.0.0.post0 (unreleased)
+13.0.0.post0 (2026-11-03)
 -------------------------
 
 Based on Pillow 13.0.0
+
+- First release on PyPI, as a source package (``pip install -C simd=avx2
+  pillow-allsimd``), uploaded by the release workflow with trusted
+  publishing
 
 - The project is Pillow-AllSIMD (``pillow-allsimd``), a fork of Pillow-SIMD:
   the distribution name, the documentation and the credits say so; the fast
