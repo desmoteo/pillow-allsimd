@@ -128,6 +128,8 @@ _LIB_IMAGING = (
     "RankFilter",
     "RawDecode",
     "RawEncode",
+    "SIMDDispatch",
+    "SIMDKernels",
     "Storage",
     "SgiRleDecode",
     "SunRleDecode",

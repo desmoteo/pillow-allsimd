@@ -35,6 +35,23 @@
 
 #endif /* IMAGING_SIMD_DISABLE */
 
+/* The kernel table this translation unit's tier defines (SIMDKernels.c)
+   and the table SIMDDispatch.c selects: one per build when the build is
+   compiled for one instruction set. Undefined for the scalar build. */
+#if defined(IMAGING_SIMD_AVXVNNI)
+#define IMAGING_SIMD_TABLE ImagingSIMDKernels_avxvnni
+#define IMAGING_SIMD_TIER_NAME "avxvnni"
+#elif defined(IMAGING_SIMD_AVX2)
+#define IMAGING_SIMD_TABLE ImagingSIMDKernels_avx2
+#define IMAGING_SIMD_TIER_NAME "avx2"
+#elif defined(IMAGING_SIMD_SSE4)
+#define IMAGING_SIMD_TABLE ImagingSIMDKernels_sse4
+#define IMAGING_SIMD_TIER_NAME "sse4"
+#elif defined(IMAGING_SIMD_NEON)
+#define IMAGING_SIMD_TABLE ImagingSIMDKernels_neon
+#define IMAGING_SIMD_TIER_NAME "neon"
+#endif
+
 /* Inlined at every call, for kernels that should see an argument as a
    constant where a call site passes one (a shift count): plain inline
    leaves a large body that is called twice out of line. */

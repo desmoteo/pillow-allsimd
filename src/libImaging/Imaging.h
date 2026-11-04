@@ -192,6 +192,9 @@ ImagingMemoryClearCache(ImagingMemoryArena arena, int new_size);
 extern void
 ImagingMemorySetBlockAllocator(ImagingMemoryArena arena, int use_block_allocator);
 
+/* The SIMD kernels of the tier chosen at run time (SIMDDispatch.c). */
+#include "SIMDKernels.h"
+
 /* Fast mode (Fast.c): operations may use kernels whose results differ from
    Pillow's by a documented amount. On by default. ImagingSetFast sets the
    process default; ImagingSetFastThread the calling thread's flags (-1 for
