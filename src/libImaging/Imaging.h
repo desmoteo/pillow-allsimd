@@ -369,6 +369,10 @@ extern Imaging
 ImagingFillLinearGradient(ModeID mode);
 extern Imaging
 ImagingFillRadialGradient(ModeID mode);
+/* The fixed-point precision of the integer kernel filters (Filter.c,
+   FilterSIMD.c): 5 bits are enough for the sum of 25 coefficients (1 << 5
+   > 25) and 8 for the result; a smaller coefficient delta has no effect. */
+#define IMAGING_FILTER_PRECISION_BITS (8 + 5)
 extern Imaging
 ImagingFilter(Imaging im, int xsize, int ysize, const FLOAT32 *kernel, FLOAT32 offset);
 extern Imaging

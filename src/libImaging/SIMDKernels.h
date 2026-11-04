@@ -17,9 +17,34 @@
  * per row or per operation, never per pixel.
  */
 
+/* Kernel filters (FilterSIMD.c): 3x3 and 5x5, for 1-byte and 4-byte
+   pixels, with integer coefficients at a precision (i*) or float ones
+   (f*). Each writes the whole output image. */
+typedef struct {
+    void (*i3x3_u8)(
+        Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset, int precision
+    );
+    void (*i5x5_u8)(
+        Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset, int precision
+    );
+    void (*i3x3_4u8)(
+        Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset, int precision
+    );
+    void (*i5x5_4u8)(
+        Imaging imOut, Imaging im, const INT16 *kernel, INT32 offset, int precision
+    );
+    void (*f3x3_u8)(Imaging imOut, Imaging im, const float *kernel, float offset);
+    void (*f5x5_u8)(Imaging imOut, Imaging im, const float *kernel, float offset);
+    void (*f3x3_4u8)(Imaging imOut, Imaging im, const float *kernel, float offset);
+    void (*f5x5_4u8)(Imaging imOut, Imaging im, const float *kernel, float offset);
+} ImagingSIMDFilterKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
+    /* One group per area, never NULL: the scalar table's groups have
+       every kernel NULL. */
+    const ImagingSIMDFilterKernels *filter;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */
@@ -30,7 +55,7 @@ extern const ImagingSIMDKernels *ImagingSIMD;
     (ImagingSIMD->kernel ? ImagingSIMD->kernel(__VA_ARGS__) : 0)
 
 /* Chooses the tier for this CPU. Returns 0, or -1 with a message in
-   *error when the build's instruction set isn't supported by the CPU. */
+ *error when the build's instruction set isn't supported by the CPU. */
 extern int
 ImagingSIMDInit(const char **error);
 

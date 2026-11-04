@@ -12,8 +12,11 @@
 
 #if defined(IMAGING_SIMD_TABLE)
 
+#include "FilterSIMD.c"
+
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
+    .filter = &filter_simd_kernels,
 };
 
 #endif

@@ -9,7 +9,12 @@
 
 #include "Imaging.h"
 
-const ImagingSIMDKernels ImagingSIMDKernels_scalar = {"scalar"};
+static const ImagingSIMDFilterKernels no_filter_kernels = {0};
+
+const ImagingSIMDKernels ImagingSIMDKernels_scalar = {
+    .name = "scalar",
+    .filter = &no_filter_kernels,
+};
 
 const ImagingSIMDKernels *ImagingSIMD = &ImagingSIMDKernels_scalar;
 

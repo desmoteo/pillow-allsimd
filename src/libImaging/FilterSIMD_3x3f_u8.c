@@ -1,4 +1,4 @@
-void
+static void
 ImagingFilter3x3f_u8(Imaging imOut, Imaging im, const float *kernel, float offset) {
 #define MM_KERNEL1x3_SUM1(ss, row, kernel)                       \
     ss = _mm_mul_ps(pix0##row, kernel0##kernel);                 \
