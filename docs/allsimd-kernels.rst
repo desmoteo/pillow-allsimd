@@ -21,8 +21,8 @@ exact mode, Pillow's arithmetic.
 
 The page is written section by section. Written so far: the ground rules,
 resampling, the blurs, the kernel filters, the rank filters, the colour
-conversions, compositing and the channel operations. To come: geometry,
-drawing and text, codecs and packing, what was tried and dropped, where OpenCV and
+conversions, compositing and the channel operations, and geometry. To
+come: drawing and text, codecs and packing, what was tried and dropped, where OpenCV and
 libvips are still faster, and the fast-mode kernels (meanwhile,
 ``design/SIMD_FAST_KERNELS.md`` in the repository describes those).
 
@@ -1754,3 +1754,248 @@ in double and lost to GCC's code with GCC 11, the second took a
 corrected reciprocal and lost to the table; the SSE4 blend and merge
 kernels measured no gain over GCC's; and ``pshufb`` table lookups on
 x86 lost to the scalar loop, where NEON's ``tbl`` won.
+
+Geometry
+--------
+
+``Image.transpose()`` (the flips, the 90° rotations, transpose and
+transverse), ``rotate()`` and ``transform()`` with the affine,
+perspective and quad methods (``Geometry.c``). The transposes move
+pixels; the transforms compute each output pixel from a filter over the
+source, in doubles.
+
+What Pillow computes
+~~~~~~~~~~~~~~~~~~~~
+
+The 90° transposes move one pixel at a time, in 8×8 tiles within
+512×512 chunks for the cache; the flips reverse rows, and flip top-bottom
+is a ``memcpy`` per row. A transform maps every output pixel's centre
+(``x + 0.5``, ``y + 0.5``) through the transform's equations in double
+(affine: two linear forms; perspective: two linear forms over a third;
+quad: bilinear in *x* and *y*), then samples the source there with a
+filter: nearest truncates the coordinate; bilinear interpolates the 2×2
+neighbours, with indices clamped at the edges and a missing second row
+repeating the first; bicubic interpolates the 4×4 neighbours with a
+cubic in each direction (``p1 + d (p2 + d (p3 + d p4))`` with the
+``p``\ s differences of the samples), rows missing at the edge repeating
+the one before. Each band goes through the filter separately, in double,
+and is truncated to a byte (the bicubic clamped first). ``rotate()`` is
+an affine transform; an affine transform with the nearest filter runs in
+16.16 fixed point. Everything is one pixel at a time through a function
+pointer for the transform and one for the filter.
+
+The idea
+~~~~~~~~
+
+* **Transposes in register blocks.** The 8×8 tiles of the old loop
+  wrote 32 bytes to each of their output rows, rows whose stride maps
+  them to a few cache sets, so the lines were evicted and fetched again
+  about three times before they were complete. Now a block of 8×8 bytes
+  or 4×4 32-bit pixels is transposed in registers (SSE unpacks, NEON
+  ``vtrn``), the mirrored variants of rotate 90 and 270 and transverse
+  choose the order of the rows read and written, and the blocks go in
+  columns of 64 bytes' worth of rows, so that each output row receives a
+  whole cache line at once. The flips and rotate 180 reverse rows with
+  ``pshufb``/``pshufd`` and ``vrev64``/``vext``, as fast as the
+  ``memcpy`` of flip top-bottom. I;16 and the portable build keep
+  Pillow's loops.
+* **Transforms in tiles.** A rotation crosses a new source row every few
+  pixels of an output row, so an output row walks over hundreds of source
+  rows and nothing stays in cache. The output is computed in 64×64 tiles
+  (``TRANSFORM_TILES``), whose source rows stay in cache; every pixel is
+  computed from the same coordinates as before. The tiles alone make the
+  portable build 4x faster on nearest rotation and 1.2x on bilinear and
+  bicubic, and the fixed-point nearest path is tiled too. Other tile
+  shapes were measured: 256×32 and 512×16 up to 3x slower than 64×64 on
+  x86; 128×64 gives back the 4% the tiles cost a near-identity
+  perspective transform on arm64, whose reads were sequential already,
+  but brings nearest rotation from 10.9 to 25 ms. 64×64 stayed.
+* **A pixel's channels in one vector of doubles** (x86). The filters for
+  3- and 4-band images take the four channels together, one ``__m256d``
+  with AVX2 or two ``__m128d`` with SSE4, with the operations of the
+  scalar filter in the same order: the bilinear ``a + (b - a) d``, the
+  bicubic's four terms (``-a + b`` as ``b - a``, which rounds the same),
+  the clamp and the truncation (``cvttpd2dq``). x86 compilers don't
+  contract these to fused multiply-adds, so the pixels are the scalar
+  filter's. The common cases call the transform and the filter directly
+  instead of through pointers, so they are inlined (quad with bilinear
+  1.2x from that alone).
+* **A tile row's coordinates at once.** A perspective transform divides
+  twice per pixel. ``perspective_row()`` computes the coordinates of a
+  tile row of 64 pixels in a loop of fixed length, with the per-pixel
+  expressions unchanged, which the compiler vectorizes (``vdivpd`` with
+  AVX2: four divisions at a time); IEEE division is exact, so the
+  coordinates are the same. RGB bilinear 62 to 44 ms, bicubic 131 to 90,
+  L nearest 23 to 13.
+* **arm64: the filters' integer parts in lanes, two pixels at a time.**
+  On arm64 GCC contracts the scalar filters to fused multiply-adds, so
+  "the scalar result" there is the contracted one, and a NEON filter
+  must contract the same way (the ground rules' exception). The first
+  NEON filters, two doubles per vector with GCC's vector types so that
+  the compiler fused them alike, were exact and no faster than the
+  scalar code (bilinear 112 to 115 ms, bicubic 286 to 313) and were
+  removed. The second kind won: the samples' differences (``b - a``,
+  ``p2`` to ``p4``) are integers in the scalar filters, so they are
+  computed for the four bands of two rows at once in 16-bit lanes,
+  converted to double exactly through float (which holds them), and
+  only then go through the same fused multiply-adds; and two output
+  pixels whose source windows are both inside the image go through the
+  filter together (``bilinear_filter32RGB_simd2``), so that their long
+  chains of dependent operations overlap, the pixels at the edges one at
+  a time. Rotate bicubic RGBA 1.59x, RGB 1.32x, bilinear 1.47x,
+  perspective 1.25 to 1.30x, quad 1.37x on the Cortex-A78AE.
+
+Why the builds agree, and where they don't
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The transposes move bytes, and ``test_rotations_match_columns`` and
+``test_flips_match_rows`` compare every variant with Python slicing at
+sizes that exercise the blocks, the bands and the edges. For the
+transforms, every build computes the same coordinates (the same
+expressions per pixel, or a vector division of them) and the same
+filter arithmetic in the same order, so all x86 builds give the same
+pixels, and so do all arm64 builds; x86 and arm64 differ from each
+other by the contraction, which is Pillow's own behaviour on arm64 (the
+``transform`` area of ``checks/simd_hashes.py`` is one hash on x86 and
+another on arm64). ``test_multiband_matches_single_band`` checks each
+band of a transformed RGB, RGBX and CMYK image against the same
+transform of an L image, across several tiles;
+``test_transform_pairs_match_single_pixels`` checks the arm64 pair
+filters against the single-pixel ones for every column of the output.
+
+Numbers
+~~~~~~~
+
+2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
+milliseconds shown.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Operation
+     - Pillow 13 (x86, ms)
+     - SSE4
+     - AVX2
+     - Pillow 13 (arm64, ms)
+     - NEON
+   * - FLIP_LEFT_RIGHT RGB
+     - 2.0
+     - 1.5x
+     - 1.5x
+     - 2.1
+     - 1.2x
+   * - ROTATE_180 RGB
+     - 2.1
+     - 1.6x
+     - 1.6x
+     - 2.1
+     - 1.2x
+   * - ROTATE_90 RGB
+     - 3.6
+     - 1.9x
+     - 2.1x
+     - 5.8
+     - 1.2x
+   * - ROTATE_270 RGB
+     - 4.1
+     - 2.2x
+     - 2.2x
+     - 7.4
+     - 1.5x
+   * - TRANSPOSE RGB
+     - 3.6
+     - 2.0x
+     - 2.0x
+     - 5.9
+     - 1.2x
+   * - ROTATE_90 L
+     - 2.7
+     - 6.2x
+     - 6.2x
+     - 5.3
+     - 3.6x
+   * - rotate 30°, nearest, RGB
+     - 8.8
+     - 1.9x
+     - 1.8x
+     - 40.2
+     - 3.6x
+   * - rotate 30°, bilinear, RGB
+     - 73.9
+     - 1.6x
+     - 2.1x
+     - 127.9
+     - 1.7x
+   * - rotate 30°, bicubic, RGB
+     - 185.4
+     - 1.3x
+     - 2.0x
+     - 290.7
+     - 1.5x
+   * - rotate 30°, bicubic, RGBA
+     - 282.5
+     - 1.8x
+     - 2.9x
+     - 391.3
+     - 1.9x
+   * - perspective, bilinear, RGB
+     - 83.7
+     - 1.9x
+     - 2.6x
+     - 146.8
+     - 1.6x
+
+Nearest rotation's gain is the tiles (the portable build has the same
+1.9x and 3.6x). Flip top-bottom, a ``memcpy`` per row, is 1.0x
+everywhere, and the flips are at the memory's speed. Pillow-SIMD has no
+geometry kernels. Against OpenCV: the 90° rotations and transpose of RGB
+are 1.1 to 1.5x faster than OpenCV's on x86 and 2 to 2.4x on arm64;
+the flips are 1.4x slower on x86, where OpenCV's are IPP's (the only
+places IPP still runs for it), and 1.2x and 1.8x faster on arm64; the L
+rotation is 1.4x behind
+KleidiCV's transpose on arm64. The exact transforms are 1.2 to 1.5x
+slower than ``warpAffine`` and ``warpPerspective`` on x86 and 2.1 to
+2.5x on arm64: OpenCV computes in single-precision floats, eight or 16
+output pixels per step across pixels, with an all-inside fast path,
+where Pillow's result is defined in double per pixel. Fast mode (the
+default) takes positions in fixed point and integer filters with one
+rounding, within 2 levels of the exact result: rotate bilinear 6.2x on
+x86 and 3.2x on arm64, bicubic 6.3x and 3.7x, RGBA bicubic 7.7x and
+4.2x, perspective 6.0x and 2.9x, ahead of OpenCV on x86 and within 1.3x
+either way on arm64; see :ref:`fast-mode` and, until the fast-mode section is
+written, ``design/SIMD_FAST_KERNELS.md``.
+
+Code map
+~~~~~~~~
+
+* ``Geometry.c``: ``transpose_4x4_32()``, ``transpose_8x8_8()`` and the
+  ``TRANSPOSE_BLOCKS`` driver, ``flip_rows()``, and the six
+  ``Imaging*`` entries that use them (with Pillow's loops for the other
+  types); ``affine_transform()``, ``perspective_transform()`` and
+  ``quad_transform()``; the scalar filters (``bilinear_filter*``,
+  ``bicubic_filter*``); the x86 vector filters (``transform_vec``,
+  ``tv_bilinear()``, ``tv_bicubic()``, ``bilinear_filter32RGB_simd()``,
+  ``bicubic_filter32RGB_simd()``) and the NEON ones (``tn_*``, the
+  ``*_simd2`` pair filters); ``perspective_row()``;
+  ``ImagingGenericTransform()`` with ``TRANSFORM_TILES``,
+  ``PERSPECTIVE_TILES`` and the arm64 ``TRANSFORM_PAIRS``; the tiled
+  ``affine_fixed()``; the fast-mode entry.
+* ``TransformFast.c``: fast mode's transforms.
+* Tests: ``test_rotations_match_columns`` and ``test_flips_match_rows``
+  in ``Tests/test_image_transpose.py``;
+  ``test_multiband_matches_single_band`` in
+  ``Tests/test_image_transform.py``;
+  ``test_transform_pairs_match_single_pixels`` in
+  ``Tests/test_simd_consistency.py``.
+
+Pitfalls met on the way: the AVX2 build's nearest rotation was slower
+than the SSE4 build's (33 against 24 ms) with no AVX2 code in it, from
+the order of memory accesses alone, and both became 8.8 ms with the
+tiles, a reminder that a rotation is limited by where it reads, not by
+its arithmetic (the vector filters cut instructions by a third to a
+half and time much less, until the output was tiled); the NEON filters
+went in, came out and went back in a different form; converting each
+byte to double on arm64, as x86 does, was slower than the scalar
+filters; and three bytes of an RGB result copied from a general
+register went through the stack and stalled, so they are stored from
+the vector register (``vst1_lane``).
