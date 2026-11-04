@@ -20,8 +20,8 @@ Cortex-A78AE, GCC 14). Unless a section says "fast mode", they are for
 exact mode, Pillow's arithmetic.
 
 The page is written section by section. Written so far: the ground rules,
-resampling and the blurs. To come: kernel and rank filters, colour
-conversions, compositing and channel operations, geometry, drawing and
+resampling, the blurs and the kernel filters. To come: rank filters,
+colour conversions, compositing and channel operations, geometry, drawing and
 text, codecs and packing, what was tried and dropped, where OpenCV and
 libvips are still faster, and the fast-mode kernels (meanwhile,
 ``design/SIMD_FAST_KERNELS.md`` in the repository describes those).
@@ -46,8 +46,10 @@ match double sums (the F, I and I;16 resample, the exact transforms) use
 fused multiply-adds explicitly and differ from x86 only where the scalar
 code would too. Against Pillow itself, resize uses 16-bit coefficients
 where Pillow uses 32-bit ones and RGB to L uses 15-bit weights, each off
-by one level in a few places; everything else in exact mode is Pillow's
-arithmetic.
+by one level in a few places, and the kernel filters use 16-bit
+coefficients, which can't hold 1/13 or 1/100 exactly (so ``SMOOTH_MORE``
+differs by one level in a few percent of the pixels); everything else in
+exact mode is Pillow's arithmetic.
 
 The checks: ``checks/simd_hashes.py`` prints one hash per kernel area over
 many sizes and modes, and the hashes of a scalar, SSE4, AVX2, AVX-VNNI and
@@ -740,3 +742,275 @@ pass's accumulators in L1 measured 0.90 to 1.11x, because the misses the
 cache model counted are served by the hardware prefetcher, and were
 dropped; and the NEON decisions above each went the other way with
 another GCC, so they are re-measured when the compiler changes.
+
+Kernel filters
+--------------
+
+``ImageFilter.Kernel`` and the built-in 3×3 and 5×5 filters (``SMOOTH``,
+``SHARPEN``, ``FIND_EDGES``, ``SMOOTH_MORE`` and the others), on 8-bit
+images (``Filter.c`` and the ``FilterSIMD_*.c`` files it includes). I and
+I;16 images keep Pillow's code.
+
+What Pillow computes
+~~~~~~~~~~~~~~~~~~~~
+
+A kernel is given as integers with a scale and an offset; the
+coefficients are the integers divided by the scale (``SMOOTH``: 1/13 and
+5/13; ``FIND_EDGES``: −1 and 8; ``SMOOTH_MORE``: 1/100, 5/100 and
+44/100). For every pixel and channel, Pillow sums the 9 or 25 products of
+the coefficients and the neighbouring pixels in single-precision floats,
+adds the offset and 0.5, clamps to 0..255 and truncates; the border rows
+and columns, where the kernel doesn't fit, are copied from the input.
+Kernel row 0 applies to the image row *below* the pixel (``y + 1``), the
+last row to the row above. Pillow 13's loop is scalar, one channel at a
+time, and the portable build is no faster than it.
+
+Pillow-SIMD's method, which this fork keeps, is the fixed-point one:
+the coefficients as 16-bit integers with 13 fractional bits
+(``PRECISION_BITS`` = 8 + 5: 8 for the result and 5 for a sum of up to 25
+coefficients), ``pmaddwd`` into 32-bit sums, the rounding as an added
+half (``offset += 1 << (precision - 1)``), an arithmetic shift and a
+saturating pack to bytes. A coefficient of 4 or more doesn't fit 16 bits
+at that precision, and Pillow-SIMD sent those kernels to float versions
+of the same loops.
+
+The idea
+~~~~~~~~
+
+Four changes since Pillow-SIMD:
+
+* **The lower exact precision.** When a coefficient doesn't fit at 13
+  fractional bits, ``ImagingFilterSIMD()`` tries 12, 11, …, and takes the
+  highest precision at which every coefficient *and the offset* are
+  exact integers once scaled. ``FIND_EDGES`` and ``CONTOUR`` (−1 and 8,
+  with the offset 0 or 255) take 11 bits, ``EDGE_ENHANCE`` (−1/2, 5) 12,
+  ``EDGE_ENHANCE_MORE`` (−1, 9) 11. The sums are then exact integers, and
+  adding the half and shifting rounds them half up exactly as Pillow's
+  ``+ 0.5`` and truncation do, so these kernels give Pillow's pixels and
+  run at the integer kernels' speed: ``FIND_EDGES`` on RGB from 9.5 to
+  4.3 ms with AVX2, 53 to 38 on the Jetson. Only a kernel whose
+  coefficients are inexact at every precision down to 1 bit (a custom
+  one with 5.5 in it, say) still takes the float kernels.
+* **Integer kernels for 1-byte images** (``FilterSIMD_NxNi.c``). Pillow-SIMD
+  filtered L images with float kernels and horizontal adds, 2.7x the cost
+  per byte of the RGB kernel. The integer kernel for 1-byte images is one
+  function for both sizes and both instruction sets, written over two
+  primitives (a multiply-accumulate of 16 bytes by a pair of taps and a
+  shift-and-saturate pack), 16 bytes per step with SSE4 and NEON, 32 with
+  AVX2, and the same arithmetic as the 4-byte kernels; L images filter
+  1.4x (3×3) to 2x (5×5) faster than with the float kernels, and x86 and
+  arm64 give the same L pixels.
+* **Constants where the compiler needs them.** The shift count is
+  ``PRECISION_BITS`` as a constant wherever that is the precision (a
+  wrapper calls the kernel once with the constant and once with the
+  variable, ``FILTER_NxN``), because a count in a register costs a µop
+  per shift on x86 (``SHARPEN`` was 12% slower with AVX-VNNI) and NEON
+  then fuses the shift and the narrowing into one ``sqshrn`` (6% on the
+  Jetson); the kernel bodies are ``SIMD_FORCE_INLINE``, so that the two
+  calls don't stop GCC inlining them; and the 3×3 kernel for 1-byte
+  images copies its nine coefficients to a local array, because the
+  byte stores to the output could alias the coefficient pointer and GCC
+  reloaded all nine on every step (L ``SHARPEN`` 11% on NEON, 8% with
+  AVX2).
+* **AVX-VNNI.** Every ``add(acc, madd(a, b))`` of the integer kernels is
+  ``mm_dpwssd`` or ``mm256_dpwssd``: one ``vpdpwssd`` with AVX-VNNI, the
+  pair without, the same sum modulo 2³². The integer filters are where
+  it pays most: 1.35x (3×3) and 2.1x (5×5) over AVX2 on RGB.
+
+x86-64
+~~~~~~
+
+*4-byte pixels, integer kernels* (``FilterSIMD_3x3i_4u8.c``,
+``FilterSIMD_5x5i_4u8.c``, Pillow-SIMD's). One ``pshufb`` turns a load of
+four pixels into channel-major pairs, so that after widening to 16 bits
+each 32-bit lane of ``pmaddwd`` holds two horizontally adjacent pixels of
+one channel; the kernel vector holds a row's taps in that pair layout
+with zeros, and ``pshufd`` of it selects which two taps multiply which
+pair. So one load of four pixels per kernel row serves four output
+pixels, each ``pmaddwd`` making one output pixel's four channels for two
+taps, and a 3×3 kernel is six ``pmaddwd`` per output pixel. The AVX2
+version copies the four pixels into both 128-bit halves and applies a
+differently aligned kernel in each half: two output pixels per
+multiply-add. The assessment that this "isn't really 256-bit" and eight
+consecutive pixels per step would be better was wrong: that saves
+shuffles but not multiply-adds, and measured 0.93x (3×3) and 1.02x (5×5)
+with AVX2, 0.89x and 0.46x with AVX-VNNI.
+
+*1-byte pixels, integer kernels* (``FilterSIMD_NxNi.c``). A step loads 16
+bytes at each tap's offset, widens them to 16 bits and interleaves the
+two loads of a pair of taps (``punpcklwd``/``punpckhwd``), so that
+``pmaddwd`` computes ``a[i] * k0 + b[i] * k1`` for 16 bytes into four
+accumulators; the odd last tap of a row is paired with 0. With AVX2, 32
+bytes per step in the same way, the pairs interleaved within each 128-bit
+lane and a ``vpermq`` after the packs putting the 32 results back in
+order.
+
+*Float kernels* (``FilterSIMD_3x3f_4u8.c``, ``5x5f_4u8``, ``3x3f_u8``,
+``5x5f_u8``). For 4-byte pixels, one pixel's four channels are one float
+vector (``pmovzxbd``, ``cvtdq2ps``) and the sum is nine (or 25)
+multiply-adds per pixel, three pixels per step; the AVX2 3×3 version
+takes eight pixels per step with ``vperm2f128`` sliding the window. For
+1-byte pixels the three taps of a row are one dot product with
+horizontal adds (``haddps``), two rows at a time; the AVX2 version runs
+the same operations in the same order for eight pixels. The rounding is
+``cvtps2dq``, to nearest even, where Pillow adds 0.5 and truncates, and
+the summation order differs from Pillow's, so these kernels can differ
+from the scalar build by one level (below).
+
+arm64
+~~~~~
+
+*Integer kernels*: the generic kernel of ``FilterSIMD_NxNi.c`` for both
+pixel sizes, with NEON's primitives: ``vmlal_n_s16``, a widening
+multiply-accumulate of 8 lanes by one coefficient, one per tap (NEON has
+no pair sum), into four 32-bit accumulators, and ``vqmovn_s32`` plus
+``vqmovun_s16`` to pack, which with the constant shift become
+``sqshrn``. The 4-byte pixels go through the same loop, 4 pixels per
+step; the same arithmetic as x86's, and the same pixels.
+
+*Float kernels* (``FilterSIMD_NxNf.c``): 4-byte pixels only, 16 bytes per
+step as four float vectors. On arm64 GCC compiles Pillow's float loop
+with fused multiply-adds, so the "scalar" result there is already
+contracted; the NEON kernel reproduces GCC's contraction (each kernel
+row as ``vmulq_n_f32`` then a chain of ``vfmaq_n_f32``, rows added to the
+sum in order, clamp, truncate) and the leftover bytes use ``fmaf()``. It
+matches the arm64 scalar build bit for bit for exact coefficients, and
+in about 0.05% of bytes for an inexact one GCC's own loop fuses
+differently. 1-byte images keep the generic code: GCC vectorizes it
+well, and the NEON float kernel was 1.5x slower (``CONTOUR`` on L 15.5
+against 22.9 ms).
+
+Why the builds agree, and where they don't
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The integer kernels are the same arithmetic on SSE4, AVX2, AVX-VNNI and
+NEON, 16-bit products summed in 32 bits modulo 2³² and one rounding, so
+all four give the same pixels; and when the coefficients are exact at
+the precision used (the built-in kernels whose scale is a power of two,
+1 or 16, and the lower-precision ones above) those pixels are Pillow's,
+the scalar build's. When a coefficient is inexact at 13 fractional bits
+it is rounded (1/13 becomes 630/8192), and the SIMD builds differ from
+the scalar build by at most one level: on the test image ``DETAIL`` in
+9% of the bytes, ``SMOOTH_MORE`` in 4%, ``SMOOTH`` in none (its rounded
+coefficients sum to 8191/8192). This is the one place in exact mode
+where a SIMD build doesn't give Pillow's pixels on purpose; it is
+Pillow-SIMD's behaviour and was kept. The float kernels differ from the
+scalar build by one level in about 0.2% of bytes, the 4-byte ones also
+between SSE4 and AVX2, whose summation orders differ; the 1-byte AVX2
+kernel equals SSE4 by construction.
+
+The checks: ``test_filter`` in ``Tests/test_simd_consistency.py`` (flat
+images stay flat inside the border for integer and float kernels, every
+width and mode, so the vector loop and its scalar tail agree),
+``test_float_kernel_l_matches_rgb_band`` and
+``test_i16_uses_generic_kernel`` in ``Tests/test_image_filter.py``, and,
+when the kernels were written, 3,268 filter outputs compared across the
+SSE4, AVX2 and AVX-VNNI builds. The kernel filters have no area in
+``checks/simd_hashes.py``, whose areas are those where the scalar build
+agrees.
+
+Numbers
+~~~~~~~
+
+2560×1600, times faster than Pillow 13.0.0, which took the milliseconds
+shown.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Filter
+     - Pillow 13 (x86, ms)
+     - SSE4
+     - AVX2
+     - AVX-VNNI
+     - Pillow 13 (arm64, ms)
+     - NEON
+   * - RGB 3×3 SMOOTH
+     - 51.4
+     - 8.0x
+     - 12.3x
+     - 16.4x
+     - 98.2
+     - 3.6x
+   * - RGB 3×3 SHARPEN
+     - 52.9
+     - 8.2x
+     - 12.6x
+     - 16.9x
+     - 99.0
+     - 3.7x
+   * - RGB 3×3 EDGE_ENHANCE
+     - 55.9
+     - 8.2x
+     - 12.7x
+     - 16.3x
+     - 100.4
+     - 3.8x
+   * - RGB 3×3 FIND_EDGES
+     - 146.9
+     - 21.4x
+     - 33.5x
+     - 42.9x
+     - 145.3
+     - 5.5x
+   * - RGB 5×5 SMOOTH_MORE
+     - 133.6
+     - 7.5x
+     - 8.9x
+     - 18.9x
+     - 227.3
+     - 3.6x
+   * - L 3×3 SHARPEN
+     - 16.5
+     - 5.8x
+     - 12.1x
+     - 14.8x
+     - 33.1
+     - 5.6x
+   * - L 5×5 SMOOTH_MORE
+     - 42.5
+     - 5.6x
+     - 12.6x
+     - 15.5x
+     - 75.1
+     - 4.6x
+
+The SIMD time of a 3×3 kernel on RGB is the same whatever the kernel,
+4.2 to 4.4 ms with AVX2; ``FIND_EDGES``'s larger factor is Pillow 13's
+own time on it, 147 ms against 51 for the other kernels. Against
+Pillow-SIMD 12.1.1 with AVX2, the kernels it ran as integers are equal
+(``SMOOTH`` 12.5x there), ``FIND_EDGES``, which it ran in float, is 2.2x
+faster, and L images, which it filtered in float, 3.4x (3×3) and 3.6x
+(5×5). Against OpenCV's ``filter2D``, which accumulates in 32-bit floats,
+the AVX2 build is 1.5 to 1.6x faster on the 3×3 kernels and 1.1x on
+5×5, the AVX-VNNI build 1.9 to 2.1x and 2.3x, and the NEON build 1.4x
+to 2.2x on all of them; libvips' convolution is slower than Pillow 13 on 5×5.
+
+Code map
+~~~~~~~~
+
+* ``Filter.c``: Pillow's ``ImagingFilter3x3()`` and ``ImagingFilter5x5()``
+  (the definition, and the I, I;16 and portable paths),
+  ``filter_int_kernel()`` and the precision search in
+  ``ImagingFilterSIMD()``, which chooses the kernel.
+* ``FilterSIMD_3x3i_4u8.c``, ``FilterSIMD_5x5i_4u8.c``: the x86 integer
+  kernels for 4-byte pixels, SSE4 and AVX2.
+* ``FilterSIMD_NxNi.c``: the integer kernel for 1-byte pixels on x86 (and
+  for both pixel sizes on arm64), with the SSE4/AVX2 and NEON primitives.
+* ``FilterSIMD_3x3f_4u8.c``, ``FilterSIMD_5x5f_4u8.c``,
+  ``FilterSIMD_3x3f_u8.c``, ``FilterSIMD_5x5f_u8.c``: the x86 float
+  kernels; ``FilterSIMD_NxNf.c``: the NEON one.
+* ``ImagingSIMD.h``: ``mm_dpwssd``, ``mm256_dpwssd``,
+  ``SIMD_FORCE_INLINE``.
+* Tests: ``test_filter`` in ``Tests/test_simd_consistency.py``; the end of
+  ``Tests/test_image_filter.py``.
+
+Pitfalls met on the way: Pillow-SIMD sent I;16 images to the 8-bit
+kernels, which filtered the bytes of the 16-bit samples over half of
+each row (``test_i16_uses_generic_kernel``); passing the precision as a
+variable cost 12% on x86 and un-inlined the 1-byte kernel, and the
+inlining then exposed the aliasing reloads, so one change needed two
+follow-ups; AVX2 5×5 float kernels gained nothing for 4-byte pixels and
+lost (0.57x) for 1-byte ones, and were dropped; and on arm64 the
+decision per pixel size went opposite ways for the float kernels, as it
+did for the blurs.
