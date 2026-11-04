@@ -18,6 +18,10 @@ Unreleased
   (``Tests/conftest.py``, the upstream tests that need the exact kernels)
   names no test of a collected file, so a test renamed upstream can't run
   with the fast kernels unnoticed
+- The portable RGBA -> RGBa loop (the tail of the SIMD builds, the whole
+  conversion of the portable one) indexed its rows with ``x * 4``, which GCC
+  can't vectorize under ``-fno-strict-overflow``: the portable build was
+  0.32x Pillow 13 on arm64. Pointer increments, as in Pillow; same pixels
 - Documentation: "How the kernels work" (``docs/allsimd-kernels.rst``),
   the explanation of the SIMD kernels for contributors planned in
   ``design/SIMD_EXPLAINER_PLAN.md``, written section by section: so far

@@ -1361,12 +1361,17 @@ rgbA2rgba(UINT8 *out, const UINT8 *in, int xsize) {
 
 #endif
 
-    for (; x < xsize; x++) {
-        alpha = in[x * 4 + 3];
-        out[x * 4 + 0] = MULDIV255(in[x * 4 + 0], alpha, tmp);
-        out[x * 4 + 1] = MULDIV255(in[x * 4 + 1], alpha, tmp);
-        out[x * 4 + 2] = MULDIV255(in[x * 4 + 2], alpha, tmp);
-        out[x * 4 + 3] = alpha;
+    /* Pointer increments, as in Pillow: with "in[x * 4]" the compiler
+       can't vectorize this loop under -fno-strict-overflow, and the
+       portable build was 0.32x Pillow 13 on arm64. */
+    in += x * 4;
+    out += x * 4;
+    for (; x < xsize; x++, in += 4, out += 4) {
+        alpha = in[3];
+        out[0] = MULDIV255(in[0], alpha, tmp);
+        out[1] = MULDIV255(in[1], alpha, tmp);
+        out[2] = MULDIV255(in[2], alpha, tmp);
+        out[3] = alpha;
     }
 }
 
