@@ -333,11 +333,19 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
 
 ### Phase C: x86 Linux wheels
 
-- [ ] C1. `release_plan.py`: `manylinux_2_28 x86_64` and `musllinux
+- [x] C1. `release_plan.py`: `manylinux_2_28 x86_64` and `musllinux
       x86_64` in the Linux platforms; the check step expects the dispatch
       summary line on x86 and NEON on arm64; `check_wheel.py` asserts the
       tiers. The wheel tests run the suite on the runner's best tier and
       `test_simd_tiers.py` covers the rest.
+      Done 2026-11-04: each platform entry carries its `kernels` line and
+      the check step greps for it; `check_wheel.py` expects the `simd`
+      feature and the tiers of the machine (four on x86-64, three with
+      MSVC, two on arm64); `test_simd_tiers.py` compares only the tiers
+      the CPU can run, since a wheel holds tiers the runner may lack. The
+      expected count of a Linux release is 29 files (the source package
+      and 4 x 7 wheels). The install docs (README, `PyPI.rst`,
+      `docs/allsimd.rst`) say Linux x86-64 and arm64 get wheels.
 - [ ] C2. Release 13.0.0.post3 as `allsimd-13.0.0.post3-linux`; verify
       on PyPI; the perf page gets a `wheel` variant run (the dispatch
       build's AVX2 tier) next to `branch-avx2`.

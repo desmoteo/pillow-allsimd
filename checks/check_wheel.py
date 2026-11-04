@@ -43,8 +43,9 @@ def test_wheel_features() -> None:
         "libjpeg_turbo",
         "zlib_ng",
         "xcb",
-        # Pillow-AllSIMD's fast mode, in every build
+        # Pillow-AllSIMD's fast mode and SIMD kernels, in every wheel
         "fast",
+        "simd",
     }
 
     if sys.platform == "win32":
@@ -55,3 +56,22 @@ def test_wheel_features() -> None:
         expected_features -= {"raqm", "fribidi", "harfbuzz"}
 
     assert set(features.get_supported_features()) == expected_features
+
+
+def test_wheel_simd_tiers() -> None:
+    # An x86-64 wheel holds every x86 tier and chooses at run time; an
+    # arm64 wheel has NEON (design/SIMD_DISPATCH_PLAN.md)
+    from PIL import Image
+
+    machine = platform.machine().lower()
+    expected: tuple[str, ...]
+    if machine in ("x86_64", "amd64"):
+        expected = ("scalar", "sse4", "avx2", "avxvnni")
+        if sys.platform == "win32":  # MSVC has no AVX-VNNI tier
+            expected = expected[:3]
+    elif machine in ("aarch64", "arm64"):
+        expected = ("scalar", "neon")
+    else:
+        expected = ("scalar",)
+    assert Image.core.simd_tiers == expected
+    assert Image.core.simd_kernels in expected

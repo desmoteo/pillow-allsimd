@@ -30,9 +30,9 @@ State
 -----
 
 * Version |release|, on Pillow 13.0.0 (the ``simd/pillow-13`` branch).
-* Beta. On PyPI as wheels for arm64 Linux (macOS to follow, when GitHub's
-  macOS runners build them), and as a source package, compiled on
-  installation, everywhere else (below).
+* Beta. On PyPI as wheels for Linux on x86-64 and arm64 (macOS to follow,
+  when GitHub's macOS runners build them), and as a source package,
+  compiled on installation, everywhere else (below).
 * Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson Orin):
   Pillow's test suite on every build, the SIMD consistency tests, and output
   hashes per kernel that compare the builds (``checks/simd_hashes.py``). The
@@ -46,27 +46,28 @@ State
 Installing
 ----------
 
-On arm64 Linux (glibc 2.28 or later, or musl), pip installs a wheel with
-the NEON kernels and the image libraries bundled, as Pillow's wheels have
-them (wheels for macOS 11 or later on Apple silicon follow; until then
-macOS builds from source, with the NEON kernels too). Elsewhere, x86
-included, Pillow-AllSIMD is a
-source package, which pip compiles on installation, so install the
-libraries that :doc:`building Pillow from source
-<installation/building-from-source>` needs first. On x86-64 that build
-holds SSE4.1, AVX2 and AVX-VNNI kernels and picks the set the CPU has
-when Pillow loads, so no option is needed. It installs the ``PIL``
-package, like Pillow: install your other packages first, then uninstall
-Pillow (or Pillow-SIMD) and install Pillow-AllSIMD::
+On Linux (glibc 2.28 or later, or musl), on x86-64 and arm64, pip
+installs a wheel with the image libraries bundled, as Pillow's wheels
+have them. The x86-64 wheel holds SSE4.1, AVX2 and AVX-VNNI kernels and
+picks the set the CPU has when Pillow loads; the arm64 wheel has the NEON
+kernels. Wheels for macOS 11 or later on Apple silicon follow; until then
+macOS builds from source, with the NEON kernels too. Elsewhere,
+Pillow-AllSIMD is a source package, which pip compiles on installation,
+so install the libraries that :doc:`building Pillow from source
+<installation/building-from-source>` needs first; a source build on
+x86-64 holds the same three sets as the wheel, so no option is needed.
+It installs the ``PIL`` package, like Pillow: install your other packages
+first, then uninstall Pillow (or Pillow-SIMD) and install
+Pillow-AllSIMD::
 
     python3 -m pip uninstall -y pillow pillow-simd
-    python3 -m pip install pillow-allsimd  # arm64: a wheel; x86-64: every set
+    python3 -m pip install pillow-allsimd
 
 ``python3 -m PIL`` shows the kernels in use (``--- SIMD kernels: avx2
 (built: scalar, sse4, avx2, avxvnni)``).
 
 Uninstall Pillow before, not after: both own the files in ``PIL``. To build
-from source on arm64 anyway, add ``--no-binary pillow-allsimd``. To
+from source on Linux anyway, add ``--no-binary pillow-allsimd``. To
 rebuild with another ``simd`` option, add ``--no-cache-dir
 --force-reinstall``, or pip reuses the wheel it built first. The development
 branch installs with ``"pillow-allsimd @
