@@ -1,6 +1,8 @@
+/* The SSE4, AVX2 and NEON vertical kernel for 8-bit images, included by
+   ResampleSIMD.c. */
 #if defined(IMAGING_SIMD_SSE4)
 
-void
+static void
 ImagingResampleVerticalConvolution8u(
     UINT32 *restrict lineOut,
     Imaging imIn,
@@ -302,7 +304,7 @@ neon_resample_pack16(
     return vcombine_u8(vqmovun_s16(r0), vqmovun_s16(r1));
 }
 
-void
+static void
 ImagingResampleVerticalConvolution8u(
     UINT32 *restrict lineOut,
     Imaging imIn,
@@ -357,42 +359,5 @@ ImagingResampleVerticalConvolution8u(
 }
 
 #undef NEON_VERT_MLA
-
-#else
-
-/* Portable version of the kernel above, with the same arithmetic.
-   Works on chunks of bytes so rows are read sequentially. */
-void
-ImagingResampleVerticalConvolution8u(
-    UINT32 *restrict lineOut,
-    Imaging imIn,
-    int xmin,
-    int xmax,
-    INT16 *k,
-    int coefs_precision,
-    int xsize
-) {
-    int x, xx, i, n;
-    int size = xsize * 4;
-    UINT8 *out = (UINT8 *)lineOut;
-    int ss[64];
-
-    for (xx = 0; xx < size; xx += n) {
-        n = size - xx < 64 ? size - xx : 64;
-        for (i = 0; i < n; i++) {
-            ss[i] = 1 << (coefs_precision - 1);
-        }
-        for (x = 0; x < xmax; x++) {
-            UINT8 *in = (UINT8 *)imIn->image[x + xmin] + xx;
-            int kx = k[x];
-            for (i = 0; i < n; i++) {
-                ss[i] += in[i] * kx;
-            }
-        }
-        for (i = 0; i < n; i++) {
-            out[xx + i] = clip8(ss[i], coefs_precision);
-        }
-    }
-}
 
 #endif

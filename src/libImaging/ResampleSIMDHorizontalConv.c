@@ -1,5 +1,6 @@
-/* Included twice by Resample.c: as is, the exact kernels, with 8-bit
-   results; with RESAMPLE_OUT16 defined, the kernels for fast mode's resize
+/* The SSE4, AVX2 and NEON horizontal kernels for 8-bit images, included
+   twice by ResampleSIMD.c: as is, the exact kernels, with 8-bit results;
+   with RESAMPLE_OUT16 defined, the kernels for fast mode's resize
    (ResampleFast.c), whose results keep 6 more bits. Those are called with
    coefs_precision - 6, so they round there, and RH_PACK clips each pixel's
    four 16-bit values to 0 .. 255 * 2^6 and stores them doubled in a 64-bit
@@ -36,7 +37,7 @@ RH(rh_pack_sse)(__m128i v) {
 #define RH_PACK_SSE(v) _mm_cvtsi128_si32(_mm_packus_epi16(v, v))
 #endif
 
-void
+static void
 RH(ImagingResampleHorizontalConvolution8u4x)(
     RH_OUT *restrict lineOut0,
     RH_OUT *restrict lineOut1,
@@ -494,7 +495,7 @@ RH(ImagingResampleHorizontalConvolution8u4x)(
     }
 }
 
-void
+static void
 RH(ImagingResampleHorizontalConvolution8u)(
     RH_OUT *restrict lineOut,
     UINT32 *restrict lineIn,
@@ -925,7 +926,7 @@ neon_resample_horiz_px(const UINT8 *in, const INT16 *k, int xmax, int32x4_t sss)
 }
 #endif
 
-void
+static void
 RH(ImagingResampleHorizontalConvolution8u4x)(
     RH_OUT *restrict lineOut0,
     RH_OUT *restrict lineOut1,
@@ -968,7 +969,7 @@ RH(ImagingResampleHorizontalConvolution8u4x)(
     }
 }
 
-void
+static void
 RH(ImagingResampleHorizontalConvolution8u)(
     RH_OUT *restrict lineOut,
     UINT32 *restrict lineIn,
@@ -993,134 +994,6 @@ RH(ImagingResampleHorizontalConvolution8u)(
     }
 }
 
-#else
-
-/* Portable version of the kernels above, with the same arithmetic:
-   16-bit coefficients, 32-bit accumulators, rounding by adding half. */
-#if defined(RESAMPLE_OUT16)
-static inline INT16
-RH(rh_clip)(int in, int precision) {
-    in >>= precision;
-    return (INT16)(2 * (in < 0 ? 0 : in > 255 << 6 ? 255 << 6 : in));
-}
-#define RH_CLIP(in, precision) RH(rh_clip)(in, precision)
-#define RH_ELEM INT16
-#define RH_FULL (255 << 7)
-#else
-#define RH_CLIP(in, precision) clip8(in, precision)
-#define RH_ELEM UINT8
-#define RH_FULL 255
-#endif
-
-void
-RH(ImagingResampleHorizontalConvolution8u)(
-    RH_OUT *restrict lineOut,
-    UINT32 *restrict lineIn,
-    int xsize,
-    int *xbounds,
-    INT16 *kk,
-    int kmax,
-    int coefs_precision
-) {
-    int xmin, xmax, xx, x;
-    INT16 *k;
-
-    for (xx = 0; xx < xsize; xx++) {
-        int ss0, ss1, ss2, ss3;
-        UINT8 *in;
-        RH_ELEM *out;
-        xmin = xbounds[xx * 2 + 0];
-        xmax = xbounds[xx * 2 + 1];
-        k = &kk[xx * kmax];
-        in = (UINT8 *)&lineIn[xmin];
-        ss0 = ss1 = ss2 = ss3 = 1 << (coefs_precision - 1);
-        for (x = 0; x < xmax; x++) {
-            ss0 += in[x * 4 + 0] * k[x];
-            ss1 += in[x * 4 + 1] * k[x];
-            ss2 += in[x * 4 + 2] * k[x];
-            ss3 += in[x * 4 + 3] * k[x];
-        }
-        out = (RH_ELEM *)&lineOut[xx];
-        out[0] = RH_CLIP(ss0, coefs_precision);
-        out[1] = RH_CLIP(ss1, coefs_precision);
-        out[2] = RH_CLIP(ss2, coefs_precision);
-        out[3] = RH_CLIP(ss3, coefs_precision);
-    }
-}
-
-/* The same for 3-band images: the fourth byte is padding, so it isn't
-   summed (a quarter of the work), and gets 255 like decoded RGB pixels. */
-#if !defined(RESAMPLE_HORIZONTAL_3BANDS_PORTABLE)
-#define RESAMPLE_HORIZONTAL_3BANDS_PORTABLE
-#endif
-static void
-RH(ImagingResampleHorizontalConvolution8u3)(
-    RH_OUT *restrict lineOut,
-    UINT32 *restrict lineIn,
-    int xsize,
-    int *xbounds,
-    INT16 *kk,
-    int kmax,
-    int coefs_precision
-) {
-    int xmin, xmax, xx, x;
-    INT16 *k;
-
-    for (xx = 0; xx < xsize; xx++) {
-        int ss0, ss1, ss2;
-        UINT8 *in;
-        RH_ELEM *out;
-        xmin = xbounds[xx * 2 + 0];
-        xmax = xbounds[xx * 2 + 1];
-        k = &kk[xx * kmax];
-        in = (UINT8 *)&lineIn[xmin];
-        ss0 = ss1 = ss2 = 1 << (coefs_precision - 1);
-        for (x = 0; x < xmax; x++) {
-            ss0 += in[x * 4 + 0] * k[x];
-            ss1 += in[x * 4 + 1] * k[x];
-            ss2 += in[x * 4 + 2] * k[x];
-        }
-        out = (RH_ELEM *)&lineOut[xx];
-        out[0] = RH_CLIP(ss0, coefs_precision);
-        out[1] = RH_CLIP(ss1, coefs_precision);
-        out[2] = RH_CLIP(ss2, coefs_precision);
-        out[3] = RH_FULL;
-    }
-}
-
-void
-RH(ImagingResampleHorizontalConvolution8u4x)(
-    RH_OUT *restrict lineOut0,
-    RH_OUT *restrict lineOut1,
-    RH_OUT *restrict lineOut2,
-    RH_OUT *restrict lineOut3,
-    UINT32 *restrict lineIn0,
-    UINT32 *restrict lineIn1,
-    UINT32 *restrict lineIn2,
-    UINT32 *restrict lineIn3,
-    int xsize,
-    int *xbounds,
-    INT16 *kk,
-    int kmax,
-    int coefs_precision
-) {
-    RH(ImagingResampleHorizontalConvolution8u)(
-        lineOut0, lineIn0, xsize, xbounds, kk, kmax, coefs_precision
-    );
-    RH(ImagingResampleHorizontalConvolution8u)(
-        lineOut1, lineIn1, xsize, xbounds, kk, kmax, coefs_precision
-    );
-    RH(ImagingResampleHorizontalConvolution8u)(
-        lineOut2, lineIn2, xsize, xbounds, kk, kmax, coefs_precision
-    );
-    RH(ImagingResampleHorizontalConvolution8u)(
-        lineOut3, lineIn3, xsize, xbounds, kk, kmax, coefs_precision
-    );
-}
-
-#undef RH_CLIP
-#undef RH_ELEM
-#undef RH_FULL
 #endif
 
 #if !defined(RESAMPLE_OUT16)
@@ -1128,7 +1001,6 @@ RH(ImagingResampleHorizontalConvolution8u4x)(
    into 32 bits, then one at a time. Integer sums don't depend on the order,
    so the results match the scalar code. */
 #if defined(IMAGING_SIMD_SSE4)
-#define RESAMPLE_HORIZONTAL_1BAND_SIMD
 
 /* Four rows at once: they share the coefficient loads and one set of
    horizontal sums per output pixel. The output rows may be the same row,
@@ -1212,7 +1084,6 @@ ImagingResampleHorizontalConvolution1u4x(
 }
 
 #elif defined(IMAGING_SIMD_NEON)
-#define RESAMPLE_HORIZONTAL_1BAND_SIMD
 
 /* Four bytes, widened to 16 bits. */
 static inline int16x4_t
@@ -1308,7 +1179,6 @@ ImagingResampleHorizontalConvolution1u4x(
 
 #endif
 
-#if defined(RESAMPLE_HORIZONTAL_1BAND_SIMD)
 static void
 ImagingResampleHorizontalConvolution1u(
     UINT8 *restrict lineOut,
@@ -1335,7 +1205,6 @@ ImagingResampleHorizontalConvolution1u(
         coefs_precision
     );
 }
-#endif
 #endif /* !RESAMPLE_OUT16: the 1-byte kernels */
 
 #undef RH_PACK_SSE

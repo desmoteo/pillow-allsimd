@@ -23,19 +23,7 @@
  *
  * Included by Resample.c. */
 
-#define RF_FRAC 6
-/* The sums' bound: each product is within 2 of the value times the
-   weight (1 from the weight's rounding, 1 from the product's), so a sum is
-   at most 255 * 2^6 * RF_WSUM_MAX + 2 * taps, and adding 2^5 for the
-   rounding keeps it below 32602. (The horizontal kernels' precision is at
-   least 13 for weights up to 1.98, so coefs_precision - RF_FRAC >= 7.) */
-#define RF_WSUM_MAX 1.98
-#define RF_TAPS_MAX 128
-
-static inline int
-rf_mul(int a, int w) {
-    return (a * w + (1 << 14)) >> 15;
-}
+#include "ResampleFast.h"
 
 /* The vertical pass's weights in 2^-14 units, ksize per output, from the
    exact path's coefficients. Returns 0 if the sums could overflow. */
@@ -62,70 +50,7 @@ rf_weights(INT16 *w, int size, int ksize, const int *bounds, const double *kk) {
 /* An output row of n bytes from taps ring rows with weights w. */
 static void
 rf_vrow(UINT8 *restrict out, INT16 **rows, const INT16 *w, int taps, int n) {
-    int x = 0, k;
-#if defined(IMAGING_SIMD_AVX2)
-    const __m256i half8 = _mm256_set1_epi16(1 << (RF_FRAC - 1));
-    for (; x + 32 <= n; x += 32) {
-        __m256i s0 = _mm256_setzero_si256(), s1 = _mm256_setzero_si256();
-        for (k = 0; k < taps; k++) {
-            __m256i wk = _mm256_set1_epi16(w[k]);
-            s0 = _mm256_add_epi16(
-                s0,
-                _mm256_mulhrs_epi16(
-                    _mm256_loadu_si256((const __m256i *)(rows[k] + x)), wk
-                )
-            );
-            s1 = _mm256_add_epi16(
-                s1,
-                _mm256_mulhrs_epi16(
-                    _mm256_loadu_si256((const __m256i *)(rows[k] + x + 16)), wk
-                )
-            );
-        }
-        s0 = _mm256_srai_epi16(_mm256_add_epi16(s0, half8), RF_FRAC);
-        s1 = _mm256_srai_epi16(_mm256_add_epi16(s1, half8), RF_FRAC);
-        /* packus works within 128-bit lanes: 64-bit groups 0 2 1 3 */
-        _mm256_storeu_si256(
-            (__m256i *)(out + x),
-            _mm256_permute4x64_epi64(_mm256_packus_epi16(s0, s1), 0xd8)
-        );
-    }
-#endif
-#if defined(IMAGING_SIMD_SSE4)
-    const __m128i half = _mm_set1_epi16(1 << (RF_FRAC - 1));
-    for (; x + 16 <= n; x += 16) {
-        __m128i s0 = _mm_setzero_si128(), s1 = _mm_setzero_si128();
-        for (k = 0; k < taps; k++) {
-            __m128i wk = _mm_set1_epi16(w[k]);
-            s0 = _mm_add_epi16(
-                s0,
-                _mm_mulhrs_epi16(_mm_loadu_si128((const __m128i *)(rows[k] + x)), wk)
-            );
-            s1 = _mm_add_epi16(
-                s1,
-                _mm_mulhrs_epi16(
-                    _mm_loadu_si128((const __m128i *)(rows[k] + x + 8)), wk
-                )
-            );
-        }
-        s0 = _mm_srai_epi16(_mm_add_epi16(s0, half), RF_FRAC);
-        s1 = _mm_srai_epi16(_mm_add_epi16(s1, half), RF_FRAC);
-        _mm_storeu_si128((__m128i *)(out + x), _mm_packus_epi16(s0, s1));
-    }
-#elif defined(IMAGING_SIMD_NEON)
-    for (; x + 16 <= n; x += 16) {
-        int16x8_t s0 = vdupq_n_s16(0), s1 = vdupq_n_s16(0);
-        for (k = 0; k < taps; k++) {
-            s0 = vaddq_s16(s0, vqrdmulhq_n_s16(vld1q_s16(rows[k] + x), w[k]));
-            s1 = vaddq_s16(s1, vqrdmulhq_n_s16(vld1q_s16(rows[k] + x + 8), w[k]));
-        }
-        /* (s + 2^5) >> 6, saturated to 0 .. 255 */
-        vst1q_u8(
-            out + x,
-            vcombine_u8(vqrshrun_n_s16(s0, RF_FRAC), vqrshrun_n_s16(s1, RF_FRAC))
-        );
-    }
-#endif
+    int x = IMAGING_SIMD_CALL(resample->fast_vrow, out, rows, w, taps, n), k;
     for (; x < n; x++) {
         int s = 0;
         for (k = 0; k < taps; k++) {
@@ -150,18 +75,23 @@ rf_hrows(
     int ksize,
     int coefs_precision
 ) {
+    const ImagingSIMDResampleKernels *simd = ImagingSIMD->resample;
+    ImagingResampleRow16Fn row =
+        simd->horizontal_8u_16 ? simd->horizontal_8u_16 : resample_horizontal_8u_16;
+    ImagingResampleRows16Fn rows4 = simd->horizontal_8u4x_16
+                                        ? simd->horizontal_8u4x_16
+                                        : resample_horizontal_8u4x_16;
     int r = 0;
-#if defined(RESAMPLE_HORIZONTAL_3BANDS_PORTABLE)
-    if (bands == 3) {
+    if (bands == 3 && !simd->horizontal_8u4x_16) {
+        /* the portable kernels have one for 3 bands */
         for (; r < n; r++) {
-            ImagingResampleHorizontalConvolution8u3_16(
+            resample_horizontal_8u3_16(
                 out[r], in[r], xsize, bounds, kk, ksize, coefs_precision
             );
         }
     }
-#endif
     if (n - r == 4) {
-        ImagingResampleHorizontalConvolution8u4x_16(
+        rows4(
             out[0],
             out[1],
             out[2],
@@ -179,9 +109,7 @@ rf_hrows(
         r = n;
     }
     for (; r < n; r++) {
-        ImagingResampleHorizontalConvolution8u_16(
-            out[r], in[r], xsize, bounds, kk, ksize, coefs_precision
-        );
+        row(out[r], in[r], xsize, bounds, kk, ksize, coefs_precision);
     }
 }
 
@@ -314,7 +242,3 @@ done:
     free(scratch);
     return 1;
 }
-
-#undef RF_FRAC
-#undef RF_WSUM_MAX
-#undef RF_TAPS_MAX
