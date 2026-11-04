@@ -53,14 +53,17 @@ macOS builds from source, with the NEON kernels too). Elsewhere, x86
 included, Pillow-AllSIMD is a
 source package, which pip compiles on installation, so install the
 libraries that :doc:`building Pillow from source
-<installation/building-from-source>` needs first. It installs the ``PIL``
+<installation/building-from-source>` needs first. On x86-64 that build
+holds SSE4.1, AVX2 and AVX-VNNI kernels and picks the set the CPU has
+when Pillow loads, so no option is needed. It installs the ``PIL``
 package, like Pillow: install your other packages first, then uninstall
-Pillow (or Pillow-SIMD) and install Pillow-AllSIMD, choosing the
-instruction set of a source build with the ``simd`` build option::
+Pillow (or Pillow-SIMD) and install Pillow-AllSIMD::
 
     python3 -m pip uninstall -y pillow pillow-simd
-    python3 -m pip install pillow-allsimd               # arm64: a wheel
-    python3 -m pip install -C simd=avx2 pillow-allsimd  # x86: built with AVX2
+    python3 -m pip install pillow-allsimd  # arm64: a wheel; x86-64: every set
+
+``python3 -m PIL`` shows the kernels in use (``--- SIMD kernels: avx2
+(built: scalar, sse4, avx2, avxvnni)``).
 
 Uninstall Pillow before, not after: both own the files in ``PIL``. To build
 from source on arm64 anyway, add ``--no-binary pillow-allsimd``. To
@@ -69,10 +72,18 @@ rebuild with another ``simd`` option, add ``--no-cache-dir
 branch installs with ``"pillow-allsimd @
 git+https://github.com/desmoteo/pillow-allsimd@simd/pillow-13"``.
 
-The ``simd`` option takes:
+The ``simd`` build option chooses the instruction sets of a source build:
 
-* ``auto`` (the default): SSE4.1 on x86, NEON on arm64, portable C elsewhere.
-* ``sse4``: SSE4.1 (x86 only).
+* ``auto`` (the default): ``dispatch`` on x86-64, NEON on arm64, SSE4.1 on
+  32-bit x86, portable C elsewhere.
+* ``dispatch``: SSE4.1, AVX2 and AVX-VNNI kernels in one build, the set
+  the CPU supports chosen when Pillow loads (x86-64 only; with MSVC,
+  SSE4.1 and AVX2). The ``PILLOW_ALLSIMD_ISA`` environment variable
+  (``scalar``, ``sse4``, ``avx2``, ``avxvnni``) caps the choice, to compare
+  the tiers on one machine.
+* ``sse4``: SSE4.1 only, in every file (x86 only). This and ``avx2``,
+  ``avxvnni``, ``native`` and ``native512`` build for one instruction set,
+  which the CPU must have, or Pillow fails to import with a message.
 * ``avx2``: SSE4.1 and AVX2 (x86 only).
 * ``avxvnni``: SSE4.1, AVX2 and AVX-VNNI (x86 only: Intel Alder Lake,
   Sapphire Rapids and newer, AMD Zen 5); faster integer filters and resize.

@@ -34,7 +34,8 @@ compilers and the two architectures.
 
 **The same pixels on every build.** A SIMD build must produce the pixels
 of the portable C build, bit for bit, so that an image processed on an
-AVX2 laptop, an arm64 server and a RISC-V board is the same image. The
+AVX2 laptop, an arm64 server and a RISC-V board is the same image, and
+the tiers of one x86-64 build must agree with one another. The
 portable code is the definition: each kernel's scalar version does the
 arithmetic in a form the vector version can reproduce exactly, usually
 integer sums of products with one rounding at the end, rather than the
@@ -80,10 +81,24 @@ kernel for a whole operation returns 1 when it did the work. The call
 is once per row or per operation, never per pixel: the fast transforms
 were first called per tile row of 64 pixels, and the SSE4 build lost
 14% to the calls and the vector constants set up on each, so they take
-the whole region. A build has one tier today; run-time dispatch between
-SSE4, AVX2 and AVX-VNNI tiers in one build, for x86 wheels, is the next
-phase of ``design/SIMD_DISPATCH_PLAN.md``. On arm64, NEON is part of the
-baseline, so the wheels have it.
+the whole region.
+
+**Run-time dispatch on x86-64.** The ``dispatch`` build (``auto`` there)
+compiles ``SIMDKernels.c`` three times, through the ``SIMDKernels_sse4.c``,
+``_avx2.c`` and ``_avxvnni.c`` stubs, each with its instruction set as a
+per-file compiler flag (``setup.py`` wraps the compiler's per-source
+step; MSVC needs no flag and has the SSE4.1 and AVX2 tiers), and every
+other file for plain x86-64; the stub's ``IMAGING_SIMD_TIER`` tells
+``ImagingSIMD.h`` which macros to define. ``SIMDDispatch.c`` reads
+``cpuid`` (SSE4.1; AVX2 with the OS saving the YMM state; AVX-VNNI) and
+``ImagingSIMDInit()`` points ``ImagingSIMD`` at the highest tier built
+that the CPU has, capped by ``PILLOW_ALLSIMD_ISA`` if set; a build for
+one instruction set the CPU lacks fails to import with a message. The
+tiers of one build give the same pixels, which ``Tests/test_simd_tiers.py``
+checks through ``Image.core.set_simd()``; the scalar table of a dispatch
+build is the common files' portable code compiled for x86-64. On arm64,
+NEON is part of the baseline, so the wheels have it and the build has
+one tier.
 
 ``ImagingSIMD.h`` also holds the helpers the kernels share:
 ``SIMD_FORCE_INLINE`` for kernels that must see a shift count as a
@@ -2753,11 +2768,14 @@ has all three of SSE4, AVX2 and NEON.
 
 * ``SIMDKernels.h``: the table of kernel groups and ``IMAGING_SIMD_CALL``;
   ``SIMDKernels.c``: the one translation unit, which includes every
-  companion and defines the tier's table; ``SIMDDispatch.c``: the scalar
-  table, ``ImagingSIMD`` and ``ImagingSIMDInit()``; ``ImagingSIMD.h``: the
-  ISA macros, ``SIMD_FORCE_INLINE``, ``mm_dpwssd`` and ``mm256_dpwssd``,
-  ``mm_madd_add``, the widening loads; ``ImagingPx4.h``: one pixel as four
-  32-bit lanes.
+  companion and defines the tier's table; ``SIMDKernels_sse4.c``,
+  ``SIMDKernels_avx2.c`` and ``SIMDKernels_avxvnni.c``: the stubs that
+  compile it once per tier in a dispatch build, each with its own flags;
+  ``SIMDDispatch.c``: the scalar table, ``ImagingSIMD``, the CPU
+  detection, ``ImagingSIMDInit()`` and ``ImagingSIMDSelect()``;
+  ``ImagingSIMD.h``: the tier and ISA macros, ``SIMD_FORCE_INLINE``,
+  ``mm_dpwssd`` and ``mm256_dpwssd``, ``mm_madd_add``, the widening loads;
+  ``ImagingPx4.h``: one pixel as four 32-bit lanes.
 * Resampling: ``Resample.c`` (the drivers) and ``ResampleHorizontal.c``
   (the portable horizontal kernels); ``ResampleSIMD.c``, which includes
   ``ResampleSIMDHorizontalConv.c``, ``ResampleSIMDVerticalConv.c``,
@@ -2800,7 +2818,16 @@ Appendix C: the tools
 
 * ``checks/simd_hashes.py``: one hash per kernel area over many sizes
   and modes; run with each build on ``PYTHONPATH`` and compare. The areas
-  agree on every build except where this page says so.
+  agree on every build except where this page says so. On a dispatch
+  build, ``PILLOW_ALLSIMD_ISA=sse4 python3 checks/simd_hashes.py`` hashes
+  one tier (``scalar``, ``sse4``, ``avx2``, ``avxvnni``); the tiers'
+  hashes equal the single-tier builds'.
+* ``Tests/test_simd_tiers.py``: 75 operations on two image shapes, exact
+  and fast, through every tier of the build (``Image.core.set_simd()``,
+  ``Image.core.simd_tiers``): the SIMD tiers give the same pixels, and
+  the scalar table differs only in the areas listed above. The x86 CI
+  jobs also run the whole suite under ``PILLOW_ALLSIMD_ISA`` set to
+  ``sse4``, ``avx2`` and ``scalar``.
 * ``Tests/test_simd_consistency.py`` and ``Tests/simd_shapes.py``: the
   vector loops and their scalar tails give the same pixels, on six image
   shapes; ``Tests/test_fast_mode.py``: the fast kernels' bounds;

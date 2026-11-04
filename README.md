@@ -243,6 +243,14 @@ But with the option included, a compiler will inject AVX instructions even
 for SSE functions (i.e. interchange them) since every SSE instruction has its AVX equivalent.
 So there is no easy way to compile such library, especially with setuptools.
 
+That was Pillow-SIMD's reasoning. Pillow-AllSIMD does it: the SIMD code of
+every operation sits in companion files compiled into one translation unit
+per instruction set, each with its own compiler flags, and a table of
+kernels chosen when Pillow loads (`design/SIMD_DISPATCH_PLAN.md`), which
+is what the `dispatch` build is. The rest of the module is compiled for
+plain x86-64, so one build runs on every x86-64 CPU and uses the best
+kernels it has.
+
 
 ## Installation
 
@@ -253,20 +261,20 @@ until then macOS builds from source, with the NEON kernels too). Elsewhere,
 x86 included,
 Pillow-AllSIMD is a source package: pip compiles it on installation, so
 install the [build prerequisites][allsimd-build-deps] for your platform
-first (those of Pillow). It installs the `PIL` package, like Pillow, so
-install your other packages first, then replace Pillow (or Pillow-SIMD)
-with it, choosing the instruction set of a source build with the `simd`
-option:
+first (those of Pillow). On x86-64 that build holds SSE4.1, AVX2 and
+AVX-VNNI kernels and picks the set your CPU has when Pillow loads, so no
+option is needed. It installs the `PIL` package, like Pillow, so install
+your other packages first, then replace Pillow (or Pillow-SIMD) with it:
 
 ```bash
 python3 -m pip uninstall -y pillow pillow-simd
-python3 -m pip install pillow-allsimd               # arm64: a wheel
-python3 -m pip install -C simd=avx2 pillow-allsimd  # x86: built with AVX2
+python3 -m pip install pillow-allsimd  # arm64: a wheel; x86-64: every set
 ```
 
-Without `-C simd=...` a source build takes SSE4.1 on x86 and NEON on
-arm64. To build from source on arm64 anyway (for another `simd` option, or
-to link the system's libraries), add `--no-binary pillow-allsimd`.
+`python3 -m PIL` shows the kernels in use (`--- SIMD kernels: avx2 (built:
+scalar, sse4, avx2, avxvnni)`). To build from source on arm64 anyway (for
+another `simd` option, or to link the system's libraries), add
+`--no-binary pillow-allsimd`.
 
 - Uninstall Pillow before installing, not after: both own the files in
   `PIL`, so removing Pillow afterwards deletes Pillow-AllSIMD's files too.
@@ -279,10 +287,18 @@ to link the system's libraries), add `--no-binary pillow-allsimd`.
   `"pillow-allsimd @ git+https://github.com/desmoteo/pillow-allsimd@simd/pillow-13"`
   in place of `pillow-allsimd`.
 
-The `simd` option accepts:
+The `simd` build option chooses the instruction sets of a source build
+(`-C simd=...`):
 
-- `auto` (default): SSE4.1 on x86, NEON on arm64, portable C elsewhere.
-- `sse4`: SSE4.1 (x86 only).
+- `auto` (default): `dispatch` on x86-64, NEON on arm64, SSE4.1 on 32-bit
+  x86, portable C elsewhere.
+- `dispatch`: SSE4.1, AVX2 and AVX-VNNI kernels in one build, the set the
+  CPU supports chosen when Pillow loads (x86-64 only; with MSVC, SSE4.1 and
+  AVX2). The `PILLOW_ALLSIMD_ISA` environment variable (`scalar`, `sse4`,
+  `avx2`, `avxvnni`) caps the choice, to compare the tiers on one machine.
+- `sse4`: SSE4.1 only, in every file (x86 only). This and `avx2`,
+  `avxvnni`, `native` and `native512` build for one instruction set, which
+  the CPU must have, or Pillow fails to import with a message.
 - `avx2`: SSE4.1 and AVX2 (x86 only).
 - `avxvnni`: SSE4.1, AVX2 and AVX-VNNI (x86 only: Intel Alder Lake,
   Sapphire Rapids and newer, AMD Zen 5). Faster integer filters and resize.

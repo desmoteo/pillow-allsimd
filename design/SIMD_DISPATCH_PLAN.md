@@ -274,26 +274,62 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
 
 ### Phase B: the tiers (finding 11)
 
-- [ ] B1. The 4-byte float kernel filter: AVX2 sums in the SSE4 order;
+- [x] B1. The 4-byte float kernel filter: AVX2 sums in the SSE4 order;
       measure; the page's "Kernel filters" section loses its exception.
-- [ ] B2. The tier macro in `ImagingSIMD.h`, the three stubs, `-C
+      Done 2026-11-04 (68a594fed): the AVX2 kernel was 1.6x slower than
+      the SSE4 one and rounded 0.2% of the bytes differently, so the AVX2
+      tier uses the SSE4 kernel; the AVX2 and SSE4 hashes now agree in
+      every area.
+- [x] B2. The tier macro in `ImagingSIMD.h`, the three stubs, `-C
       simd=dispatch` with the per-file flags, `auto` → `dispatch` on x86.
       A dispatch build on the development machine: all three tiers
       present, the hashes of each tier (through `PILLOW_ALLSIMD_ISA`)
       equal to the single-tier builds'.
-- [ ] B3. The CPU detection, `ImagingSIMDInit()` choosing the tier, the
+      Done 2026-11-04 (4d517eca8). The per-file flags go through a wrapper
+      of the compiler's per-source `_compile` in `setup.py`; the common
+      files get `IMAGING_SIMD_DISPATCH` and no instruction-set flag. On
+      the Core Ultra 9 285H the build has the four tables, `avxvnni`
+      active, `_imaging.so` 6.2 MB, and each tier's hashes equal the
+      single-tier builds' (the AVX-VNNI tier's equal the AVX2 build's).
+      Compile time: a tier's unit takes about two seconds at `-O2` with
+      GCC 13, so the units stay whole.
+- [x] B3. The CPU detection, `ImagingSIMDInit()` choosing the tier, the
       env variable, `set_simd()`, `simd_kernels`, `simd_tiers`, the
       `features` entry, the import check of single-tier builds.
-- [ ] B4. `Tests/test_simd_tiers.py`; the x86 CI jobs run it (`auto` is
+      Done 2026-11-04 (4d517eca8): `cpuid` leaf 1 (SSE4.1; OSXSAVE and AVX
+      with XCR0 bits 1 and 2 through `xgetbv`), leaf 7 (AVX2), leaf 7
+      sub-leaf 1 (AVX-VNNI); `features.check("simd")`; `pilinfo` prints
+      the active tier and the tiers built.
+- [x] B4. `Tests/test_simd_tiers.py`; the x86 CI jobs run it (`auto` is
       now the dispatch build) and `checks/simd_hashes.py` per tier;
       `test-windows.yml` builds the dispatch build with MSVC.
-- [ ] B5. Measurement 2; loops moved into companions where it says so.
-- [ ] B6. Docs: README (installation: x86 wheels, the `simd` option list,
+      Done 2026-11-04 (4d517eca8): 75 operations, two shapes, exact and
+      fast, per tier; `test.yml` runs the whole suite on the dispatch
+      build under `PILLOW_ALLSIMD_ISA` set to `sse4`, `avx2` and
+      `scalar` besides the runner's best tier. `test-windows.yml`
+      installs with no `simd` option, so it builds the dispatch build
+      (SSE4.1 and AVX2 tiers) with MSVC; its first run after the push is
+      the check that MSVC compiles it.
+- [x] B5. Measurement 2; loops moved into companions where it says so.
+      AVX2 done 2026-11-04 (`bench-results/ab-phaseB-avx2.txt`, the `-O3`
+      Docker builds of 4d517eca8, `disp` with `PILLOW_ALLSIMD_ISA=avx2`
+      against `one-avx2`): outputs identical, 0.96x to 1.08x with no
+      pattern (premultiply 1.08x, unpremultiply 0.96x, both about 1 ms),
+      so the common code compiled for plain x86-64 costs nothing
+      measurable. SSE4 done the same day (`ab-phaseB-sse4.txt`,
+      `PILLOW_ALLSIMD_ISA=sse4` against `one-sse4`): outputs identical,
+      0.96x to 1.10x (the multiply and screen chops 0.96x at 1.6 ms,
+      merge 1.10x). No loop moves: the hot loops are all in the
+      companions already, and the scalar tails are too short to show.
+- [x] B6. Docs: README (installation: x86 wheels, the `simd` option list,
       the "Why the SIMD code isn't in Pillow" section's claim about
       `-mavx2`, now answered), `docs/allsimd-kernels.rst` (ground rules'
       build model, the exactness clause, Appendix B and C), PyPI.rst,
       `docs/reference/fast_mode.rst` where it names builds,
       CHANGES.SIMD.rst, a release note.
+      Done 2026-11-04. `fast_mode.rst` names no build, so it is unchanged;
+      the release note is the CHANGES.SIMD.rst entry (the fork's
+      changelog; `docs/releasenotes/` is Pillow's).
 
 ### Phase C: x86 Linux wheels
 
