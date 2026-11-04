@@ -17,6 +17,7 @@
 #include "ResampleSIMD.c"
 #include "ConvertSIMD.c"
 #include "ColorLUTSIMD.c"
+#include "GeometrySIMD.c"
 
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
@@ -25,6 +26,7 @@ const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .resample = &resample_simd_kernels,
     .convert = &convert_simd_kernels,
     .colorlut = &colorlut_simd_kernels,
+    .geometry = &geometry_simd_kernels,
 };
 
 #endif
