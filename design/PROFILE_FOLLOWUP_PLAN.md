@@ -1,9 +1,9 @@
 # Plan: the baseline's four findings
 
-Status: planned 2026-11-04, for the "what this suggests" items of
-[BASELINE_2026-11-04.md](BASELINE_2026-11-04.md), in the order of
+Status: planned and done 2026-11-04, for the "what this suggests" items
+of [BASELINE_2026-11-04.md](BASELINE_2026-11-04.md), in the order of
 [OPTIMIZATION_METHOD.md](OPTIMIZATION_METHOD.md). What came out of it is
-at the end.
+at the end: P1 to P5 done, P6 measured and left.
 
 The four findings, as the baseline stated them:
 

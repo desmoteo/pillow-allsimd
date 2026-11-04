@@ -209,6 +209,10 @@ describe:
 - [BASELINE_2026-11-04.md](design/BASELINE_2026-11-04.md): tests,
   timings, hardware counters and the full-API profile of the branch
   after the dispatch build, and what they suggest for the next round.
+- [PROFILE_FOLLOWUP_PLAN.md](design/PROFILE_FOLLOWUP_PLAN.md): that
+  round: libdeflate for PNG saving, the masked histogram, the quantizer's
+  hash table, the 3x3 mode filter kernel, the dithers two rows at a time,
+  each measured and verified pixel for pixel.
 
 
 ## Benchmarks

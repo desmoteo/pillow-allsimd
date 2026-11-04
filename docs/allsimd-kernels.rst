@@ -1545,6 +1545,19 @@ on x86 and 7.7x on arm64, RGB to YCbCr 5.0x and 2.4x, YCbCr to RGB 7.2x
 and 3.0x, all ahead of OpenCV; see :ref:`fast-mode` and, until the
 fast-mode section is written, ``design/SIMD_FAST_KERNELS.md``.
 
+**The dithers (2026-11-04).** The Floyd-Steinberg conversions to mode
+1 and to a palette are a serial chain of about ten dependent operations
+per pixel, which sets their speed, so they are not vector code; what
+changed is the schedule. ``tobilevel()`` and ``topalette()`` do two
+rows at a time, the second two pixels behind the first: a pixel needs
+the errors of the row above at x + 1, which the first row has written
+by then, so the two chains overlap, and the rows alternate between two
+error buffers. The per-pixel body is Pillow's, so the pixels are the
+same (checked over fourteen widths and eight heights, noise and
+gradients, with the palette dither's closing write of the blue terms
+into the slots past the row's end kept as it was): L to 1 1.74x, RGB
+to 1 1.60x, RGB to the web palette 1.62x on 2560×1600.
+
 Code map
 ~~~~~~~~
 
@@ -2408,13 +2421,29 @@ The idea
   in the scalar search's order, so that ties go where they did (the
   keys fit 27 bits), eight entries per AVX2 step, four per SSE4 or NEON
   step. The median-box search stays scalar: it starts near the answer,
-  and a full scan was slower with many colours.
+  and a full scan was slower with many colours. Then (2026-11-04) the
+  colour hash table itself, where the median cut spent most of its
+  time: the nodes keep their hash, and the pixel table, whose
+  comparison orders by that hash, walks its chains on integers instead
+  of calling ``pixel_cmp``, which recomputed both pixels' packed values
+  at every step; the bucket is a multiply-shift modulus instead of a
+  division by the table's prime; a run of equal pixels is one insertion
+  counting them all; and the passes that looked every pixel up again
+  take the box from the leaves' pixel lists (each colour with its count;
+  the hash is injective at every scale, checked over all 16.7 million
+  colours) or, with a scaled table, from a direct map of scaled cell to
+  box. Chains, merge points and iteration order are unchanged, so the
+  palettes are bit-identical: median cut 2.1x, the adaptive conversion
+  1.7x on a 2560×1600 photo.
 * **The histogram in four tables.** On x86, neighbouring pixels count
   into four separate tables, so that the increments of equal bytes
   don't serialize, and the padding bytes of 2- and 3-band images are
   skipped: 13.8 to 5.8 ms against Pillow 12.3. Pillow 13 then rewrote
   its own loops, which are level with the tables on x86 and 1.1x faster
-  on arm64, where they are used.
+  on arm64, where they are used. The masked histogram (2026-11-04) counts
+  the same way, with the mask byte as the increment (0 or 1) instead of
+  a branch per pixel, which on a random mask mispredicted: 12.5 to 2.1 ms
+  on x86, the same counts.
 
 Why the builds agree
 ~~~~~~~~~~~~~~~~~~~~
@@ -2534,7 +2563,9 @@ Code map
 * ``Quant.c``: ``nearest_palette_new()`` and the colour cache;
   ``QuantSIMD.c`` (the ``quant`` group): ``nearest_entry_simd()``;
   ``QuantNearest.h``: ``NearestPalette``; ``QuantHash.c``: the node
-  blocks. ``Histo.c``: ``histogram_u8()``, two versions.
+  blocks, ``_hashtable_find()`` and ``hashtable_order_by_hash()``;
+  ``Quant.c``: ``sum_box_leaves()``, ``build_box_map()``. ``Histo.c``:
+  ``histogram_u8()``, two versions, and ``histogram_u8_masked()``.
 * Tests: ``Tests/test_codecs_simd.py``.
 
 Pitfalls met on the way: vectorizing the PNG decoder's Sub, Average and
