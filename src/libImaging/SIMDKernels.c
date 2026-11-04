@@ -15,12 +15,14 @@
 #include "FilterSIMD.c"
 #include "ReduceSIMD.c"
 #include "ResampleSIMD.c"
+#include "ConvertSIMD.c"
 
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
     .filter = &filter_simd_kernels,
     .reduce = &reduce_simd_kernels,
     .resample = &resample_simd_kernels,
+    .convert = &convert_simd_kernels,
 };
 
 #endif

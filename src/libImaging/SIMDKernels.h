@@ -156,6 +156,29 @@ typedef struct {
     ImagingResampleFastVrowFn fast_vrow;
 } ImagingSIMDResampleKernels;
 
+/* Mode conversions (ConvertSIMD.c, ConvertYCbCrSIMD.c): a row of pixels
+   in, a row out. Each does the pixels its vector loop can and returns how
+   many; Convert.c finishes the row from there. */
+typedef int (*ImagingSIMDRowFn)(UINT8 *out, const UINT8 *in, int pixels);
+
+typedef struct {
+    ImagingSIMDRowFn l2rgb;
+    ImagingSIMDRowFn rgb2l;
+    ImagingSIMDRowFn rgb2la;
+    ImagingSIMDRowFn rgb2i;
+    ImagingSIMDRowFn rgba2la;
+    ImagingSIMDRowFn rgb2hsv;
+    ImagingSIMDRowFn rgb2hsv_fast;
+    ImagingSIMDRowFn rgb2rgba;
+    ImagingSIMDRowFn rgb2cmyk;
+    ImagingSIMDRowFn premultiply;   /* RGBA to RGBa */
+    ImagingSIMDRowFn unpremultiply; /* RGBa to RGBA */
+    ImagingSIMDRowFn rgb2ycbcr;
+    ImagingSIMDRowFn ycbcr2rgb;
+    ImagingSIMDRowFn rgb2ycbcr_fast;
+    ImagingSIMDRowFn ycbcr2rgb_fast;
+} ImagingSIMDConvertKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -164,6 +187,7 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDFilterKernels *filter;
     const ImagingSIMDReduceKernels *reduce;
     const ImagingSIMDResampleKernels *resample;
+    const ImagingSIMDConvertKernels *convert;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */
