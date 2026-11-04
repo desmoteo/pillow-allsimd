@@ -259,11 +259,18 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
       blur's direct passes, 3 to 5% slower, to confirm in measurement 1.
       The Jetson was unreachable on 2026-11-04; NEON was built and tested
       under QEMU instead, and the Jetson run is still to do.
-- [ ] A13. Measurement 1. The kernels page's Appendix B (file map) and the
+- [x] A13. Measurement 1. The kernels page's Appendix B (file map) and the
       code maps of the sections list the companions; CHANGES.SIMD.rst.
-      Docs and changelog done 2026-11-04; the measurement runs
-      `checks/simd_bench.py` on the `-O3` Docker builds of b8fb92778 and
-      HEAD (`bench-results/ab-phaseA-{avx2,sse4}.txt`).
+      Done 2026-11-04. The measurement (`checks/simd_bench.py`, 43
+      operations, best of 5 interleaved rounds, the `-O3` Docker builds of
+      b8fb92778 and 770e78be3, `bench-results/ab-phaseA-{avx2,sse4}.txt`):
+      outputs identical; AVX2 between 0.93x and 1.08x with no pattern
+      (premultiply 0.93x, colour LUT 1.06x, max filter 1.07x); SSE4 between
+      0.87x and 1.08x, most within 3%, the blurs and the 5x5 filter at
+      0.96-0.97x and the reduces by 8 at 0.87x (0.50 to 0.57 ms, a
+      whole-image kernel called once, so layout rather than calls). Within
+      the noise of single runs; the published benchmark after phase B will
+      settle it.
 
 ### Phase B: the tiers (finding 11)
 
