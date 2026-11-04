@@ -20,7 +20,7 @@ Cortex-A78AE, GCC 14). Unless a section says "fast mode", they are for
 exact mode, Pillow's arithmetic.
 
 The page is written section by section. Written so far: the ground rules,
-resampling, the blurs and the kernel filters. To come: rank filters,
+resampling, the blurs, the kernel filters and the rank filters. To come:
 colour conversions, compositing and channel operations, geometry, drawing and
 text, codecs and packing, what was tried and dropped, where OpenCV and
 libvips are still faster, and the fast-mode kernels (meanwhile,
@@ -1014,3 +1014,228 @@ follow-ups; AVX2 5×5 float kernels gained nothing for 4-byte pixels and
 lost (0.57x) for 1-byte ones, and were dropped; and on arm64 the
 decision per pixel size went opposite ways for the float kernels, as it
 did for the blurs.
+
+Rank filters
+------------
+
+``ImageFilter.MedianFilter``, ``MinFilter``, ``MaxFilter`` and
+``RankFilter`` (``RankFilter.c``), and ``ImageFilter.ModeFilter``
+(``ModeFilter.c``). These have the largest factors on this page, 50x to
+500x, and most of each factor is the algorithm: the vector code is a
+minimum and a maximum of bytes, and the compiler writes much of it.
+
+What Pillow computes
+~~~~~~~~~~~~~~~~~~~~
+
+A rank filter of size *s* replaces each pixel with the *k*-th smallest of
+the *s*\ ² pixels around it (*k* = 0 for the minimum, *s*\ ² − 1 for the
+maximum, *s*\ ² / 2 for the median), with the pixels beyond the edges
+repeating the edge pixels: ``RankFilter.filter()`` expands the image by
+*s* / 2 pixels on each side (``ImagingExpand()``, a copy) and filters the
+copy. Multi-band images are filtered band by band: ``Image.filter()``
+splits them, filters each band and merges. A rank filter has no
+arithmetic, so there is nothing to round: any method that selects the
+*k*-th value gives the same pixels.
+
+Pillow 13 selects with Wirth's quickselect on a copy of each window
+(``memcpy`` of each row of the window, then a partitioning loop whose
+branches depend on the data: 40 to 70 mispredictions per pixel). A 3×3
+median of a 2560×1600 RGB image takes 1.2 s, a 5×5 one 4 s.
+
+``ModeFilter`` writes the most frequent value of the window if it occurs
+more than twice (the lowest of equally frequent ones) and the pixel
+itself otherwise; Pillow 13 builds a 256-bin histogram from scratch for
+every pixel and scans all of it.
+
+The idea
+~~~~~~~~
+
+* **Sorting networks over rows of pixels.** A sorting network is a fixed
+  sequence of compare-exchanges, the same for every input; applied to
+  *s*\ ² rows of 256 pixels at once (one row per window position), each
+  compare-exchange is a minimum and a maximum of two rows of bytes,
+  which has no branches and which every compiler vectorizes (x86-64's
+  baseline has ``pminub``; the portable build is 50 to 85x Pillow 13 on
+  the medians and 270x on minimum and maximum). The network is an optimal 25-comparator one for nine values,
+  and for larger windows Batcher's odd-even merge sort for the next
+  power of two with the comparators that touch wires past *s*\ ² left
+  out (those wires can be taken as holding the largest value, which no
+  comparator moves); and it is pruned to the comparators that the wire
+  of the requested rank depends on, 113 of 140 for the 5×5 median, 319
+  of 394 for 7×7. Sizes up to 11×11 use this; larger ones keep
+  quickselect.
+* **No expanded copy.** The fast paths read the image itself
+  (``rankfilter(size, rank, True)``) and repeat the edges as they load:
+  rows beyond the image clamp to the first or last row, and the chunks
+  at a row's ends are filled with the edge pixel: a 3×3 median of a
+  1280×800 L image went from 2.4 to 0.95 ms.
+* **All bands in one pass.** For 4-byte pixels the neighbours of a byte
+  are 4 bytes apart and the edges repeat whole pixels, so filtering
+  every byte of the row with the same byte of its neighbours filters
+  every band at once (``ImagingRankFilterSameSize()``), and
+  ``Image.filter()`` hands those images over instead of splitting and
+  merging. It also filters the padding byte of RGB, a quarter more work,
+  so ``ImagingRankFilterAllBands()`` says when it pays: minimum,
+  maximum, the register medians, and 4-band images; a 3-band image with
+  the general network goes band by band, as it was 0.81x on arm64
+  otherwise. A subclass that overrides ``filter()`` keeps the
+  band-by-band path, so that its override still runs.
+* **Medians in registers.** For 3×3 and 5×5 the nine or 25 neighbours
+  are loaded straight from the rows into vectors and go through a
+  median network there, Paeth's 19 comparators for nine values and
+  Devillard's 99 for 25 (checked for all 2²⁵ inputs of 0 and 1, which by
+  the 0-1 principle covers every input); the compiler drops the half of
+  each comparator whose result isn't used. 32 output bytes per step with
+  AVX2, 16 with SSE4 and NEON. The 5×5 network needs more than SSE4's 16
+  registers, which spill: 10.3 ms for L against 4.6 with AVX2.
+* **Minimum and maximum separably.** The minimum of an *s*\ ×\ *s*
+  window is the minimum over *s* rows of the minimum over *s* pixels of
+  each row, 2\ *s* operations per pixel instead of *s*\ ². The row
+  results go to a ring of *s* rows (they went to a whole-image buffer,
+  16 MB for RGB, freshly allocated on every call), and ``RankMinMaxLine()``
+  takes all *s* sources of a line in one vector pass, with the 3×3 case
+  unrolled; the row ends clamp the pixel index, where a padded copy of
+  each row had been 31% of a 3×3 minimum's time. Any size.
+* **The mode filter by columns.** The histogram is kept for the row and
+  updated by one column entering and one leaving per pixel; windows of
+  fewer than 16 values look up the counts of their own values only, and
+  larger ones take the maximum of the 256 counts (a vectorized loop)
+  and its first index. The same tie-break and the same "more than
+  twice" rule: 2560×1600 L, size 3, 1195 to 94 ms, sizes 5 to 17 3.4x
+  to 4.8x.
+
+The vector code
+~~~~~~~~~~~~~~~
+
+There is little of it, and it is the same on both architectures. The
+network path (``RankFilterNetwork_u8()``) is portable C,
+``RankCompareExchange()`` over ``RANK_CHUNK`` = 256 bytes with
+``restrict`` pointers, which GCC turns into ``pminub``/``pmaxub`` or
+``umin``/``umax`` loops at ``-O2``; a chunk of every window position is
+copied into a buffer first (``memcpy``, or the edge fill). The register
+medians and the min/max line are written with four macros, ``RANK_LOAD``,
+``RANK_STORE``, ``RANK_VMIN`` and ``RANK_VMAX``, defined for AVX2 (32
+bytes), SSE4 and NEON (16); ``RANK_SORT(a, b)`` is a minimum and a
+maximum of two vectors, and the two networks are written out as lists of
+``RANK_SORT``.
+
+Two details are for ``-O2``, where Debian, Ubuntu and conda build
+Python. The register medians index their vectors with constants only
+(``RANK_LOAD3``, ``RANK_LOAD5``): with the loads in a loop that GCC
+doesn't unroll at ``-O2``, one variable index kept the whole array in
+memory, 5.0 ms instead of 2.8 for a 3×3 median of RGB. And the min/max
+line loops take ``restrict`` sources, since GCC's ``-O2`` cost model
+leaves a loop scalar rather than add the run-time check that the rows
+don't overlap.
+
+Why the builds agree
+~~~~~~~~~~~~~~~~~~~~
+
+Nothing is computed, so nothing is rounded: every path returns the
+*k*-th value of the window, and a sorting network returns it whatever
+the input, which the 0-1 principle lets the median networks be checked
+for exhaustively. The checks compare the paths against each other and
+against Python references: ``test_rankfilter_3x3_all_ranks``,
+``test_rankfilter_network_ranks`` (sizes 5 to 11), ``test_min_max_filter_any_size``,
+``test_rankfilter_same_size`` (no expanded copy against the expanded
+copy, images smaller than the window included),
+``test_rankfilter_all_bands_at_once`` (ten modes against band by band),
+``test_median3_matches_reference`` at every width around the vector
+width, ``test_modefilter_matches_reference`` and
+``test_rankfilter_subclass_filter_is_used``, all in
+``Tests/test_image_filter.py``; ``checks/simd_hashes.py``'s ``rank
+filters`` area (L and RGB, sizes 3 to 11, median, minimum, maximum and a
+rank of *s*\ ² / 3) agrees on every build.
+
+Numbers
+~~~~~~~
+
+2560×1600, times faster than Pillow 13.0.0, which took the milliseconds
+shown. The "portable" column is the fork's build without SIMD, where
+the compiler vectorizes the networks.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Filter
+     - Pillow 13 (x86, ms)
+     - Portable
+     - SSE4
+     - AVX2
+     - Pillow 13 (arm64, ms)
+     - NEON
+   * - Median 3×3 RGB
+     - 1,184
+     - 50x
+     - 218x
+     - 424x
+     - 1,262
+     - 154x
+   * - Median 5×5 RGB
+     - 4,023
+     - 54x
+     - 128x
+     - 252x
+     - 3,933
+     - 83x
+   * - Median 3×3 L
+     - 384
+     - 85x
+     - 280x
+     - 541x
+     - 410
+     - 191x
+   * - Minimum 3×3 RGB
+     - 818
+     - 273x
+     - 439x
+     - 479x
+     - 884
+     - 298x
+   * - Maximum 3×3 RGB
+     - 811
+     - 272x
+     - 386x
+     - 433x
+     - 881
+     - 253x
+
+In milliseconds, the AVX2 build's 3×3 median of RGB takes 2.8 ms, the
+5×5 one 16, the L one 0.7, the minimum and maximum 1.7 and 1.9; the NEON
+build 8.2, 48, 2.1, 3.0 and 3.5. Pillow-SIMD has no rank filter kernels
+(1.0x). OpenCV's ``medianBlur`` (sorting networks too, KleidiCV's on
+arm64) is 1.3x faster on the 3×3 RGB median on x86 and 1.6x on arm64,
+level with the 5×5 and L medians on x86 and 1.1x to 1.3x ahead on them
+on arm64; its ``erode`` and ``dilate`` are 1.4x and 1.5x faster on x86
+and within 10% on arm64. What remains of the gap is
+structural: OpenCV moves 3 bytes per RGB pixel where Pillow's layout has
+4, and its morphology makes two output rows per step, sharing the rows
+they have in common (``design/PERFORMANCE_GAPS.md``). The mode filter
+isn't in the benchmark; its figures are above.
+
+Code map
+~~~~~~~~
+
+* ``RankFilter.c``: ``RankNetworkBatcher()`` and ``RankNetworkPrune()``,
+  ``RankFilterNetwork_u8()`` (any rank, sizes 3 to 11),
+  ``RankFilterMedianVec_u8()`` with the two networks and the
+  ``RankFilterMedian3_u8()``/``Median5`` entries, ``RankMinMaxLine()`` and
+  ``RankFilterMinMax_u8()``, ``ImagingRankFilter()`` (Pillow's entry, on an
+  expanded image), ``ImagingRankFilterAllBands()`` and
+  ``ImagingRankFilterSameSize()`` (the fast paths on the image itself,
+  1-byte and 4-byte pixels).
+* ``ModeFilter.c``.
+* ``src/PIL/ImageFilter.py``: ``RankFilter.filter()`` and
+  ``RankFilter._filter_bands()``; ``Image.filter()`` in
+  ``src/PIL/Image.py``, which calls the latter for multi-band images.
+* Tests: the rank and mode tests at the end of
+  ``Tests/test_image_filter.py``.
+
+Pitfalls met on the way: the first version of "all bands at once" made
+the 5×5 median of RGB 0.81x on arm64, from the padding byte, hence the
+rule for when it pays; the register median was 1.8x slower at ``-O2``
+than at ``-O3`` until the loads used constant indices; the min/max row
+results in a whole-image buffer cost page faults on every call; and a
+rank filter size set after ``__init__`` must still raise from
+``expand()`` as Pillow's does, so ``filter()`` checks the size again
+before taking the path without the copy.
