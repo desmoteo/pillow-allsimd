@@ -24,10 +24,12 @@ Unreleased
   0.32x Pillow 13 on arm64. Pointer increments, as in Pillow; same pixels
 - Documentation: "How the kernels work" (``docs/allsimd-kernels.rst``),
   the explanation of the SIMD kernels for contributors planned in
-  ``design/SIMD_EXPLAINER_PLAN.md``, written section by section: so far
-  the ground rules, resampling, the blurs, the kernel filters, the rank
-  filters, the colour conversions, compositing and the channel operations,
-  geometry, drawing and text, and codecs and packing
+  ``design/SIMD_EXPLAINER_PLAN.md``: the ground rules, then each
+  operation (what Pillow computes, the idea, the x86 and arm64 kernels,
+  why the builds agree and the exceptions, the numbers, a code map),
+  what was tried and dropped, where OpenCV and libvips are still faster,
+  the fast-mode kernels, and the overall numbers, a file map and the
+  tools
 
 13.0.0.post2 (2026-11-03)
 -------------------------
