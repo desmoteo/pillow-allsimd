@@ -32,6 +32,8 @@
 #include "BandsSIMD.c"
 #include "PasteSIMD.c"
 #include "DrawSIMD.c"
+#include "QuantSIMD.c"
+#include "RankFilterSIMD.c"
 
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
@@ -55,6 +57,8 @@ const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .bands = &bands_simd_kernels,
     .paste = &paste_simd_kernels,
     .draw = &draw_simd_kernels,
+    .quant = &quant_simd_kernels,
+    .rank = &rank_simd_kernels,
 };
 
 #endif
