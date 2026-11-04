@@ -1042,9 +1042,11 @@ class pil_build_ext(build_ext):
     def _configure_simd(self) -> str:
         """Add the compile flags for the SIMD kernels in PIL._imaging.
 
-        -C simd=auto (default) picks SSE4.1 on x86 and NEON on arm64,
-        -C simd=avx2 adds AVX2 on x86, -C simd=avxvnni adds AVX2 and AVX-VNNI
-        (Intel Alder Lake, Sapphire Rapids and newer, AMD Zen 5),
+        -C simd=auto (default) picks dispatch on x86-64 (one build with
+        SSE4.1, AVX2 and AVX-VNNI kernels, chosen when _imaging loads),
+        SSE4.1 on 32-bit x86 and NEON on arm64; -C simd=sse4 builds SSE4.1
+        only, -C simd=avx2 adds AVX2 on x86, -C simd=avxvnni adds AVX2 and
+        AVX-VNNI (Intel Alder Lake, Sapphire Rapids and newer, AMD Zen 5),
         -C simd=native builds for the CPU of the build machine (-march=native,
         float contraction off so results don't change), -C simd=native512 also
         lets the compiler use 512-bit vectors; such builds only run on CPUs
@@ -1054,6 +1056,7 @@ class pil_build_ext(build_ext):
         requested = configuration.get("simd", ["auto"])[-1]
         if requested not in (
             "auto",
+            "dispatch",
             "sse4",
             "avx2",
             "avxvnni",
@@ -1072,6 +1075,8 @@ class pil_build_ext(build_ext):
 
         args: list[str] = []
         macros: list[tuple[str, str | None]] = []
+        # a dispatch build: the kernel files of each tier and their flags
+        tier_flags: dict[str, list[str]] = {}
         if requested == "disable":
             macros.append(("IMAGING_SIMD_DISABLE", None))
             simd = "disabled"
@@ -1111,7 +1116,34 @@ class pil_build_ext(build_ext):
             if requested == "neon":
                 msg = "'-C simd=neon' requires an arm64 target"
                 raise ValueError(msg)
-            if requested == "avxvnni":
+            x86_64 = struct.calcsize("P") == 8 and all(
+                a in ("x86_64", "amd64") for a in arches
+            )
+            if requested == "dispatch" and not x86_64:
+                msg = "'-C simd=dispatch' requires an x86-64 target"
+                raise ValueError(msg)
+            if requested in ("auto", "dispatch") and x86_64:
+                # One build with SSE4.1, AVX2 and AVX-VNNI kernels, chosen
+                # when _imaging loads (SIMDDispatch.c): SIMDKernels.c is
+                # compiled once per tier through the SIMDKernels_*.c stubs,
+                # each with its instruction set, and the other files get
+                # none beyond x86-64's. MSVC compiles any intrinsic without
+                # a flag, and has no AVX-VNNI tier.
+                macros.append(("IMAGING_SIMD_DISPATCH", None))
+                tier_flags["SIMDKernels_sse4.c"] = [] if msvc else ["-msse4.1"]
+                tier_flags["SIMDKernels_avx2.c"] = (
+                    [] if msvc else ["-msse4.1", "-mavx2"]
+                )
+                simd = "dispatch (SSE4.1, AVX2)"
+                if not msvc:
+                    tier_flags["SIMDKernels_avxvnni.c"] = [
+                        "-msse4.1",
+                        "-mavx2",
+                        "-mavxvnni",
+                    ]
+                    macros.append(("IMAGING_SIMD_DISPATCH_AVXVNNI", None))
+                    simd = "dispatch (SSE4.1, AVX2, AVX-VNNI)"
+            elif requested == "avxvnni":
                 if msvc:
                     msg = "'-C simd=avxvnni' is not supported with MSVC"
                     raise ValueError(msg)
@@ -1125,9 +1157,13 @@ class pil_build_ext(build_ext):
                 simd = "SSE4.1"
             # (32-bit Python in a container on a 64-bit kernel reports
             # linux-x86_64, but its pointers are 4 bytes)
-            if not msvc and (
-                all(a in ("i386", "i686", "x86") for a in arches)
-                or struct.calcsize("P") == 4
+            if (
+                not msvc
+                and not tier_flags
+                and (
+                    all(a in ("i386", "i686", "x86") for a in arches)
+                    or struct.calcsize("P") == 4
+                )
             ):
                 # 32-bit x86 does double arithmetic on the x87 unit by default,
                 # with 80-bit intermediates, so results depend on register
@@ -1163,7 +1199,23 @@ class pil_build_ext(build_ext):
             if extension.name == "PIL._imaging":
                 extension.extra_compile_args += args
                 extension.define_macros += macros
-        _dbg(f"SIMD for {arches}: {simd} {args}")
+                if tier_flags:
+                    extension.sources = [
+                        s for s in extension.sources if not s.endswith("SIMDKernels.c")
+                    ] + [f"src/libImaging/{f}" for f in tier_flags]
+        if tier_flags and hasattr(self.compiler, "_compile"):
+            # per-file flags: the unix compiler (and pybind11's parallel
+            # compile) compiles each source through _compile
+            original_compile = self.compiler._compile
+
+            def _compile(obj, src, ext, cc_args, extra_postargs, pp_opts):  # type: ignore[no-untyped-def]
+                flags = tier_flags.get(os.path.basename(src))
+                if flags:
+                    extra_postargs = list(extra_postargs) + flags
+                return original_compile(obj, src, ext, cc_args, extra_postargs, pp_opts)
+
+            self.compiler._compile = _compile
+        _dbg(f"SIMD for {arches}: {simd} {args} {tier_flags}")
         return simd
 
     def summary_report(self, feature: ext_feature) -> None:

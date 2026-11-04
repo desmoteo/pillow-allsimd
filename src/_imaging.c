@@ -4913,6 +4913,34 @@ _get_fast(PyObject *self, PyObject *args) {
     return PyBool_FromLong(ImagingGetFast() != 0);
 }
 
+/* Pillow-AllSIMD: makes a built SIMD tier the active one, for tests and
+   benchmarks (SIMDDispatch.c); simd_kernels follows. */
+static PyObject *
+_set_simd(PyObject *self, PyObject *args) {
+    const char *name;
+    PyObject *value;
+    int r;
+    if (!PyArg_ParseTuple(args, "s:set_simd", &name)) {
+        return NULL;
+    }
+    r = ImagingSIMDSelect(name);
+    if (r == -1) {
+        return PyErr_Format(PyExc_ValueError, "no SIMD tier '%s' in this build", name);
+    }
+    if (r == -2) {
+        return PyErr_Format(
+            PyExc_ValueError, "this CPU doesn't support the '%s' SIMD tier", name
+        );
+    }
+    value = PyUnicode_FromString(ImagingSIMD->name);
+    if (!value || PyObject_SetAttrString(self, "simd_kernels", value) < 0) {
+        Py_XDECREF(value);
+        return NULL;
+    }
+    Py_DECREF(value);
+    Py_RETURN_NONE;
+}
+
 static PyObject *
 _clear_cache(PyObject *self, PyObject *args) {
     int i = 0;
@@ -5127,6 +5155,7 @@ static PyMethodDef functions[] = {
     {"get_fast", (PyCFunction)_get_fast, METH_NOARGS},
     {"set_fast", (PyCFunction)_set_fast, METH_VARARGS},
     {"set_fast_thread", (PyCFunction)_set_fast_thread, METH_VARARGS},
+    {"set_simd", (PyCFunction)_set_simd, METH_VARARGS},
 
     {NULL, NULL} /* sentinel */
 };
@@ -5314,14 +5343,38 @@ setup_module(PyObject *m) {
         return -1;
     }
 
-    /* Pillow-AllSIMD: the SIMD kernels for this CPU (SIMDDispatch.c) */
+    /* Pillow-AllSIMD: the SIMD kernels for this CPU (SIMDDispatch.c):
+       simd_kernels names the active tier, simd_tiers those built */
     {
-        const char *error;
+        const char *error, *names[8];
+        PyObject *tiers;
+        int n, i;
         if (ImagingSIMDInit(&error) < 0) {
             PyErr_SetString(PyExc_ImportError, error);
             return -1;
         }
         if (PyModule_AddStringConstant(m, "simd_kernels", ImagingSIMD->name) < 0) {
+            return -1;
+        }
+        n = ImagingSIMDTiers(names, 8);
+        tiers = PyTuple_New(n);
+        if (!tiers) {
+            return -1;
+        }
+        for (i = 0; i < n; i++) {
+            PyObject *name = PyUnicode_FromString(names[i]);
+            if (!name) {
+                Py_DECREF(tiers);
+                return -1;
+            }
+            PyTuple_SET_ITEM(tiers, i, name);
+        }
+        if (PyModule_AddObjectRef(m, "simd_tiers", tiers) < 0) {
+            Py_DECREF(tiers);
+            return -1;
+        }
+        Py_DECREF(tiers);
+        if (PyModule_AddObjectRef(m, "HAVE_SIMD", Py_True) < 0) {
             return -1;
         }
     }

@@ -1,0 +1,4 @@
+/* The AVX2 tier of a dispatch build: SIMDKernels.c compiled for it
+   (setup.py adds -msse4.1 -mavx2 for this file). */
+#define IMAGING_SIMD_TIER IMAGING_SIMD_TIER_AVX2
+#include "SIMDKernels.c"

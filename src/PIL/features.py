@@ -133,6 +133,7 @@ features: dict[str, tuple[str, str, str | None]] = {
     "libimagequant": ("PIL._imaging", "HAVE_LIBIMAGEQUANT", "imagequant_version"),
     "xcb": ("PIL._imaging", "HAVE_XCB", None),
     "fast": ("PIL._imaging", "HAVE_FAST", None),
+    "simd": ("PIL._imaging", "HAVE_SIMD", None),
 }
 
 
@@ -269,6 +270,11 @@ def pilinfo(out: IO[str] | None = None, supported_formats: bool = True) -> None:
         file=out,
     )
     print("-" * 68, file=out)
+
+    # Pillow-AllSIMD: the SIMD kernels in use and those built
+    if hasattr(Image.core, "simd_kernels"):
+        tiers = ", ".join(Image.core.simd_tiers)
+        print(f"--- SIMD kernels: {Image.core.simd_kernels} (built: {tiers})", file=out)
 
     for name, feature in [
         ("pil", "PIL CORE"),
