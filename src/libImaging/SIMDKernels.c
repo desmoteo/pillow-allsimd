@@ -20,6 +20,11 @@
 #include "GeometrySIMD.c"
 #include "TransformFastSIMD.c"
 #include "BoxBlurSIMD.c"
+#include "UnsharpMaskSIMD.c"
+#include "GaussianFastSIMD.c"
+#include "AlphaCompositeSIMD.c"
+#include "BlendSIMD.c"
+#include "ChopsSIMD.c"
 
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
@@ -31,6 +36,11 @@ const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .geometry = &geometry_simd_kernels,
     .transform_fast = &transform_fast_simd_kernels,
     .blur = &blur_simd_kernels,
+    .unsharp = &unsharp_simd_kernels,
+    .gauss = &gauss_simd_kernels,
+    .composite = &composite_simd_kernels,
+    .blend = &blend_simd_kernels,
+    .chops = &chops_simd_kernels,
 };
 
 #endif

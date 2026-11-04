@@ -293,6 +293,41 @@ typedef struct {
     );
 } ImagingSIMDBlurKernels;
 
+/* Row kernels that do the bytes their vector loops can and return how
+   many; the scalar file finishes the row. Unsharp mask
+   (UnsharpMaskSIMD.c): a row sharpened in place from its blurred copy.
+   Fast mode's Gaussian blur (GaussianFastSIMD.c): the taps of radius r,
+   weights w (w[0] at the centre), over the 2r + 1 sources. Alpha
+   composite (AlphaCompositeSIMD.c): src over dst into out, which may be
+   dst, rows of RGBA or LA pixels as bytes. Fast mode's blend
+   (BlendSIMD.c): in1 + (in2 - in1) a15 / 2^15. ImageChops
+   (ChopsSIMD.c): multiply (screen with invert = 255) and the saturating
+   add (sign 1) or subtract (sign -1). */
+typedef struct {
+    int (*row)(UINT8 *out, const UINT8 *in, int size, int percent, int threshold);
+} ImagingSIMDUnsharpKernels;
+
+typedef struct {
+    int (*taps)(UINT8 *out, const UINT8 **src, int r, const UINT16 *w, int n);
+} ImagingSIMDGaussKernels;
+
+typedef struct {
+    int (*row)(UINT8 *out, const UINT8 *dst, const UINT8 *src, int xsize);
+} ImagingSIMDCompositeKernels;
+
+typedef struct {
+    int (*fast_row)(UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n, INT16 a15);
+} ImagingSIMDBlendKernels;
+
+typedef struct {
+    int (*multiply_row)(
+        UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n, UINT8 invert
+    );
+    int (*saturate_row)(
+        UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n, int sign
+    );
+} ImagingSIMDChopsKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -306,6 +341,11 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDGeometryKernels *geometry;
     const ImagingSIMDTransformFastKernels *transform_fast;
     const ImagingSIMDBlurKernels *blur;
+    const ImagingSIMDUnsharpKernels *unsharp;
+    const ImagingSIMDGaussKernels *gauss;
+    const ImagingSIMDCompositeKernels *composite;
+    const ImagingSIMDBlendKernels *blend;
+    const ImagingSIMDChopsKernels *chops;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */

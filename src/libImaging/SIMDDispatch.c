@@ -17,6 +17,11 @@ static const ImagingSIMDColorLUTKernels no_colorlut_kernels = {0};
 static const ImagingSIMDGeometryKernels no_geometry_kernels = {0};
 static const ImagingSIMDTransformFastKernels no_transform_fast_kernels = {0};
 static const ImagingSIMDBlurKernels no_blur_kernels = {0};
+static const ImagingSIMDUnsharpKernels no_unsharp_kernels = {0};
+static const ImagingSIMDGaussKernels no_gauss_kernels = {0};
+static const ImagingSIMDCompositeKernels no_composite_kernels = {0};
+static const ImagingSIMDBlendKernels no_blend_kernels = {0};
+static const ImagingSIMDChopsKernels no_chops_kernels = {0};
 
 const ImagingSIMDKernels ImagingSIMDKernels_scalar = {
     .name = "scalar",
@@ -28,6 +33,11 @@ const ImagingSIMDKernels ImagingSIMDKernels_scalar = {
     .geometry = &no_geometry_kernels,
     .transform_fast = &no_transform_fast_kernels,
     .blur = &no_blur_kernels,
+    .unsharp = &no_unsharp_kernels,
+    .gauss = &no_gauss_kernels,
+    .composite = &no_composite_kernels,
+    .blend = &no_blend_kernels,
+    .chops = &no_chops_kernels,
 };
 
 const ImagingSIMDKernels *ImagingSIMD = &ImagingSIMDKernels_scalar;
