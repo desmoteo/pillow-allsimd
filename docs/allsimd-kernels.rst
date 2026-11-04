@@ -2896,3 +2896,7 @@ Appendix C: the tools
   figures and the fast-mode page's speed-ups from them, into regions
   marked with the benchmark commit they come from, which the lint
   workflow checks (``make tables``; ``design/GENERATED_TABLES_PLAN.md``).
+* ``design/OPTIMIZATION_METHOD.md``: the order in which these tools are
+  used on the next optimization (timings and callgrind, then the
+  hardware counters, then the compiler's remarks, then SIMD), and what
+  each stage rules out.

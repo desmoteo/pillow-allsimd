@@ -203,6 +203,9 @@ describe:
   checklist.
 - [SIMD_EXPLAINER_PLAN.md](design/SIMD_EXPLAINER_PLAN.md): the outline of a detailed
   explanation of every optimization on both architectures.
+- [OPTIMIZATION_METHOD.md](design/OPTIMIZATION_METHOD.md): how the next
+  optimization is found, made and verified, in stages, with the fork's
+  tools mapped onto each stage and the tooling left out.
 
 
 ## Benchmarks
