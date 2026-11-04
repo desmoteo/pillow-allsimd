@@ -33,6 +33,11 @@ Unreleased
   (``design/SIMD_DISPATCH_PLAN.md``, phase A). The same kernels, the same
   pixels: the hashes of every area are unchanged on the SSE4, AVX2 and
   scalar builds. ``_imaging.simd_kernels`` names the active tier
+- The AVX2 build's 3x3 float kernel filters on 4-byte images (a
+  ``Kernel`` whose coefficients don't fit 16 bits) use the SSE4 kernel:
+  the AVX2 one was 1.6 times slower and rounded 0.2% of the bytes
+  differently, so an AVX2 build's pixels now equal an SSE4 build's for
+  every operation
 - Documentation: "How the kernels work" (``docs/allsimd-kernels.rst``),
   the explanation of the SIMD kernels for contributors planned in
   ``design/SIMD_EXPLAINER_PLAN.md``: the ground rules, then each

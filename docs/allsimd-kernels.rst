@@ -918,9 +918,12 @@ the scalar build by at most one level: on the test image ``DETAIL`` in
 coefficients sum to 8191/8192). This is the one place in exact mode
 where a SIMD build doesn't give Pillow's pixels on purpose; it is
 Pillow-SIMD's behaviour and was kept. The float kernels differ from the
-scalar build by one level in about 0.2% of bytes, the 4-byte ones also
-between SSE4 and AVX2, whose summation orders differ; the 1-byte AVX2
-kernel equals SSE4 by construction.
+scalar build by one level in about 0.2% of bytes, and agree between the
+x86 tiers: the 3x3 kernel for 4-byte pixels had an AVX2 version that
+summed two columns in the two 128-bit halves and added them last, 0.2%
+of bytes off the SSE4 kernel's rounding, and it was dropped (it was also
+20% slower than the SSE4 kernel on the Core Ultra 9 285H); the 1-byte
+AVX2 kernel equals SSE4 by construction.
 
 The checks: ``test_filter`` in ``Tests/test_simd_consistency.py`` (flat
 images stay flat inside the border for integer and float kernels, every
@@ -2500,8 +2503,12 @@ On x86:
   kernel filters: 0.93 and 1.02x with AVX2, 0.89 and 0.46x with
   AVX-VNNI; the duplicated lanes already make two pixels per
   multiply-add. **AVX2 5×5 float kernels**: no gain (4-byte) and 0.57x
-  (1-byte). **Force-inlining the filter kernel per size** for its own
-  sake: 4% and 0%.
+  (1-byte). **The AVX2 3×3 float kernel for 4-byte pixels**, two columns
+  in the two 128-bit halves added last: 0.63x the SSE4 kernel, and 0.2%
+  of bytes off its rounding, which a build with several tiers can't
+  have; dropped in favour of the SSE4 kernel on every x86 tier.
+  **Force-inlining the filter kernel per size** for its own sake: 4% and
+  0%.
 * **Two rows per AVX2 vector** in the horizontal blur, the first time
   (Gaussian 1.08x, unsharp 0.84x); adopted once the passes kept rows in
   cache.
