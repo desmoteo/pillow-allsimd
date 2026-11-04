@@ -219,6 +219,25 @@ typedef struct {
     );
 } ImagingSIMDGeometryKernels;
 
+/* Fast mode's transforms (TransformFastSIMD.c): the whole region, tile by
+   tile, from the map and the bicubic table ImagingTransformFast prepared;
+   returns 1. */
+struct ImagingTFMap;
+typedef struct {
+    int (*tiles)(
+        Imaging imOut,
+        Imaging imIn,
+        const struct ImagingTFMap *map,
+        INT16 (*cubic)[4],
+        int x0,
+        int y0,
+        int x1,
+        int y1,
+        int bicubic,
+        int fill
+    );
+} ImagingSIMDTransformFastKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -230,6 +249,7 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDConvertKernels *convert;
     const ImagingSIMDColorLUTKernels *colorlut;
     const ImagingSIMDGeometryKernels *geometry;
+    const ImagingSIMDTransformFastKernels *transform_fast;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */
