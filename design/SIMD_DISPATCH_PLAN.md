@@ -221,18 +221,20 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
 
 ### Phase A: companion files and the kernel table (finding 3)
 
-- [ ] A1. `ImagingSIMDKernels`, `ImagingSIMD`, `IMAGING_SIMD_CALL`,
+- [x] A1. `ImagingSIMDKernels`, `ImagingSIMD`, `IMAGING_SIMD_CALL`,
       `SIMDKernels.c` with an empty table, `SIMDDispatch.c` with the
       static scalar table and `ImagingSIMDInit()` that selects the one
       compiled tier; `setup.py` lists the new sources. No kernel moves
-      yet; builds and hashes unchanged.
-- [ ] A2. The companions that already exist join `SIMDKernels.c`:
+      yet; builds and hashes unchanged. Done 2026-11-04 (69bf0883f).
+- [x] A2. The companions that already exist join `SIMDKernels.c`:
       `Resample.c` stops including `ResampleSIMD*.c` and `ResampleFast.c`'s
       SIMD loops, `Reduce.c` stops including `ReduceSIMD.c`, `Filter.c`
       stops including `FilterSIMD_*.c`; each gets table entries. Shared
       helpers (`clip8()`, the coefficient tables) move to a header where
-      both sides need them.
-- [ ] A3 to A12. One scalar file per commit, largest first: Convert.c and
+      both sides need them. Done 2026-11-04, three commits; the portable
+      resample kernels moved out of the companions into
+      `ResampleHorizontal.c` and `Resample.c`.
+- [x] A3 to A12. One scalar file per commit, largest first: Convert.c and
       ConvertYCbCr.c, Geometry.c, ColorLUT.c, TransformFast.c, BoxBlur.c
       with UnsharpMask.c and GaussianFast.c, AlphaComposite.c with
       Blend.c and Chops.c, ZipEncode.c with ZipDecode.c, Pack.c and
@@ -244,9 +246,24 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
       `test_image_resample`, `test_image_convert`, `test_imagechops`, the
       file's own tests). NEON is checked on the Jetson at the end of the
       phase with `checks/simd_test_remote.sh` and the hashes, and in CI on
-      the arm64 runners at every push.
+      the arm64 runners at every push. Done 2026-11-04 (0238a3998 to
+      35a821700, plus the `permute4` shuffle of `ImagingSIMD.h`, the last
+      SIMD code a scalar file compiled itself); the whole test suite
+      passes on the three x86 builds. Two lessons: the fast transforms,
+      first called per tile row of 64 pixels, cost the SSE4 build 14% in
+      calls and vector constants set up again on each call, so they are
+      called per region (`TransformFast.h`, instantiated once scalar and
+      once with the vector loops); and the one translation unit found
+      one name clash (`interleave4`), fixed with a per-area prefix.
+      Quick timings of each move are within noise except the SSE4 box
+      blur's direct passes, 3 to 5% slower, to confirm in measurement 1.
+      The Jetson was unreachable on 2026-11-04; NEON was built and tested
+      under QEMU instead, and the Jetson run is still to do.
 - [ ] A13. Measurement 1. The kernels page's Appendix B (file map) and the
       code maps of the sections list the companions; CHANGES.SIMD.rst.
+      Docs and changelog done 2026-11-04; the measurement runs
+      `checks/simd_bench.py` on the `-O3` Docker builds of b8fb92778 and
+      HEAD (`bench-results/ab-phaseA-{avx2,sse4}.txt`).
 
 ### Phase B: the tiers (finding 11)
 
