@@ -1,5 +1,6 @@
-/* Kernels for images with 4-byte pixels, included from Reduce.c.
-   They use the same arithmetic as the scalar code in Reduce.c. */
+/* Kernels for 8-bit images, compiled into SIMDKernels.c; Reduce.c calls
+   them through the table's reduce group. They use the same arithmetic as
+   the scalar code in Reduce.c. */
 
 #if defined(IMAGING_SIMD_SSE4)
 #define REDUCE_SIMD
@@ -968,3 +969,8 @@ ImagingReduce_1u8(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscal
     return 1;
 }
 #endif
+
+static const ImagingSIMDReduceKernels reduce_simd_kernels = {
+    .u8x4 = ImagingReduce_4u8,
+    .u8x1 = ImagingReduce_1u8,
+};

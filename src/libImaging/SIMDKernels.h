@@ -39,12 +39,22 @@ typedef struct {
     void (*f5x5_4u8)(Imaging imOut, Imaging im, const float *kernel, float offset);
 } ImagingSIMDFilterKernels;
 
+/* Integer box downscale (ReduceSIMD.c), 8-bit images with 4-byte (u8x4)
+   or 1-byte (u8x1) pixels. Each returns 0 for scales it has no kernel
+   for; otherwise it writes the output image but its last column and row
+   (ImagingReduceCorners). */
+typedef struct {
+    int (*u8x4)(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscale);
+    int (*u8x1)(Imaging imOut, Imaging imIn, int box[4], int xscale, int yscale);
+} ImagingSIMDReduceKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
     /* One group per area, never NULL: the scalar table's groups have
        every kernel NULL. */
     const ImagingSIMDFilterKernels *filter;
+    const ImagingSIMDReduceKernels *reduce;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */

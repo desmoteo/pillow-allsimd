@@ -440,6 +440,10 @@ extern Imaging
 ImagingResampleAlpha(Imaging imIn, int xsize, int ysize, int filter, float box[4]);
 extern Imaging
 ImagingReduce(Imaging imIn, int xscale, int yscale, int box[4]);
+/* The fixed-point reciprocal of a box's pixel count (Reduce.c), for the
+   kernels in ReduceSIMD.c too */
+extern UINT32
+division_UINT32(int divider, int result_bits);
 extern int
 ImagingTransform(
     Imaging imOut,
