@@ -14,6 +14,15 @@ Based on Pillow 13.0.0
   dispatch build below), so pip installs a wheel on x86-64 Linux now and
   ``-C simd=avx2`` is no longer needed; ``--no-binary pillow-allsimd``
   still builds from source, with the same three sets
+- The benchmark tables and figures of the documentation (the PyPI
+  description's table and headline figures, the kernels page's nine
+  "Numbers" tables and Appendix A, the fast-mode page's speed-ups, the
+  README's Gaussian figure) are written by ``checks/simd_tables.py`` from
+  the benchmark repository's data, like the chart, into marked regions
+  that name the benchmark commit; the lint workflow checks them against
+  it, so they can't drift (``make tables``). The hand-typed figures were
+  off by one in the last digit in a few cells; the fast-mode page's
+  speed-ups are now the published benchmark's, in their own table
 - ``Image.fast_mode()`` sets the mode of the thread it runs in, and
   restores that thread's previous setting: before, it set the process-wide
   flag, so two threads' blocks could restore it in the wrong order.

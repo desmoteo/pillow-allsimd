@@ -1,7 +1,26 @@
+.. generated: pypi-figures (checks/simd_tables.py, pillow-allsimd-perf@0d7d352f2d047c9ff9daffe99d7314c197cd2ab2)
+
+.. |fast-x86| replace:: 6.1
+.. |fast-arm64| replace:: 3.1
+.. |cases| replace:: 111
+.. |vs-pillow-simd| replace:: 2.9
+.. |opencv-cases| replace:: 104
+.. |opencv-x86| replace:: 78
+.. |opencv-arm64| replace:: 68
+.. |exact-x86| replace:: 5.4
+.. |exact-arm64| replace:: 2.5
+.. |date| replace:: 2026-10-31
+
+.. generated-end
+
 Pillow-AllSIMD
 ==============
 
+.. generated: pypi-headline (checks/simd_tables.py, pillow-allsimd-perf@0d7d352f2d047c9ff9daffe99d7314c197cd2ab2)
+
 **Pillow, 6 times as fast on x86-64 and 3 times as fast on arm64.**
+
+.. generated-end
 
 Pillow-AllSIMD is a drop-in replacement for `Pillow <https://python-pillow.org>`_
 13.0.0, the friendly PIL fork: the same ``PIL`` package and the same API, with
@@ -10,23 +29,23 @@ of `Pillow-SIMD <https://github.com/uploadcare/pillow-simd>`_, which brought
 SIMD to Pillow on x86.
 
 .. image:: https://raw.githubusercontent.com/desmoteo/pillow-allsimd/allsimd-13.0.0.post2/docs/resources/allsimd-speedups.svg
-   :alt: Bar chart: Pillow-AllSIMD is 6.1 times as fast as Pillow 13.0.0 on
-         x86-64 with AVX2 and 3.1 times on arm64 with NEON, as the geometric
-         mean of 111 operations; resizes 3.6 to 15.8 times, Gaussian blur at
-         radius 1 9.7 to 21.6 times, text drawing 17.5 to 19.7 times.
+   :alt: Bar chart: how many times faster than Pillow 13.0.0 Pillow-AllSIMD
+         runs ten operations, and the geometric mean of all, on x86-64 with
+         AVX2 and on arm64 with NEON; the numbers are in the table below.
    :target: https://desmoteo.github.io/pillow-allsimd-perf/
 
-- **Fast**: as the geometric mean of 111 operations on one thread, 6.1 times
-  as fast as Pillow 13.0.0 on x86-64 with AVX2 and 3.1 times on arm64 with
-  NEON. That is 2.9 times as fast as Pillow-SIMD 12.1.1 with AVX2, Pillow-SIMD's
-  last release. Of the 104 operations that OpenCV 5.0 also has, Pillow-AllSIMD
-  is faster in 78 on x86-64 and in 68 on arm64.
+- **Fast**: as the geometric mean of |cases| operations on one thread,
+  |fast-x86| times as fast as Pillow 13.0.0 on x86-64 with AVX2 and
+  |fast-arm64| times on arm64 with NEON. That is |vs-pillow-simd| times as
+  fast as Pillow-SIMD 12.1.1 with AVX2, Pillow-SIMD's last release. Of the
+  |opencv-cases| operations that OpenCV 5.0 also has, Pillow-AllSIMD is faster
+  in |opencv-x86| on x86-64 and in |opencv-arm64| on arm64.
 - **Drop-in**: your code doesn't change. Pillow's test suite passes on every
   build.
 - **Exact when you ask**: in fast mode (the default) a few operations give
   results that differ from Pillow's by a few levels at most, the same on every
-  build and CPU. Exact mode follows Pillow's arithmetic and is still 5.4
-  times as fast on x86-64 and 2.5 times on arm64.
+  build and CPU. Exact mode follows Pillow's arithmetic and is still
+  |exact-x86| times as fast on x86-64 and |exact-arm64| times on arm64.
 - **arm64 too**: NEON kernels for resizes, blurs, filters, conversions,
   transforms and more, tested on an NVIDIA Jetson Orin, in wheels for Linux
   (and macOS, as they are added to this release). Other CPUs build portable
@@ -39,6 +58,8 @@ Benchmarks
 
 Selected operations, one thread, a 2560×1600 RGB image. Each cell shows
 Pillow 13.0.0's time, then Pillow-AllSIMD's, then the speed-up:
+
+.. generated: pypi-benchmarks (checks/simd_tables.py, pillow-allsimd-perf@0d7d352f2d047c9ff9daffe99d7314c197cd2ab2)
 
 =====================================  =========================  ========================
 Operation                              x86-64, AVX2               arm64, NEON
@@ -61,13 +82,15 @@ Encode PNG                             789 → 509 ms, **1.6×**     1015 → 71
 JPEG load, rotate, resize, blur, save  86.1 → 28.6 ms, **3.0×**   112 → 66.4 ms, **1.7×**
 =====================================  =========================  ========================
 
+.. generated-end
+
 Codecs gain little: decoding and encoding are mostly libjpeg's, libpng's and
 libwebp's own work. The machines are an Intel Core Ultra 9 285H laptop (with
 turbo off) and an NVIDIA Jetson Orin (Cortex-A78AE). Each time is the best of
 3 interleaved rounds, in Docker with Python 3.12 and GCC 14, measured on
-2026-10-31 on the same x86-64 and arm64 code as this release. The
+|date| on the same x86-64 and arm64 code as this release. The
 `benchmark page <https://desmoteo.github.io/pillow-allsimd-perf/>`_ has all
-111 operations, in exact and fast mode. It also compares Pillow-SIMD, OpenCV,
+|cases| operations, in exact and fast mode. It also compares Pillow-SIMD, OpenCV,
 libvips and ImageMagick, with notes where another library's operation
 differs.
 

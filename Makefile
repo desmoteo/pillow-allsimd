@@ -128,6 +128,14 @@ readme:
 	python3 -m markdown2 README.md > .long-description.html && open .long-description.html
 
 
+# The benchmark tables and the chart of the documentation, from the data
+# of a checkout of the benchmark repository (checks/simd_tables.py)
+PERF ?= ../pillow-allsimd-perf
+.PHONY: tables
+tables:
+	python3 checks/simd_tables.py --data $(PERF)/docs/data --commit $$(git -C $(PERF) rev-parse HEAD)
+	python3 checks/simd_speedups_svg.py $(PERF)/docs/data docs/resources/allsimd-speedups.svg
+
 .PHONY: lint
 lint:
 	python3 -c "import tox" > /dev/null 2>&1 || python3 -m pip install tox
