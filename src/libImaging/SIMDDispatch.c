@@ -39,6 +39,7 @@ static const ImagingSIMDPasteKernels no_paste_kernels = {0};
 static const ImagingSIMDDrawKernels no_draw_kernels = {0};
 static const ImagingSIMDQuantKernels no_quant_kernels = {0};
 static const ImagingSIMDRankKernels no_rank_kernels = {0};
+static const ImagingSIMDModeKernels no_mode_kernels = {0};
 
 const ImagingSIMDKernels ImagingSIMDKernels_scalar = {
     .name = "scalar",
@@ -64,6 +65,7 @@ const ImagingSIMDKernels ImagingSIMDKernels_scalar = {
     .draw = &no_draw_kernels,
     .quant = &no_quant_kernels,
     .rank = &no_rank_kernels,
+    .mode = &no_mode_kernels,
 };
 
 const ImagingSIMDKernels *ImagingSIMD = &ImagingSIMDKernels_scalar;

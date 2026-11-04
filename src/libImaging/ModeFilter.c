@@ -39,6 +39,34 @@ mode_max_count(const int *histogram) {
 /* Windows with fewer values check those; larger ones scan the counts. */
 #define MODE_WINDOW_LIMIT 16
 
+/* The mode of one pixel's window x0..x1, y0..y1 (at most 3x3), each value
+   counted against the others: the highest count, the lowest value on a
+   tie, as the histogram scan below; the pixel itself when that count is 2
+   or less. For the pixels the vector kernel leaves. */
+static UINT8
+mode_window_pixel(Imaging im, int x, int y, int x0, int x1, int y0, int y1) {
+    UINT8 v[9];
+    int n = 0, i, j, xx, yy;
+    int bestcount = 0;
+    UINT8 best = 255;
+    for (yy = y0; yy <= y1; yy++) {
+        for (xx = x0; xx <= x1; xx++) {
+            v[n++] = IMAGING_PIXEL_L(im, xx, yy);
+        }
+    }
+    for (i = 0; i < n; i++) {
+        int count = 0;
+        for (j = 0; j < n; j++) {
+            count += v[j] == v[i];
+        }
+        if (count > bestcount || (count == bestcount && v[i] < best)) {
+            bestcount = count;
+            best = v[i];
+        }
+    }
+    return bestcount > 2 ? best : IMAGING_PIXEL_L(im, x, y);
+}
+
 Imaging
 ImagingModeFilter(Imaging im, int size) {
     Imaging imOut;
@@ -66,6 +94,27 @@ ImagingModeFilter(Imaging im, int size) {
         UINT8 *out = &IMAGING_PIXEL_L(imOut, 0, y);
         y0 = y - size < 0 ? 0 : y - size;
         y1 = y + size >= imOut->ysize ? imOut->ysize - 1 : y + size;
+
+        /* A 3x3 window on an inner row: the active tier's kernel does the
+           pixels it can (ModeFilterSIMD.c), this function the first pixel
+           and the last ones. */
+        if (size == 1 && ImagingSIMD->mode->mode3 && y >= 1 && y <= imOut->ysize - 2 &&
+            imOut->xsize >= 3) {
+            int done = ImagingSIMD->mode->mode3(
+                out,
+                &IMAGING_PIXEL_L(im, 0, y - 1),
+                &IMAGING_PIXEL_L(im, 0, y),
+                &IMAGING_PIXEL_L(im, 0, y + 1),
+                imOut->xsize
+            );
+            out[0] = mode_window_pixel(im, 0, y, 0, 1, y0, y1);
+            for (x = done; x < imOut->xsize; x++) {
+                x0 = x - 1;
+                x1 = x + 1 >= imOut->xsize ? imOut->xsize - 1 : x + 1;
+                out[x] = mode_window_pixel(im, x, y, x0, x1, y0, y1);
+            }
+            continue;
+        }
 
         /* The histogram of the window, updated by one column on each step. */
         memset(histogram, 0, sizeof(histogram));

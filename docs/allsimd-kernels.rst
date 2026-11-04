@@ -1158,6 +1158,21 @@ The idea
   and its first index. The same tie-break and the same "more than
   twice" rule: 2560×1600 L, size 3, 1195 to 94 ms, sizes 5 to 17 3.4x
   to 4.8x.
+* **The 3×3 mode in vectors (2026-11-04).** ``ModeFilterSIMD.c`` does
+  the inner rows' pixels 16 or 32 at a time: the nine window bytes are
+  loaded from the three rows, each is compared with the other eight
+  (the 36 pairs once, each result subtracted from both counts), and the
+  winner is chosen by packing the count above the inverted value in a
+  16-bit lane and taking the maximum of the nine, which is the highest
+  count and, on a tie, the lowest value, as the scalar scan chooses;
+  where the count is two or less the centre pixel is kept. The first and
+  last pixel of a row, the row tails and the first and last rows go
+  through a per-pixel count in ``ModeFilter.c``. 2560×1600 L: 63 to
+  4.5 ms (14x) on AVX2; the rank area of the hash set, which now holds
+  the mode filter at sizes 3 and 5 on noise and on a flat-region image,
+  agrees between the tiers and with the histogram code, and
+  ``Tests/test_simd_consistency.py`` compares every width from 1 up
+  against a per-pixel definition.
 
 The vector code
 ~~~~~~~~~~~~~~~
@@ -1270,7 +1285,8 @@ and within 10% on arm64. What remains of the gap is
 structural: OpenCV moves 3 bytes per RGB pixel where Pillow's layout has
 4, and its morphology makes two output rows per step, sharing the rows
 they have in common (``design/PERFORMANCE_GAPS.md``). The mode filter
-isn't in the benchmark; its figures are above.
+isn't in the benchmark; its figures are above (the 3×3 kernel's are
+from ``checks/simd_bench.py``'s "mode 3 L").
 
 Code map
 ~~~~~~~~
@@ -1285,7 +1301,9 @@ Code map
 * ``RankFilterSIMD.c``, the ``rank`` group: ``RankFilterMedianVec_u8()``
   with the two networks and the ``RankFilterMedian3_u8()``/``Median5``
   entries, ``rank_minmax_line_simd()``.
-* ``ModeFilter.c``.
+* ``ModeFilter.c``: ``ImagingModeFilter()`` with the column-updated
+  histogram, ``mode_window_pixel()`` for the pixels the kernel leaves;
+  ``ModeFilterSIMD.c``, the ``mode`` group: ``mode3_u8_simd()``.
 * ``src/PIL/ImageFilter.py``: ``RankFilter.filter()`` and
   ``RankFilter._filter_bands()``; ``Image.filter()`` in
   ``src/PIL/Image.py``, which calls the latter for multi-band images.
@@ -2852,7 +2870,7 @@ has all three of SSE4, AVX2 and NEON.
   ``FilterSIMD_3x3f_u8.c``, ``FilterSIMD_5x5f_u8.c`` (x86),
   ``FilterSIMD_NxNi.c`` (x86 and NEON) and ``FilterSIMD_NxNf.c`` (NEON).
 * Rank filters: ``RankFilter.c``, ``RankFilter.h`` and
-  ``RankFilterSIMD.c``; ``ModeFilter.c`` (portable).
+  ``RankFilterSIMD.c``; ``ModeFilter.c`` and ``ModeFilterSIMD.c``.
 * Conversions: ``Convert.c`` and ``ConvertSIMD.c``; ``ConvertYCbCr.c``,
   ``ConvertYCbCr.h`` and ``ConvertYCbCrSIMD.c``.
 * Compositing and channels: ``AlphaComposite.c``, ``AlphaComposite.h``

@@ -33,6 +33,10 @@ Based on Pillow 13.0.0
   from the pixel lists or a direct map instead. The palettes and indices
   are bit-identical; 2.1x on a 2560x1600 photo, 1.7x for the adaptive
   conversion
+- ``ImageFilter.ModeFilter(3)`` has a vector kernel on x86-64 and arm64
+  (``ModeFilterSIMD.c``): the nine window bytes counted against each
+  other and the winner picked by a packed maximum, the same pixels as the
+  histogram code; 14x on a 2560x1600 L image on AVX2
 - Wheels for x86-64 Linux (manylinux_2_28 and musllinux_1_2 x86_64), built
   and tested as the arm64 ones are. Each holds the SSE4.1, AVX2 and
   AVX-VNNI kernels and picks the set the CPU has when Pillow loads (the

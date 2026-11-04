@@ -34,6 +34,7 @@
 #include "DrawSIMD.c"
 #include "QuantSIMD.c"
 #include "RankFilterSIMD.c"
+#include "ModeFilterSIMD.c"
 
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
@@ -59,6 +60,7 @@ const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .draw = &draw_simd_kernels,
     .quant = &quant_simd_kernels,
     .rank = &rank_simd_kernels,
+    .mode = &mode_simd_kernels,
 };
 
 #endif

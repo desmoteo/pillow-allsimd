@@ -115,6 +115,37 @@ def test_alpha_composite_every_alpha() -> None:
     assert Image.alpha_composite(im_dst, im_src).tobytes() == bytes(expected)
 
 
+def _mode3_reference(im: Image.Image) -> bytes:
+    """ModeFilter(3) as its definition: in the 3x3 window clipped to the
+    image, the most frequent value, the lowest on a tie, where it occurs
+    more than twice; the pixel itself otherwise."""
+    w, h = im.size
+    px = im.tobytes()
+    out = bytearray()
+    for y in range(h):
+        for x in range(w):
+            window = [
+                px[yy * w + xx]
+                for yy in range(max(y - 1, 0), min(y + 1, h - 1) + 1)
+                for xx in range(max(x - 1, 0), min(x + 1, w - 1) + 1)
+            ]
+            best = max(sorted(set(window)), key=lambda v: (window.count(v), -v))
+            out.append(best if window.count(best) > 2 else px[y * w + x])
+    return bytes(out)
+
+
+@pytest.mark.parametrize(
+    "width", (1, 2, 3, 4, 17, 18, 19, 33, 34, 35, 66, *(w for w, _ in SHAPES.values()))
+)
+@pytest.mark.parametrize("height", (1, 2, 3, 7))
+def test_mode_filter_3(width: int, height: int) -> None:
+    # few values, so that counts above two and ties are common
+    rnd = random.Random(width * 31 + height)
+    data = bytes(rnd.choice((0, 7, 7, 200, 255)) for _ in range(width * height))
+    im = Image.frombytes("L", (width, height), data)
+    assert im.filter(ImageFilter.ModeFilter(3)).tobytes() == _mode3_reference(im)
+
+
 @pytest.mark.parametrize(
     "width", (5, 6, 7, 9, 17, 21, 23, *(w for w, _ in SHAPES.values()))
 )
