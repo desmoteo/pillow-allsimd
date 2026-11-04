@@ -19,6 +19,7 @@
 #include "ColorLUTSIMD.c"
 #include "GeometrySIMD.c"
 #include "TransformFastSIMD.c"
+#include "BoxBlurSIMD.c"
 
 const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .name = IMAGING_SIMD_TIER_NAME,
@@ -29,6 +30,7 @@ const ImagingSIMDKernels IMAGING_SIMD_TABLE = {
     .colorlut = &colorlut_simd_kernels,
     .geometry = &geometry_simd_kernels,
     .transform_fast = &transform_fast_simd_kernels,
+    .blur = &blur_simd_kernels,
 };
 
 #endif

@@ -1,205 +1,24 @@
 #include "Imaging.h"
-#include "ImagingPx4.h"
+#include "BoxBlur.h"
 
 typedef UINT8 pixel[4];
 
-/* The running-sum box blur of a row of 4-byte pixels, for any vector
-   type: the caller defines V (the type), V_LOAD(i) (pixel i as four
-   32-bit channels), V_SET1, V_ADD, V_SUB, V_MUL and V_SAVE(x, bulk). */
-#define BOX_LINE_BLUR                                                                 \
-    {                                                                                 \
-        int x;                                                                        \
-        V acc, bulk;                                                                  \
-        V wws = V_SET1(ww);                                                           \
-        V fws = V_SET1(fw);                                                           \
-        /* Compute acc for -1 pixel (outside of image): from "-radius-1" to */        \
-        /* "-1" get first pixel, then from "0" to "radius-1". */                      \
-        acc = V_MUL(V_LOAD(0), V_SET1(radius + 1));                                   \
-        /* As radius can be bigger than xsize, iterate to edgeA -1. */                \
-        for (x = 0; x < edgeA - 1; x++) {                                             \
-            acc = V_ADD(acc, V_LOAD(x));                                              \
-        }                                                                             \
-        /* Then multiply remainder to last x. */                                      \
-        acc = V_ADD(acc, V_MUL(V_LOAD(x), V_SET1(radius - edgeA + 1)));               \
-        if (edgeA <= edgeB) {                                                         \
-            /* Subtract pixel from left ("0"). Add pixels from radius. */             \
-            for (x = 0; x < edgeA; x++) {                                             \
-                BOX_STEP(0, x + radius, 0, x + radius + 1);                           \
-            }                                                                         \
-            /* Subtract previous pixel from "-radius". Add from radius. */            \
-            for (x = edgeA; x < edgeB; x++) {                                         \
-                BOX_STEP(x - radius - 1, x + radius, x - radius - 1, x + radius + 1); \
-            }                                                                         \
-            /* Subtract previous pixel from "-radius". Add last pixel. */             \
-            for (x = edgeB; x <= lastx; x++) {                                        \
-                BOX_STEP(x - radius - 1, lastx, x - radius - 1, lastx);               \
-            }                                                                         \
-        } else {                                                                      \
-            for (x = 0; x < edgeB; x++) {                                             \
-                BOX_STEP(0, x + radius, 0, x + radius + 1);                           \
-            }                                                                         \
-            for (x = edgeB; x < edgeA; x++) {                                         \
-                BOX_STEP(0, lastx, 0, lastx);                                         \
-            }                                                                         \
-            for (x = edgeA; x <= lastx; x++) {                                        \
-                BOX_STEP(x - radius - 1, lastx, x - radius - 1, lastx);               \
-            }                                                                         \
-        }                                                                             \
-    }
-
-/* acc[0] += lineIn[add][0] - lineIn[subtract][0];
-   bulk[0] = (acc[0] * ww) + (lineIn[left][0] + lineIn[right][0]) * fw;
-   lineOut[x][0] = (UINT8)((bulk[0] + (1 << 23)) >> 24); */
-#define BOX_STEP(subtract, add, left, right)                                       \
-    acc = V_SUB(V_ADD(acc, V_LOAD(add)), V_LOAD(subtract));                        \
-    bulk = V_ADD(V_MUL(V_ADD(V_LOAD(left), V_LOAD(right)), fws), V_MUL(acc, wws)); \
-    V_SAVE(x, bulk);
-
-void static inline ImagingLineBoxBlur32(
-    UINT32 *lineOut,
-    UINT32 *lineIn,
-    int lastx,
-    int radius,
-    int edgeA,
-    int edgeB,
-    UINT32 ww,
-    UINT32 fw
-) {
-#define V px4
-#define V_LOAD(i) px4_load(&lineIn[i])
-#define V_SET1 px4_set1
-#define V_ADD px4_add
-#define V_SUB px4_sub
-#define V_MUL px4_mul
-#define V_SAVE(x, bulk) lineOut[x] = px4_round24(bulk)
-    BOX_LINE_BLUR
-#undef V
-#undef V_LOAD
-#undef V_SET1
-#undef V_ADD
-#undef V_SUB
-#undef V_MUL
-#undef V_SAVE
-}
-
-#if defined(IMAGING_SIMD_AVX2)
-/* Two rows at once, one in each 128-bit half: the same arithmetic per
-   channel with half the instructions. */
-static inline __m256i
-px8_load(const UINT32 *a, const UINT32 *b) {
-    return _mm256_cvtepu8_epi32(
-        _mm_unpacklo_epi32(_mm_cvtsi32_si128(*a), _mm_cvtsi32_si128(*b))
-    );
-}
-
-void static inline ImagingLineBoxBlur32x2(
-    UINT32 *lineOut0,
-    UINT32 *lineOut1,
-    UINT32 *lineIn0,
-    UINT32 *lineIn1,
-    int lastx,
-    int radius,
-    int edgeA,
-    int edgeB,
-    UINT32 ww,
-    UINT32 fw
-) {
-    const __m256i b23 = _mm256_set1_epi32(1 << 23);
-    const __m256i bytes = _mm256_setr_epi8(
-        0,
-        4,
-        8,
-        12,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        0,
-        4,
-        8,
-        12,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1,
-        -1
-    );
-#define V __m256i
-#define V_LOAD(i) px8_load(&lineIn0[i], &lineIn1[i])
-#define V_SET1 _mm256_set1_epi32
-#define V_ADD _mm256_add_epi32
-#define V_SUB _mm256_sub_epi32
-#define V_MUL _mm256_mullo_epi32
-#define V_SAVE(x, bulk)                                                   \
-    {                                                                     \
-        __m256i v_ = _mm256_shuffle_epi8(                                 \
-            _mm256_srli_epi32(_mm256_add_epi32(bulk, b23), 24), bytes     \
-        );                                                                \
-        lineOut0[x] = _mm_cvtsi128_si32(_mm256_castsi256_si128(v_));      \
-        lineOut1[x] = _mm_cvtsi128_si32(_mm256_extracti128_si256(v_, 1)); \
-    }
-    BOX_LINE_BLUR
-#undef V
-#undef V_LOAD
-#undef V_SET1
-#undef V_ADD
-#undef V_SUB
-#undef V_MUL
-#undef V_SAVE
-}
-#endif
-
-/* Up to this radius a pass may use ImagingBoxBlurDirect instead of running
-   sums: always for radius 0, and with SIMD for radius 1, and to
-   BOX_DIRECT_MAX where the fast form below applies. */
-#if defined(IMAGING_SIMD_SSE4) || defined(IMAGING_SIMD_NEON)
-#define BOX_DIRECT_SIMD
-#define BOX_DIRECT_MAX 4
-#else
-#define BOX_DIRECT_MAX 0
-#endif
-
-/* How ImagingBoxBlurDirect computes a pass: from count = 2 * radius + 3
-   sources with the weights ww and fw, or, if fast, from the sum c of the
-   box alone, out = (((c << s) + k) * m >> 16) >> t in 16 bits. That needs
-   fw = 0, which integer radii from 1 to 4 have, and the result equals the
-   one of the full arithmetic for every sum (checked in BoxDirectInit). */
-typedef struct {
-    int direct, count;
-    UINT32 ww, fw;
-    int fast, s, t, m, k;
-} BoxDirect;
-
 static void
 BoxDirectInit(BoxDirect *d, int radius, UINT32 ww, UINT32 fw) {
-#if defined(BOX_DIRECT_SIMD)
     /* s, t, m and k for the integer radii 1 to 4, found by a search
        around m = ww * 2^(t - s - 8) and k = 2^(15 + t) / m. */
     static const unsigned short fast[4][4] = {
         {6, 0, 341, 112}, {5, 1, 819, 80}, {5, 1, 585, 112}, {4, 0, 455, 73}
     };
-#endif
     d->count = 2 * radius + 3;
     d->ww = ww;
     d->fw = fw;
     d->fast = 0;
     d->direct = radius == 0;
-#if defined(BOX_DIRECT_SIMD)
+    /* with the active tier's direct kernel (BoxBlurSIMD.c) */
+    if (!ImagingSIMD->blur->direct) {
+        return;
+    }
     if (radius >= 1 && radius <= BOX_DIRECT_MAX && fw == 0) {
         const unsigned short *f = fast[radius - 1];
         int c, cmax = 255 * (2 * radius + 1);
@@ -215,7 +34,26 @@ BoxDirectInit(BoxDirect *d, int radius, UINT32 ww, UINT32 fw) {
         }
     }
     d->direct = radius <= 1 || d->fast;
-#endif
+}
+
+/* The running-sum blur of a row of 4-byte pixels: the active tier's kernel
+   (BoxBlurSIMD.c), or the portable lanes. */
+static inline void
+line_blur32(
+    UINT32 *lineOut,
+    UINT32 *lineIn,
+    int lastx,
+    int radius,
+    int edgeA,
+    int edgeB,
+    UINT32 ww,
+    UINT32 fw
+) {
+    if (ImagingSIMD->blur->line32) {
+        ImagingSIMD->blur->line32(lineOut, lineIn, lastx, radius, edgeA, edgeB, ww, fw);
+    } else {
+        box_line_blur32(lineOut, lineIn, lastx, radius, edgeA, edgeB, ww, fw);
+    }
 }
 
 /* Radius below 1 without SIMD: in chunks of a fixed length, with restrict
@@ -253,185 +91,10 @@ BOX_DIRECT_INLINE void
 box_direct(
     UINT8 *restrict out, const UINT8 **src, int n, const BoxDirect *d, int count
 ) {
-    int i = 0, j;
+    int i, j;
     UINT32 ww = d->ww, fw = d->fw;
-#if defined(IMAGING_SIMD_SSE4)
-/* c, the sum of the box at offset o */
-#define BOX_DIRECT_SUM(P, load, o)                \
-    c = load(src[1] + (o));                       \
-    for (j = 2; j < count - 1; j++) {             \
-        c = P##_add_epi16(c, load(src[j] + (o))); \
-    }
-    if (d->fast) {
-#define BOX_DIRECT_FAST(P, c) \
-    P##_srl_epi16(P##_mulhi_epu16(P##_add_epi16(P##_sll_epi16(c, s), k), m), t)
-        __m128i s = _mm_cvtsi32_si128(d->s), t = _mm_cvtsi32_si128(d->t);
-#if defined(IMAGING_SIMD_AVX2)
-        {
-            __m256i k = _mm256_set1_epi16((short)d->k);
-            __m256i m = _mm256_set1_epi16((short)d->m);
-            for (; i <= n - 32; i += 32) {
-                __m256i r[2], c;
-                int h;
-                for (h = 0; h < 2; h++) {
-                    BOX_DIRECT_SUM(_mm256, mm256_cvtepu8_epi16, i + h * 16)
-                    r[h] = BOX_DIRECT_FAST(_mm256, c);
-                }
-                /* 64-bit groups 0-7, 16-23, 8-15, 24-31 */
-                _mm256_storeu_si256(
-                    (__m256i *)(out + i),
-                    _mm256_permute4x64_epi64(_mm256_packus_epi16(r[0], r[1]), 0xd8)
-                );
-            }
-        }
-#endif
-        {
-            __m128i k = _mm_set1_epi16((short)d->k), m = _mm_set1_epi16((short)d->m);
-            for (; i <= n - 16; i += 16) {
-                __m128i r[2], c;
-                int h;
-                for (h = 0; h < 2; h++) {
-                    BOX_DIRECT_SUM(_mm, mm_cvtepu8_epi16, i + h * 8)
-                    r[h] = BOX_DIRECT_FAST(_mm, c);
-                }
-                _mm_storeu_si128((__m128i *)(out + i), _mm_packus_epi16(r[0], r[1]));
-            }
-        }
-#undef BOX_DIRECT_FAST
-    } else {
-        /* The products exactly, with the weights split in 12-bit halves:
-           pmaddwd makes two 16-bit products and their sum in one
-           instruction, where pmulld takes two for one product.
-           ww * c + fw * e = ((wh * c + fh * e) << 12) + (wl * c + fl * e),
-           with no step above 2^32: the weights add up to at most 2^24, and
-           c, at most 255 * 3 here, fits in 16 bits. */
-        const int wh = (int)((fw >> 12) << 16 | (ww >> 12));
-        const int wl = (int)((fw & 0xfff) << 16 | (ww & 0xfff));
-#define BOX_DIRECT_PAIRS(P, v, h, l, b23)                                      \
-    P##_srli_epi32(                                                            \
-        P##_add_epi32(                                                         \
-            P##_add_epi32(                                                     \
-                P##_slli_epi32(P##_madd_epi16(v, h), 12), P##_madd_epi16(v, l) \
-            ),                                                                 \
-            b23                                                                \
-        ),                                                                     \
-        24                                                                     \
-    )
-/* e, the sum of the two far sources, at offset o */
-#define BOX_DIRECT_FAR(P, load, o) \
-    e = P##_add_epi16(load(src[0] + (o)), load(src[count - 1] + (o)));
-#if defined(IMAGING_SIMD_AVX2)
-        {
-            __m256i h = _mm256_set1_epi32(wh), l = _mm256_set1_epi32(wl);
-            __m256i b23 = _mm256_set1_epi32(1 << 23);
-            for (; i <= n - 32; i += 32) {
-                __m256i r[2], c, e;
-                int k;
-                for (k = 0; k < 2; k++) {
-                    /* bytes 0-7 in the low 128-bit lane, 8-15 in the high one */
-                    BOX_DIRECT_SUM(_mm256, mm256_cvtepu8_epi16, i + k * 16)
-                    BOX_DIRECT_FAR(_mm256, mm256_cvtepu8_epi16, i + k * 16)
-                    r[k] = _mm256_packus_epi32(
-                        BOX_DIRECT_PAIRS(
-                            _mm256, _mm256_unpacklo_epi16(c, e), h, l, b23
-                        ),
-                        BOX_DIRECT_PAIRS(_mm256, _mm256_unpackhi_epi16(c, e), h, l, b23)
-                    );
-                }
-                _mm256_storeu_si256(
-                    (__m256i *)(out + i),
-                    _mm256_permute4x64_epi64(_mm256_packus_epi16(r[0], r[1]), 0xd8)
-                );
-            }
-        }
-#endif
-        {
-            __m128i h = _mm_set1_epi32(wh), l = _mm_set1_epi32(wl);
-            __m128i b23 = _mm_set1_epi32(1 << 23);
-            for (; i <= n - 16; i += 16) {
-                __m128i r[2], c, e;
-                int k;
-                for (k = 0; k < 2; k++) {
-                    BOX_DIRECT_SUM(_mm, mm_cvtepu8_epi16, i + k * 8)
-                    BOX_DIRECT_FAR(_mm, mm_cvtepu8_epi16, i + k * 8)
-                    r[k] = _mm_packus_epi32(
-                        BOX_DIRECT_PAIRS(_mm, _mm_unpacklo_epi16(c, e), h, l, b23),
-                        BOX_DIRECT_PAIRS(_mm, _mm_unpackhi_epi16(c, e), h, l, b23)
-                    );
-                }
-                _mm_storeu_si128((__m128i *)(out + i), _mm_packus_epi16(r[0], r[1]));
-            }
-        }
-#undef BOX_DIRECT_FAR
-#undef BOX_DIRECT_PAIRS
-    }
-#undef BOX_DIRECT_SUM
-#elif defined(IMAGING_SIMD_NEON)
-    /* The same with 16 bytes at a time: c, the sum of the box, in two
-       halves of 8 16-bit lanes */
-#define BOX_DIRECT_SUM(o)                                       \
-    {                                                           \
-        uint8x16_t v_ = vld1q_u8(src[1] + (o));                 \
-        c0 = vmovl_u8(vget_low_u8(v_)), c1 = vmovl_high_u8(v_); \
-        for (j = 2; j < count - 1; j++) {                       \
-            v_ = vld1q_u8(src[j] + (o));                        \
-            c0 = vaddw_u8(c0, vget_low_u8(v_));                 \
-            c1 = vaddw_high_u8(c1, v_);                         \
-        }                                                       \
-    }
-    if (d->fast) {
-        int16x8_t s = vdupq_n_s16(d->s), t = vdupq_n_s16(-d->t);
-        uint16x8_t k = vdupq_n_u16(d->k);
-        uint16x4_t m = vdup_n_u16(d->m);
-        for (; i <= n - 16; i += 16) {
-            uint16x8_t c0, c1, r[2];
-            int h;
-            BOX_DIRECT_SUM(i)
-            for (h = 0; h < 2; h++) {
-                uint16x8_t v = vaddq_u16(vshlq_u16(h ? c1 : c0, s), k);
-                /* the high halves of the 32-bit products: mulhi */
-                uint16x8_t hi = vuzp2q_u16(
-                    vreinterpretq_u16_u32(vmull_u16(vget_low_u16(v), m)),
-                    vreinterpretq_u16_u32(vmull_high_u16(v, vcombine_u16(m, m)))
-                );
-                r[h] = vshlq_u16(hi, t);
-            }
-            vst1q_u8(out + i, vcombine_u8(vmovn_u16(r[0]), vmovn_u16(r[1])));
-        }
-    } else {
-        /* The products exactly, in 32 bits: one instruction each on arm64,
-           where splitting the weights as for x86 was slower. vaddhn gives
-           (total + 2^23) >> 16. */
-        uint32x4_t vww = vdupq_n_u32(ww), vfw = vdupq_n_u32(fw);
-        uint32x4_t b23 = vdupq_n_u32(1 << 23);
-        for (; i <= n - 16; i += 16) {
-            uint16x8_t c0, c1;
-            uint8x8_t r[2];
-            uint8x16_t e0 = vld1q_u8(src[0] + i), e1 = vld1q_u8(src[count - 1] + i);
-            uint16x8_t e[2] = {
-                vaddl_u8(vget_low_u8(e0), vget_low_u8(e1)), vaddl_high_u8(e0, e1)
-            };
-            int h;
-            BOX_DIRECT_SUM(i)
-            for (h = 0; h < 2; h++) {
-                uint16x8_t c = h ? c1 : c0;
-                uint32x4_t lo = vmlaq_u32(
-                    vmulq_u32(vmovl_u16(vget_low_u16(c)), vww),
-                    vmovl_u16(vget_low_u16(e[h])),
-                    vfw
-                );
-                uint32x4_t hi = vmlaq_u32(
-                    vmulq_u32(vmovl_high_u16(c), vww), vmovl_high_u16(e[h]), vfw
-                );
-                r[h] = vshrn_n_u16(
-                    vcombine_u16(vaddhn_u32(lo, b23), vaddhn_u32(hi, b23)), 8
-                );
-            }
-            vst1q_u8(out + i, vcombine_u8(r[0], r[1]));
-        }
-    }
-#undef BOX_DIRECT_SUM
-#endif
+    /* the active tier's kernel does the bytes it can (BoxBlurSIMD.c) */
+    i = IMAGING_SIMD_CALL(blur->direct, out, src, n, d, count);
     if (count == 3) {
         for (; i <= n - BOX_ZERO_CHUNK; i += BOX_ZERO_CHUNK) {
             ImagingBoxBlurZeroChunk(
@@ -464,7 +127,6 @@ ImagingBoxBlurDirect(
         case 5:
             box_direct(out, src, n, d, 5);
             break;
-#if BOX_DIRECT_MAX >= 2
         case 7:
             box_direct(out, src, n, d, 7);
             break;
@@ -474,7 +136,6 @@ ImagingBoxBlurDirect(
         case 11:
             box_direct(out, src, n, d, 11);
             break;
-#endif
         default:
             box_direct(out, src, n, d, d->count);
     }
@@ -601,61 +262,6 @@ void static inline ImagingLineBoxBlur8(
 #undef SAVE
 }
 
-#if defined(IMAGING_SIMD_SSE4)
-/* 1-byte images are blurred four rows at a time: byte x of rows 0..3 become
-   the four channels of pixel x of a 4-byte row, which the 4-byte line blur
-   processes with the same arithmetic per byte. Not on arm64: on the Jetson
-   Orin (GCC 11) this was 1-5% slower than the compiler's 1-byte code. */
-static void
-interleave4(UINT32 *out, UINT8 *in0, UINT8 *in1, UINT8 *in2, UINT8 *in3, int xsize) {
-    int x = 0;
-    for (; x < xsize - 15; x += 16) {
-        __m128i a = _mm_loadu_si128((__m128i *)&in0[x]);
-        __m128i b = _mm_loadu_si128((__m128i *)&in1[x]);
-        __m128i c = _mm_loadu_si128((__m128i *)&in2[x]);
-        __m128i d = _mm_loadu_si128((__m128i *)&in3[x]);
-        __m128i ab_lo = _mm_unpacklo_epi8(a, b), ab_hi = _mm_unpackhi_epi8(a, b);
-        __m128i cd_lo = _mm_unpacklo_epi8(c, d), cd_hi = _mm_unpackhi_epi8(c, d);
-        _mm_storeu_si128((__m128i *)&out[x], _mm_unpacklo_epi16(ab_lo, cd_lo));
-        _mm_storeu_si128((__m128i *)&out[x + 4], _mm_unpackhi_epi16(ab_lo, cd_lo));
-        _mm_storeu_si128((__m128i *)&out[x + 8], _mm_unpacklo_epi16(ab_hi, cd_hi));
-        _mm_storeu_si128((__m128i *)&out[x + 12], _mm_unpackhi_epi16(ab_hi, cd_hi));
-    }
-    for (; x < xsize; x++) {
-        out[x] = MAKE_UINT32(in0[x], in1[x], in2[x], in3[x]);
-    }
-}
-
-static void
-deinterleave4(
-    UINT8 *out0, UINT8 *out1, UINT8 *out2, UINT8 *out3, UINT32 *in, int xsize
-) {
-    int x = 0;
-    __m128i by_row =
-        _mm_setr_epi8(0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15);
-    for (; x < xsize - 15; x += 16) {
-        // [32] 4 pixels of row 3, row 2, row 1, row 0
-        __m128i v0 = _mm_shuffle_epi8(_mm_loadu_si128((__m128i *)&in[x]), by_row);
-        __m128i v1 = _mm_shuffle_epi8(_mm_loadu_si128((__m128i *)&in[x + 4]), by_row);
-        __m128i v2 = _mm_shuffle_epi8(_mm_loadu_si128((__m128i *)&in[x + 8]), by_row);
-        __m128i v3 = _mm_shuffle_epi8(_mm_loadu_si128((__m128i *)&in[x + 12]), by_row);
-        __m128i t0 = _mm_unpacklo_epi32(v0, v1), t1 = _mm_unpacklo_epi32(v2, v3);
-        __m128i t2 = _mm_unpackhi_epi32(v0, v1), t3 = _mm_unpackhi_epi32(v2, v3);
-        _mm_storeu_si128((__m128i *)&out0[x], _mm_unpacklo_epi64(t0, t1));
-        _mm_storeu_si128((__m128i *)&out1[x], _mm_unpackhi_epi64(t0, t1));
-        _mm_storeu_si128((__m128i *)&out2[x], _mm_unpacklo_epi64(t2, t3));
-        _mm_storeu_si128((__m128i *)&out3[x], _mm_unpackhi_epi64(t2, t3));
-    }
-    for (; x < xsize; x++) {
-        UINT8 *p = (UINT8 *)&in[x];
-        out0[x] = p[0];
-        out1[x] = p[1];
-        out2[x] = p[2];
-        out3[x] = p[3];
-    }
-}
-#endif
-
 /* passes horizontal box blurs. All passes run on one row before the next
    row, so the row stays in cache: the same arithmetic as blurring the
    whole image once per pass, with one read and one write of the image.
@@ -719,8 +325,8 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
         }                                                              \
     }
 
-#if defined(IMAGING_SIMD_AVX2)
-    /* The same for two rows of 4-byte pixels at once. */
+    /* The same for two rows of 4-byte pixels at once, with the active tier's
+       kernel for two rows. */
     UINT32 *pair[2][2] = {{NULL, NULL}, {NULL, NULL}};
 #define BLUR_PASSES_2(in0, in1, out0, out1)                                 \
     {                                                                       \
@@ -738,7 +344,7 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
                     (UINT8 *)d1_, (UINT8 *)s1_, n_, 4, &direct, pad         \
                 );                                                          \
             } else {                                                        \
-                ImagingLineBoxBlur32x2(                                     \
+                ImagingSIMD->blur->line32x2(                                \
                     d0_, d1_, s0_, s1_, lastx, radius, edgeA, edgeB, ww, fw \
                 );                                                          \
             }                                                               \
@@ -752,7 +358,7 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
             memcpy((out1), s1_, imIn->xsize * sizeof(UINT32));              \
         }                                                                   \
     }
-    for (p = 0; p < 4; p++) {
+    for (p = 0; ImagingSIMD->blur->line32x2 && p < 4; p++) {
         pair[p / 2][p % 2] = malloc(imIn->xsize * sizeof(UINT32));
         if (!pair[p / 2][p % 2]) {
             for (p = 0; p < 4; p++) {
@@ -764,104 +370,99 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
             return ImagingError_MemoryError();
         }
     }
-#endif
 
     ImagingSectionEnter(&cookie);
 
     if (imIn->image8) {
         y = 0;
-#if defined(IMAGING_SIMD_SSE4)
-        UINT32 *lineIn4 = malloc(imIn->xsize * sizeof(UINT32));
-        UINT32 *lineOut4 = malloc(imIn->xsize * sizeof(UINT32));
-        UINT32 *lineIn4b = malloc(imIn->xsize * sizeof(UINT32));
-        UINT32 *lineOut4b = malloc(imIn->xsize * sizeof(UINT32));
-        if (!lineIn4 || !lineOut4 || !lineIn4b || !lineOut4b) {
-            ImagingSectionLeave(&cookie);
+        /* with the active tier's interleaving, four rows at a time */
+        if (ImagingSIMD->blur->interleave4) {
+            UINT32 *lineIn4 = malloc(imIn->xsize * sizeof(UINT32));
+            UINT32 *lineOut4 = malloc(imIn->xsize * sizeof(UINT32));
+            UINT32 *lineIn4b = malloc(imIn->xsize * sizeof(UINT32));
+            UINT32 *lineOut4b = malloc(imIn->xsize * sizeof(UINT32));
+            if (!lineIn4 || !lineOut4 || !lineIn4b || !lineOut4b) {
+                ImagingSectionLeave(&cookie);
+                free(lineIn4);
+                free(lineOut4);
+                free(lineIn4b);
+                free(lineOut4b);
+                free(buf[0]);
+                free(buf[1]);
+                free(pad);
+                for (p = 0; p < 4; p++) {
+                    free(pair[p / 2][p % 2]);
+                }
+                return ImagingError_MemoryError();
+            }
+            // Eight rows: two groups of four, each a row of 4-byte pixels.
+            for (; ImagingSIMD->blur->line32x2 && y < imIn->ysize - 7; y += 8) {
+                ImagingSIMD->blur->interleave4(
+                    lineIn4,
+                    imIn->image8[y],
+                    imIn->image8[y + 1],
+                    imIn->image8[y + 2],
+                    imIn->image8[y + 3],
+                    imIn->xsize
+                );
+                ImagingSIMD->blur->interleave4(
+                    lineIn4b,
+                    imIn->image8[y + 4],
+                    imIn->image8[y + 5],
+                    imIn->image8[y + 6],
+                    imIn->image8[y + 7],
+                    imIn->xsize
+                );
+                BLUR_PASSES_2(lineIn4, lineIn4b, lineOut4, lineOut4b);
+                ImagingSIMD->blur->deinterleave4(
+                    imOut->image8[y],
+                    imOut->image8[y + 1],
+                    imOut->image8[y + 2],
+                    imOut->image8[y + 3],
+                    lineOut4,
+                    imIn->xsize
+                );
+                ImagingSIMD->blur->deinterleave4(
+                    imOut->image8[y + 4],
+                    imOut->image8[y + 5],
+                    imOut->image8[y + 6],
+                    imOut->image8[y + 7],
+                    lineOut4b,
+                    imIn->xsize
+                );
+            }
+            // All four input rows are read before any output row is written,
+            // so imOut may be imIn.
+            for (; y < imIn->ysize - 3; y += 4) {
+                ImagingSIMD->blur->interleave4(
+                    lineIn4,
+                    imIn->image8[y],
+                    imIn->image8[y + 1],
+                    imIn->image8[y + 2],
+                    imIn->image8[y + 3],
+                    imIn->xsize
+                );
+                BLUR_PASSES(UINT32, lineIn4, lineOut4, line_blur32);
+                ImagingSIMD->blur->deinterleave4(
+                    imOut->image8[y],
+                    imOut->image8[y + 1],
+                    imOut->image8[y + 2],
+                    imOut->image8[y + 3],
+                    lineOut4,
+                    imIn->xsize
+                );
+            }
             free(lineIn4);
             free(lineOut4);
             free(lineIn4b);
             free(lineOut4b);
-            free(buf[0]);
-            free(buf[1]);
-            free(pad);
-#if defined(IMAGING_SIMD_AVX2)
-            for (p = 0; p < 4; p++) {
-                free(pair[p / 2][p % 2]);
-            }
-#endif
-            return ImagingError_MemoryError();
         }
-#if defined(IMAGING_SIMD_AVX2)
-        // Eight rows: two groups of four, each a row of 4-byte pixels.
-        for (; y < imIn->ysize - 7; y += 8) {
-            interleave4(
-                lineIn4,
-                imIn->image8[y],
-                imIn->image8[y + 1],
-                imIn->image8[y + 2],
-                imIn->image8[y + 3],
-                imIn->xsize
-            );
-            interleave4(
-                lineIn4b,
-                imIn->image8[y + 4],
-                imIn->image8[y + 5],
-                imIn->image8[y + 6],
-                imIn->image8[y + 7],
-                imIn->xsize
-            );
-            BLUR_PASSES_2(lineIn4, lineIn4b, lineOut4, lineOut4b);
-            deinterleave4(
-                imOut->image8[y],
-                imOut->image8[y + 1],
-                imOut->image8[y + 2],
-                imOut->image8[y + 3],
-                lineOut4,
-                imIn->xsize
-            );
-            deinterleave4(
-                imOut->image8[y + 4],
-                imOut->image8[y + 5],
-                imOut->image8[y + 6],
-                imOut->image8[y + 7],
-                lineOut4b,
-                imIn->xsize
-            );
-        }
-#endif
-        // All four input rows are read before any output row is written,
-        // so imOut may be imIn.
-        for (; y < imIn->ysize - 3; y += 4) {
-            interleave4(
-                lineIn4,
-                imIn->image8[y],
-                imIn->image8[y + 1],
-                imIn->image8[y + 2],
-                imIn->image8[y + 3],
-                imIn->xsize
-            );
-            BLUR_PASSES(UINT32, lineIn4, lineOut4, ImagingLineBoxBlur32);
-            deinterleave4(
-                imOut->image8[y],
-                imOut->image8[y + 1],
-                imOut->image8[y + 2],
-                imOut->image8[y + 3],
-                lineOut4,
-                imIn->xsize
-            );
-        }
-        free(lineIn4);
-        free(lineOut4);
-        free(lineIn4b);
-        free(lineOut4b);
-#endif
         for (; y < imIn->ysize; y++) {
             BLUR_PASSES(UINT8, imIn->image8[y], imOut->image8[y], ImagingLineBoxBlur8);
         }
     } else {
         y = 0;
-#if defined(IMAGING_SIMD_AVX2)
-        for (; y < imIn->ysize - 1; y += 2) {
+        for (; ImagingSIMD->blur->line32x2 && y < imIn->ysize - 1; y += 2) {
             BLUR_PASSES_2(
                 (UINT32 *)imIn->image32[y],
                 (UINT32 *)imIn->image32[y + 1],
@@ -869,11 +470,8 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
                 (UINT32 *)imOut->image32[y + 1]
             );
         }
-#endif
         for (; y < imIn->ysize; y++) {
-            BLUR_PASSES(
-                UINT32, imIn->image32[y], imOut->image32[y], ImagingLineBoxBlur32
-            );
+            BLUR_PASSES(UINT32, imIn->image32[y], imOut->image32[y], line_blur32);
         }
     }
 #undef BLUR_PASSES
@@ -883,12 +481,10 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
     free(buf[0]);
     free(buf[1]);
     free(pad);
-#if defined(IMAGING_SIMD_AVX2)
 #undef BLUR_PASSES_2
     for (p = 0; p < 4; p++) {
         free(pair[p / 2][p % 2]);
     }
-#endif
 
     return imOut;
 }
@@ -907,79 +503,8 @@ ImagingBoxBlurColumns(
     UINT32 ww,
     UINT32 fw
 ) {
-    int b = 0;
-
-#if defined(IMAGING_SIMD_AVX2)
-    {
-        __m256i wws = _mm256_set1_epi32(ww);
-        __m256i fws = _mm256_set1_epi32(fw);
-        __m256i b23 = _mm256_set1_epi32(1 << 23);
-        /* packs and packus work within 128-bit lanes: this puts the
-           four groups of 8 results back in order. */
-        __m256i order = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
-        for (; b < size - 31; b += 32) {
-            __m256i r[4];
-#define COLUMNS_8(k)                                                \
-    {                                                               \
-        __m256i a = mm256_cvtepu8_epi32(&add[b + k * 8]);           \
-        __m256i s = mm256_cvtepu8_epi32(&sub[b + k * 8]);           \
-        __m256i f = mm256_cvtepu8_epi32(&far_row[b + k * 8]);       \
-        __m256i c = _mm256_loadu_si256((__m256i *)&acc[b + k * 8]); \
-        c = _mm256_sub_epi32(_mm256_add_epi32(c, a), s);            \
-        _mm256_storeu_si256((__m256i *)&acc[b + k * 8], c);         \
-        c = _mm256_add_epi32(                                       \
-            _mm256_mullo_epi32(c, wws),                             \
-            _mm256_mullo_epi32(_mm256_add_epi32(s, f), fws)         \
-        );                                                          \
-        r[k] = _mm256_srli_epi32(_mm256_add_epi32(c, b23), 24);     \
-    }
-            COLUMNS_8(0);
-            COLUMNS_8(1);
-            COLUMNS_8(2);
-            COLUMNS_8(3);
-#undef COLUMNS_8
-            __m256i v = _mm256_packus_epi16(
-                _mm256_packs_epi32(r[0], r[1]), _mm256_packs_epi32(r[2], r[3])
-            );
-            _mm256_storeu_si256(
-                (__m256i *)&out[b], _mm256_permutevar8x32_epi32(v, order)
-            );
-        }
-    }
-#endif
-#if defined(IMAGING_SIMD_SSE4)
-    __m128i wws = _mm_set1_epi32(ww);
-    __m128i fws = _mm_set1_epi32(fw);
-    __m128i b23 = _mm_set1_epi32(1 << 23);
-    for (; b < size - 15; b += 16) {
-        __m128i add8 = _mm_loadu_si128((__m128i *)&add[b]);
-        __m128i sub8 = _mm_loadu_si128((__m128i *)&sub[b]);
-        __m128i far8 = _mm_loadu_si128((__m128i *)&far_row[b]);
-        __m128i r[4];
-#define COLUMNS_4(k)                                                           \
-    {                                                                          \
-        __m128i a = _mm_cvtepu8_epi32(_mm_srli_si128(add8, k * 4));            \
-        __m128i s = _mm_cvtepu8_epi32(_mm_srli_si128(sub8, k * 4));            \
-        __m128i f = _mm_cvtepu8_epi32(_mm_srli_si128(far8, k * 4));            \
-        __m128i c = _mm_loadu_si128((__m128i *)&acc[b + k * 4]);               \
-        c = _mm_sub_epi32(_mm_add_epi32(c, a), s);                             \
-        _mm_storeu_si128((__m128i *)&acc[b + k * 4], c);                       \
-        c = _mm_add_epi32(                                                     \
-            _mm_mullo_epi32(c, wws), _mm_mullo_epi32(_mm_add_epi32(s, f), fws) \
-        );                                                                     \
-        r[k] = _mm_srli_epi32(_mm_add_epi32(c, b23), 24);                      \
-    }
-        COLUMNS_4(0);
-        COLUMNS_4(1);
-        COLUMNS_4(2);
-        COLUMNS_4(3);
-#undef COLUMNS_4
-        _mm_storeu_si128(
-            (__m128i *)&out[b],
-            _mm_packus_epi16(_mm_packs_epi32(r[0], r[1]), _mm_packs_epi32(r[2], r[3]))
-        );
-    }
-#endif
+    /* the active tier's kernel does the bytes it can (BoxBlurSIMD.c) */
+    int b = IMAGING_SIMD_CALL(blur->columns, out, acc, add, sub, far_row, size, ww, fw);
 
     for (; b < size; b++) {
         acc[b] += add[b] - sub[b];
@@ -1232,12 +757,12 @@ box_fused_row(BoxFusedRows *f, long long k) {
     k = k < 0 ? 0 : (k > lasty ? lasty : k);
     while (f->made < k) {
         UINT8 *dst, *src;
-#if defined(IMAGING_SIMD_AVX2)
-        /* running sums two rows at a time; the ring has a row to spare */
-        if (!f->d->direct && f->made + 2 <= lasty) {
+        /* running sums two rows at a time with the active tier's kernel for
+           two rows; the ring has a row to spare */
+        if (ImagingSIMD->blur->line32x2 && !f->d->direct && f->made + 2 <= lasty) {
             UINT8 *dst2 = f->ring + (size_t)((f->made + 2) % f->rows) * f->im->linesize;
             dst = f->ring + (size_t)((f->made + 1) % f->rows) * f->im->linesize;
-            ImagingLineBoxBlur32x2(
+            ImagingSIMD->blur->line32x2(
                 (UINT32 *)dst,
                 (UINT32 *)dst2,
                 (UINT32 *)f->im->image[f->made + 1],
@@ -1252,14 +777,13 @@ box_fused_row(BoxFusedRows *f, long long k) {
             f->made += 2;
             continue;
         }
-#endif
         f->made++;
         dst = f->ring + (size_t)(f->made % f->rows) * f->im->linesize;
         src = (UINT8 *)f->im->image[f->made];
         if (f->d->direct) {
             ImagingLineBoxBlurDirect(dst, src, f->n, f->im->pixelsize, f->d, f->pad);
         } else {
-            ImagingLineBoxBlur32(
+            line_blur32(
                 (UINT32 *)dst,
                 (UINT32 *)src,
                 f->lastx,

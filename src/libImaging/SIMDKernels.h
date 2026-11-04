@@ -238,6 +238,61 @@ typedef struct {
     );
 } ImagingSIMDTransformFastKernels;
 
+/* Box blur (BoxBlurSIMD.c). line32 blurs a row of 4-byte pixels with
+   running sums, line32x2 two rows at once; direct does the box of each
+   byte from the count source rows for the bytes it can and returns how
+   many; interleave4 turns four 1-byte rows into a 4-byte row and
+   deinterleave4 back; columns advances the vertical pass's running sums
+   for the bytes it can and returns how many. */
+struct ImagingBoxDirect;
+typedef struct {
+    void (*line32)(
+        UINT32 *out,
+        UINT32 *in,
+        int lastx,
+        int radius,
+        int edgeA,
+        int edgeB,
+        UINT32 ww,
+        UINT32 fw
+    );
+    void (*line32x2)(
+        UINT32 *out0,
+        UINT32 *out1,
+        UINT32 *in0,
+        UINT32 *in1,
+        int lastx,
+        int radius,
+        int edgeA,
+        int edgeB,
+        UINT32 ww,
+        UINT32 fw
+    );
+    int (*direct)(
+        UINT8 *out,
+        const UINT8 **src,
+        int n,
+        const struct ImagingBoxDirect *d,
+        int count
+    );
+    void (*interleave4)(
+        UINT32 *out, UINT8 *in0, UINT8 *in1, UINT8 *in2, UINT8 *in3, int xsize
+    );
+    void (*deinterleave4)(
+        UINT8 *out0, UINT8 *out1, UINT8 *out2, UINT8 *out3, UINT32 *in, int xsize
+    );
+    int (*columns)(
+        UINT8 *out,
+        UINT32 *acc,
+        const UINT8 *add,
+        const UINT8 *sub,
+        const UINT8 *far_row,
+        int size,
+        UINT32 ww,
+        UINT32 fw
+    );
+} ImagingSIMDBlurKernels;
+
 typedef struct ImagingSIMDKernels {
     /* "scalar", "sse4", "avx2", "avxvnni" or "neon" */
     const char *name;
@@ -250,6 +305,7 @@ typedef struct ImagingSIMDKernels {
     const ImagingSIMDColorLUTKernels *colorlut;
     const ImagingSIMDGeometryKernels *geometry;
     const ImagingSIMDTransformFastKernels *transform_fast;
+    const ImagingSIMDBlurKernels *blur;
 } ImagingSIMDKernels;
 
 /* The active tier's table; the scalar table until ImagingSIMDInit(). */
