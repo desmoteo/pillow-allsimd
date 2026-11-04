@@ -25,6 +25,14 @@ Based on Pillow 13.0.0
 - The masked histogram (``Image.histogram(mask)``) counts without a
   branch per pixel, into four tables like the unmasked one: 6x faster on
   x86-64, the same counts
+- The median-cut quantizer (``quantize()``'s default,
+  ``convert("P", palette=ADAPTIVE)``) spends less time in its colour
+  hash table: chain walks compare the hashes kept in the nodes, the
+  bucket needs no division, runs of one colour count at once, and the
+  passes over the image that looked every pixel up again read the box
+  from the pixel lists or a direct map instead. The palettes and indices
+  are bit-identical; 2.1x on a 2560x1600 photo, 1.7x for the adaptive
+  conversion
 - Wheels for x86-64 Linux (manylinux_2_28 and musllinux_1_2 x86_64), built
   and tested as the arm64 ones are. Each holds the SSE4.1, AVX2 and
   AVX-VNNI kernels and picks the set the CPU has when Pillow loads (the

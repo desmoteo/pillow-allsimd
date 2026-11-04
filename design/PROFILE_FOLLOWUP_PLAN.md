@@ -194,3 +194,23 @@ the outputs; raw results in `bench-results/baseline-2026-11-04/` and
   it up on Linux), the SBOM lists it, the wheel check expects the
   feature. The benchmark's output check reports the encode cases as
   different, which is the bytes, not the pixels.
+- **P3, the quantizer's colour hash (2026-11-04).** Three changes, each
+  keeping the table's chains, merge points and iteration order as they
+  were, so the palettes and indices are bit-identical (one hash over
+  five images, four colour counts, three kmeans values, both median
+  methods, adaptive and web conversions with and without dither, old
+  against new: equal; `simd_bench --check` identical): the nodes keep
+  their hash and the pixel table, whose comparison orders by that hash,
+  walks chains on integers (`hashtable_order_by_hash`); the bucket is a
+  fast modulus (Lemire's multiply-shift, the `%` where no 128-bit
+  product exists); a run of equal pixels is one insertion counting them
+  all. Then the per-pixel passes that looked each pixel up again: with
+  an unscaled table (up to 65,536 colours) the palette's per-box sums
+  come from the leaves' pixel lists, which hold each colour's count (the
+  hash is injective at every scale, checked over all 16.7 million
+  colours); with a scaled table, a direct map from scaled cell to box
+  (8 MB at scale 1) replaces the chain walk per pixel in both the sums
+  and the mapping pass. `simd_bench.py` at 2560x1600: quantize mediancut
+  362 to 171 ms (2.11x), convert RGB to P adaptive 689 to 400 ms (1.72x);
+  the other quantizers unchanged. What remains in the adaptive case is
+  the three linked-list merge sorts (12%) and the first pass's inserts.

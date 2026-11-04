@@ -25,6 +25,7 @@
 
 typedef struct _HashNode {
     struct _HashNode *next;
+    uint32_t hash; /* hashFunc(key), kept so chain walks compare integers */
     HashKey_t key;
     HashVal_t value;
 } HashNode;
@@ -48,7 +49,61 @@ struct _HashTable {
     HashNodeBlock *blocks;
     uint32_t blockUsed;
     HashNode *freeNodes;
+    int orderedByHash; /* cmpFunc orders keys as hashFunc's values */
+    uint64_t fastmodM; /* for hash % length without a division */
 };
+
+/* The bucket of a hash: hash % length, by the multiply-shift of Lemire's
+   fastmod where a 128-bit product is available, which gives the same
+   value for every 32-bit hash and length. */
+static inline void
+_hashtable_set_length(HashTable *h, uint32_t length) {
+    h->length = length;
+    h->fastmodM = UINT64_MAX / length + 1;
+}
+
+static inline uint32_t
+_hashtable_bucket(const HashTable *h, uint32_t hash) {
+#ifdef __SIZEOF_INT128__
+    uint64_t lowbits = h->fastmodM * hash;
+    return (uint32_t)(((unsigned __int128)lowbits * h->length) >> 64);
+#else
+    return hash % h->length;
+#endif
+}
+
+/* Walks key's chain, sorted ascending by cmpFunc: returns the node with
+   key, or NULL with *where the link where a new node goes (before the
+   first node that sorts after key, or at the end). A table ordered by
+   hash compares the hashes kept in the nodes instead of calling
+   cmpFunc, which gives the same positions. */
+static inline HashNode *
+_hashtable_find(const HashTable *h, uint32_t hash, HashKey_t key, HashNode ***where) {
+    HashNode **n = &h->table[_hashtable_bucket(h, hash)];
+    if (h->orderedByHash) {
+        for (; *n; n = &((*n)->next)) {
+            uint32_t nh = (*n)->hash;
+            if (nh == hash) {
+                *where = n;
+                return *n;
+            } else if (nh > hash) {
+                break;
+            }
+        }
+    } else {
+        for (; *n; n = &((*n)->next)) {
+            int i = h->cmpFunc(h, (*n)->key, key);
+            if (!i) {
+                *where = n;
+                return *n;
+            } else if (i > 0) {
+                break;
+            }
+        }
+    }
+    *where = n;
+    return NULL;
+}
 
 static HashNode *
 _hashtable_node_alloc(HashTable *h) {
@@ -90,12 +145,13 @@ hashtable_new(HashFunc hf, HashCmpFunc cf) {
     }
     h->hashFunc = hf;
     h->cmpFunc = cf;
-    h->length = MIN_LENGTH;
+    _hashtable_set_length(h, MIN_LENGTH);
     h->count = 0;
     h->userData = NULL;
     h->blocks = NULL;
     h->blockUsed = 0;
     h->freeNodes = NULL;
+    h->orderedByHash = 0;
     h->table = malloc(sizeof(HashNode *) * h->length);
     if (!h->table) {
         free(h);
@@ -139,16 +195,24 @@ _hashtable_rehash(HashTable *h, CollisionFunc cf, uint32_t newSize) {
         h->table = oldTable;
         return;
     }
-    h->length = newSize;
+    _hashtable_set_length(h, newSize);
     h->count = 0;
     memset(h->table, 0, sizeof(HashNode *) * h->length);
     for (i = 0; i < oldSize; i++) {
         for (n = oldTable[i]; n; n = nn) {
             nn = n->next;
+            /* the hash function's result may have changed (the pixel
+               hash's scale), so each node's is computed again */
+            n->hash = h->hashFunc(h, n->key);
             _hashtable_insert_node(h, n, 0, 0, cf);
         }
     }
     free(oldTable);
+}
+
+void
+hashtable_order_by_hash(HashTable *h) {
+    h->orderedByHash = 1;
 }
 
 static void
@@ -174,27 +238,21 @@ static int
 _hashtable_insert_node(
     HashTable *h, HashNode *node, int resize, int update, CollisionFunc cf
 ) {
-    uint32_t hash = h->hashFunc(h, node->key) % h->length;
     HashNode **n, *nv;
-    int i;
 
-    for (n = &(h->table[hash]); *n; n = &((*n)->next)) {
-        nv = *n;
-        i = h->cmpFunc(h, nv->key, node->key);
-        if (!i) {
-            if (cf) {
-                nv->key = node->key;
-                cf(h, &(nv->key), &(nv->value), node->key, node->value);
-                _hashtable_node_free(h, node);
-                return 1;
-            } else {
-                nv->key = node->key;
-                nv->value = node->value;
-                _hashtable_node_free(h, node);
-                return 1;
-            }
-        } else if (i > 0) {
-            break;
+    /* node->hash is set by the caller */
+    nv = _hashtable_find(h, node->hash, node->key, &n);
+    if (nv) {
+        if (cf) {
+            nv->key = node->key;
+            cf(h, &(nv->key), &(nv->value), node->key, node->value);
+            _hashtable_node_free(h, node);
+            return 1;
+        } else {
+            nv->key = node->key;
+            nv->value = node->value;
+            _hashtable_node_free(h, node);
+            return 1;
         }
     }
     if (!update) {
@@ -214,18 +272,12 @@ static int
 _hashtable_insert(HashTable *h, HashKey_t key, HashVal_t val, int resize, int update) {
     HashNode **n, *nv;
     HashNode *t;
-    int i;
-    uint32_t hash = h->hashFunc(h, key) % h->length;
+    uint32_t hash = h->hashFunc(h, key);
 
-    for (n = &(h->table[hash]); *n; n = &((*n)->next)) {
-        nv = *n;
-        i = h->cmpFunc(h, nv->key, key);
-        if (!i) {
-            nv->value = val;
-            return 1;
-        } else if (i > 0) {
-            break;
-        }
+    nv = _hashtable_find(h, hash, key, &n);
+    if (nv) {
+        nv->value = val;
+        return 1;
     }
     if (!update) {
         t = _hashtable_node_alloc(h);
@@ -234,6 +286,7 @@ _hashtable_insert(HashTable *h, HashKey_t key, HashVal_t val, int resize, int up
         }
         t->next = *n;
         *n = t;
+        t->hash = hash;
         t->key = key;
         t->value = val;
         h->count++;
@@ -252,27 +305,22 @@ hashtable_insert_or_update_computed(
 ) {
     HashNode **n, *nv;
     HashNode *t;
-    int i;
-    uint32_t hash = h->hashFunc(h, key) % h->length;
+    uint32_t hash = h->hashFunc(h, key);
 
-    for (n = &(h->table[hash]); *n; n = &((*n)->next)) {
-        nv = *n;
-        i = h->cmpFunc(h, nv->key, key);
-        if (!i) {
-            if (existsFunc) {
-                existsFunc(h, nv->key, &(nv->value));
-            } else {
-                return 0;
-            }
-            return 1;
-        } else if (i > 0) {
-            break;
+    nv = _hashtable_find(h, hash, key, &n);
+    if (nv) {
+        if (existsFunc) {
+            existsFunc(h, nv->key, &(nv->value));
+        } else {
+            return 0;
         }
+        return 1;
     }
     t = _hashtable_node_alloc(h);
     if (!t) {
         return 0;
     }
+    t->hash = hash;
     t->key = key;
     t->next = *n;
     *n = t;
@@ -340,18 +388,12 @@ hashtable_rehash_compute(HashTable *h, CollisionFunc cf) {
 
 int
 hashtable_lookup(const HashTable *h, const HashKey_t key, HashVal_t *valp) {
-    uint32_t hash = h->hashFunc(h, key) % h->length;
-    HashNode *n;
-    int i;
+    HashNode **where, *n;
 
-    for (n = h->table[hash]; n; n = n->next) {
-        i = h->cmpFunc(h, n->key, key);
-        if (!i) {
-            *valp = n->value;
-            return 1;
-        } else if (i > 0) {
-            break;
-        }
+    n = _hashtable_find(h, h->hashFunc(h, key), key, &where);
+    if (n) {
+        *valp = n->value;
+        return 1;
     }
     return 0;
 }

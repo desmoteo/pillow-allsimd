@@ -33,6 +33,7 @@
 
 typedef struct {
     uint32_t scale;
+    uint32_t run; /* pixels of the colour being counted (create_pixel_hash) */
 } PixelHashData;
 
 typedef struct _PixelList {
@@ -113,14 +114,18 @@ pixel_cmp(const HashTable *h, const Pixel pixel1, const Pixel pixel2) {
     return (A == B) ? 0 : ((A < B) ? -1 : 1);
 }
 
+/* The count of a colour, by runs: a run of n equal pixels counts as n
+   single ones did. */
 static void
 exists_count_func(const HashTable *h, const Pixel key, uint32_t *val) {
-    *val += 1;
+    PixelHashData *d = (PixelHashData *)hashtable_get_user_data(h);
+    *val += d->run;
 }
 
 static void
 new_count_func(const HashTable *h, const Pixel key, uint32_t *val) {
-    *val = 1;
+    PixelHashData *d = (PixelHashData *)hashtable_get_user_data(h);
+    *val = d->run;
 }
 
 static void
@@ -144,14 +149,26 @@ create_pixel_hash(Pixel *pixelData, uint32_t nPixels) {
         return NULL;
     }
     hash = hashtable_new(pixel_hash, pixel_cmp);
+    /* pixel_cmp orders pixels by pixel_hash's value, so the chains are
+       walked by the hashes kept in the nodes (QuantHash.c) */
+    hashtable_order_by_hash(hash);
     hashtable_set_user_data(hash, d);
     d->scale = 0;
     for (i = 0; i < nPixels; i++) {
+        /* a run of equal pixels is one insertion counting them all; the
+           table ends up as with one insertion per pixel, since a run adds
+           no entry after its first pixel */
+        uint32_t run = 1;
+        while (i + run < nPixels && pixelData[i + run].v == pixelData[i].v) {
+            run++;
+        }
+        d->run = run;
         if (!hashtable_insert_or_update_computed(
                 hash, pixelData[i], new_count_func, exists_count_func
             )) {
             ;
         }
+        i += run - 1;
         while (hashtable_get_count(hash) > MAX_HASH_ENTRIES) {
             d->scale++;
             hashtable_rehash_compute(hash, rehash_collide);
@@ -769,6 +786,9 @@ map_image_pixels_from_quantized_pixels(
     return changes;
 }
 
+static inline int
+box_of_pixel(const HashTable *, const uint32_t *, uint32_t, Pixel, uint32_t *);
+
 static int
 map_image_pixels_from_median_box(
     Pixel *pixelData,
@@ -776,6 +796,7 @@ map_image_pixels_from_median_box(
     Pixel *paletteData,
     uint32_t nPaletteEntries,
     HashTable *medianBoxHash,
+    const uint32_t *boxMap,
     uint32_t *avgDist,
     uint32_t **avgDistSortKey,
     uint32_t *pixelArray
@@ -788,6 +809,7 @@ map_image_pixels_from_median_box(
     uint32_t pixelVal;
     uint32_t *cache;
     int small = nPaletteEntries <= 256;
+    uint32_t scale = ((PixelHashData *)hashtable_get_user_data(medianBoxHash))->scale;
 
     cache = malloc(sizeof(uint32_t) << NEAREST_CACHE_BITS);
     if (!cache) {
@@ -802,7 +824,7 @@ map_image_pixels_from_median_box(
             pixelArray[i] = cache[slot] & 0xff;
             continue;
         }
-        if (!hashtable_lookup(medianBoxHash, pixelData[i], &pixelVal)) {
+        if (!box_of_pixel(medianBoxHash, boxMap, scale, pixelData[i], &pixelVal)) {
             free(cache);
             return 0;
         }
@@ -834,11 +856,99 @@ map_image_pixels_from_median_box(
     return 1;
 }
 
+/* With a scaled hash, the node of a pixel is the one of its scaled
+   components (the hash is injective in them), so a table from scaled cell
+   to the node's value, the box index after annotate_hash_table, replaces
+   the chain walk per pixel of the passes below: (256 >> scale)^3 entries,
+   8 MB at scale 1. UINT32_MAX marks a cell with no node. NULL (no scale,
+   or out of memory) leaves the passes to the hash table. */
+#define BOX_CELL(p, s, bits)                        \
+    ((((uint32_t)(p).c.r >> (s)) << (2 * (bits))) | \
+     (((uint32_t)(p).c.g >> (s)) << (bits)) | ((uint32_t)(p).c.b >> (s)))
+
+typedef struct {
+    uint32_t *map;
+    uint32_t scale;
+    uint32_t bits;
+} BoxMapFill;
+
+static void
+box_map_fill(const HashTable *h, const Pixel key, const uint32_t value, void *u) {
+    BoxMapFill *f = (BoxMapFill *)u;
+    f->map[BOX_CELL(key, f->scale, f->bits)] = value;
+}
+
+static uint32_t *
+build_box_map(HashTable *h) {
+    PixelHashData *d = (PixelHashData *)hashtable_get_user_data(h);
+    BoxMapFill f;
+    size_t n;
+    if (d->scale == 0 || d->scale > 8) {
+        return NULL;
+    }
+    f.scale = d->scale;
+    f.bits = 8 - d->scale;
+    n = (size_t)1 << (3 * f.bits);
+    f.map = malloc(n * sizeof(uint32_t));
+    if (!f.map) {
+        return NULL;
+    }
+    memset(f.map, 0xff, n * sizeof(uint32_t));
+    hashtable_foreach(h, box_map_fill, &f);
+    return f.map;
+}
+
+/* The box of a pixel: from the map where there is one, else the table. */
+static inline int
+box_of_pixel(
+    const HashTable *h, const uint32_t *boxMap, uint32_t scale, Pixel p, uint32_t *box
+) {
+    if (boxMap) {
+        *box = boxMap[BOX_CELL(p, scale, 8 - scale)];
+        return *box != UINT32_MAX;
+    }
+    return hashtable_lookup(h, p, box);
+}
+
+/* The sums of the colours in each leaf box, from its pixel list: with the
+   hash unscaled every list entry is one colour and its pixel count, so
+   the sums equal the per-pixel ones below, and the boxes are numbered as
+   annotate_hash_table numbers them. Returns 0 on a malformed tree. */
+static int
+sum_box_leaves(
+    BoxNode *n, uint32_t *avg[3], uint32_t *count, uint32_t *box, uint32_t nEntries
+) {
+    PixelList *p;
+    if (n->l && n->r) {
+        return sum_box_leaves(n->l, avg, count, box, nEntries) &&
+               sum_box_leaves(n->r, avg, count, box, nEntries);
+    }
+    if (n->l || n->r) {
+        return 0;
+    }
+    if (!n->head[0]) {
+        return 1;
+    }
+    if (*box >= nEntries) {
+        return 0;
+    }
+    for (p = n->head[0]; p; p = p->next[0]) {
+        uint32_t c = (uint32_t)p->count;
+        avg[0][*box] += p->p.c.r * c;
+        avg[1][*box] += p->p.c.g * c;
+        avg[2][*box] += p->p.c.b * c;
+        count[*box] += c;
+    }
+    (*box)++;
+    return 1;
+}
+
 static int
 compute_palette_from_median_cut(
     Pixel *pixelData,
     uint32_t nPixels,
     HashTable *medianBoxHash,
+    const uint32_t *boxMap,
     Pixel **palette,
     uint32_t nPaletteEntries,
     BoxNode *root
@@ -848,6 +958,7 @@ compute_palette_from_median_cut(
     Pixel *p;
     uint32_t *avg[3];
     uint32_t *count;
+    PixelHashData *d = (PixelHashData *)hashtable_get_user_data(medianBoxHash);
 
     *palette = NULL;
     /* malloc check ok, using calloc */
@@ -869,25 +980,43 @@ compute_palette_from_median_cut(
             return 0;
         }
     }
-    for (i = 0; i < nPixels; i++) {
-        if (!hashtable_lookup(medianBoxHash, pixelData[i], &paletteEntry)) {
+    if (d->scale == 0) {
+        /* one list entry per colour: the sums from the leaves, no lookup
+           per pixel */
+        paletteEntry = 0;
+        if (!sum_box_leaves(root, avg, count, &paletteEntry, nPaletteEntries) ||
+            paletteEntry != nPaletteEntries) {
             for (i = 0; i < 3; i++) {
                 free(avg[i]);
             }
             free(count);
             return 0;
         }
-        if (paletteEntry >= nPaletteEntries) {
-            for (i = 0; i < 3; i++) {
-                free(avg[i]);
+    } else {
+        /* scaled: a list entry stands for several colours, so each pixel
+           adds its own */
+        for (i = 0; i < nPixels; i++) {
+            if (!box_of_pixel(
+                    medianBoxHash, boxMap, d->scale, pixelData[i], &paletteEntry
+                )) {
+                for (i = 0; i < 3; i++) {
+                    free(avg[i]);
+                }
+                free(count);
+                return 0;
             }
-            free(count);
-            return 0;
+            if (paletteEntry >= nPaletteEntries) {
+                for (i = 0; i < 3; i++) {
+                    free(avg[i]);
+                }
+                free(count);
+                return 0;
+            }
+            avg[0][paletteEntry] += pixelData[i].c.r;
+            avg[1][paletteEntry] += pixelData[i].c.g;
+            avg[2][paletteEntry] += pixelData[i].c.b;
+            count[paletteEntry]++;
         }
-        avg[0][paletteEntry] += pixelData[i].c.r;
-        avg[1][paletteEntry] += pixelData[i].c.g;
-        avg[2][paletteEntry] += pixelData[i].c.b;
-        count[paletteEntry]++;
     }
     /* malloc check ok, using calloc */
     p = calloc(nPaletteEntries, sizeof(Pixel));
@@ -1095,6 +1224,7 @@ quantize(
     uint32_t i;
     uint32_t *qp;
     uint32_t nPaletteEntries;
+    uint32_t *boxMap = NULL;
 
     uint32_t *avgDist;
     uint32_t **avgDistSortKey;
@@ -1123,8 +1253,9 @@ quantize(
     if (!annotate_hash_table(root, h, &nPaletteEntries)) {
         goto error_3;
     }
+    boxMap = build_box_map(h);
     if (!compute_palette_from_median_cut(
-            pixelData, nPixels, h, &p, nPaletteEntries, root
+            pixelData, nPixels, h, boxMap, &p, nPaletteEntries, root
         )) {
         goto error_3;
     }
@@ -1158,7 +1289,15 @@ quantize(
     }
 
     if (!map_image_pixels_from_median_box(
-            pixelData, nPixels, p, nPaletteEntries, h, avgDist, avgDistSortKey, qp
+            pixelData,
+            nPixels,
+            p,
+            nPaletteEntries,
+            h,
+            boxMap,
+            avgDist,
+            avgDistSortKey,
+            qp
         )) {
         goto error_7;
     }
@@ -1177,6 +1316,7 @@ quantize(
     if (avgDistSortKey) {
         free(avgDistSortKey);
     }
+    free(boxMap);
     destroy_pixel_hash(h);
     return 1;
 
@@ -1201,6 +1341,7 @@ error_3:
         free_box_tree(root);
     }
 error_1:
+    free(boxMap);
     destroy_pixel_hash(h);
 error_0:
     *quantizedPixels = NULL;

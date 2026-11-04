@@ -55,5 +55,10 @@ uint32_t
 hashtable_get_count(const HashTable *h);
 void
 hashtable_rehash_compute(HashTable *h, CollisionFunc cf);
+/* Pillow-AllSIMD: declares that cf orders keys exactly as hf's values
+   (equal hashes are equal keys), so chain walks compare the hashes kept
+   in the nodes instead of calling cf. Call right after hashtable_new. */
+void
+hashtable_order_by_hash(HashTable *h);
 
 #endif  // __QUANTHASH_H__
