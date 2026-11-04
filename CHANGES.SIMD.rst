@@ -27,7 +27,7 @@ Unreleased
   ``design/SIMD_EXPLAINER_PLAN.md``, written section by section: so far
   the ground rules, resampling, the blurs, the kernel filters, the rank
   filters, the colour conversions, compositing and the channel operations,
-  and geometry
+  geometry, and drawing and text
 
 13.0.0.post2 (2026-11-03)
 -------------------------
