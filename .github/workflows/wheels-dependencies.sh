@@ -107,6 +107,7 @@ BZIP2_VERSION=$(_get_ver bzip2)
 LIBXCB_VERSION=$(_get_ver libxcb)
 BROTLI_VERSION=$(_get_ver brotli)
 LIBAVIF_VERSION=$(_get_ver libavif)
+LIBDEFLATE_VERSION=$(_get_ver libdeflate)
 
 function build_pkg_config {
     if [ -e pkg-config-stamp ]; then return; fi
@@ -240,6 +241,19 @@ function build_libavif {
     touch libavif-stamp
 }
 
+# Pillow-AllSIMD: libdeflate compresses the PNGs Pillow saves (ZipEncode.c);
+# built before libtiff, which uses it for deflate-compressed TIFFs where
+# its configure finds it (Linux; the macOS build disables it explicitly).
+function build_libdeflate {
+    if [ -e libdeflate-stamp ]; then return; fi
+    local out_dir=$(fetch_unpack https://github.com/ebiggers/libdeflate/releases/download/v$LIBDEFLATE_VERSION/libdeflate-$LIBDEFLATE_VERSION.tar.gz)
+    (cd $out_dir \
+        && cmake -DCMAKE_INSTALL_PREFIX=$BUILD_PREFIX -DCMAKE_INSTALL_LIBDIR=$BUILD_PREFIX/lib -DCMAKE_INSTALL_NAME_DIR=$BUILD_PREFIX/lib -DCMAKE_MACOSX_BUNDLE=OFF \
+            -DLIBDEFLATE_BUILD_STATIC_LIB=OFF -DLIBDEFLATE_BUILD_GZIP=OFF -DLIBDEFLATE_BUILD_TESTS=OFF $HOST_CMAKE_FLAGS . \
+        && make -j4 install)
+    touch libdeflate-stamp
+}
+
 function build_zstd {
     if [ -e zstd-stamp ]; then return; fi
     local out_dir=$(fetch_unpack https://github.com/facebook/zstd/releases/download/v$ZSTD_VERSION/zstd-$ZSTD_VERSION.tar.gz)
@@ -271,6 +285,8 @@ function build {
 
     # -DCMAKE_POSITION_INDEPENDENT_CODE=1 is a workaround from https://github.com/libjpeg-turbo/libjpeg-turbo/issues/898
     HOST_CMAKE_FLAGS="-DCMAKE_POSITION_INDEPENDENT_CODE=1 $HOST_CMAKE_FLAGS" build_libjpeg_turbo
+
+    build_libdeflate
 
     if [[ -n "$IS_MACOS" ]]; then
         # Custom tiff build to include jpeg; by default, configure won't include

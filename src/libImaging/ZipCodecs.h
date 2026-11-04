@@ -55,4 +55,15 @@ typedef struct {
 
     int pass; /* current pass of the interlaced image (PNG) */
 
+    /* Pillow-AllSIMD: with libdeflate, the encoder keeps the filtered rows
+       of the whole image and compresses them at once after the last one,
+       then hands the result out (ZipEncode.c) */
+    int use_libdeflate;
+    UINT8 *whole;      /* the filtered rows (allocated) */
+    size_t whole_size; /* its capacity, rows times bytes + 1 */
+    size_t whole_used; /* bytes filled so far */
+    UINT8 *out;        /* the compressed stream (allocated) */
+    size_t out_size;   /* its length */
+    size_t out_pos;    /* bytes handed out so far */
+
 } ZIPSTATE;

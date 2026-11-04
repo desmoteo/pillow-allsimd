@@ -95,11 +95,38 @@ def generate(version: str) -> dict[str, Any]:
                     "AVX-VNNI, NEON) and a fast mode added to the C extensions; "
                     "forked from Pillow-SIMD (https://github.com/uploadcare/"
                     "pillow-simd). The C extensions and the bundled native "
-                    "libraries are those of the Pillow release."
+                    "libraries are those of the Pillow release, plus libdeflate, "
+                    "which compresses the PNGs it saves."
                 ),
             },
         }
     )
+    # libdeflate, which the wheels bundle for PNG saving (ZipEncode.c)
+    versions = pillow.load_dep_versions()
+    sbom["components"].append(
+        {
+            "bom-ref": "pkg:generic/libdeflate",
+            "type": "library",
+            "name": "libdeflate",
+            "version": versions["libdeflate"],
+            "scope": "optional",
+            "description": (
+                "DEFLATE compression of the PNGs Pillow-AllSIMD saves (optional; "
+                "disable with -C libdeflate=disable)."
+            ),
+            "licenses": [{"license": {"id": "MIT"}}],
+            "externalReferences": [
+                {"type": "website", "url": "https://github.com/ebiggers/libdeflate"},
+                {
+                    "type": "distribution",
+                    "url": "https://github.com/ebiggers/libdeflate/releases",
+                },
+            ],
+        }
+    )
+    for dependency in sbom["dependencies"]:
+        if dependency["ref"] == f"{purl}#c-ext/PIL._imaging":
+            dependency["dependsOn"].append("pkg:generic/libdeflate")
     return sbom
 
 

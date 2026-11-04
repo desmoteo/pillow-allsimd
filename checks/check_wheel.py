@@ -43,9 +43,11 @@ def test_wheel_features() -> None:
         "libjpeg_turbo",
         "zlib_ng",
         "xcb",
-        # Pillow-AllSIMD's fast mode and SIMD kernels, in every wheel
+        # Pillow-AllSIMD's fast mode and SIMD kernels, in every wheel, and
+        # libdeflate for PNG saving
         "fast",
         "simd",
+        "libdeflate",
     }
 
     if sys.platform == "win32":

@@ -8,6 +8,23 @@ Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
 Based on Pillow 13.0.0
 
+- PNG saving compresses with libdeflate where Pillow was built with it
+  (the wheels, and source builds on a machine with ``libdeflate.h``):
+  the filtered rows of the image are compressed in one piece after the
+  last row, which libdeflate does several times faster than zlib's
+  stream (on a 1280x800 photo at the default level: 5x for RGB, 6.4x
+  for RGBA, 5.4x for L, 1.9x for P, the files within 2% of zlib's or
+  smaller). ``optimize`` uses libdeflate's level 10: files 3 to 9%
+  smaller than zlib's level 9, in 2 to 9x less time for RGB and RGBA
+  (a little more for L and P). The pixels are the same; the
+  bytes differ from zlib's, as a zlib-ng build's already did. zlib is
+  still used for a ``dictionary``, an explicit ``compress_type``, images
+  whose filtered data is above 256 MB (``PILLOW_LIBDEFLATE_MAX`` moves
+  the cap, in bytes; 0 turns libdeflate off), and builds without it
+  (``-C libdeflate=disable``). ``features.check("libdeflate")`` tells
+- The masked histogram (``Image.histogram(mask)``) counts without a
+  branch per pixel, into four tables like the unmasked one: 6x faster on
+  x86-64, the same counts
 - Wheels for x86-64 Linux (manylinux_2_28 and musllinux_1_2 x86_64), built
   and tested as the arm64 ones are. Each holds the SSE4.1, AVX2 and
   AVX-VNNI kernels and picks the set the CPU has when Pillow loads (the

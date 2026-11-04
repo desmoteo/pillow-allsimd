@@ -2317,7 +2317,9 @@ unpacking (``Pack.c``, ``Unpack.c``), ``tobytes()``, WebP and JPEG
 decoding (``_webp.c``, ``JpegDecode.c``), and two neighbours: palette
 mapping (``Quant.c``, ``QuantHash.c``) and the histogram (``Histo.c``).
 The codecs themselves (zlib, libjpeg-turbo, libwebp) are untouched;
-what changed is what Pillow does around them.
+what changed is what Pillow does around them, with one exception: a
+build with libdeflate (the wheels) compresses the PNG encoder's output
+with it instead of zlib, as below.
 
 What Pillow computes
 ~~~~~~~~~~~~~~~~~~~~
@@ -2470,7 +2472,26 @@ milliseconds shown; the "portable" column is the build without SIMD.
 PNG encoding at level 6 is zlib's: the filters are 1.2x in the portable
 build (the arithmetic alone) and 1.6x in vectors, and the encoder is
 now level with OpenCV's and ahead of libvips', which use libpng; at
-level 1 the filters are a larger share and the gain 1.7x. JPEG encoding
+level 1 the filters are a larger share and the gain 1.7x.
+
+**libdeflate (2026-11-04).** The table above is a zlib build. Where
+Pillow is built with libdeflate (``features.check("libdeflate")``; the
+wheels are), the encoder keeps the filtered rows of the whole image and
+compresses them in one piece after the last row with
+``libdeflate_zlib_compress``, which has no streaming interface but a
+better match finder: on a 1280x800 photo-like image at the default
+level, 5x faster for RGB (1,177 to 232 ms), 6.4x for RGBA, 5.4x for L
+and 1.9x for P, with files within 2% of zlib's for RGB and L and 5%
+smaller for RGBA; ``optimize`` uses libdeflate's level 10, whose files
+are 3 to 9% smaller than zlib's level 9 and take 2 to 9x less time for
+RGB and RGBA (a little more for L and P). ``compress_level`` 0 to 9
+keep their meaning. The pixels are the same; the bytes differ, as a
+zlib-ng build's already did. zlib is still used for a preset
+dictionary, an explicit ``compress_type`` (a zlib strategy), images
+whose filtered rows exceed 256 MB (the one-piece path holds them and
+the output bound in memory; ``PILLOW_LIBDEFLATE_MAX`` moves the cap)
+and builds without the library. Decoding is unchanged: zlib's inflate
+and the vector unfiltering above. JPEG encoding
 and decoding, WebP encoding and JPEG thumbnails are the libraries' own
 time, 1.0x; WebP decoding is 1.5x on x86 and 1.2x on arm64 from the
 copies saved, now ahead of OpenCV. The histogram is 1.0x against Pillow
