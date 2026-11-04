@@ -25,8 +25,8 @@ Unreleased
 - Documentation: "How the kernels work" (``docs/allsimd-kernels.rst``),
   the explanation of the SIMD kernels for contributors planned in
   ``design/SIMD_EXPLAINER_PLAN.md``, written section by section: so far
-  the ground rules, resampling, the blurs, the kernel filters and the
-  rank filters
+  the ground rules, resampling, the blurs, the kernel filters, the rank
+  filters and the colour conversions
 
 13.0.0.post2 (2026-11-03)
 -------------------------
