@@ -167,6 +167,74 @@ histogram_u8(long *histogram, Imaging im) {
 }
 #endif
 
+/* Counts the bytes of an 8-bit image where the mask is nonzero. The mask
+   byte becomes the increment (0 or 1), so a random mask costs no branch
+   mispredicts, and neighbouring pixels go to different tables, as above.
+   The counts are the same as the branchy loop's. Returns 0 if out of
+   memory. */
+#define HISTOGRAM_MASK_TABLES 4
+static int
+histogram_u8_masked(long *histogram, Imaging im, Imaging imMask) {
+    int bins = im->pixelsize * 256;
+    int x, y, i, k;
+    long *t = calloc((size_t)HISTOGRAM_MASK_TABLES * bins, sizeof(long));
+    if (!t) {
+        return 0;
+    }
+    long *t0 = t, *t1 = t + bins, *t2 = t + 2 * bins, *t3 = t + 3 * bins;
+
+    for (y = 0; y < im->ysize; y++) {
+        const UINT8 *restrict in = (const UINT8 *)im->image[y];
+        const UINT8 *restrict mask = imMask->image8[y];
+        x = 0;
+        if (im->image8) {
+            for (; x < im->xsize - 3; x += 4) {
+                t0[in[x]] += mask[x] != 0;
+                t1[in[x + 1]] += mask[x + 1] != 0;
+                t2[in[x + 2]] += mask[x + 2] != 0;
+                t3[in[x + 3]] += mask[x + 3] != 0;
+            }
+            for (; x < im->xsize; x++) {
+                t0[in[x]] += mask[x] != 0;
+            }
+        } else {
+            /* Bands 2 and 3 skip the padding bytes; nothing reads their
+               counts. */
+            int b1 = im->bands == 2 ? 3 : 1;
+            int nb = im->bands == 2 ? 2 : im->bands;
+#define HISTOGRAM_MASKED_PIXEL(t, p, m) \
+    {                                   \
+        long inc = (m) != 0;            \
+        t[(p)[0]] += inc;               \
+        t[(p)[b1] + 256] += inc;        \
+        if (nb > 2) {                   \
+            t[(p)[2] + 512] += inc;     \
+        }                               \
+        if (nb > 3) {                   \
+            t[(p)[3] + 768] += inc;     \
+        }                               \
+    }
+            for (; x < im->xsize - 3; x += 4, in += 16) {
+                HISTOGRAM_MASKED_PIXEL(t0, in, mask[x])
+                HISTOGRAM_MASKED_PIXEL(t1, in + 4, mask[x + 1])
+                HISTOGRAM_MASKED_PIXEL(t2, in + 8, mask[x + 2])
+                HISTOGRAM_MASKED_PIXEL(t3, in + 12, mask[x + 3])
+            }
+            for (; x < im->xsize; x++, in += 4) {
+                HISTOGRAM_MASKED_PIXEL(t0, in, mask[x])
+            }
+#undef HISTOGRAM_MASKED_PIXEL
+        }
+    }
+    for (k = 0; k < HISTOGRAM_MASK_TABLES; k++) {
+        for (i = 0; i < bins; i++) {
+            histogram[i] += t[k * bins + i];
+        }
+    }
+    free(t);
+    return 1;
+}
+
 /**
  * Compute a histogram of `im`'s value distribution,
  * optionally restricted to imMask.
@@ -210,45 +278,18 @@ ImagingGetHistogram(Imaging im, Imaging imMask, void *minmax) {
 
     if (imMask) {
         /* mask */
-        if (im->image8) {
-            ImagingSectionEnter(&cookie);
-            MUTEX_LOCK(&im->mutex);
-            for (int y = 0; y < ysize; y++) {
-                UINT8 *restrict in = im->image8[y];
-                UINT8 *restrict mask = imMask->image8[y];
-                for (int x = 0; x < xsize; x++) {
-                    if (mask[x] != 0) {
-                        histogram[in[x]]++;
-                    }
-                }
-            }
-            MUTEX_UNLOCK(&im->mutex);
-            ImagingSectionLeave(&cookie);
-        } else { /* yes, we need the braces. C isn't Python! */
-            if (im->type != IMAGING_TYPE_UINT8) {
-                ImagingHistogramDelete(h);
-                return ImagingError_ModeError();
-            }
-            ImagingSectionEnter(&cookie);
-            MUTEX_LOCK(&im->mutex);
-            for (int y = 0; y < ysize; y++) {
-                UINT8 *restrict in = (UINT8 *)im->image32[y];
-                UINT8 *restrict mask = imMask->image8[y];
-                for (int x = 0; x < xsize; x++, in += 4) {
-                    if (mask[x] != 0) {
-                        histogram[*in]++;
-                        if (im->bands == 2) {
-                            histogram[*(in + 3) + 256]++;
-                        } else {
-                            histogram[*(in + 1) + 256]++;
-                            histogram[*(in + 2) + 512]++;
-                            histogram[*(in + 3) + 768]++;
-                        }
-                    }
-                }
-            }
-            MUTEX_UNLOCK(&im->mutex);
-            ImagingSectionLeave(&cookie);
+        if (!im->image8 && im->type != IMAGING_TYPE_UINT8) {
+            ImagingHistogramDelete(h);
+            return ImagingError_ModeError();
+        }
+        ImagingSectionEnter(&cookie);
+        MUTEX_LOCK(&im->mutex);
+        int ok = histogram_u8_masked(histogram, im, imMask);
+        MUTEX_UNLOCK(&im->mutex);
+        ImagingSectionLeave(&cookie);
+        if (!ok) {
+            ImagingHistogramDelete(h);
+            return ImagingError_MemoryError();
         }
     } else {
         /* mask not given; process pixels in image */
