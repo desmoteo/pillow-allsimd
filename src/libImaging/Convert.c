@@ -1214,6 +1214,69 @@ frompalette(Imaging imOut, Imaging imIn, const ModeID mode) {
 #if defined(_MSC_VER)
 #pragma optimize("", off)
 #endif
+/* One pixel of Floyd-Steinberg error diffusion to a palette, Pillow's
+   loop body (topalette): inp the row's pixels, rd the errors from the row
+   above (read at x + 1), wr the errors for the row below (written at x),
+   st the row's carried terms per channel. The arithmetic and its order
+   are Pillow's, and so is the row's closing write of the blue terms into
+   the three slots past the end. */
+typedef struct {
+    int r, r0, r1, r2;
+    int g, g0, g1, g2;
+    int b, b0, b1, b2;
+} DitherPaletteState;
+
+#define DITHER_PALETTE_CHANNEL(c, c0, c1, c2, wr, i) \
+    {                                                \
+        int d2;                                      \
+        c2 = c;                                      \
+        d2 = c + c;                                  \
+        c += d2;                                     \
+        (wr)[i] = c + c0;                            \
+        c += d2;                                     \
+        c0 = c + c1;                                 \
+        c1 = c2;                                     \
+        c += d2;                                     \
+    }
+
+#define DITHER_PALETTE_STEP(st, inp, outp, rd, wr, x)                          \
+    {                                                                          \
+        const UINT8 *px = (inp) + 4 * (x);                                     \
+        INT16 *cache;                                                          \
+        int r = CLIP8(px[0] + ((st).r + (rd)[3 * (x) + 3]) / 16);              \
+        int g = CLIP8(px[1] + ((st).g + (rd)[3 * (x) + 4]) / 16);              \
+        int b = CLIP8(px[2] + ((st).b + (rd)[3 * (x) + 5]) / 16);              \
+        /* get closest colour */                                               \
+        cache = &ImagingPaletteCache(palette, r, g, b);                        \
+        if (cache[0] == 0x100) {                                               \
+            ImagingPaletteCacheUpdate(palette, r, g, b);                       \
+        }                                                                      \
+        if (alpha) {                                                           \
+            (outp)[(x) * 4] = (outp)[(x) * 4 + 1] = (outp)[(x) * 4 + 2] =      \
+                (UINT8)cache[0];                                               \
+            (outp)[(x) * 4 + 3] = 255;                                         \
+        } else {                                                               \
+            (outp)[x] = (UINT8)cache[0];                                       \
+        }                                                                      \
+        r -= (int)palette->palette[cache[0] * 4];                              \
+        g -= (int)palette->palette[cache[0] * 4 + 1];                          \
+        b -= (int)palette->palette[cache[0] * 4 + 2];                          \
+        /* propagate errors (don't ask ;-) */                                  \
+        DITHER_PALETTE_CHANNEL(r, (st).r0, (st).r1, (st).r2, wr, 3 * (x));     \
+        DITHER_PALETTE_CHANNEL(g, (st).g0, (st).g1, (st).g2, wr, 3 * (x) + 1); \
+        DITHER_PALETTE_CHANNEL(b, (st).b0, (st).b1, (st).b2, wr, 3 * (x) + 2); \
+        (st).r = r;                                                            \
+        (st).g = g;                                                            \
+        (st).b = b;                                                            \
+    }
+
+#define DITHER_PALETTE_END(st, wr, xsize) \
+    {                                     \
+        (wr)[3 * (xsize)] = (st).b0;      \
+        (wr)[3 * (xsize) + 1] = (st).b1;  \
+        (wr)[3 * (xsize) + 2] = (st).b2;  \
+    }
+
 static Imaging
 topalette(
     Imaging imOut, Imaging imIn, const ModeID mode, ImagingPalette inpalette, int dither
@@ -1294,85 +1357,51 @@ topalette(
         }
 
         if (dither) {
-            /* floyd-steinberg dither */
-
-            int *errors;
-            errors = calloc(imIn->xsize + 1, sizeof(int) * 3);
+            /* floyd-steinberg dither, two rows at a time as tobilevel()
+               does it: the second row two pixels behind the first, so
+               that the chains of error terms overlap; the arithmetic per
+               pixel, the palette cache and its filling are unchanged */
+            int xsize = imIn->xsize;
+            int *errors, *ea, *eb;
+            errors = calloc(2 * ((size_t)xsize + 1), sizeof(int) * 3);
             if (!errors) {
                 ImagingDelete(imOut);
                 return ImagingError_MemoryError();
             }
+            ea = errors;
+            eb = errors + 3 * (xsize + 1);
 
             /* Map each pixel to the nearest palette entry */
             ImagingSectionEnter(&cookie);
-            for (y = 0; y < imIn->ysize; y++) {
-                int r, r0, r1, r2;
-                int g, g0, g1, g2;
-                int b, b0, b1, b2;
-                UINT8 *in = (UINT8 *)imIn->image[y];
-                UINT8 *out = alpha ? (UINT8 *)imOut->image32[y] : imOut->image8[y];
-                int *e = errors;
+            for (y = 0; y < imIn->ysize; y += 2) {
+                int two = y + 1 < imIn->ysize;
+                DitherPaletteState s0 = {0}, s1 = {0};
+                UINT8 *in0 = (UINT8 *)imIn->image[y];
+                UINT8 *out0 = alpha ? (UINT8 *)imOut->image32[y] : imOut->image8[y];
+                UINT8 *in1 = two ? (UINT8 *)imIn->image[y + 1] : in0;
+                UINT8 *out1 = !two    ? out0
+                              : alpha ? (UINT8 *)imOut->image32[y + 1]
+                                      : imOut->image8[y + 1];
 
-                r = r0 = r1 = 0;
-                g = g0 = g1 = 0;
-                b = b0 = b1 = b2 = 0;
-
-                for (x = 0; x < imIn->xsize; x++, in += 4) {
-                    int d2;
-                    INT16 *cache;
-
-                    r = CLIP8(in[0] + (r + e[3 + 0]) / 16);
-                    g = CLIP8(in[1] + (g + e[3 + 1]) / 16);
-                    b = CLIP8(in[2] + (b + e[3 + 2]) / 16);
-
-                    /* get closest colour */
-                    cache = &ImagingPaletteCache(palette, r, g, b);
-                    if (cache[0] == 0x100) {
-                        ImagingPaletteCacheUpdate(palette, r, g, b);
-                    }
-                    if (alpha) {
-                        out[x * 4] = out[x * 4 + 1] = out[x * 4 + 2] = (UINT8)cache[0];
-                        out[x * 4 + 3] = 255;
-                    } else {
-                        out[x] = (UINT8)cache[0];
-                    }
-
-                    r -= (int)palette->palette[cache[0] * 4];
-                    g -= (int)palette->palette[cache[0] * 4 + 1];
-                    b -= (int)palette->palette[cache[0] * 4 + 2];
-
-                    /* propagate errors (don't ask ;-) */
-                    r2 = r;
-                    d2 = r + r;
-                    r += d2;
-                    e[0] = r + r0;
-                    r += d2;
-                    r0 = r + r1;
-                    r1 = r2;
-                    r += d2;
-                    g2 = g;
-                    d2 = g + g;
-                    g += d2;
-                    e[1] = g + g0;
-                    g += d2;
-                    g0 = g + g1;
-                    g1 = g2;
-                    g += d2;
-                    b2 = b;
-                    d2 = b + b;
-                    b += d2;
-                    e[2] = b + b0;
-                    b += d2;
-                    b0 = b + b1;
-                    b1 = b2;
-                    b += d2;
-
-                    e += 3;
+                for (x = 0; x < 2 && x < xsize; x++) {
+                    DITHER_PALETTE_STEP(s0, in0, out0, ea, eb, x);
                 }
-
-                e[0] = b0;
-                e[1] = b1;
-                e[2] = b2;
+                if (two) {
+                    for (; x < xsize; x++) {
+                        DITHER_PALETTE_STEP(s0, in0, out0, ea, eb, x);
+                        DITHER_PALETTE_STEP(s1, in1, out1, eb, ea, x - 2);
+                    }
+                    DITHER_PALETTE_END(s0, eb, xsize);
+                    for (x = xsize > 2 ? xsize - 2 : 0; x < xsize; x++) {
+                        DITHER_PALETTE_STEP(s1, in1, out1, eb, ea, x);
+                    }
+                    DITHER_PALETTE_END(s1, ea, xsize);
+                } else {
+                    for (; x < xsize; x++) {
+                        DITHER_PALETTE_STEP(s0, in0, out0, ea, eb, x);
+                    }
+                    DITHER_PALETTE_END(s0, eb, xsize);
+                }
             }
             ImagingSectionLeave(&cookie);
             free(errors);
@@ -1419,11 +1448,69 @@ topalette(
     return imOut;
 }
 
+/* One pixel of Floyd-Steinberg error diffusion to black or white, Pillow's
+   loop body: v the pixel's value, rd the errors from the row above (read
+   at x + 1), wr the errors for the row below (written at x), st the row's
+   carried terms. The arithmetic and its order are Pillow's, so the pixels
+   are the same however the rows are scheduled. */
+typedef struct {
+    int l, l0, l1;
+} DitherState;
+
+#define DITHER_BILEVEL_STEP(st, v, outp, rd, wr, x)         \
+    {                                                       \
+        int l = CLIP8((v) + ((st).l + (rd)[(x) + 1]) / 16); \
+        int l2, d2;                                         \
+        UINT8 o = (l > 128) ? 255 : 0;                      \
+        (outp)[x] = o;                                      \
+        l -= (int)o;                                        \
+        l2 = l;                                             \
+        d2 = l + l;                                         \
+        l += d2;                                            \
+        (wr)[x] = l + (st).l0;                              \
+        l += d2;                                            \
+        (st).l0 = l + (st).l1;                              \
+        (st).l1 = l2;                                       \
+        l += d2;                                            \
+        (st).l = l;                                         \
+    }
+
+/* Two rows at a time, the second two pixels behind the first, so that
+   the two chains of error terms (about ten dependent operations per
+   pixel each) overlap: a pixel needs the errors of the row above at
+   x + 1, which the first row has written by then. Even rows read ea and
+   write eb, odd rows the reverse. VAL(in, x) is the pixel's value. */
+#define DITHER_BILEVEL_ROWS(VAL)                                               \
+    {                                                                          \
+        for (x = 0; x < 2 && x < xsize; x++) {                                 \
+            DITHER_BILEVEL_STEP(s0, VAL(in0, x), out0, ea, eb, x);             \
+        }                                                                      \
+        if (two) {                                                             \
+            for (; x < xsize; x++) {                                           \
+                DITHER_BILEVEL_STEP(s0, VAL(in0, x), out0, ea, eb, x);         \
+                DITHER_BILEVEL_STEP(s1, VAL(in1, x - 2), out1, eb, ea, x - 2); \
+            }                                                                  \
+            eb[xsize] = s0.l0;                                                 \
+            for (x = xsize > 2 ? xsize - 2 : 0; x < xsize; x++) {              \
+                DITHER_BILEVEL_STEP(s1, VAL(in1, x), out1, eb, ea, x);         \
+            }                                                                  \
+            ea[xsize] = s1.l0;                                                 \
+        } else {                                                               \
+            for (; x < xsize; x++) {                                           \
+                DITHER_BILEVEL_STEP(s0, VAL(in0, x), out0, ea, eb, x);         \
+            }                                                                  \
+            eb[xsize] = s0.l0;                                                 \
+        }                                                                      \
+    }
+
+#define DITHER_VAL_L(in, x) ((in)[x])
+#define DITHER_VAL_RGB(in, x) (L((in) + 4 * (x)) / 1000)
+
 static Imaging
 tobilevel(Imaging imOut, Imaging imIn) {
     ImagingSectionCookie cookie;
-    int x, y;
-    int *errors;
+    int x, y, xsize;
+    int *errors, *ea, *eb;
 
     /* Map L or RGB to dithered 1 image */
     if (imIn->mode != IMAGING_MODE_L && imIn->mode != IMAGING_MODE_RGB) {
@@ -1435,74 +1522,33 @@ tobilevel(Imaging imOut, Imaging imIn) {
         return NULL;
     }
 
-    errors = calloc(imIn->xsize + 1, sizeof(int));
+    xsize = imIn->xsize;
+    /* the errors of two rows: the row above's, read, and this row's,
+       written for the row below */
+    errors = calloc(2 * ((size_t)xsize + 1), sizeof(int));
     if (!errors) {
         ImagingDelete(imOut);
         return ImagingError_MemoryError();
     }
+    ea = errors;
+    eb = errors + xsize + 1;
 
-    if (imIn->bands == 1) {
-        /* map each pixel to black or white, using error diffusion */
-        ImagingSectionEnter(&cookie);
-        for (y = 0; y < imIn->ysize; y++) {
-            int l, l0, l1, l2, d2;
-            UINT8 *in = (UINT8 *)imIn->image[y];
-            UINT8 *out = imOut->image8[y];
-
-            l = l0 = l1 = 0;
-
-            for (x = 0; x < imIn->xsize; x++) {
-                /* pick closest colour */
-                l = CLIP8(in[x] + (l + errors[x + 1]) / 16);
-                out[x] = (l > 128) ? 255 : 0;
-
-                /* propagate errors */
-                l -= (int)out[x];
-                l2 = l;
-                d2 = l + l;
-                l += d2;
-                errors[x] = l + l0;
-                l += d2;
-                l0 = l + l1;
-                l1 = l2;
-                l += d2;
-            }
-
-            errors[x] = l0;
+    /* map each pixel to black or white, using error diffusion */
+    ImagingSectionEnter(&cookie);
+    for (y = 0; y < imIn->ysize; y += 2) {
+        int two = y + 1 < imIn->ysize;
+        DitherState s0 = {0, 0, 0}, s1 = {0, 0, 0};
+        UINT8 *in0 = (UINT8 *)imIn->image[y];
+        UINT8 *out0 = imOut->image8[y];
+        UINT8 *in1 = two ? (UINT8 *)imIn->image[y + 1] : in0;
+        UINT8 *out1 = two ? imOut->image8[y + 1] : out0;
+        if (imIn->bands == 1) {
+            DITHER_BILEVEL_ROWS(DITHER_VAL_L);
+        } else {
+            DITHER_BILEVEL_ROWS(DITHER_VAL_RGB);
         }
-        ImagingSectionLeave(&cookie);
-
-    } else {
-        /* map each pixel to black or white, using error diffusion */
-        ImagingSectionEnter(&cookie);
-        for (y = 0; y < imIn->ysize; y++) {
-            int l, l0, l1, l2, d2;
-            UINT8 *in = (UINT8 *)imIn->image[y];
-            UINT8 *out = imOut->image8[y];
-
-            l = l0 = l1 = 0;
-
-            for (x = 0; x < imIn->xsize; x++, in += 4) {
-                /* pick closest colour */
-                l = CLIP8(L(in) / 1000 + (l + errors[x + 1]) / 16);
-                out[x] = (l > 128) ? 255 : 0;
-
-                /* propagate errors */
-                l -= (int)out[x];
-                l2 = l;
-                d2 = l + l;
-                l += d2;
-                errors[x] = l + l0;
-                l += d2;
-                l0 = l + l1;
-                l1 = l2;
-                l += d2;
-            }
-
-            errors[x] = l0;
-        }
-        ImagingSectionLeave(&cookie);
     }
+    ImagingSectionLeave(&cookie);
 
     free(errors);
 
