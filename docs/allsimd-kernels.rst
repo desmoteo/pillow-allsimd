@@ -20,9 +20,9 @@ Cortex-A78AE, GCC 14). Unless a section says "fast mode", they are for
 exact mode, Pillow's arithmetic.
 
 The page is written section by section. Written so far: the ground rules,
-resampling, the blurs, the kernel filters, the rank filters and the
-colour conversions. To come: compositing and channel operations, geometry, drawing and
-text, codecs and packing, what was tried and dropped, where OpenCV and
+resampling, the blurs, the kernel filters, the rank filters, the colour
+conversions, compositing and the channel operations. To come: geometry,
+drawing and text, codecs and packing, what was tried and dropped, where OpenCV and
 libvips are still faster, and the fast-mode kernels (meanwhile,
 ``design/SIMD_FAST_KERNELS.md`` in the repository describes those).
 
@@ -40,8 +40,9 @@ arithmetic in a form the vector version can reproduce exactly, usually
 integer sums of products with one rounding at the end, rather than the
 floating-point loops Pillow once had. The exceptions are documented in
 ``checks/simd_hashes.py``: the x86 alpha composite rounds a division
-differently from the portable code by one level, and on arm64 the
-compilers fuse floating-point multiply-adds, so the kernels that must
+differently from the portable code by one level, the x86 3D colour
+lookup table interpolates at Pillow-SIMD's 16-bit precision, up to two
+levels from Pillow's, and on arm64 the compilers fuse floating-point multiply-adds, so the kernels that must
 match double sums (the F, I and I;16 resample, the exact transforms) use
 fused multiply-adds explicitly and differ from x86 only where the scalar
 code would too. Against Pillow itself, resize uses 16-bit coefficients
@@ -1490,3 +1491,266 @@ SSE4 until the loop worked on whole pixels; the whole-pixel loops being
 another, so arm64 got its own loops; and the tail loop with ``x * 4``
 indexing that the benchmark caught after the page's own ground rules
 had described the problem.
+
+Compositing and channel operations
+----------------------------------
+
+``Image.alpha_composite()`` (``AlphaComposite.c``), ``Image.blend()``
+(``Blend.c``), ``Image.composite()`` and ``paste()`` with a mask
+(``Paste.c``), ``ImageChops`` (``Chops.c``), ``Image.point()`` and
+``ImageOps``' invert, posterize and solarize and ``ImageEnhance``
+(``Point.c``, ``ImageEnhance.py``), ``ImageFilter.Color3DLUT``
+(``ColorLUT.c``), and ``split()``, ``merge()`` and ``getchannel()``
+(``Bands.c``). Small kernels, each a few instructions per pixel, and
+mostly bandwidth-bound once written right.
+
+What Pillow computes
+~~~~~~~~~~~~~~~~~~~~
+
+Alpha compositing is Porter-Duff *over* in integers with 7 extra bits:
+``outa255 = sa * 255 + da * (255 - sa)``, ``coef1 = sa * 255 * 255 * 128
+/ outa255`` (one integer division per pixel), ``coef2 = 255 * 128 -
+coef1``, each colour ``(s * coef1 + d * coef2 + 0x80 * 128) / 255 >> 7``
+with ``/ 255`` as ``(x + (x >> 8)) >> 8``, and pixels with ``sa`` = 0 keep
+the destination. Blend is ``in1 + alpha * (in2 - in1)`` in floats,
+truncated. Masked paste and ``composite()`` are ``BLEND(m, out, in) =
+(out * (255 - m) + in * m + 128) / 255`` with the same ``/ 255``. The
+chops: ``multiply`` is ``a * b / 255`` and ``screen`` its inverse, in C's
+integer division; ``add`` and ``subtract`` are ``(a ± b) / scale +
+offset`` in float, clipped; ``lighter``, ``darker`` and ``difference``
+need no arithmetic. ``point()`` looks every byte up in a 256-entry table
+per band, into a zero-filled image; ``ImageEnhance`` blends the image
+with a "degenerate" one (grey, black, desaturated, blurred). The 3D
+colour LUT interpolates trilinearly between eight table entries, 16-bit
+values with 6 fractional bits, the weights at 15 bits. Pillow 13's loops
+for all of these are scalar on x86 except where GCC vectorizes them
+(``lighter``, ``difference``, blend with AVX2).
+
+The idea
+~~~~~~~~
+
+* **Alpha composite.** Pillow-SIMD's kernel, kept on x86: four (SSE4) or
+  eight (AVX2) pixels per step, ``coef1`` from ``rcpps``, a reciprocal
+  estimate, which rounds one level away from the integer division in 6%
+  of the bytes, the one approximation left in exact mode on x86 (an
+  exception the ground rules list; ``test_alpha_composite_every_alpha``
+  is skipped there). On arm64 the division bound the loop at about 12
+  cycles a pixel, a vector division or a corrected reciprocal was no
+  faster, and GCC's vectorization of the portable loop beat the first
+  NEON kernel; what won, 1.25x over that, is a 128 KB table of ``coef1``
+  for every (source alpha, destination alpha) pair, built on first use,
+  with NEON for the blends (``ac_blend8``, the ``/ 255`` as two shifts
+  and adds in 32-bit lanes): the same pixels as the scalar code. Where
+  ``alpha_composite()`` takes a destination offset, the overlay is
+  composited straight onto the destination's rows in place
+  (``ImagingAlphaCompositeOnto()``) instead of through a crop, a
+  composite and a paste, which is no SIMD but 2.2x.
+* **Multiply and screen without a division.** For every product ``x`` of
+  two bytes, ``x / 255`` is exactly ``(x + 1 + (x >> 8)) >> 8``, and no
+  step leaves 16 bits; screen is multiply with every byte inverted on the
+  way in and out (``255 - (255 - a)(255 - b) / 255``). 32 bytes per AVX2
+  step, 16 per SSE4 or NEON step, and the portable loop uses the same
+  formula, so even the portable build is 6x Pillow 13. ``add`` and
+  ``subtract`` with scale 1 and offset 0 are one saturating add or
+  subtract per vector (``paddusb``, ``vqaddq_u8``), which compilers don't
+  find; with scale 1 and another offset an integer loop that
+  vectorizes; with any other scale a 511-entry table of the same float
+  expression for every possible sum, in place of a float division per
+  byte. ``lighter`` and ``darker`` can't leave 0..255, so they skip the
+  clipping that stopped them vectorizing.
+* **Tables that are a byte operation.** ``point()`` recognizes a table
+  that equals ``v ^ c`` (invert is ``v ^ 255``), ``v & c`` (posterize) or
+  ``v < t ? v : 255 - v`` (solarize) for all 256 values, in every band,
+  and transforms whole rows with the byte operation instead (solarize as
+  ``v ^ (v >= t ? 255 : 0)``, the comparison a ``pmaxub`` and
+  ``pcmpeqb``); other tables keep the lookup, and the output is no
+  longer zero-filled first, since every byte is written. A vector table
+  lookup on x86 (``pshufb`` over 16 groups of 16 entries) was measured
+  slower than the scalar lookup, 0.56 cycles per byte; on arm64 NEON's
+  ``tbl``/``tbx`` look 16 bytes up in 64-entry groups held in registers,
+  four instructions for a 256-entry table, and a row of 4-byte pixels is
+  split into band planes so that each band's table is loaded once per
+  row (L 1.9x, RGB 1.3x).
+* **ImageEnhance as a table.** Contrast and Brightness blend the image
+  with an image that is constant in each band (alpha excepted), so each
+  output byte is a function of the input byte: ``enhance()`` now blends a
+  0..255 gradient with those constants, through the same ``Image.blend``,
+  and applies the result with ``point()``, instead of allocating a
+  full-size degenerate image and blending it; the degenerate image is
+  still made on request, for the subclasses that set it. The pixels are
+  the same, since the same C code computes each byte.
+* **Masked fills.** ``ImageDraw.text()`` and ``bitmap()`` put ink through
+  an L mask one byte at a time; ``fill_mask_L_simd()`` blends 16 bytes
+  (or four 4-byte pixels) with ``BLEND``'s rounding in 16-bit lanes, the
+  colour channels of transparent pixels taking a mask of 255 as the
+  scalar expression gives; the SSE4 and NEON kernels exist, AVX2 uses
+  SSE4's. The drawing section returns to it.
+* **The 3D colour LUT.** Pillow-SIMD's kernel on x86: the index and the
+  interpolation weight of each axis in one 16-bit value (6 bits of
+  index, 9 of weight), the eight entries interpolated with ``pmaddwd``
+  against (1 − *s*, *s*) pairs, one pixel per 128-bit vector and two
+  per AVX2 vector, with ``vpdpwssd`` in the AVX-VNNI build. It uses its
+  own precision, not Pillow's: the output differs from the scalar
+  build's by up to two levels in about 10% of the bytes for a random
+  table (none for a smooth one), the other exception the ground rules
+  list. The NEON kernel computes Pillow's arithmetic instead, one pixel
+  as four 32-bit lanes, and gives the scalar pixels.
+* **Bands.** ``split()`` and ``getchannel()`` transpose four pixels into
+  planes with one ``pshufb`` on x86 and ``vld4q`` on NEON; ``merge()``
+  uses ``vst4q`` on NEON, and on x86 the compiler's code, since an
+  explicit unpack kernel measured no better.
+
+Why the builds agree, and where they don't
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The chops, ``point()``, ``ImageEnhance``, the masked pastes and fills,
+blend and the band operations give the same bytes on every build: the
+``paste/composite``, ``point/enhance`` and ``chops/convert`` areas of
+``checks/simd_hashes.py`` agree, and ``test_multiply_screen_exact``,
+``test_byte_operation_tables`` (every byte value, each pattern and a
+near miss), ``test_lookup_table_matches_blend``, ``test_point_table``,
+``test_bitmap_mask_blend_exact`` and ``test_alpha_composite`` (flat
+images stay flat, vector loop and tail) check the paths against
+references. The two exceptions are on x86 only: ``alpha_composite()``,
+one level in 6% of the bytes (its hash area is named "x86 SIMD vs
+scalar: known"), and ``Color3DLUT``, up to two levels in about 10%, both
+Pillow-SIMD's kernels kept as they were. On arm64 both are exact, the
+alpha composite checked for every alpha pair
+(``test_alpha_composite_every_alpha``).
+
+Numbers
+~~~~~~~
+
+2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
+milliseconds shown.
+
+.. list-table::
+   :header-rows: 1
+
+   * - Operation
+     - Pillow 13 (x86, ms)
+     - SSE4
+     - AVX2
+     - Pillow 13 (arm64, ms)
+     - NEON
+   * - alpha_composite RGBA
+     - 19.6
+     - 3.8x
+     - 6.7x
+     - 22.1
+     - 1.2x
+   * - blend RGB, 50%
+     - 5.2
+     - 1.0x
+     - 1.7x
+     - 13.0
+     - 1.0x
+   * - composite RGB, L mask
+     - 11.7
+     - 1.2x
+     - 1.9x
+     - 11.1
+     - 1.0x
+   * - ImageChops.multiply RGB
+     - 14.7
+     - 6.6x
+     - 7.6x
+     - 14.0
+     - 3.9x
+   * - ImageChops.screen RGB
+     - 18.5
+     - 8.4x
+     - 9.5x
+     - 17.8
+     - 4.9x
+   * - ImageChops.add RGB
+     - 10.4
+     - 5.5x
+     - 5.7x
+     - 15.6
+     - 5.0x
+   * - ImageChops.lighter RGB
+     - 5.3
+     - 2.8x
+     - 2.9x
+     - 6.4
+     - 2.1x
+   * - ImageOps.invert RGB
+     - 4.1
+     - 3.2x
+     - 3.3x
+     - 9.9
+     - 5.3x
+   * - point() RGB, a table
+     - 4.1
+     - 1.1x
+     - 1.1x
+     - 9.9
+     - 1.3x
+   * - point() L, a table
+     - 1.7
+     - 1.1x
+     - 1.1x
+     - 3.6
+     - 2.0x
+   * - Color3DLUT RGB, 16³
+     - 80.0
+     - 5.1x
+     - 7.6x
+     - 103.0
+     - 2.0x
+   * - Color3DLUT RGBA, 16³
+     - 98.3
+     - 6.5x
+     - 9.7x
+     - 118.3
+     - 2.4x
+
+Blend, the masked composite and the plain table lookups are the
+compiler's code in exact mode (blend's 1.7x is GCC's AVX2 vectorization
+of Pillow's loop; an SSE4 kernel for it was measured and dropped), so
+their columns say what the compiler does; fast mode's blend, which
+interpolates in integers with ``pmulhrsw``, is 2.7x on x86 and 4.2x on
+arm64. The chops run at the memory's speed: against OpenCV, ``multiply``
+is level, ``screen`` 3.8x faster (OpenCV has no screen and composes it),
+and ``add``, ``lighter``, ``difference`` and invert are 1.3 to 1.4x
+slower on both machines, the 4/3 byte ratio of Pillow's RGB layout.
+OpenCV's ``LUT``, a scalar loop over the whole image as one row, is 1.5x
+faster than ``point()`` with a table on x86 and level on arm64 for RGB,
+where NEON's lookups put the L table 1.4x ahead. Against Pillow-SIMD
+12.1.1 with AVX2, the alpha composite and the LUT are its kernels and
+equal; ``multiply`` is 6.3x faster, ``add`` 9x and invert 3.3x.
+
+Code map
+~~~~~~~~
+
+* ``AlphaComposite.c``: ``alpha_composite_4px()`` and ``_8px()`` (x86),
+  ``ac_coef1_table`` and ``alpha_composite_16px_neon()``,
+  ``alpha_composite_row()`` with the scalar definition,
+  ``ImagingAlphaCompositeOnto()``.
+* ``Chops.c``: ``chop_multiply_row()``, ``chop_saturate_row()``,
+  ``chop_add_subtract()``; ``Blend.c``: ``blend_fast_row()`` and
+  Pillow's loops; ``Paste.c``: ``fill_blend16()`` and
+  ``fill_mask_L_simd()``.
+* ``Point.c``: ``point_byte_op()`` and ``point_byte_row()``,
+  ``neon_lut16()`` and ``neon_lut_row()``; ``src/PIL/ImageEnhance.py``:
+  ``_Enhance._lut()`` and ``_levels()``.
+* ``ColorLUT.c``: ``mm_lut_pixel()`` and ``mm256_lut_pixel()`` with the
+  x86 ``ImagingColorLUT3D_linear()``; the portable one with
+  ``neon_lut_pixel()`` after ``#else``.
+* ``Bands.c``: ``ImagingGetBand()``, ``SPLIT_LOAD``/``SPLIT_STORE``,
+  ``ImagingMerge()``.
+* Tests: ``test_alpha_composite``, ``test_alpha_composite_every_alpha``
+  and ``test_point_table`` in ``Tests/test_simd_consistency.py``;
+  ``test_multiply_screen_exact`` in ``Tests/test_imagechops.py``;
+  ``test_byte_operation_tables`` in ``Tests/test_image_point.py``;
+  ``test_lookup_table_matches_blend`` in ``Tests/test_imageenhance.py``.
+
+Pitfalls met on the way: Pillow-SIMD's alpha composite gave a pixel a
+different value depending on its column, because the vector loop and
+its scalar tail rounded differently (the tail now runs through the
+vector code on a padded buffer); the first NEON alpha composite divided
+in double and lost to GCC's code with GCC 11, the second took a
+corrected reciprocal and lost to the table; the SSE4 blend and merge
+kernels measured no gain over GCC's; and ``pshufb`` table lookups on
+x86 lost to the scalar loop, where NEON's ``tbl`` won.
