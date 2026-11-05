@@ -1055,6 +1055,28 @@ class pil_build_ext(build_ext):
             return [match.group(0)]
         return [target.rsplit("-", 1)[-1] if "-" in target else target]
 
+    def _compiles(self, code: str, flags: list[str]) -> bool:
+        """Whether the C compiler makes an object file of this code with
+        these flags: the compiler and its assembler both, without their
+        messages in the build's output."""
+        with tempfile.TemporaryDirectory() as tmp:
+            source = os.path.join(tmp, "probe.c")
+            with open(source, "w") as fp:
+                fp.write(code)
+            command = getattr(self.compiler, "compiler_so", None)
+            if command:
+                cmd = [*command, *flags, "-c", source]
+                cmd += ["-o", os.path.join(tmp, "probe.o")]
+                try:
+                    return subprocess.run(cmd, capture_output=True).returncode == 0
+                except OSError:
+                    return False
+            try:
+                self.compiler.compile([source], output_dir=tmp, extra_postargs=flags)
+            except Exception:
+                return False
+        return True
+
     def _windows_gcc_avx_flags(self) -> list[str]:
         """The flag that 256-bit code needs from GCC for a 64-bit Windows
         target (Cygwin, MinGW), or nothing.
@@ -1075,18 +1097,24 @@ class pil_build_ext(build_ext):
         if self.compiler.compiler_type == "msvc" or not windows:
             return []
         flag = "-Wa,-muse-unaligned-vector-move"
-        with tempfile.TemporaryDirectory() as tmp:
-            source = os.path.join(tmp, "avx_move_probe.c")
-            with open(source, "w") as fp:
-                fp.write("int pillow_avx_move_probe;\n")
-            try:
-                self.compiler.compile(
-                    [source], output_dir=tmp, extra_postargs=["-mavx2", flag]
-                )
-            except Exception:
-                _dbg("%s is not accepted: AVX2 code may crash (GCC bug 54412)", flag)
-                return []
+        if not self._compiles("int pillow_avx_move_probe;\n", ["-mavx2", flag]):
+            _dbg("%s is not accepted: AVX2 code may crash (GCC bug 54412)", flag)
+            return []
         return [flag]
+
+    def _has_avxvnni(self) -> bool:
+        """Whether the toolchain can build the AVX-VNNI tier: a compiler
+        that knows -mavxvnni (GCC 11, clang 12) and an assembler that knows
+        the VEX encoding of vpdpwssd (binutils 2.36). RHEL 9 and its
+        relatives have GCC 11 with binutils 2.35: the compiler accepts the
+        flag and the assembler rejects every instruction it is for."""
+        code = (
+            "#include <immintrin.h>\n"
+            "__m256i pillow_avxvnni_probe(__m256i a, __m256i b, __m256i c) {\n"
+            "    return _mm256_dpwssd_avx_epi32(a, b, c);\n"
+            "}\n"
+        )
+        return self._compiles(code, ["-mavx2", "-mavxvnni"])
 
     def _configure_simd(self) -> str:
         """Add the compile flags for the SIMD kernels in PIL._imaging.
@@ -1190,7 +1218,9 @@ class pil_build_ext(build_ext):
                     [] if msvc else ["-msse4.1", "-mavx2", *avx_moves]
                 )
                 simd = "dispatch (SSE4.1, AVX2)"
-                if not msvc:
+                # (without the tier where the compiler or the assembler is
+                # too old for it: the build has the other two)
+                if not msvc and self._has_avxvnni():
                     tier_flags["SIMDKernels_avxvnni.c"] = [
                         "-msse4.1",
                         "-mavx2",
@@ -1202,6 +1232,13 @@ class pil_build_ext(build_ext):
             elif requested == "avxvnni":
                 if msvc:
                     msg = "'-C simd=avxvnni' is not supported with MSVC"
+                    raise ValueError(msg)
+                if not self._has_avxvnni():
+                    msg = (
+                        "'-C simd=avxvnni' needs a compiler with -mavxvnni "
+                        "(GCC 11, clang 12) and an assembler that knows the "
+                        "instructions (binutils 2.36)"
+                    )
                     raise ValueError(msg)
                 args = ["-msse4.1", "-mavx2", "-mavxvnni", *avx_moves]
                 simd = "SSE4.1 + AVX2 + AVX-VNNI"
