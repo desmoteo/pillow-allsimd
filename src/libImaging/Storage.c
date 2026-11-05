@@ -391,6 +391,15 @@ memory_advise_hugepages(void *ptr, size_t size) {
 #endif
 }
 
+/* The same advice for a large work array outside the arena, freshly
+   allocated and not yet touched (the quantizers' per-pixel arrays): a
+   16 MB array that the allocator maps afresh costs 4,096 page faults at
+   its first pass, as much as the quantizer's own work on it. */
+void
+ImagingMemoryAdviseHugePages(void *ptr, size_t size) {
+    memory_advise_hugepages(ptr, size);
+}
+
 ImagingMemoryBlock
 memory_get_block(ImagingMemoryArena arena, int requested_size, int dirty) {
     ImagingMemoryBlock block = {NULL, 0};

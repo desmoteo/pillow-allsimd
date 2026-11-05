@@ -1268,6 +1268,7 @@ quantize(
     if (!qp) {
         goto error_4;
     }
+    ImagingMemoryAdviseHugePages(qp, (size_t)nPixels * sizeof(uint32_t));
 
     if (nPaletteEntries > UINT32_MAX / nPaletteEntries) {
         goto error_5;
@@ -1424,6 +1425,7 @@ quantize2(
     if (!qp) {
         goto error_1;
     }
+    ImagingMemoryAdviseHugePages(qp, (size_t)nPixels * sizeof(uint32_t));
 
     if (nQuantPixels > UINT32_MAX / nQuantPixels) {
         goto error_2;
@@ -1522,6 +1524,7 @@ ImagingQuantize(Imaging im, int colors, int mode, int kmeans) {
     if (!p) {
         return ImagingError_MemoryError();
     }
+    ImagingMemoryAdviseHugePages(p, (size_t)xsize * ysize * sizeof(Pixel));
 
     /* collect statistics */
 
