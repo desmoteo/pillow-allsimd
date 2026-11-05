@@ -131,7 +131,7 @@ images on one core of an Intel Core Ultra 9 285H (AVX2) and an NVIDIA Jetson
 Orin (NEON), from the published benchmark (the exact kernels' own speed over
 Pillow is on the :doc:`kernels page </allsimd-kernels>`):
 
-.. generated: fast-mode-speedups (checks/simd_tables.py, pillow-allsimd-perf@0d7d352f2d047c9ff9daffe99d7314c197cd2ab2)
+.. generated: fast-mode-speedups (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
 
 .. list-table::
    :header-rows: 1
@@ -140,53 +140,53 @@ Pillow is on the :doc:`kernels page </allsimd-kernels>`):
      - x86-64 (AVX2)
      - arm64 (NEON)
    * - Gaussian blur, radius 1
-     - 2.96x
-     - 3.18x
+     - 2.94x
+     - 3.04x
    * - Unsharp mask, radius 2
-     - 1.68x
-     - 1.82x
+     - 1.65x
+     - 1.79x
    * - RGB to YCbCr
      - 1.62x
-     - 2.23x
+     - 2.15x
    * - YCbCr to RGB
-     - 1.25x
-     - 2.60x
+     - 1.21x
+     - 2.63x
    * - RGB to HSV
      - 3.00x
-     - 3.35x
+     - 3.34x
    * - rotate 30°, bilinear
-     - 2.97x
-     - 1.84x
-   * - rotate 30°, bicubic
-     - 3.10x
-     - 2.54x
-   * - rotate 30°, bicubic, RGBA
-     - 2.68x
-     - 2.23x
-   * - perspective, bilinear
-     - 2.30x
+     - 2.82x
      - 1.85x
+   * - rotate 30°, bicubic
+     - 3.04x
+     - 2.49x
+   * - rotate 30°, bicubic, RGBA
+     - 2.64x
+     - 2.21x
+   * - perspective, bilinear
+     - 2.29x
+     - 1.80x
    * - blend, 50%
-     - 1.64x
-     - 4.20x
+     - 1.63x
+     - 4.14x
    * - resize to 5478×3424, bilinear
-     - 1.17x
-     - 1.43x
+     - 1.18x
+     - 1.46x
    * - resize to 5478×3424, bicubic
-     - 1.28x
+     - 1.35x
      - 1.47x
    * - resize RGBA to 5478×3424, bilinear
-     - 1.17x
+     - 1.21x
      - 1.31x
    * - resize to 2048×1280, bicubic
-     - 0.96x
+     - 1.00x
      - 1.20x
    * - resize to 320×200, Lanczos (``reducing_gap``)
-     - 1.72x
-     - 2.61x
+     - 1.76x
+     - 2.63x
    * - resize to 26×16, Lanczos (``reducing_gap``)
-     - 2.97x
-     - 5.75x
+     - 2.98x
+     - 5.31x
 
 .. generated-end
 

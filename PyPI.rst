@@ -1,22 +1,22 @@
-.. generated: pypi-figures (checks/simd_tables.py, pillow-allsimd-perf@0d7d352f2d047c9ff9daffe99d7314c197cd2ab2)
+.. generated: pypi-figures (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
 
-.. |fast-x86| replace:: 6.1
-.. |fast-arm64| replace:: 3.1
+.. |fast-x86| replace:: 6.2
+.. |fast-arm64| replace:: 3.2
 .. |cases| replace:: 111
-.. |vs-pillow-simd| replace:: 2.9
+.. |vs-pillow-simd| replace:: 3.0
 .. |opencv-cases| replace:: 104
-.. |opencv-x86| replace:: 78
-.. |opencv-arm64| replace:: 68
-.. |exact-x86| replace:: 5.4
-.. |exact-arm64| replace:: 2.5
-.. |date| replace:: 2026-10-31
+.. |opencv-x86| replace:: 76
+.. |opencv-arm64| replace:: 66
+.. |exact-x86| replace:: 5.5
+.. |exact-arm64| replace:: 2.6
+.. |date| replace:: 2026-11-05
 
 .. generated-end
 
 Pillow-AllSIMD
 ==============
 
-.. generated: pypi-headline (checks/simd_tables.py, pillow-allsimd-perf@0d7d352f2d047c9ff9daffe99d7314c197cd2ab2)
+.. generated: pypi-headline (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
 
 **Pillow, 6 times as fast on x86-64 and 3 times as fast on arm64.**
 
@@ -59,33 +59,34 @@ Benchmarks
 Selected operations, one thread, a 2560×1600 RGB image. Each cell shows
 Pillow 13.0.0's time, then Pillow-AllSIMD's, then the speed-up:
 
-.. generated: pypi-benchmarks (checks/simd_tables.py, pillow-allsimd-perf@0d7d352f2d047c9ff9daffe99d7314c197cd2ab2)
+.. generated: pypi-benchmarks (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb)
 
 =====================================  =========================  ========================
 Operation                              x86-64, AVX2               arm64, NEON
 =====================================  =========================  ========================
-Resize to 320×200, bicubic             22.3 → 1.41 ms, **15.8×**  30.2 → 5.02 ms, **6.0×**
-Resize RGBA to 2048×1280, Lanczos      119 → 9.95 ms, **12.0×**   145 → 40.7 ms, **3.6×**
-Enlarge to 5478×3424, bicubic          226 → 27.7 ms, **8.2×**    260 → 87.3 ms, **3.0×**
-Gaussian blur, radius 1                121 → 5.59 ms, **21.6×**   162 → 16.7 ms, **9.7×**
-Gaussian blur, radius 10               121 → 25.9 ms, **4.7×**    163 → 91.2 ms, **1.8×**
-Unsharp mask                           197 → 15.8 ms, **12.5×**   236 → 40.1 ms, **5.9×**
-SHARPEN filter                         52.9 → 4.21 ms, **12.6×**  99.0 → 27.1 ms, **3.7×**
-Median filter, 3×3                     1183 → 2.79 ms, **425×**   1262 → 8.20 ms, **154×**
-RGB to HSV                             59.7 → 2.99 ms, **20.0×**  81.4 → 10.6 ms, **7.7×**
-Unpremultiply alpha                    26.6 → 2.20 ms, **12.1×**  38.8 → 7.21 ms, **5.4×**
-Rotate 30°, bicubic                    185 → 29.3 ms, **6.3×**    291 → 79.3 ms, **3.7×**
-Alpha composite                        19.6 → 2.90 ms, **6.8×**   22.1 → 18.0 ms, **1.2×**
-Draw 100 lines of text                 56.5 → 3.23 ms, **17.5×**  113 → 5.72 ms, **19.7×**
-Decode JPEG                            16.2 → 15.5 ms, **1.0×**   28.3 → 28.4 ms, **1.0×**
-Encode PNG                             789 → 509 ms, **1.6×**     1015 → 711 ms, **1.4×**
-JPEG load, rotate, resize, blur, save  86.1 → 28.6 ms, **3.0×**   112 → 66.4 ms, **1.7×**
+Resize to 320×200, bicubic             22.3 → 1.40 ms, **16.0×**  30.5 → 5.10 ms, **6.0×**
+Resize RGBA to 2048×1280, Lanczos      120 → 9.85 ms, **12.2×**   145 → 40.5 ms, **3.6×**
+Enlarge to 5478×3424, bicubic          227 → 27.2 ms, **8.3×**    261 → 87.5 ms, **3.0×**
+Gaussian blur, radius 1                122 → 5.78 ms, **21.2×**   163 → 17.6 ms, **9.3×**
+Gaussian blur, radius 10               122 → 26.6 ms, **4.6×**    163 → 91.1 ms, **1.8×**
+Unsharp mask                           198 → 16.2 ms, **12.2×**   237 → 41.4 ms, **5.7×**
+SHARPEN filter                         53.0 → 4.21 ms, **12.6×**  99.3 → 14.7 ms, **6.7×**
+Median filter, 3×3                     1182 → 2.82 ms, **419×**   1263 → 8.28 ms, **153×**
+RGB to HSV                             59.7 → 2.99 ms, **20.0×**  81.5 → 10.6 ms, **7.7×**
+Unpremultiply alpha                    26.6 → 2.18 ms, **12.2×**  38.9 → 7.25 ms, **5.4×**
+Rotate 30°, bicubic                    187 → 30.2 ms, **6.2×**    290 → 81.3 ms, **3.6×**
+Alpha composite                        19.6 → 2.94 ms, **6.7×**   22.1 → 17.8 ms, **1.2×**
+Draw 100 lines of text                 57.0 → 3.25 ms, **17.5×**  113 → 6.21 ms, **18.2×**
+Decode JPEG                            15.5 → 15.3 ms, **1.0×**   28.6 → 28.7 ms, **1.0×**
+Encode PNG                             789 → 154 ms, **5.1×**     1021 → 231 ms, **4.4×**
+JPEG load, rotate, resize, blur, save  87.3 → 29.8 ms, **2.9×**   113 → 66.9 ms, **1.7×**
 =====================================  =========================  ========================
 
 .. generated-end
 
-Codecs gain little: decoding and encoding are mostly libjpeg's, libpng's and
-libwebp's own work. The machines are an Intel Core Ultra 9 285H laptop (with
+JPEG and WebP gain little: decoding and encoding them is mostly libjpeg's and
+libwebp's own work. PNG saving gains because the encoder compresses with
+libdeflate where it is built in, as in the wheels. The machines are an Intel Core Ultra 9 285H laptop (with
 turbo off) and an NVIDIA Jetson Orin (Cortex-A78AE). Each time is the best of
 3 interleaved rounds, in Docker with Python 3.12 and GCC 14, measured on
 |date| on the same x86-64 and arm64 code as this release. The
