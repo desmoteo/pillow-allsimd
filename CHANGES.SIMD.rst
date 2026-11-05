@@ -3,6 +3,31 @@ Changelog (Pillow-AllSIMD)
 
 Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
+Unreleased
+----------
+
+Based on Pillow 13.0.0
+
+- PNG loading inflates the image data with libdeflate where Pillow was
+  built with it: the plugin walks the headers of the ``IDAT`` chunks for
+  the length of the compressed stream, the decoder gathers the stream
+  and decompresses the image in one piece, which libdeflate does 2.4x
+  faster than zlib's stream, and the rows are then unfiltered where they
+  lie. On 2560x1600 images: 1.6x for RGB and RGBA, 1.4x for L, 4x for P;
+  1.6 to 1.8x at 512x512 and 128x128, no slower on icons. The pixels are
+  the same. zlib's stream still decodes the frames of an animation,
+  files loaded with ``LOAD_TRUNCATED_IMAGES``, images above the 256 MB
+  cap of the encoder (``PILLOW_LIBDEFLATE_MAX``), and any stream that
+  libdeflate refuses or that does not hold exactly the image's rows, so
+  that damaged and truncated files raise the errors they raised
+- The quantizers' two per-pixel work arrays (16 MB each for a 2560x1600
+  image, allocated and freed on every call) get the huge-page advice the
+  image blocks have, on Linux where transparent huge pages are in
+  ``madvise`` mode: when the allocator maps them afresh, which depends on
+  what the process allocated before, their page faults were half of a
+  fast-octree quantization (30 to 19.6 ms; 15.6 ms when the allocator
+  recycles the arrays, as before)
+
 13.0.0.post3 (2026-11-04)
 -------------------------
 
@@ -37,13 +62,6 @@ Based on Pillow 13.0.0
   (``ModeFilterSIMD.c``): the nine window bytes counted against each
   other and the winner picked by a packed maximum, the same pixels as the
   histogram code; 14x on a 2560x1600 L image on AVX2
-- The quantizers' two per-pixel work arrays (16 MB each for a 2560x1600
-  image, allocated and freed on every call) get the huge-page advice the
-  image blocks have, on Linux where transparent huge pages are in
-  ``madvise`` mode: when the allocator maps them afresh, which depends on
-  what the process allocated before, their page faults were half of a
-  fast-octree quantization (30 to 19.6 ms; 15.6 ms when the allocator
-  recycles the arrays, as before)
 - arm64: kernel filters with a power-of-two scale (``SHARPEN``,
   ``FIND_EDGES``, ``EDGE_ENHANCE``, ``EMBOSS``, ``CONTOUR``, ``BLUR`` and
   kernels of one's own like them) are computed with their small integer

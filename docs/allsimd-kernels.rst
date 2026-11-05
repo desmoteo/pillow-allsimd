@@ -2387,7 +2387,7 @@ mapping (``Quant.c``, ``QuantHash.c``) and the histogram (``Histo.c``).
 The codecs themselves (zlib, libjpeg-turbo, libwebp) are untouched;
 what changed is what Pillow does around them, with one exception: a
 build with libdeflate (the wheels) compresses the PNG encoder's output
-with it instead of zlib, as below.
+and inflates the decoder's input with it instead of zlib, as below.
 
 What Pillow computes
 ~~~~~~~~~~~~~~~~~~~~
@@ -2575,8 +2575,41 @@ zlib-ng build's already did. zlib is still used for a preset
 dictionary, an explicit ``compress_type`` (a zlib strategy), images
 whose filtered rows exceed 256 MB (the one-piece path holds them and
 the output bound in memory; ``PILLOW_LIBDEFLATE_MAX`` moves the cap)
-and builds without the library. Decoding is unchanged: zlib's inflate
-and the vector unfiltering above. JPEG encoding
+and builds without the library.
+
+**Decoding with libdeflate (2026-11-05).** Inflating was 67 of the 97 ms
+of decoding the benchmark's 2560x1600 RGB photo (7.5 MB of ``IDAT``),
+and libdeflate inflates the same stream in 28 ms, but only in one piece.
+The plugin therefore walks the headers of the consecutive ``IDAT``
+chunks before decoding, which costs a seek and an 8-byte read per chunk,
+and tells the decoder the stream's length; the decoder gathers the
+stream, computes the size the image's rows must decompress to (the
+filter bytes and, for interlaced images, the seven passes included),
+decompresses into a buffer of exactly that size and unfilters and
+unpacks the rows where they lie, each with the row above it as its
+predecessor. Both buffers get the huge-page advice of the image blocks:
+mapped afresh on every decode, their page faults were 6 ms of the 69 ms
+the path first measured. The decode is 62 ms, 1.56x; on a noisier
+2560x1600 image 1.60x for RGB (119 to 74 ms), 1.67x for RGBA, 1.40x for
+L and 4.0x for P (15.1 to 3.8 ms), 1.6x at 512x512, 1.8x at 128x128 and
+level at 16x16. What remains is the filters themselves, a byte at a
+time for Sub, Average and Paeth (29 ms of the 62; their vector forms
+measured slower, as the list below has it).
+
+The one-piece path is taken only when it cannot change a result. The
+stream decoder is used, as before, for the frames of an animation after
+the first, with ``LOAD_TRUNCATED_IMAGES`` (which must return the rows
+that arrived), for a file whose chunk headers cannot be walked or end
+early, and above the cap; and when libdeflate refuses the stream, or
+the stream does not hold exactly the image's rows, the gathered bytes
+go through the stream decoder from the first one, so that a damaged
+file raises the error, and leaves the rows, that it did. The test
+suite's PNG files, whole, cut at random offsets and with single bits
+flipped (15,666 cases, from a path and from memory, with and without
+``LOAD_TRUNCATED_IMAGES``) give the same pixels or the same error text
+with the path, without it (``PILLOW_LIBDEFLATE_MAX=0``) and in the
+build before it; Memcheck reports nothing on the 10,518 cases of the
+small files. JPEG encoding
 and decoding, WebP encoding and JPEG thumbnails are the libraries' own
 time, 1.0x; WebP decoding is 1.5x on x86 and 1.2x on arm64 from the
 copies saved, now ahead of OpenCV. The histogram is 1.0x against Pillow

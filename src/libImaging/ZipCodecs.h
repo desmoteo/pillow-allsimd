@@ -66,4 +66,10 @@ typedef struct {
     size_t out_size;   /* its length */
     size_t out_pos;    /* bytes handed out so far */
 
+    /* and the decoder, told the length of the compressed stream, gathers
+       it and decompresses the image at once (ZipDecode.c) */
+    size_t gather_size;  /* the stream's length, 0 if not known */
+    UINT8 *gathered;     /* the stream so far (allocated) */
+    size_t gathered_len; /* bytes gathered */
+
 } ZIPSTATE;

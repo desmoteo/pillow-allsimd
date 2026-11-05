@@ -818,7 +818,12 @@ PyImaging_ZipDecoderNew(PyObject *self, PyObject *args) {
 
     char *mode_name, *rawmode_name;
     int interlaced = 0;
-    if (!PyArg_ParseTuple(args, "ss|i", &mode_name, &rawmode_name, &interlaced)) {
+    /* Pillow-AllSIMD: the length of the compressed stream, when the caller
+       knows it; the decoder then inflates it in one piece (ZipDecode.c) */
+    Py_ssize_t stream_size = 0;
+    if (!PyArg_ParseTuple(
+            args, "ss|in", &mode_name, &rawmode_name, &interlaced, &stream_size
+        )) {
         return NULL;
     }
 
@@ -838,6 +843,8 @@ PyImaging_ZipDecoderNew(PyObject *self, PyObject *args) {
     decoder->cleanup = ImagingZipDecodeCleanup;
 
     ((ZIPSTATE *)decoder->state.context)->interlaced = interlaced;
+    ((ZIPSTATE *)decoder->state.context)->gather_size =
+        stream_size > 0 ? (size_t)stream_size : 0;
 
     return (PyObject *)decoder;
 }
