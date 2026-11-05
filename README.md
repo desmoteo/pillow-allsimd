@@ -151,7 +151,7 @@ s390x, armv7 and 32-bit x86: [OTHER_ARCHITECTURES.md](design/OTHER_ARCHITECTURES
 Fast mode is on by default: some operations use faster kernels whose
 results differ from Pillow's by a few levels at most and are the same on
 every build and architecture (so far the Gaussian blur,
-<!-- generated: readme-gaussian-fast (checks/simd_tables.py, pillow-allsimd-perf@25fb07c9f9d0fe561fdf70ed446fc63125279beb) -->2.9x at radius 1 on x86-64, 3.0x on arm64<!-- generated-end -->,
+<!-- generated: readme-gaussian-fast (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92) -->3.0x at radius 1 on x86-64, 3.1x on arm64<!-- generated-end -->,
 RGB ↔ YCbCr, RGB → HSV, the affine, perspective and quad transforms and
 rotate(), blend(), resize() of RGB, RGBA and other 4-byte images, and
 large downscales). The other operations follow
