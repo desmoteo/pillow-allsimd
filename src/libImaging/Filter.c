@@ -549,6 +549,62 @@ filter_int_kernel(
     return 1;
 }
 
+/* The integer kernel with the power of two that its coefficients and its
+   offset share divided out, if what is left is small: every coefficient at
+   most 255 in size and every sum of a window within 16 bits. With s the
+   power divided out, sum(p * k) + offset is 2^s times the reduced sum, so
+   shifting the reduced sum, with its own rounding, by precision - s gives
+   the same result as shifting the full one by precision; and when s is the
+   whole precision nothing is shifted and the rounding, less than one unit,
+   never carries. Returns 1 with the reduced kernel, offset and precision
+   (0 or more), or 0 if the kernel doesn't reduce that far. Kernels with a
+   power-of-two scale do: SHARPEN, FIND_EDGES, EDGE_ENHANCE, EMBOSS,
+   CONTOUR and BLUR among Pillow's own. */
+static int
+filter_small_kernel(
+    const INT16 *kernel,
+    int n,
+    INT32 offset,
+    int precision,
+    INT16 *small,
+    INT32 *small_offset,
+    int *small_precision
+) {
+    int i, s = precision;
+    INT32 high, low;
+    if (offset > (1 << 20) || offset < -(1 << 20)) {
+        return 0;
+    }
+    for (i = 0; i < n && s > 0; i++) {
+        while (s > 0 && (kernel[i] & ((1 << s) - 1))) {
+            s--;
+        }
+    }
+    while (s > 0 && (offset & ((1 << s) - 1))) {
+        s--;
+    }
+    /* the largest and the smallest sum of a window, rounding included */
+    high = low = (offset >> s) + (s < precision ? 1 << (precision - s - 1) : 0);
+    for (i = 0; i < n; i++) {
+        int k = kernel[i] >> s;
+        if (k > 255 || k < -255) {
+            return 0;
+        }
+        small[i] = (INT16)k;
+        if (k > 0) {
+            high += k * 255;
+        } else {
+            low += k * 255;
+        }
+    }
+    if (high > 32767 || low < -32768) {
+        return 0;
+    }
+    *small_offset = offset >> s;
+    *small_precision = precision - s;
+    return 1;
+}
+
 /* 8-bit images through the SIMD kernels of the active tier (FilterSIMD.c):
    integer kernels when the coefficients fit 16 bits, float kernels
    otherwise. Returns 0 if the image has to go to the generic code. */
@@ -607,6 +663,24 @@ filter_simd(
     }
 
     if (fast_path) {
+        if (simd->ismall) {
+            /* small coefficients: 16-bit sums, the same bytes */
+            INT16 small[25];
+            INT32 small_offset;
+            int small_precision;
+            if (filter_small_kernel(
+                    norm_kernel,
+                    xsize * ysize,
+                    norm_offset,
+                    precision,
+                    small,
+                    &small_offset,
+                    &small_precision
+                )) {
+                simd->ismall(imOut, im, small, small_offset, small_precision, xsize);
+                return 1;
+            }
+        }
         if (!ikernel) {
             return 0;
         }

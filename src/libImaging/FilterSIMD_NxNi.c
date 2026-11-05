@@ -253,6 +253,103 @@ ImagingFilter5x5i_4u8_simd(
 ) {
     FILTER_NxN(5, 4);
 }
+
+/* Kernels whose coefficients are small once the power of two that they,
+   the offset and the rounding share is divided out (filter_small_kernel()
+   in Filter.c): each at most 255 in size and every sum within 16 bits, as
+   for SHARPEN, FIND_EDGES, EDGE_ENHANCE, EMBOSS, CONTOUR and BLUR. The
+   sums go in 16-bit lanes, eight per operation where the kernel above has
+   four, a coefficient of 1 or -1 as a widening add or subtract and any
+   other as one widening multiply-accumulate of bytes: the Cortex-A78 has
+   one multiplier pipe, which the four multiplies per tap of the general
+   kernel keep busy for 9 cycles per pixel. The sums are the general
+   kernel's divided by the shared power of two, exactly, so the shift and
+   the saturation give the same bytes. Any pixel size: bytes are filtered
+   with the byte bpp positions away. */
+static void
+ImagingFilterSmall_simd(
+    Imaging imOut,
+    Imaging im,
+    const INT16 *kernel,
+    INT32 offset,
+    int precision,
+    int size
+) {
+    int x, y, r, d;
+    int R = size / 2, bpp = im->image8 ? 1 : 4;
+    int rowbytes = im->xsize * bpp, edge = R * bpp;
+    int ysize = im->ysize;
+    const UINT8 *rows[5];
+    int16x8_t shift = vdupq_n_s16((int16_t)-precision);
+
+    /* precision 0: nothing is shifted and nothing rounded */
+    if (precision) {
+        offset += 1 << (precision - 1);
+    }
+
+    for (y = 0; y < R && y < ysize; y++) {
+        memcpy(imOut->image[y], im->image[y], im->linesize);
+    }
+    for (y = R; y < ysize - R; y++) {
+        UINT8 *out = (UINT8 *)imOut->image[y];
+        const UINT8 *in0 = (UINT8 *)im->image[y];
+        for (r = 0; r < size; r++) {
+            rows[r] = (UINT8 *)im->image[y + R - r];
+        }
+        memcpy(out, in0, edge < rowbytes ? edge : rowbytes);
+        x = edge;
+        for (; x + 16 <= rowbytes - edge; x += 16) {
+            uint16x8_t a0 = vdupq_n_u16((uint16_t)offset), a1 = a0;
+            for (r = 0; r < size; r++) {
+                for (d = 0; d < size; d++) {
+                    int k = kernel[r * size + d];
+                    uint8x16_t src;
+                    if (!k) {
+                        continue;
+                    }
+                    src = vld1q_u8(rows[r] + x + (d - R) * bpp);
+                    if (k == 1) {
+                        a0 = vaddw_u8(a0, vget_low_u8(src));
+                        a1 = vaddw_high_u8(a1, src);
+                    } else if (k == -1) {
+                        a0 = vsubw_u8(a0, vget_low_u8(src));
+                        a1 = vsubw_high_u8(a1, src);
+                    } else if (k > 0) {
+                        uint8x16_t kv = vdupq_n_u8((uint8_t)k);
+                        a0 = vmlal_u8(a0, vget_low_u8(src), vget_low_u8(kv));
+                        a1 = vmlal_high_u8(a1, src, kv);
+                    } else {
+                        uint8x16_t kv = vdupq_n_u8((uint8_t)-k);
+                        a0 = vmlsl_u8(a0, vget_low_u8(src), vget_low_u8(kv));
+                        a1 = vmlsl_high_u8(a1, src, kv);
+                    }
+                }
+            }
+            vst1q_u8(
+                out + x,
+                vcombine_u8(
+                    vqmovun_s16(vshlq_s16(vreinterpretq_s16_u16(a0), shift)),
+                    vqmovun_s16(vshlq_s16(vreinterpretq_s16_u16(a1), shift))
+                )
+            );
+        }
+        for (; x < rowbytes - edge; x++) {
+            INT32 ss = offset;
+            for (r = 0; r < size; r++) {
+                for (d = 0; d < size; d++) {
+                    ss += rows[r][x + (d - R) * bpp] * kernel[r * size + d];
+                }
+            }
+            out[x] = filter_clip(ss, precision);
+        }
+        if (x < rowbytes) {
+            memcpy(out + x, in0 + x, rowbytes - x);
+        }
+    }
+    for (; y < ysize; y++) {
+        memcpy(imOut->image[y], im->image[y], im->linesize);
+    }
+}
 #endif
 
 #undef FILTER_NxN
