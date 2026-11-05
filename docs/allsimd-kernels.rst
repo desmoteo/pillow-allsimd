@@ -594,6 +594,21 @@ packed to bytes. ``packssdw`` and ``packuswb`` pack within 128-bit lanes,
 so the AVX2 version ends with a ``vpermd`` that puts the four groups back
 in order.
 
+*The far weight of zero (2026-11-05).* Each output byte is two products,
+the box's sum by ``ww`` and the two bytes just outside the box by ``fw``,
+which is what the integer weight leaves of 2²⁴, halved: 0 whenever 2²⁴
+is 0 or 1 modulo the box, as for the radii 1 to 4, 6, 7, 8, 10 and 17.
+The running sums, horizontal and vertical, then skip the second product
+(``BOX_STEP_WHOLE``, the ``whole`` argument of ``box_columns_body()``):
+it was half of the multiplies, and on the Cortex-A78, with one vector
+multiplier, the blur at radius 10 went from 57.1 to 42.3 million cycles
+on a 2560x1600 RGB image (1.35x); on x86, where ``pmulld`` is two µops,
+from 7.5 to 5.5 ms with AVX2 and 13.8 to 9.8 ms with SSE4.1. Adding
+zero changes no byte. Radii with a far weight (5, 9, 12, any fraction)
+run as before; taking the difference of the entering and leaving pixels
+first, to shorten the sum's chain to one addition, measured the same
+there.
+
 *Direct passes* (``box_direct()``) sum the inner sources in 16-bit lanes
 (``pmovzxbw``, ``paddw``), 32 bytes per step with AVX2, 16 with SSE4.
 The exact form then needs ``acc * ww + e * fw`` with 24-bit weights,
@@ -1757,7 +1772,20 @@ The idea
   build's by up to two levels in about 10% of the bytes for a random
   table (none for a smooth one), the other exception the ground rules
   list. The NEON kernel computes Pillow's arithmetic instead, one pixel
-  as four 32-bit lanes, and gives the scalar pixels.
+  as four 32-bit lanes, and gives the scalar pixels. That is seven
+  32-bit multiplies a pixel on a core with one vector multiplier, so
+  (2026-11-05) where every value of the table is within −16384..16383,
+  about twice the range of the colours 0..1 and the case of every
+  table that does not extrapolate far, ``neon_lut_pair()`` interpolates
+  two pixels at once in 16-bit lanes: the weight is 15 bits, the
+  difference of two entries fits 16, and ``sqdmulh`` gives
+  ((*b* − *a*) · *s*) >> 15 exactly, so the seven multiplies serve two
+  pixels, and one narrowing shift does the rounding and the clipping.
+  103.4 to 63.5 million cycles on a 2560x1600 image (1.63x, 52 to
+  32 ms), the same pixels as the scalar code; other tables keep the
+  32-bit kernel. Tables of each channel's cell offset and weight, in
+  place of computing them for every pixel, measured 2% and were not
+  kept.
 * **Bands.** ``split()`` and ``getchannel()`` transpose four pixels into
   planes with one ``pshufb`` on x86 and ``vld4q`` on NEON; ``merge()``
   uses ``vst4q`` on NEON, and on x86 the compiler's code, since an

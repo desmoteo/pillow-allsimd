@@ -277,6 +277,78 @@ def test_point_table(mode: str) -> None:
         assert out == bytes(table[(i % bands) * 256 + v] for i, v in enumerate(src))
 
 
+def _box_row(row: bytes, radius: int) -> bytes:
+    # BoxBlur.c: the sum of the 2 * radius + 1 bytes around each one, the
+    # row's ends repeated, by the box's weight in 24 bits; what the integer
+    # weight leaves of 2^24 goes to the two bytes just outside the box.
+    n = len(row)
+    ww = (1 << 24) // (2 * radius + 1)
+    fw = ((1 << 24) - (2 * radius + 1) * ww) // 2
+
+    def at(i: int) -> int:
+        return row[min(max(i, 0), n - 1)]
+
+    out = bytearray(n)
+    for x in range(n):
+        total = sum(at(i) for i in range(x - radius, x + radius + 1))
+        far = at(x - radius - 1) + at(x + radius + 1)
+        out[x] = (total * ww + far * fw + (1 << 23)) >> 24
+    return bytes(out)
+
+
+# With 2^24 = 1 or 0 modulo the box, the far weight is 0 and its product is
+# skipped (radii 1 to 4, 6, 7, 8, 10, 17); 5, 9, 12 and 21 have one.
+@pytest.mark.parametrize("radius", (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 17, 21))
+@pytest.mark.parametrize("width", (1, 9, 40, 67))
+def test_box_blur_against_the_sums(radius: int, width: int) -> None:
+    rnd = random.Random(f"{radius} {width}")
+    height = 5
+    for mode in ("L", "RGB", "RGBA"):
+        bands = len(mode)
+        data = rnd.randbytes(width * height * bands)
+        im = Image.frombytes(mode, (width, height), data)
+        rows = im.filter(ImageFilter.BoxBlur((radius, 0)))
+        for band, got in enumerate(rows.split()):
+            plane = data[band::bands]
+            expected = b"".join(
+                _box_row(plane[y * width : (y + 1) * width], radius)
+                for y in range(height)
+            )
+            assert got.tobytes() == expected, (mode, band)
+        # the columns: the same sums down the transposed image
+        turned = im.transpose(Image.Transpose.TRANSPOSE)
+        columns = turned.filter(ImageFilter.BoxBlur((0, radius)))
+        assert columns.transpose(Image.Transpose.TRANSPOSE).tobytes() == (
+            rows.tobytes()
+        )
+
+
+@pytest.mark.parametrize("channels", (3, 4))
+@pytest.mark.parametrize("spread", (1.0, 1.0038, 1.01, 2.5))
+def test_color_lut_pairs_match_single_pixels(channels: int, spread: float) -> None:
+    # The NEON kernel does two pixels at a time, in 16-bit lanes, when the
+    # table's values allow (up to a little over the 0..1 range), and one at
+    # a time in 32-bit lanes otherwise and for a last odd pixel: a pixel
+    # alone in a one-pixel image must get what it gets in a row.
+    rnd = random.Random(f"{channels} {spread}")
+    size = (5, 4, 3)
+    count = size[0] * size[1] * size[2] * channels
+    lut = ImageFilter.Color3DLUT(
+        size,
+        [rnd.uniform(-spread, spread) for _ in range(count)],
+        channels=channels,
+        target_mode="RGBA" if channels == 4 else None,
+    )
+    for mode in ("RGB", "RGBA"):
+        for width in (2, 5, 33):
+            im = Image.frombytes(mode, (width, 2), rnd.randbytes(width * 2 * len(mode)))
+            whole = im.filter(lut)
+            for x in range(width):
+                for y in range(2):
+                    one = im.crop((x, y, x + 1, y + 1)).filter(lut)
+                    assert one.getpixel((0, 0)) == whole.getpixel((x, y)), (x, y)
+
+
 def _blend(mask: int, out: int, src: int) -> int:
     # Paste.c's BLEND: the weighted sum, divided by 255 with rounding
     t = out * (255 - mask) + src * mask + 128
