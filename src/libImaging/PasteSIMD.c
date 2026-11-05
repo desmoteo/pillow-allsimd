@@ -1,6 +1,7 @@
-/* The masked fills of pasting and drawing text (Paste.c), compiled into
-   SIMDKernels.c: ink blended into pixels through an L mask, for the pixels
-   the vector loop can; returns how many. */
+/* The masked fills of pasting and drawing text and the paste through an L
+   mask (Paste.c), compiled into SIMDKernels.c: ink, or another image's
+   pixels, blended into pixels through the mask, for the pixels the vector
+   loop can; returns how many. */
 
 /* BLEND(m, out, ink) = DIV255(out * (255 - m) + ink * m) for vectors of
    bytes: every term fits 16 bits, so the result is the scalar one. */
@@ -24,6 +25,31 @@ fill_blend16(__m128i out, __m128i m, __m128i ink) {
     }
     return _mm_packus_epi16(res[0], res[1]);
 }
+#if defined(IMAGING_SIMD_AVX2)
+/* The same on 32 bytes: the unpacks and the pack work within each half. */
+static inline __m256i
+fill_blend32(__m256i out, __m256i m, __m256i ink) {
+    __m256i zero = _mm256_setzero_si256(), c255 = _mm256_set1_epi16(255);
+    __m256i r128 = _mm256_set1_epi16(128), res[2];
+    int h;
+    for (h = 0; h < 2; h++) {
+        __m256i o =
+            h ? _mm256_unpackhi_epi8(out, zero) : _mm256_unpacklo_epi8(out, zero);
+        __m256i k = h ? _mm256_unpackhi_epi8(m, zero) : _mm256_unpacklo_epi8(m, zero);
+        __m256i c =
+            h ? _mm256_unpackhi_epi8(ink, zero) : _mm256_unpacklo_epi8(ink, zero);
+        __m256i t = _mm256_add_epi16(
+            _mm256_add_epi16(
+                _mm256_mullo_epi16(o, _mm256_sub_epi16(c255, k)),
+                _mm256_mullo_epi16(c, k)
+            ),
+            r128
+        );
+        res[h] = _mm256_srli_epi16(_mm256_add_epi16(t, _mm256_srli_epi16(t, 8)), 8);
+    }
+    return _mm256_packus_epi16(res[0], res[1]);
+}
+#endif
 #elif defined(IMAGING_SIMD_NEON)
 static inline uint8x16_t
 fill_blend16(uint8x16_t out, uint8x16_t m, uint8x16_t ink) {
@@ -115,6 +141,158 @@ fill_mask_L_simd(
     return x;
 }
 
+/* Blends n pixels of in into out through mask, as paste_mask_L's loops:
+   1-byte pixels, or 4-byte ones, all four bytes as there. The rows do not
+   overlap (the caller checks). Returns the number of pixels done; the
+   caller does the rest. The portable build's compiler vectorizes the plain
+   loop when it is given AVX2, but for the baseline of a dispatch build it
+   makes code half as fast, which is why the loop is a kernel. */
+static int
+paste_mask_L_simd(
+    UINT8 *out, const UINT8 *in, const UINT8 *mask, int n, int pixelsize
+) {
+    int x = 0;
+#if defined(IMAGING_SIMD_SSE4)
+    if (pixelsize == 1) {
+#if defined(IMAGING_SIMD_AVX2)
+        for (; x < n - 31; x += 32) {
+            __m256i o = _mm256_loadu_si256((__m256i *)(out + x));
+            __m256i m = _mm256_loadu_si256((const __m256i *)(mask + x));
+            __m256i c = _mm256_loadu_si256((const __m256i *)(in + x));
+            _mm256_storeu_si256((__m256i *)(out + x), fill_blend32(o, m, c));
+        }
+#endif
+        for (; x < n - 15; x += 16) {
+            __m128i o = _mm_loadu_si128((__m128i *)(out + x));
+            __m128i m = _mm_loadu_si128((const __m128i *)(mask + x));
+            __m128i c = _mm_loadu_si128((const __m128i *)(in + x));
+            _mm_storeu_si128((__m128i *)(out + x), fill_blend16(o, m, c));
+        }
+    } else if (pixelsize == 4) {
+        __m128i spread = _mm_set_epi8(3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0);
+#if defined(IMAGING_SIMD_AVX2)
+        /* eight mask bytes, one in each 32-bit lane, then in its four bytes */
+        __m256i spread8 = _mm256_setr_epi8(
+            0,
+            0,
+            0,
+            0,
+            4,
+            4,
+            4,
+            4,
+            8,
+            8,
+            8,
+            8,
+            12,
+            12,
+            12,
+            12,
+            0,
+            0,
+            0,
+            0,
+            4,
+            4,
+            4,
+            4,
+            8,
+            8,
+            8,
+            8,
+            12,
+            12,
+            12,
+            12
+        );
+        for (; x < n - 7; x += 8) {
+            __m256i o = _mm256_loadu_si256((__m256i *)(out + x * 4));
+            __m256i c = _mm256_loadu_si256((const __m256i *)(in + x * 4));
+            __m256i m = _mm256_shuffle_epi8(
+                _mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)(mask + x))),
+                spread8
+            );
+            _mm256_storeu_si256((__m256i *)(out + x * 4), fill_blend32(o, m, c));
+        }
+#endif
+        for (; x < n - 3; x += 4) {
+            __m128i o = _mm_loadu_si128((__m128i *)(out + x * 4));
+            __m128i c = _mm_loadu_si128((const __m128i *)(in + x * 4));
+            __m128i m =
+                _mm_shuffle_epi8(_mm_cvtsi32_si128(mm_load_si32(mask + x)), spread);
+            _mm_storeu_si128((__m128i *)(out + x * 4), fill_blend16(o, m, c));
+        }
+    }
+#elif defined(IMAGING_SIMD_NEON)
+    if (pixelsize == 1) {
+        for (; x < n - 15; x += 16) {
+            vst1q_u8(
+                out + x,
+                fill_blend16(vld1q_u8(out + x), vld1q_u8(mask + x), vld1q_u8(in + x))
+            );
+        }
+    } else if (pixelsize == 4) {
+        const uint8_t spread_idx[16] = {0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3};
+        uint8x16_t spread = vld1q_u8(spread_idx);
+        for (; x < n - 3; x += 4) {
+            uint32_t m4;
+            memcpy(&m4, mask + x, 4);
+            uint8x16_t m = vqtbl1q_u8(vreinterpretq_u8_u32(vdupq_n_u32(m4)), spread);
+            vst1q_u8(
+                out + x * 4,
+                fill_blend16(vld1q_u8(out + x * 4), m, vld1q_u8(in + x * 4))
+            );
+        }
+    }
+#endif
+    return x;
+}
+
+/* The same with the mask in the alpha bytes of n 4-byte pixels (an RGBA
+   image pasted through itself), as paste_mask_RGBA's loop. */
+static int
+paste_mask_RGBA_simd(UINT8 *out, const UINT8 *in, const UINT8 *mask, int n) {
+    int x = 0;
+#if defined(IMAGING_SIMD_SSE4)
+    __m128i alpha_bytes =
+        _mm_set_epi8(15, 15, 15, 15, 11, 11, 11, 11, 7, 7, 7, 7, 3, 3, 3, 3);
+#if defined(IMAGING_SIMD_AVX2)
+    __m256i alpha_bytes8 = _mm256_broadcastsi128_si256(alpha_bytes);
+    for (; x < n - 7; x += 8) {
+        __m256i o = _mm256_loadu_si256((__m256i *)(out + x * 4));
+        __m256i c = _mm256_loadu_si256((const __m256i *)(in + x * 4));
+        __m256i m = _mm256_shuffle_epi8(
+            _mm256_loadu_si256((const __m256i *)(mask + x * 4)), alpha_bytes8
+        );
+        _mm256_storeu_si256((__m256i *)(out + x * 4), fill_blend32(o, m, c));
+    }
+#endif
+    for (; x < n - 3; x += 4) {
+        __m128i o = _mm_loadu_si128((__m128i *)(out + x * 4));
+        __m128i c = _mm_loadu_si128((const __m128i *)(in + x * 4));
+        __m128i m = _mm_shuffle_epi8(
+            _mm_loadu_si128((const __m128i *)(mask + x * 4)), alpha_bytes
+        );
+        _mm_storeu_si128((__m128i *)(out + x * 4), fill_blend16(o, m, c));
+    }
+#elif defined(IMAGING_SIMD_NEON)
+    const uint8_t alpha_idx[16] = {
+        3, 3, 3, 3, 7, 7, 7, 7, 11, 11, 11, 11, 15, 15, 15, 15
+    };
+    uint8x16_t alpha_bytes = vld1q_u8(alpha_idx);
+    for (; x < n - 3; x += 4) {
+        uint8x16_t m = vqtbl1q_u8(vld1q_u8(mask + x * 4), alpha_bytes);
+        vst1q_u8(
+            out + x * 4, fill_blend16(vld1q_u8(out + x * 4), m, vld1q_u8(in + x * 4))
+        );
+    }
+#endif
+    return x;
+}
+
 static const ImagingSIMDPasteKernels paste_simd_kernels = {
     .fill_mask_L = fill_mask_L_simd,
+    .paste_mask_L = paste_mask_L_simd,
+    .paste_mask_RGBA = paste_mask_RGBA_simd,
 };

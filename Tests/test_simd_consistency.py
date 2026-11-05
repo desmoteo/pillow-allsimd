@@ -277,6 +277,70 @@ def test_point_table(mode: str) -> None:
         assert out == bytes(table[(i % bands) * 256 + v] for i, v in enumerate(src))
 
 
+def _blend(mask: int, out: int, src: int) -> int:
+    # Paste.c's BLEND: the weighted sum, divided by 255 with rounding
+    t = out * (255 - mask) + src * mask + 128
+    return ((t >> 8) + t) >> 8
+
+
+@pytest.mark.parametrize("mode", ("L", "LA", "RGB", "RGBA", "CMYK"))
+@pytest.mark.parametrize("width", (1, 3, 4, 7, 8, 15, 16, 17, 31, 32, 33, 65, 100))
+def test_paste_through_l_mask(mode: str, width: int) -> None:
+    # the kernel of PasteSIMD.c against the formula, with a box of the
+    # source and a destination offset so that rows start unaligned
+    rnd = random.Random(f"{mode} {width}")
+    bands = len(mode)
+    height = 3
+    dst = Image.frombytes(
+        mode, (width + 5, height + 2), rnd.randbytes((width + 5) * (height + 2) * bands)
+    )
+    src = Image.frombytes(mode, (width, height), rnd.randbytes(width * height * bands))
+    values = bytearray(rnd.randbytes(width * height))
+    for i in range(0, len(values), 5):
+        values[i] = rnd.choice((0, 1, 127, 128, 254, 255))
+    mask = Image.frombytes("L", (width, height), bytes(values))
+    for offset in ((0, 0), (3, 1), (5, 2)):
+        out = dst.copy()
+        out.paste(src, offset, mask)
+        expected = bytearray(dst.tobytes())
+        s, stride = src.tobytes(), (width + 5) * bands
+        for y in range(height):
+            for x in range(width):
+                m = values[y * width + x]
+                for b in range(bands):
+                    i = (y + offset[1]) * stride + (x + offset[0]) * bands + b
+                    expected[i] = _blend(m, expected[i], s[(y * width + x) * bands + b])
+        assert out.tobytes() == bytes(expected), offset
+
+
+def test_paste_through_l_mask_every_value() -> None:
+    # every mask value with every source value, over three destinations
+    src = Image.frombytes("L", (256, 256), bytes(range(256)) * 256)
+    mask = src.transpose(Image.Transpose.ROTATE_90)
+    values = mask.tobytes()
+    for base in (0, 77, 255):
+        out = Image.new("L", (256, 256), base)
+        out.paste(src, (0, 0), mask)
+        assert out.tobytes() == bytes(
+            _blend(values[i], base, i % 256) for i in range(65536)
+        )
+        rgb = Image.new("RGB", (256, 256), (base, 255 - base, base))
+        rgb.paste(Image.merge("RGB", [src] * 3), (0, 0), mask)
+        assert rgb.getchannel(1).tobytes() == bytes(
+            _blend(values[i], 255 - base, i % 256) for i in range(65536)
+        )
+
+
+def test_paste_into_itself_through_l_mask() -> None:
+    # the rows overlap exactly: the kernel is not used, the result is the
+    # formula's all the same
+    rnd = random.Random(8)
+    im = Image.frombytes("L", (70, 3), rnd.randbytes(210))
+    before = im.tobytes()
+    im.paste(im, (0, 0), im)
+    assert im.tobytes() == bytes(_blend(v, v, v) for v in before)
+
+
 def _alpha_image(mode: str, size: tuple[int, int]) -> Image.Image:
     # every alpha value, with colours both below and above it
     rnd = random.Random(size[0] * 7 + size[1])

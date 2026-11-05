@@ -53,6 +53,26 @@ blend_fast_row_simd(
     return x;
 }
 
+/* The exact blend and the extrapolation: the float loops of PlainLoops.h
+   as this tier's compiler makes them. */
+static int
+blend_interpolate_row_simd(
+    UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n, float alpha
+) {
+    plain_blend_interpolate_row(out, in1, in2, n, alpha);
+    return n;
+}
+
+static int
+blend_extrapolate_row_simd(
+    UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n, float alpha
+) {
+    plain_blend_extrapolate_row(out, in1, in2, n, alpha);
+    return n;
+}
+
 static const ImagingSIMDBlendKernels blend_simd_kernels = {
     .fast_row = blend_fast_row_simd,
+    .interpolate_row = blend_interpolate_row_simd,
+    .extrapolate_row = blend_extrapolate_row_simd,
 };

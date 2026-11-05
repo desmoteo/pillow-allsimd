@@ -187,6 +187,12 @@ typedef struct {
     ImagingSIMDRowFn ycbcr2rgb;
     ImagingSIMDRowFn rgb2ycbcr_fast;
     ImagingSIMDRowFn ycbcr2rgb_fast;
+    /* PlainLoops.h, compiled for the tier: the whole row, n back. L to I
+       and back, and Matrix.c's rows to L and to RGB. */
+    ImagingSIMDRowFn l2i;
+    ImagingSIMDRowFn i2l;
+    int (*matrix_l_row)(UINT8 *out, const UINT8 *in, int n, const float *m);
+    int (*matrix_rgb_row)(UINT8 *out, const UINT8 *in, int n, const float *m);
 } ImagingSIMDConvertKernels;
 
 /* 3D colour lookup tables (ColorLUTSIMD.c): the whole image, with the
@@ -327,6 +333,13 @@ typedef struct {
 
 typedef struct {
     int (*fast_row)(UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n, INT16 a15);
+    /* PlainLoops.h, compiled for the tier: the whole row, n back */
+    int (*interpolate_row)(
+        UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n, float alpha
+    );
+    int (*extrapolate_row)(
+        UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n, float alpha
+    );
 } ImagingSIMDBlendKernels;
 
 typedef struct {
@@ -336,6 +349,9 @@ typedef struct {
     int (*saturate_row)(
         UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n, int sign
     );
+    /* PlainLoops.h, compiled for the tier: the whole row, n back */
+    int (*soft_light_row)(UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n);
+    int (*hard_light_row)(UINT8 *out, const UINT8 *in1, const UINT8 *in2, int n);
 } ImagingSIMDChopsKernels;
 
 /* PNG (ZipEncodeSIMD.c): the encoder's row filters do the bytes their
@@ -403,6 +419,10 @@ typedef struct {
     int (*fill_mask_L)(
         UINT8 *out, const UINT8 *mask, const UINT8 *ink, int n, int pixelsize, int alpha
     );
+    int (*paste_mask_L)(
+        UINT8 *out, const UINT8 *in, const UINT8 *mask, int n, int pixelsize
+    );
+    int (*paste_mask_RGBA)(UINT8 *out, const UINT8 *in, const UINT8 *mask, int n);
 } ImagingSIMDPasteKernels;
 
 typedef struct {
@@ -423,6 +443,9 @@ typedef struct {
     void (*median3)(Imaging imOut, Imaging im, int margin, int ps);
     void (*median5)(Imaging imOut, Imaging im, int margin, int ps);
     int (*minmax_line)(UINT8 *out, const UINT8 **src, int count, int n, int is_max);
+    /* PlainLoops.h, compiled for the tier: the sorting network of the
+       general rank filter over one chunk of every wire */
+    void (*network)(UINT8 *v, const UINT8 (*network)[2], int count);
 } ImagingSIMDRankKernels;
 
 /* ModeFilter.c: the 3x3 mode of one row of an 8-bit image from its three

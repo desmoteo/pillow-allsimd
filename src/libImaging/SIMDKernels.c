@@ -12,6 +12,9 @@
 
 #if defined(IMAGING_SIMD_TABLE)
 
+/* the loops in plain C that every tier compiles for itself */
+#include "PlainLoops.h"
+
 #include "FilterSIMD.c"
 #include "ReduceSIMD.c"
 #include "ResampleSIMD.c"

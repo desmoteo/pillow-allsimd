@@ -13,6 +13,7 @@
  */
 
 #include "Imaging.h"
+#include "PlainLoops.h"
 #include "RankFilter.h"
 
 /* Fast rank algorithm (due to Wirth), based on public domain code
@@ -63,31 +64,17 @@ MakeRankFunction(UINT8) MakeRankFunction(INT32) MakeRankFunction(FLOAT32)
    selection above: any way of sorting a window gives the same k-th value.
    Their inner loops run along rows and are plain enough for compilers to
    vectorise. */
-#ifndef RANK_CHUNK
-#define RANK_CHUNK 256
-#endif
-
-    /* Puts the minimum of each pair in a and the maximum in b. */
-    static inline void RankCompareExchange(UINT8 *restrict a, UINT8 *restrict b) {
-    int x;
-    for (x = 0; x < RANK_CHUNK; x++) {
-        UINT8 lo = a[x] < b[x] ? a[x] : b[x];
-        UINT8 hi = a[x] < b[x] ? b[x] : a[x];
-        a[x] = lo;
-        b[x] = hi;
-    }
-}
+#define RANK_CHUNK PLAIN_RANK_CHUNK
 
 /* Largest window sorted by a network; larger ones use the selection above. */
 #define RANK_NETWORK_MAX 11
 
-/* Builds a comparator network that sorts n values, n <= 128: Batcher's
-   odd-even merge sort for the next power of two, without the comparators
-   that touch the wires past n. Those wires can be taken as holding the
-   largest value, which no comparator moves, so the rest still sorts.
-   Returns the number of comparators. */
-static int
-RankNetworkBatcher(int n, UINT8 (*network)[2]) {
+    /* Builds a comparator network that sorts n values, n <= 128: Batcher's
+       odd-even merge sort for the next power of two, without the comparators
+       that touch the wires past n. Those wires can be taken as holding the
+       largest value, which no comparator moves, so the rest still sorts.
+       Returns the number of comparators. */
+    static int RankNetworkBatcher(int n, UINT8 (*network)[2]) {
     int count = 0, size = 1, p, k, j, i;
     while (size < n) {
         size <<= 1;
@@ -153,9 +140,10 @@ RankFilterNetwork_u8(
                                           {2, 6}, {4, 6}, {2, 4}, {2, 3}, {5, 6}};
     /* Batcher's network for 128 values has 1471 comparators. */
     UINT8 network[1471][2];
-    int n = size * size, count, x0, y, i, j, c;
+    int n = size * size, count, x0, y, i, j;
     int rowbytes = im->xsize * ps, outbytes = imOut->xsize * ps;
     UINT8(*v)[RANK_CHUNK];
+    void (*kernel)(UINT8 *, const UINT8(*)[2], int) = ImagingSIMD->rank->network;
 
     if (size == 3) {
         memcpy(network, network3, sizeof(network3));
@@ -199,8 +187,13 @@ RankFilterNetwork_u8(
                     }
                 }
             }
-            for (c = 0; c < count; c++) {
-                RankCompareExchange(v[network[c][0]], v[network[c][1]]);
+            /* minima and maxima over rows of bytes: the active tier's
+               kernel is the loop of PlainLoops.h compiled for it
+               (RankFilterSIMD.c), with vectors twice as wide on AVX2 */
+            if (kernel) {
+                kernel((UINT8 *)v, network, count);
+            } else {
+                plain_rank_network((UINT8 *)v, network, count);
             }
             memcpy((UINT8 *)imOut->image[y] + x0, v[rank], w);
         }

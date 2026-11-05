@@ -123,6 +123,11 @@ paste_mask_1(
     }
 }
 
+/* Two rows of n bytes that do not overlap: a vector kernel reads several
+   pixels before it writes one, which only matters when they do. */
+#define PASTE_ROWS_APART(a, b, n) \
+    ((uintptr_t)(a) + (n) <= (uintptr_t)(b) || (uintptr_t)(b) + (n) <= (uintptr_t)(a))
+
 static inline void
 paste_mask_L(
     Imaging imOut,
@@ -147,9 +152,15 @@ paste_mask_L(
             UINT8 *out = imOut->image8[y + dy] + dx;
             UINT8 *in = imIn->image8[y + sy] + sx;
             UINT8 *mask = imMask->image8[y + sy] + sx;
-            for (x = 0; x < xsize; x++) {
-                *out = BLEND(*mask, *out, *in, tmp1);
-                out++, in++, mask++;
+            /* the active tier's kernel does the pixels it can (PasteSIMD.c),
+               unless the image is pasted into itself */
+            x = 0;
+            if (PASTE_ROWS_APART(out, in, xsize) &&
+                PASTE_ROWS_APART(out, mask, xsize)) {
+                x = IMAGING_SIMD_CALL(paste->paste_mask_L, out, in, mask, xsize, 1);
+            }
+            for (; x < xsize; x++) {
+                out[x] = BLEND(mask[x], out[x], in[x], tmp1);
             }
         }
 
@@ -158,7 +169,14 @@ paste_mask_L(
             UINT8 *out = (UINT8 *)(imOut->image32[y + dy] + dx);
             UINT8 *in = (UINT8 *)(imIn->image32[y + sy] + sx);
             UINT8 *mask = (UINT8 *)(imMask->image8[y + sy] + sx);
-            for (x = 0; x < xsize; x++) {
+            x = 0;
+            if (PASTE_ROWS_APART(out, in, xsize * 4)) {
+                x = IMAGING_SIMD_CALL(paste->paste_mask_L, out, in, mask, xsize, 4);
+                out += x * 4;
+                in += x * 4;
+                mask += x;
+            }
+            for (; x < xsize; x++) {
                 UINT8 a = mask[0];
                 out[0] = BLEND(a, out[0], in[0], tmp1);
                 out[1] = BLEND(a, out[1], in[1], tmp1);
@@ -207,7 +225,18 @@ paste_mask_RGBA(
             UINT8 *out = (UINT8 *)(imOut->image32[y + dy] + dx);
             UINT8 *in = (UINT8 *)(imIn->image32[y + sy] + sx);
             UINT8 *mask = (UINT8 *)(imMask->image32[y + sy] + sx);
-            for (x = 0; x < xsize; x++) {
+            /* the active tier's kernel does the pixels it can (PasteSIMD.c);
+               the mask is usually the source itself, which is no overlap
+               with the output */
+            x = 0;
+            if (PASTE_ROWS_APART(out, in, xsize * 4) &&
+                PASTE_ROWS_APART(out, mask, xsize * 4)) {
+                x = IMAGING_SIMD_CALL(paste->paste_mask_RGBA, out, in, mask, xsize);
+                out += x * 4;
+                in += x * 4;
+                mask += x * 4;
+            }
+            for (; x < xsize; x++) {
                 UINT8 a = mask[3];
                 out[0] = BLEND(a, out[0], in[0], tmp1);
                 out[1] = BLEND(a, out[1], in[1], tmp1);
