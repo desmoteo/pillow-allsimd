@@ -7,8 +7,8 @@
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://desmoteo.github.io/pillow-allsimd/allsimd-changelog.html" />
 <meta property="og:site_name" content="Pillow-AllSIMD" />
-<meta property="og:description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. 13.0.0.post3 (2026-11-04): Based on Pillow 13.0.0 PNG saving compresses with libdeflate where Pillow was built with it (the whee..." />
-<meta name="description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. 13.0.0.post3 (2026-11-04): Based on Pillow 13.0.0 PNG saving compresses with libdeflate where Pillow was built with it (the whee..." />
+<meta property="og:description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. Unreleased: Based on Pillow 13.0.0 PNG loading inflates the image data with libdeflate where Pillow was built with it: the plugi..." />
+<meta name="description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. Unreleased: Based on Pillow 13.0.0 PNG loading inflates the image data with libdeflate where Pillow was built with it: the plugi..." />
 <link rel="author" title="About these documents" href="about.html"><link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Release notes" href="releasenotes/index.html"><link rel="prev" title="About" href="about.html">
 
     <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
@@ -395,6 +395,67 @@
           <section id="changelog-pillow-allsimd">
 <h1>Changelog (Pillow-AllSIMD)<a class="headerlink" href="#changelog-pillow-allsimd" title="Link to this heading">¶</a></h1>
 <p>Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks.</p>
+<section id="unreleased">
+<h2>Unreleased<a class="headerlink" href="#unreleased" title="Link to this heading">¶</a></h2>
+<p>Based on Pillow 13.0.0</p>
+<ul class="simple">
+<li><p>PNG loading inflates the image data with libdeflate where Pillow was
+built with it: the plugin walks the headers of the <code class="docutils literal notranslate"><span class="pre">IDAT</span></code> chunks for
+the length of the compressed stream, the decoder gathers the stream
+and decompresses the image in one piece, which libdeflate does 2.4x
+faster than zlib’s stream, and the rows are then unfiltered where they
+lie. On 2560x1600 images: 1.6x for RGB and RGBA, 1.4x for L, 4x for P;
+1.6 to 1.8x at 512x512 and 128x128, no slower on icons. The pixels are
+the same. zlib’s stream still decodes the frames of an animation,
+files loaded with <code class="docutils literal notranslate"><span class="pre">LOAD_TRUNCATED_IMAGES</span></code>, images above the 256 MB
+cap of the encoder (<code class="docutils literal notranslate"><span class="pre">PILLOW_LIBDEFLATE_MAX</span></code>), and any stream that
+libdeflate refuses or that does not hold exactly the image’s rows, so
+that damaged and truncated files raise the errors they raised</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">quantize(method=Image.Quantize.FASTOCTREE)</span></code> on RGB and RGBA images
+reads the image’s rows and writes the result’s, without the two
+per-pixel work arrays, counts an RGB pixel into its bucket with one
+vector addition and maps it through a table that fits the first-level
+cache: 7.9 ms on a 2560x1600 photo, from 15.6 ms in a build for AVX2
+and 25.1 ms in the x86-64 wheel and in Pillow 13. The same palette
+and indices</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ImageFilter.BoxBlur</span></code> with a radius whose box divides 2^24 with a
+remainder of 0 or 1 (1 to 4, 6, 7, 8, 10, 17, …) skips the product
+with the far weight, which is zero there: 1.35x at radius 10 on
+x86-64 with AVX2 (7.5 to 5.5 ms on 2560x1600 RGB) and on arm64, 1.4x
+with SSE4.1. The same pixels</p></li>
+<li><p>arm64: 3D colour LUTs whose values stay within about twice the 0..1
+range are interpolated two pixels at a time in 16-bit lanes
+(<code class="docutils literal notranslate"><span class="pre">sqdmulh</span></code>), with the scalar code’s pixels: 1.63x (52 to 32 ms on a
+2560x1600 image on a Cortex-A78)</p></li>
+<li><p>arm64: resizing RGB and RGBA images takes 8 to 15% fewer cycles (15%
+when enlarging with Lanczos): the horizontal kernel’s tap loop went
+from 17 to 10 instructions per four taps, and fast mode’s vertical
+kernel keeps its row pointers and weights in registers for up to 16
+taps. The same pixels</p></li>
+<li><p>Pasting through a mask has vector kernels on x86-64 and arm64:
+<code class="docutils literal notranslate"><span class="pre">paste(im,</span> <span class="pre">box,</span> <span class="pre">mask)</span></code> with an L mask, <code class="docutils literal notranslate"><span class="pre">Image.composite()</span></code>, and
+an RGBA image pasted through its own alpha. On a 2560x1600 RGB image
+the mask composite takes 3.0 ms, from 11.7 ms in the x86-64 wheel and
+6.3 ms in a build for AVX2, and RGBA over RGB 2.9 ms, from 12.0 and
+5.8 ms; the same pixels</p></li>
+<li><p>x86-64 wheels: the loops that only a build for AVX2 ran fast, because
+the compiler vectorized them there, are compiled once per instruction
+set (<code class="docutils literal notranslate"><span class="pre">PlainLoops.h</span></code>) and reached through the kernel table, so the
+wheel runs them as that build does: <code class="docutils literal notranslate"><span class="pre">ImageChops.soft_light</span></code>,
+<code class="docutils literal notranslate"><span class="pre">hard_light</span></code> and <code class="docutils literal notranslate"><span class="pre">overlay</span></code> 3.4x faster, <code class="docutils literal notranslate"><span class="pre">ImageEnhance.Color</span></code> and
+<code class="docutils literal notranslate"><span class="pre">Sharpness</span></code> (and every <code class="docutils literal notranslate"><span class="pre">Image.blend</span></code> outside 0..1, or in exact
+mode) 1.7x, <code class="docutils literal notranslate"><span class="pre">convert()</span></code> with a colour matrix 1.9x, I to L 1.5x, the
+rank filters of sizes 7 to 11 and non-median ranks 1.7x. The same
+pixels in every tier</p></li>
+<li><p>The quantizers’ two per-pixel work arrays (16 MB each for a 2560x1600
+image, allocated and freed on every call) get the huge-page advice the
+image blocks have, on Linux where transparent huge pages are in
+<code class="docutils literal notranslate"><span class="pre">madvise</span></code> mode: when the allocator maps them afresh, which depends on
+what the process allocated before, their page faults were half of a
+fast-octree quantization (30 to 19.6 ms; 15.6 ms when the allocator
+recycles the arrays, as before)</p></li>
+</ul>
+</section>
 <section id="post3-2026-11-04">
 <h2>13.0.0.post3 (2026-11-04)<a class="headerlink" href="#post3-2026-11-04" title="Link to this heading">¶</a></h2>
 <p>Based on Pillow 13.0.0</p>
@@ -428,13 +489,6 @@ conversion</p></li>
 (<code class="docutils literal notranslate"><span class="pre">ModeFilterSIMD.c</span></code>): the nine window bytes counted against each
 other and the winner picked by a packed maximum, the same pixels as the
 histogram code; 14x on a 2560x1600 L image on AVX2</p></li>
-<li><p>The quantizers’ two per-pixel work arrays (16 MB each for a 2560x1600
-image, allocated and freed on every call) get the huge-page advice the
-image blocks have, on Linux where transparent huge pages are in
-<code class="docutils literal notranslate"><span class="pre">madvise</span></code> mode: when the allocator maps them afresh, which depends on
-what the process allocated before, their page faults were half of a
-fast-octree quantization (30 to 19.6 ms; 15.6 ms when the allocator
-recycles the arrays, as before)</p></li>
 <li><p>arm64: kernel filters with a power-of-two scale (<code class="docutils literal notranslate"><span class="pre">SHARPEN</span></code>,
 <code class="docutils literal notranslate"><span class="pre">FIND_EDGES</span></code>, <code class="docutils literal notranslate"><span class="pre">EDGE_ENHANCE</span></code>, <code class="docutils literal notranslate"><span class="pre">EMBOSS</span></code>, <code class="docutils literal notranslate"><span class="pre">CONTOUR</span></code>, <code class="docutils literal notranslate"><span class="pre">BLUR</span></code> and
 kernels of one’s own like them) are computed with their small integer
@@ -1080,6 +1134,7 @@ Up to 5x faster.</p></li>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Changelog (Pillow-AllSIMD)</a><ul>
+<li><a class="reference internal" href="#unreleased">Unreleased</a></li>
 <li><a class="reference internal" href="#post3-2026-11-04">13.0.0.post3 (2026-11-04)</a></li>
 <li><a class="reference internal" href="#post2-2026-11-03">13.0.0.post2 (2026-11-03)</a></li>
 <li><a class="reference internal" href="#post1-2026-11-03">13.0.0.post1 (2026-11-03)</a></li>
