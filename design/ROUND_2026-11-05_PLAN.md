@@ -413,4 +413,3 @@ was not the four-row structure that cost.
   count that moved on purpose after the gate was built is the box blur
   at radius 2 in the scalar tier, 25.7 to 19.0 million instructions (the
   far weight's product, skipped).
-
