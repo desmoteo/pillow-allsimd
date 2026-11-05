@@ -7,12 +7,12 @@
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://desmoteo.github.io/pillow-allsimd/allsimd-changelog.html" />
 <meta property="og:site_name" content="Pillow-AllSIMD" />
-<meta property="og:description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. Unreleased: Based on Pillow 13.0.0 PNG loading inflates the image data with libdeflate where Pillow was built with it: the plugi..." />
-<meta name="description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. Unreleased: Based on Pillow 13.0.0 PNG loading inflates the image data with libdeflate where Pillow was built with it: the plugi..." />
+<meta property="og:description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. 13.0.0.post4 (2026-11-06): Based on Pillow 13.0.0 Building from source on RHEL 9, CentOS Stream 9 and their relatives works agai..." />
+<meta name="description" content="Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks. 13.0.0.post4 (2026-11-06): Based on Pillow 13.0.0 Building from source on RHEL 9, CentOS Stream 9 and their relatives works agai..." />
 <link rel="author" title="About these documents" href="about.html"><link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Release notes" href="releasenotes/index.html"><link rel="prev" title="About" href="about.html">
 
     <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
-        <title>Changelog (Pillow-AllSIMD) - Pillow-AllSIMD 13.0.0.post3 documentation</title>
+        <title>Changelog (Pillow-AllSIMD) - Pillow-AllSIMD 13.0.0.post4 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
@@ -174,7 +174,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post3 documentation</div></a>
+      <a href="index.html"><div class="brand">Pillow-AllSIMD 13.0.0.post4 documentation</div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -195,7 +195,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
   
-  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post3 documentation</span>
+  <span class="sidebar-brand-text">Pillow-AllSIMD 13.0.0.post4 documentation</span>
   
 </a><form class="sidebar-search-container" method="get" action="search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -395,10 +395,26 @@
           <section id="changelog-pillow-allsimd">
 <h1>Changelog (Pillow-AllSIMD)<a class="headerlink" href="#changelog-pillow-allsimd" title="Link to this heading">¶</a></h1>
 <p>Pillow-AllSIMD’s changes, then those of Pillow-SIMD, which it forks.</p>
-<section id="unreleased">
-<h2>Unreleased<a class="headerlink" href="#unreleased" title="Link to this heading">¶</a></h2>
+<section id="post4-2026-11-06">
+<h2>13.0.0.post4 (2026-11-06)<a class="headerlink" href="#post4-2026-11-06" title="Link to this heading">¶</a></h2>
 <p>Based on Pillow 13.0.0</p>
 <ul class="simple">
+<li><p>Building from source on RHEL 9, CentOS Stream 9 and their relatives
+works again: their GCC 11 accepts <code class="docutils literal notranslate"><span class="pre">-mavxvnni</span></code> and their assembler
+(binutils 2.35) rejects the instructions, so the default build of
+13.0.0.post3 failed there. The build now tries the toolchain first and
+leaves the AVX-VNNI kernels out where it cannot make them; SSE4.1 and
+AVX2 are chosen at run time as elsewhere. <code class="docutils literal notranslate"><span class="pre">-C</span> <span class="pre">simd=avxvnni</span></code> says what
+it needs instead of failing in the assembler</p></li>
+<li><p>Cygwin, and MinGW with an unpatched GCC: the AVX2 and AVX-VNNI kernels
+no longer crash. GCC for 64-bit Windows keeps 256-bit values in stack
+slots that it takes to be 32-byte aligned on a stack the ABI aligns to
+16 (GCC bug 54412), so since the build chooses its kernels at run time
+(13.0.0.post3), about every other call of an AVX2 kernel on a CPU with
+AVX2 ended in a segmentation fault there. The build now asks the
+assembler to encode aligned vector moves as unaligned ones
+(<code class="docutils literal notranslate"><span class="pre">-Wa,-muse-unaligned-vector-move</span></code>, binutils 2.38 or later), which
+cost the same. MSVC builds and MSYS2’s patched GCC were not affected</p></li>
 <li><p>PNG loading inflates the image data with libdeflate where Pillow was
 built with it: the plugin walks the headers of the <code class="docutils literal notranslate"><span class="pre">IDAT</span></code> chunks for
 the length of the compressed stream, the decoder gathers the stream
@@ -1134,7 +1150,7 @@ Up to 5x faster.</p></li>
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Changelog (Pillow-AllSIMD)</a><ul>
-<li><a class="reference internal" href="#unreleased">Unreleased</a></li>
+<li><a class="reference internal" href="#post4-2026-11-06">13.0.0.post4 (2026-11-06)</a></li>
 <li><a class="reference internal" href="#post3-2026-11-04">13.0.0.post3 (2026-11-04)</a></li>
 <li><a class="reference internal" href="#post2-2026-11-03">13.0.0.post2 (2026-11-03)</a></li>
 <li><a class="reference internal" href="#post1-2026-11-03">13.0.0.post1 (2026-11-03)</a></li>
@@ -1189,7 +1205,7 @@ Up to 5x faster.</p></li>
       
     </aside>
   </div>
-</div><script src="_static/documentation_options.js?v=7285986f"></script>
+</div><script src="_static/documentation_options.js?v=b90c08a2"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/furo.js?v=46bd48cc"></script>

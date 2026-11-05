@@ -79,7 +79,9 @@ The ``simd`` build option chooses the instruction sets of a source build:
   32-bit x86, portable C elsewhere.
 * ``dispatch``: SSE4.1, AVX2 and AVX-VNNI kernels in one build, the set
   the CPU supports chosen when Pillow loads (x86-64 only; with MSVC,
-  SSE4.1 and AVX2). The ``PILLOW_ALLSIMD_ISA`` environment variable
+  and with a compiler or an assembler too old for AVX-VNNI, which needs
+  GCC 11 or clang 12 and binutils 2.36, SSE4.1 and AVX2: RHEL 9 and its
+  relatives have binutils 2.35). The ``PILLOW_ALLSIMD_ISA`` environment variable
   (``scalar``, ``sse4``, ``avx2``, ``avxvnni``) caps the choice, to compare
   the tiers on one machine.
 * ``sse4``: SSE4.1 only, in every file (x86 only). This and ``avx2``,
