@@ -234,14 +234,33 @@ same (`uptime`, `tegrastats` on the Orin): on 2026-11-04 the Orin was at
 2% idle under other people's containers, and wall-clock A/Bs were not
 worth running.
 
-A candidate not yet built: an instruction-count regression gate in CI.
-`checks/simd_callgrind.py` on a GitHub runner gives counts stable to a
-fraction of a percent where timings there are noise; stored per
-operation and compared on every push, it would catch a kernel that
-silently fell back to scalar or gained a per-pixel call. The caveats are
-the ones of stage 2: instructions are not time, a vector instruction
-counts as one whatever its width, and the AVX-512 tier cannot run under
-valgrind.
+**The instruction-count gate (built 2026-11-05).** Three regressions were
+found late and by accident: the span fill as a table kernel, the library
+calls to `floor`, the octree's gap in the wheel. Timings on a GitHub
+runner are noise; instruction counts under callgrind are the same on
+every run. `checks/simd_ir_gate.py` runs 59 operations of `simd_bench.py`
+(at least one per kernel group, and the paths that pay per call: drawing,
+the quantizers, pasting, PNG) in the scalar, SSE4.1 and AVX2 tiers of a
+dispatch build, counts the instructions executed inside Pillow's own
+extension modules (`simd_callgrind.py` reads them per object from the
+dump), and fails when a count is more than 3% above
+`checks/simd_ir_baseline.json`. PNG encoding and decoding are compared on
+the whole count, libraries included: there the question is whether
+libdeflate's path was taken, which Pillow's own count barely shows. The
+workflow `simd-instructions.yml` runs it in `python:3.12-trixie`, the
+image the baseline was made in, since the counts belong to the compiler
+(with another one the gate prints the differences as a warning and
+passes). It takes under two minutes on ten cores.
+
+`checks/simd_ir_gate.sh` runs the same steps locally in that image, with
+the working tree's uncommitted changes. When a change moves a count on
+purpose, `checks/simd_ir_gate.sh --update` rewrites the baseline; commit
+it with the change and say why in the message.
+
+The caveats are the ones of stage 2: instructions are not time, a vector
+instruction counts as one whatever its width, a cache miss counts as
+nothing, and the AVX-VNNI and AVX-512 tiers cannot run under valgrind. A
+count that holds says little; one that rises says where to look.
 
 ## Left out, and why
 

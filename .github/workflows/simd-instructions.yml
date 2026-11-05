@@ -1,0 +1,60 @@
+name: SIMD instruction counts
+
+# Pillow-AllSIMD: fails when an operation of the wheel build executes more
+# instructions than checks/simd_ir_baseline.json records, in the scalar,
+# SSE4.1 or AVX2 tier (checks/simd_ir_gate.py). Timings need a quiet
+# machine; instruction counts under callgrind are the same on every run,
+# and show a kernel that fell back to the scalar loop, a call per pixel or
+# per span, or a library call in a loop. The counts belong to the compiler,
+# so the job runs in the container image the baseline was made in.
+
+on:
+  push:
+    branches:
+      - "**"
+      # simd/master mirrors simd/pillow-13 (the same commits): one run per push
+      - "!simd/master"
+    paths: &paths
+      - ".github/workflows/simd-instructions.yml"
+      - "checks/simd_*"
+      - "setup.py"
+      - "src/**"
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_COLOR: 1
+  PIP_DISABLE_PIP_VERSION_CHECK: 1
+  PIP_ROOT_USER_ACTION: ignore
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    # Debian 13, GCC 14.2 and Valgrind 3.24: the baseline's environment
+    container: python:3.12-trixie
+    name: Instruction counts (scalar, SSE4.1, AVX2)
+
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Build as the x86-64 wheels are and compare with the baseline
+      run: checks/simd_ir_gate.sh --inside
+
+    - name: Keep the callgrind logs
+      if: failure()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: simd-instruction-counts
+        path: |
+          /tmp/simd-ir/*.log
+          /tmp/simd-ir/*/totals.json
