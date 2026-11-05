@@ -914,6 +914,33 @@ no pair sum), into four 32-bit accumulators, and ``vqmovn_s32`` plus
 ``sqshrn``. The 4-byte pixels go through the same loop, 4 pixels per
 step; the same arithmetic as x86's, and the same pixels.
 
+*Small coefficients (2026-11-05)*. The Cortex-A78 runs vector multiplies
+on one pipe, and the generic kernel spends four of them per tap and 16
+bytes, 9 cycles per pixel of a 3×3 kernel on RGB, which is most of what
+it costs: the reason NEON gains 4 to 5x here where AVX2, with ``pmaddwd``
+on two ports, gains 13x and more. For a kernel whose fixed-point
+coefficients and offset share a power of two, the sum is that power
+times a small sum, so ``filter_small_kernel()`` in ``Filter.c`` divides
+it out, and where the coefficients left are at most 255 in size and
+every sum of a window fits 16 bits, ``ImagingFilterSmall_simd()`` adds
+them in 16-bit lanes, eight per operation: a coefficient of 1 or -1 is
+a widening add or subtract, any other one widening multiply-accumulate
+of bytes. Shifting the small sum by the precision that is left (with its
+own rounding; none when the whole precision divided out, where the
+half can never carry) gives the same bytes as the generic kernel, which
+keeps every other kernel. Seven of Pillow's ten built-in filters reduce:
+``SHARPEN`` to -1 and 16 at 3 bits, ``FIND_EDGES`` and ``CONTOUR`` to -1
+and 8 with no shift, ``EMBOSS`` to -1, 0 and 1, ``BLUR`` to ones at 4
+bits, ``EDGE_ENHANCE`` and ``EDGE_ENHANCE_MORE``; ``SMOOTH``,
+``SMOOTH_MORE`` and ``DETAIL`` (scales 13, 100 and 6) do not. On the
+Jetson, 2560×1600 RGB: ``SHARPEN``, ``FIND_EDGES`` and ``EDGE_ENHANCE``
+27 to 14.7 ms (1.8x), ``BLUR`` 24 ms, ``EMBOSS`` 10; L ``SHARPEN`` 6.0
+to 4.0 ms. The NEON and scalar builds hash every filter the same before
+and after, and ``test_integer_kernels_with_power_of_two_scale`` checks
+ten kernels against the definition at widths around the vector's.
+Splitting the adds into two chains was measured and is slower (0.8x),
+as it was for the generic kernel.
+
 *Float kernels* (``FilterSIMD_NxNf.c``): 4-byte pixels only, 16 bytes per
 step as four float vectors. On arm64 GCC compiles Pillow's float loop
 with fused multiply-adds, so the "scalar" result there is already
@@ -1051,7 +1078,9 @@ Code map
 * ``FilterSIMD_3x3i_4u8.c``, ``FilterSIMD_5x5i_4u8.c``: the x86 integer
   kernels for 4-byte pixels, SSE4 and AVX2.
 * ``FilterSIMD_NxNi.c``: the integer kernel for 1-byte pixels on x86 (and
-  for both pixel sizes on arm64), with the SSE4/AVX2 and NEON primitives.
+  for both pixel sizes on arm64), with the SSE4/AVX2 and NEON primitives;
+  ``ImagingFilterSmall_simd()``, the arm64 kernel for small coefficients
+  (``filter_small_kernel()`` in ``Filter.c`` reduces them).
 * ``FilterSIMD_3x3f_4u8.c``, ``FilterSIMD_5x5f_4u8.c``,
   ``FilterSIMD_3x3f_u8.c``, ``FilterSIMD_5x5f_u8.c``: the x86 float
   kernels; ``FilterSIMD_NxNf.c``: the NEON one.
@@ -2153,9 +2182,16 @@ The idea
 
 * **Span fill.** ``hline32`` stored one pixel at a time behind a per-pixel
   mask test, which GCC doesn't vectorize at ``-O2`` even without the test
-  (the length is unknown). Unmasked spans go through ``fill32()``: 8
-  pixels per AVX2 store, 4 per SSE4 or NEON store, and a counted loop
-  elsewhere. Filled rectangles 6.45 to 2.85 ms at 1280×800.
+  (the length is unknown). Unmasked spans go through ``fill32()``, a
+  loop over fixed chunks of four pixels, whose four stores every
+  compiler merges into one 16-byte store at ``-O2`` on any architecture.
+  Filled rectangles 6.45 to 2.85 ms at 1280×800. It is plain C in
+  ``Draw.c`` and not a kernel of the table: it was one for a day
+  (2026-11-04, 8 pixels per AVX2 store), and the call per span, with the
+  caller's saved registers around it, cost 30% of the filled rectangles
+  and 12% of the wide lines on arm64 and 7% of the lines on x86-64,
+  for a loop that the stores bound either way
+  (``design/NEON_ROUND_2026-11-04.md``).
 * **RGBA ink in lanes.** ``hline32rgba`` computes the ink's terms once
   (``in * a`` per channel) and blends four pixels per step in 16-bit
   lanes, ``out * (255 - a) + c + 128`` then the ``/ 255`` as two shifts

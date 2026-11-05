@@ -213,6 +213,10 @@ describe:
   round: libdeflate for PNG saving, the masked histogram, the quantizer's
   hash table, the 3x3 mode filter kernel, the dithers two rows at a time,
   each measured and verified pixel for pixel.
+- [NEON_ROUND_2026-11-04.md](design/NEON_ROUND_2026-11-04.md): the arm64
+  assessment of the above on a Jetson Orin, the drawing regression it
+  found and its fix, the kernel filters with small coefficients, and
+  the changes that measured slower and were dropped.
 
 
 ## Benchmarks
