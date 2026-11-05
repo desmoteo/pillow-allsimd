@@ -2,6 +2,32 @@
    in 16-bit lanes, included by ResampleSIMD.c. Does the bytes the vector
    loop can and returns how many; rf_vrow() finishes the row. */
 
+#if defined(IMAGING_SIMD_NEON)
+/* The NEON loop for a number of taps the compiler knows: the row pointers
+   and the weights stay in registers, where the general loop loads a
+   pointer and a weight for every tap of every 16 bytes. Six instructions
+   per tap and step instead of eleven; the same sums in the same order. */
+SIMD_FORCE_INLINE int
+resample_fast_vrow_taps(
+    UINT8 *restrict out, INT16 **rows, const INT16 *w, const int taps, int n
+) {
+    int x = 0, k;
+    for (; x + 16 <= n; x += 16) {
+        int16x8_t s0 = vdupq_n_s16(0), s1 = vdupq_n_s16(0);
+        for (k = 0; k < taps; k++) {
+            s0 = vaddq_s16(s0, vqrdmulhq_n_s16(vld1q_s16(rows[k] + x), w[k]));
+            s1 = vaddq_s16(s1, vqrdmulhq_n_s16(vld1q_s16(rows[k] + x + 8), w[k]));
+        }
+        /* (s + 2^5) >> 6, saturated to 0 .. 255 */
+        vst1q_u8(
+            out + x,
+            vcombine_u8(vqrshrun_n_s16(s0, RF_FRAC), vqrshrun_n_s16(s1, RF_FRAC))
+        );
+    }
+    return x;
+}
+#endif
+
 static int
 resample_fast_vrow_simd(
     UINT8 *restrict out, INT16 **rows, const INT16 *w, int taps, int n
@@ -57,6 +83,29 @@ resample_fast_vrow_simd(
         _mm_storeu_si128((__m128i *)(out + x), _mm_packus_epi16(s0, s1));
     }
 #elif defined(IMAGING_SIMD_NEON)
+    /* the tap counts of enlarging (2, 4, 6) and of reducing to a quarter
+       with a bicubic filter or a third with Lanczos (16) */
+    switch (taps) {
+#define RF_VROW_TAPS(t) \
+    case t:             \
+        return resample_fast_vrow_taps(out, rows, w, t, n);
+        RF_VROW_TAPS(2)
+        RF_VROW_TAPS(3)
+        RF_VROW_TAPS(4)
+        RF_VROW_TAPS(5)
+        RF_VROW_TAPS(6)
+        RF_VROW_TAPS(7)
+        RF_VROW_TAPS(8)
+        RF_VROW_TAPS(9)
+        RF_VROW_TAPS(10)
+        RF_VROW_TAPS(11)
+        RF_VROW_TAPS(12)
+        RF_VROW_TAPS(13)
+        RF_VROW_TAPS(14)
+        RF_VROW_TAPS(15)
+        RF_VROW_TAPS(16)
+#undef RF_VROW_TAPS
+    }
     for (; x + 16 <= n; x += 16) {
         int16x8_t s0 = vdupq_n_s16(0), s1 = vdupq_n_s16(0);
         for (k = 0; k < taps; k++) {
