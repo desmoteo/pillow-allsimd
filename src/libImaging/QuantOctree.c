@@ -28,21 +28,13 @@
 #include <string.h>
 #include <limits.h>
 
+#include "Imaging.h"
 #include "ImagingUtils.h"
+#include "PlainLoops.h"
 #include "QuantOctree.h"
 
-/* Storage.c: huge pages for a large array not yet touched */
-extern void
-ImagingMemoryAdviseHugePages(void *ptr, size_t size);
-
-typedef struct _ColorBucket {
-    /* contains palette index when used for look up cube */
-    uint32_t count;
-    uint64_t r;
-    uint64_t g;
-    uint64_t b;
-    uint64_t a;
-} *ColorBucket;
+/* a bucket's count is its palette index when the cube is used for look up */
+typedef ImagingOctreeBucket *ColorBucket;
 
 typedef struct _ColorCube {
     unsigned int rBits, gBits, bBits, aBits;
@@ -91,7 +83,7 @@ new_color_cube(int r, int g, int b, int a) {
     cube->size = (unsigned long)cube->rWidth * cube->gWidth *
                  (unsigned long)cube->bWidth * cube->aWidth;
     /* malloc check ok, overflow checked above */
-    cube->buckets = calloc(cube->size, sizeof(struct _ColorBucket));
+    cube->buckets = calloc(cube->size, sizeof(ImagingOctreeBucket));
 
     if (!cube->buckets) {
         free(cube);
@@ -131,14 +123,48 @@ color_bucket_from_cube(const ColorCube cube, const Pixel *p) {
     return &cube->buckets[offset];
 }
 
+/* Pillow-AllSIMD: the cube as the loops over the pixels take it
+   (PlainLoops.h): the shifts and offsets, without the pointer through
+   which the compiler would reload them for every pixel. */
+static ImagingOctreeIndex
+cube_index(const ColorCube cube) {
+    ImagingOctreeIndex index = {
+        {8 - cube->rBits, 8 - cube->gBits, 8 - cube->bBits, 8 - cube->aBits},
+        {cube->rOffset, cube->gOffset, cube->bOffset, cube->aOffset},
+        cube->buckets,
+        NULL
+    };
+    return index;
+}
+
+/* Moves the sums that plain_octree_count_rgb() keeps, r g b and the count
+   of each bucket, to the cube, and clears them. The fourth byte of an RGB
+   pixel counts as 255, so its sum is 255 times the count. */
 static void
-add_color_to_color_cube(const ColorCube cube, const Pixel *p) {
-    ColorBucket bucket = color_bucket_from_cube(cube, p);
-    bucket->count += 1;
-    bucket->r += p->c.r;
-    bucket->g += p->c.g;
-    bucket->b += p->c.b;
-    bucket->a += p->c.a;
+add_sums_to_color_cube(const ColorCube cube, uint32_t *sums) {
+    unsigned long i;
+    for (i = 0; i < cube->size; i++) {
+        ColorBucket bucket = &cube->buckets[i];
+        bucket->count += sums[i * 4 + 3];
+        bucket->r += sums[i * 4];
+        bucket->g += sums[i * 4 + 1];
+        bucket->b += sums[i * 4 + 2];
+        bucket->a += (uint64_t)255 * sums[i * 4 + 3];
+    }
+    memset(sums, 0, cube->size * 4 * sizeof(uint32_t));
+}
+
+/* Adds n pixels of four bytes, r g b a, to the cube: the active tier's
+   kernel, which is the loop of PlainLoops.h compiled for it (QuantSIMD.c),
+   or that loop as compiled here. */
+static void
+add_colors_to_color_cube(
+    const ColorCube cube, const UINT8 *pixels, int n, unsigned int alpha_or
+) {
+    ImagingOctreeIndex index = cube_index(cube);
+    if (!IMAGING_SIMD_CALL(quant->octree_count, &index, pixels, n, alpha_or)) {
+        plain_octree_count(&index, pixels, n, alpha_or);
+    }
 }
 
 static unsigned long
@@ -177,20 +203,20 @@ compare_bucket_count(const ColorBucket a, const ColorBucket b) {
 static ColorBucket
 create_sorted_color_palette(const ColorCube cube) {
     ColorBucket buckets;
-    if (cube->size > LONG_MAX / sizeof(struct _ColorBucket)) {
+    if (cube->size > LONG_MAX / sizeof(ImagingOctreeBucket)) {
         return NULL;
     }
     /* malloc check ok, calloc + overflow check above for memcpy */
-    buckets = calloc(cube->size, sizeof(struct _ColorBucket));
+    buckets = calloc(cube->size, sizeof(ImagingOctreeBucket));
     if (!buckets) {
         return NULL;
     }
-    memcpy(buckets, cube->buckets, sizeof(struct _ColorBucket) * cube->size);
+    memcpy(buckets, cube->buckets, sizeof(ImagingOctreeBucket) * cube->size);
 
     qsort(
         buckets,
         cube->size,
-        sizeof(struct _ColorBucket),
+        sizeof(ImagingOctreeBucket),
         (int (*)(void const *, void const *))&compare_bucket_count
     );
 
@@ -337,16 +363,16 @@ combined_palette(
 ) {
     ColorBucket result;
     if (nBucketsA > LONG_MAX - nBucketsB ||
-        (nBucketsA + nBucketsB) > LONG_MAX / sizeof(struct _ColorBucket)) {
+        (nBucketsA + nBucketsB) > LONG_MAX / sizeof(ImagingOctreeBucket)) {
         return NULL;
     }
     /* malloc check ok, overflow check above */
-    result = calloc(nBucketsA + nBucketsB, sizeof(struct _ColorBucket));
+    result = calloc(nBucketsA + nBucketsB, sizeof(ImagingOctreeBucket));
     if (!result) {
         return NULL;
     }
-    memcpy(result, bucketsA, sizeof(struct _ColorBucket) * nBucketsA);
-    memcpy(&result[nBucketsA], bucketsB, sizeof(struct _ColorBucket) * nBucketsB);
+    memcpy(result, bucketsA, sizeof(ImagingOctreeBucket) * nBucketsA);
+    memcpy(&result[nBucketsA], bucketsB, sizeof(ImagingOctreeBucket) * nBucketsB);
     return result;
 }
 
@@ -374,45 +400,45 @@ map_image_pixels(
     const ColorCube lookupCube,
     uint32_t *pixelArray
 ) {
-    long i;
+    const ImagingOctreeIndex index = cube_index(lookupCube);
+    PLAIN_OCTREE_LOCALS(&index);
+    uint32_t i;
     for (i = 0; i < nPixels; i++) {
-        pixelArray[i] = lookup_color(lookupCube, &pixelData[i]);
+        const unsigned int r = pixelData[i].c.r, g = pixelData[i].c.g;
+        const unsigned int b = pixelData[i].c.b, a = pixelData[i].c.a;
+        pixelArray[i] = buckets[PLAIN_OCTREE_BUCKET(r, g, b, a)].count;
     }
 }
 
-const unsigned int CUBE_LEVELS[8] = {4, 4, 4, 0, 2, 2, 2, 0};
+/* PlainLoops.h has an RGB image's fine cube, four bits a channel, as
+   constants (PLAIN_OCTREE_RGB_BUCKET) */
+const unsigned int CUBE_LEVELS[8] = {
+    PLAIN_OCTREE_RGB_BITS, PLAIN_OCTREE_RGB_BITS, PLAIN_OCTREE_RGB_BITS, 0, 2, 2, 2, 0
+};
 const unsigned int CUBE_LEVELS_ALPHA[8] = {3, 4, 3, 3, 2, 2, 2, 2};
 
-int
-quantize_octree(
-    Pixel *pixelData,
-    uint32_t nPixels,
+/* From the fine cube with every pixel counted to the palette's buckets
+   (nQuantPixels of them) and the cube that gives a pixel its palette
+   index: everything between the two passes over the pixels. Returns 0 if
+   out of memory. */
+static int
+octree_build(
+    ColorCube fineCube,
     uint32_t nQuantPixels,
-    Pixel **palette,
-    uint32_t *paletteLength,
-    uint32_t **quantizedPixels,
-    int withAlpha
+    const unsigned int *cubeBits,
+    ColorBucket *paletteBucketsOut,
+    ColorCube *lookupCubeOut
 ) {
-    ColorCube fineCube = NULL;
     ColorCube coarseCube = NULL;
     ColorCube lookupCube = NULL;
     ColorCube coarseLookupCube = NULL;
     ColorBucket paletteBucketsCoarse = NULL;
     ColorBucket paletteBucketsFine = NULL;
     ColorBucket paletteBuckets = NULL;
-    uint32_t *qp = NULL;
-    long i;
     unsigned long nCoarseColors, nFineColors, nAlreadySubtracted;
-    const unsigned int *cubeBits;
-
-    if (withAlpha) {
-        cubeBits = CUBE_LEVELS_ALPHA;
-    } else {
-        cubeBits = CUBE_LEVELS;
-    }
 
     /*
-    Create two color cubes, one fine grained with 8x16x8=1024
+    Two color cubes, one fine grained with 8x16x8=1024
     colors buckets and a coarse with 4x4x4=64 color buckets.
     The coarse one guarantees that there are color buckets available for
     the whole color range (assuming nQuantPixels > 64).
@@ -425,15 +451,6 @@ quantize_octree(
      For images with alpha the cubes gets a forth dimension,
      8x16x8x8 and 4x4x4x4.
     */
-
-    /* create fine cube */
-    fineCube = new_color_cube(cubeBits[0], cubeBits[1], cubeBits[2], cubeBits[3]);
-    if (!fineCube) {
-        goto error;
-    }
-    for (i = 0; i < nPixels; i++) {
-        add_color_to_color_cube(fineCube, &pixelData[i]);
-    }
 
     /* create coarse cube */
     coarseCube =
@@ -510,6 +527,53 @@ quantize_octree(
     /* add fine colors to the lookup cube */
     add_lookup_buckets(lookupCube, paletteBuckets, nFineColors, nCoarseColors);
 
+    free_color_cube(coarseCube);
+    free_color_cube(coarseLookupCube);
+    *paletteBucketsOut = paletteBuckets;
+    *lookupCubeOut = lookupCube;
+    return 1;
+
+error:
+    /* everything is initialized to NULL
+       so we are safe to call free */
+    free_color_cube(lookupCube);
+    free_color_cube(coarseLookupCube);
+    free(paletteBuckets);
+    free(paletteBucketsCoarse);
+    free(paletteBucketsFine);
+    free_color_cube(coarseCube);
+    return 0;
+}
+
+int
+quantize_octree(
+    Pixel *pixelData,
+    uint32_t nPixels,
+    uint32_t nQuantPixels,
+    Pixel **palette,
+    uint32_t *paletteLength,
+    uint32_t **quantizedPixels,
+    int withAlpha
+) {
+    ColorCube fineCube = NULL;
+    ColorCube lookupCube = NULL;
+    ColorBucket paletteBuckets = NULL;
+    uint32_t *qp = NULL;
+    const unsigned int *cubeBits = withAlpha ? CUBE_LEVELS_ALPHA : CUBE_LEVELS;
+
+    /* create fine cube */
+    fineCube = new_color_cube(cubeBits[0], cubeBits[1], cubeBits[2], cubeBits[3]);
+    if (!fineCube) {
+        goto error;
+    }
+    /* a Pixel is its four bytes, r g b a; the caller checked that the
+       count fits an int */
+    add_colors_to_color_cube(fineCube, (const UINT8 *)pixelData, (int)nPixels, 0);
+
+    if (!octree_build(fineCube, nQuantPixels, cubeBits, &paletteBuckets, &lookupCube)) {
+        goto error;
+    }
+
     /* create result pixels and map palette indices */
     /* malloc check ok, calloc for overflow */
     qp = calloc(nPixels, sizeof(Pixel));
@@ -528,10 +592,8 @@ quantize_octree(
     *quantizedPixels = qp;
     *paletteLength = nQuantPixels;
 
-    free_color_cube(coarseCube);
     free_color_cube(fineCube);
     free_color_cube(lookupCube);
-    free_color_cube(coarseLookupCube);
     free(paletteBuckets);
     return 1;
 
@@ -540,11 +602,177 @@ error:
        so we are safe to call free */
     free(qp);
     free_color_cube(lookupCube);
-    free_color_cube(coarseLookupCube);
     free(paletteBuckets);
-    free(paletteBucketsCoarse);
-    free(paletteBucketsFine);
-    free_color_cube(coarseCube);
+    free_color_cube(fineCube);
+    return 0;
+}
+
+/* Pillow-AllSIMD: the same quantization from the rows of an RGB or RGBA
+   image (ysize rows of xsize pixels of four bytes) into the rows of a P
+   image, a byte per pixel, without the copy of the pixels and the array
+   of indices that the other quantizers' interface needs: 16 MB each for
+   a 2560x1600 image, allocated, filled and freed on every call. The
+   palette and the indices are those of quantize_octree() for the same
+   pixels.
+
+   That function is given the pixels with every fully transparent one
+   recoloured as the first of them (Quant.c); here the rows are read as
+   they are, so both passes do the same: the first pass remembers the
+   colour, and the second uses it. */
+int
+quantize_octree_rows(
+    UINT8 **rows,
+    int xsize,
+    int ysize,
+    uint32_t nQuantPixels,
+    Pixel **palette,
+    uint32_t *paletteLength,
+    UINT8 **outRows,
+    int withAlpha
+) {
+    ColorCube fineCube = NULL;
+    ColorCube lookupCube = NULL;
+    ColorBucket paletteBuckets = NULL;
+    uint32_t *sums = NULL;
+    uint32_t *lut = NULL;
+    const unsigned int *cubeBits = withAlpha ? CUBE_LEVELS_ALPHA : CUBE_LEVELS;
+    int transparency = 0;
+    unsigned int tr = 0, tg = 0, tb = 0;
+    int x, y;
+    unsigned long i;
+
+    fineCube = new_color_cube(cubeBits[0], cubeBits[1], cubeBits[2], cubeBits[3]);
+    if (!fineCube) {
+        goto error;
+    }
+    if (!withAlpha) {
+        /* An RGB image: each bucket's sums of r, g and b and its count in
+           four 32-bit numbers, which one vector addition per pixel keeps
+           (PlainLoops.h, QuantSIMD.c), moved to the cube's buckets before
+           they could overflow. */
+        int pending = 0;
+        /* malloc check ok, the cube's size is a small constant */
+        sums = calloc(fineCube->size, 4 * sizeof(uint32_t));
+        if (!sums) {
+            goto error;
+        }
+        for (y = 0; y < ysize; y++) {
+            int done = 0;
+            while (done < xsize) {
+                const UINT8 *in = rows[y] + (size_t)done * 4;
+                int n = xsize - done;
+                if (n > PLAIN_OCTREE_FLUSH - pending) {
+                    n = PLAIN_OCTREE_FLUSH - pending;
+                }
+                if (!IMAGING_SIMD_CALL(quant->octree_count_rgb, in, n, sums)) {
+                    plain_octree_count_rgb(in, n, sums);
+                }
+                done += n;
+                pending += n;
+                if (pending == PLAIN_OCTREE_FLUSH) {
+                    add_sums_to_color_cube(fineCube, sums);
+                    pending = 0;
+                }
+            }
+        }
+        add_sums_to_color_cube(fineCube, sums);
+        free(sums);
+        sums = NULL;
+    }
+    for (y = 0; withAlpha && y < ysize; y++) {
+        /* An RGBA image: a row of opaque and translucent pixels goes as it
+           is; the pixels from the first transparent one on, one by one. */
+        const UINT8 *in = rows[y];
+        int first = 0;
+        while (first < xsize && in[first * 4 + 3] != 0) {
+            first++;
+        }
+        add_colors_to_color_cube(fineCube, in, first, 0);
+        if (first < xsize) {
+            const ImagingOctreeIndex index = cube_index(fineCube);
+            PLAIN_OCTREE_LOCALS(&index);
+            for (x = first; x < xsize; x++) {
+                unsigned int r = in[x * 4], g = in[x * 4 + 1], b = in[x * 4 + 2];
+                const unsigned int a = in[x * 4 + 3];
+                ColorBucket bucket;
+                if (a == 0) {
+                    if (!transparency) {
+                        transparency = 1;
+                        tr = r, tg = g, tb = b;
+                    } else {
+                        r = tr, g = tg, b = tb;
+                    }
+                }
+                bucket = &buckets[PLAIN_OCTREE_BUCKET(r, g, b, a)];
+                bucket->count += 1;
+                bucket->r += r;
+                bucket->g += g;
+                bucket->b += b;
+                bucket->a += a;
+            }
+        }
+    }
+
+    if (!octree_build(fineCube, nQuantPixels, cubeBits, &paletteBuckets, &lookupCube)) {
+        goto error;
+    }
+
+    {
+        ImagingOctreeIndex index = cube_index(lookupCube);
+        /* the palette index of every bucket, a table of the first-level
+           cache's size, where the buckets themselves are ten times that */
+        /* malloc check ok, the cube's size is a small constant */
+        lut = malloc(lookupCube->size * sizeof(uint32_t));
+        if (!lut) {
+            goto error;
+        }
+        for (i = 0; i < lookupCube->size; i++) {
+            lut[i] = lookupCube->buckets[i].count;
+        }
+        index.lut = lut;
+        /* a transparent pixel's index is that of the colour they share */
+        const UINT8 transparent = (UINT8)
+            lut[(tr >> index.shift[0]) << index.offset[0] |
+                (tg >> index.shift[1]) << index.offset[1] |
+                (tb >> index.shift[2]) << index.offset[2]];
+        for (y = 0; y < ysize; y++) {
+            const UINT8 *in = rows[y];
+            UINT8 *out = outRows[y];
+            if (!withAlpha) {
+                if (!IMAGING_SIMD_CALL(quant->octree_map_rgb, lut, in, xsize, out)) {
+                    plain_octree_map_rgb(lut, in, xsize, out);
+                }
+            } else if (!IMAGING_SIMD_CALL(quant->octree_map, &index, in, xsize, out)) {
+                plain_octree_map(&index, in, xsize, out);
+            }
+            if (transparency) {
+                for (x = 0; x < xsize; x++) {
+                    if (in[x * 4 + 3] == 0) {
+                        out[x] = transparent;
+                    }
+                }
+            }
+        }
+    }
+
+    /* convert palette buckets to RGB pixel palette */
+    *palette = create_palette_array(paletteBuckets, nQuantPixels);
+    if (!(*palette)) {
+        goto error;
+    }
+    *paletteLength = nQuantPixels;
+
+    free(lut);
+    free_color_cube(fineCube);
+    free_color_cube(lookupCube);
+    free(paletteBuckets);
+    return 1;
+
+error:
+    free(sums);
+    free(lut);
+    free_color_cube(lookupCube);
+    free(paletteBuckets);
     free_color_cube(fineCube);
     return 0;
 }

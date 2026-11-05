@@ -219,3 +219,38 @@ Done as planned, with two changes found by measuring.
 - Not covered by a test: that the fast path is the one taken, since it
   is unobservable by design. The instruction-count gate of item 1 has a
   PNG decode case for that.
+
+### 4. The fast octree without its arrays (2026-11-05)
+
+The item as planned (bytes for the index array, no zeroing) would have
+gained little: removing both arrays altogether gave 15.6 to 15.3 ms.
+Timing the phases showed why, and what to do instead.
+
+- `quantize_octree_rows()` reads an RGB or RGBA image's rows and writes
+  the P image's rows; the palette computation between the passes is
+  `octree_build()`, shared with the array interface, which other modes
+  still use. Phases after this step: counting 11.1 ms, palette 0.4 ms,
+  mapping 4.0 ms. The arrays were never the cost when the allocator
+  recycled them; they are now never a cost.
+- Counting, RGB: four 32-bit sums per bucket (r, g, b, count) in a 64 KB
+  table, one vector addition per pixel, moved to the 64-bit buckets
+  every 2^24 pixels. Mapping: a 16 KB table of the lookup cube's
+  indices. 10.0 ms (counting 6.0, mapping 3.6).
+- The RGB cube's four bits per channel as constants: 7.9 ms. The shifts
+  by variable counts were the larger part of what was left: `shl %cl` is
+  three micro-operations without BMI2, six of them per pixel.
+- Tried and dropped: two tables of sums for alternate pixels (the same
+  10.0 ms: the pass was not waiting on store forwarding).
+- Result on the benchmark's case: 25.0 ms Pillow 13, 15.6 ms the AVX2
+  build and 25.1 ms the wheel before, **7.9 ms** in both now; the scalar
+  tier 9.5 ms and SSE4 8.4 ms.
+- Exactness: `quantcheck.py` (extended with RGBA images with no, one,
+  many and only transparent pixels, RGB with other fourth bytes, one-row
+  and one-pixel images) gives one hash before and after and in every
+  tier; `Tests/test_image_quantize_octree.py` compares the rows path
+  with the array path on the same pixels, holds digests that upstream
+  Pillow 13.0.0 reproduces, and has an image whose red sum passes 2^32
+  in one bucket. Memcheck clean on the octree tests.
+- Not done: the median cut's two arrays. They are 2 x 16 MB of a 355 ms
+  call, and its interface, shared with libimagequant, wants them.
+

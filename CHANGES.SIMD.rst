@@ -20,6 +20,13 @@ Based on Pillow 13.0.0
   cap of the encoder (``PILLOW_LIBDEFLATE_MAX``), and any stream that
   libdeflate refuses or that does not hold exactly the image's rows, so
   that damaged and truncated files raise the errors they raised
+- ``quantize(method=Image.Quantize.FASTOCTREE)`` on RGB and RGBA images
+  reads the image's rows and writes the result's, without the two
+  per-pixel work arrays, counts an RGB pixel into its bucket with one
+  vector addition and maps it through a table that fits the first-level
+  cache: 7.9 ms on a 2560x1600 photo, from 15.6 ms in a build for AVX2
+  and 25.1 ms in the x86-64 wheel and in Pillow 13. The same palette
+  and indices
 - Pasting through a mask has vector kernels on x86-64 and arm64:
   ``paste(im, box, mask)`` with an L mask, ``Image.composite()``, and
   an RGBA image pasted through its own alpha. On a 2560x1600 RGB image

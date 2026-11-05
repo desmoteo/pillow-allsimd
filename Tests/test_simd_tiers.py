@@ -217,6 +217,9 @@ def _operations(
         "RGB", rgb.size, rgb.tobytes("raw", "RGBX"), "raw", "RGBX"
     )
     yield "quantize", lambda: rgb.quantize(64).convert("RGB")
+    octree = Image.Quantize.FASTOCTREE
+    yield "quantize octree", lambda: rgb.quantize(200, octree).convert("RGB")
+    yield "quantize octree RGBA", lambda: rgba.quantize(99, octree).convert("RGBA")
 
 
 def _bands(im: Image.Image) -> Image.Image:

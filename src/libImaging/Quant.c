@@ -1480,9 +1480,32 @@ error_1:
  *
  * Contract: im is read-only.
  */
+/* The quantizer's palette into the P image's. */
+static void
+quantize_set_palette(
+    Imaging imOut, const Pixel *palette, uint32_t paletteLength, int withAlpha
+) {
+    UINT8 *pp = imOut->palette->palette;
+    int i;
+
+    imOut->palette->size = (int)paletteLength;
+    for (i = 0; i < (int)paletteLength; i++) {
+        *pp++ = palette[i].c.r;
+        *pp++ = palette[i].c.g;
+        *pp++ = palette[i].c.b;
+        if (withAlpha) {
+            *pp = palette[i].c.a;
+        }
+        pp++;
+    }
+    if (withAlpha) {
+        imOut->palette->mode = IMAGING_MODE_RGBA;
+    }
+}
+
 Imaging
 ImagingQuantize(Imaging im, int colors, int mode, int kmeans) {
-    int i, j;
+    int i;
     int x, y, v;
     UINT8 *pp;
     Pixel *p;
@@ -1518,6 +1541,37 @@ ImagingQuantize(Imaging im, int colors, int mode, int kmeans) {
 
     if (xsize > INT_MAX / ysize) {
         return ImagingError_MemoryError();
+    }
+
+    /* Pillow-AllSIMD: the fast octree reads an RGB or RGBA image's rows and
+       writes the P image's, without the two per-pixel arrays below */
+    if (mode == 2 && im->image32) {
+        withAlpha = im->mode == IMAGING_MODE_RGBA;
+        imOut = ImagingNewDirty(IMAGING_MODE_P, xsize, ysize);
+        if (!imOut) {
+            return NULL;
+        }
+        ImagingSectionEnter(&cookie);
+        MUTEX_LOCK(&im->mutex);
+        result = quantize_octree_rows(
+            (UINT8 **)im->image,
+            xsize,
+            ysize,
+            colors,
+            &palette,
+            &paletteLength,
+            imOut->image8,
+            withAlpha
+        );
+        MUTEX_UNLOCK(&im->mutex);
+        ImagingSectionLeave(&cookie);
+        if (result <= 0) {
+            ImagingDelete(imOut);
+            return (Imaging)ImagingError_ValueError("quantization error");
+        }
+        quantize_set_palette(imOut, palette, paletteLength, withAlpha);
+        free(palette);
+        return imOut;
     }
     /* malloc check ok, using calloc for final overflow, x*y above */
     p = calloc((size_t)xsize * ysize, sizeof(Pixel));
@@ -1667,23 +1721,7 @@ ImagingQuantize(Imaging im, int colors, int mode, int kmeans) {
 
         free(newData);
 
-        imOut->palette->size = (int)paletteLength;
-        pp = imOut->palette->palette;
-
-        for (i = j = 0; i < (int)paletteLength; i++) {
-            *pp++ = palette[i].c.r;
-            *pp++ = palette[i].c.g;
-            *pp++ = palette[i].c.b;
-            if (withAlpha) {
-                *pp = palette[i].c.a;
-            }
-            pp++;
-        }
-
-        if (withAlpha) {
-            imOut->palette->mode = IMAGING_MODE_RGBA;
-        }
-
+        quantize_set_palette(imOut, palette, paletteLength, withAlpha);
         free(palette);
         ImagingSectionLeave(&cookie);
 

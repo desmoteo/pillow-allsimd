@@ -437,6 +437,14 @@ typedef struct {
 struct ImagingNearestPalette;
 typedef struct {
     UINT32 (*nearest_entry)(const struct ImagingNearestPalette *np, UINT32 pixel);
+    /* PlainLoops.h, compiled for the tier: the fast octree's two passes
+       over a row of 4-byte pixels (cube is an ImagingOctreeIndex); n back */
+    int (*octree_count)(
+        const void *cube, const UINT8 *in, int n, unsigned int alpha_or
+    );
+    int (*octree_count_rgb)(const UINT8 *in, int n, UINT32 *sums);
+    int (*octree_map)(const void *cube, const UINT8 *in, int n, UINT8 *out);
+    int (*octree_map_rgb)(const UINT32 *lut, const UINT8 *in, int n, UINT8 *out);
 } ImagingSIMDQuantKernels;
 
 typedef struct {
