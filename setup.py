@@ -9,12 +9,14 @@
 from __future__ import annotations
 
 import os
+import platform
 import re
 import shutil
 import struct
 import subprocess
 import sys
 import sysconfig
+import tempfile
 import warnings
 
 from pybind11.setup_helpers import ParallelCompile
@@ -1053,6 +1055,39 @@ class pil_build_ext(build_ext):
             return [match.group(0)]
         return [target.rsplit("-", 1)[-1] if "-" in target else target]
 
+    def _windows_gcc_avx_flags(self) -> list[str]:
+        """The flag that 256-bit code needs from GCC for a 64-bit Windows
+        target (Cygwin, MinGW), or nothing.
+
+        The Windows x64 ABI aligns the stack to 16 bytes, and GCC keeps
+        256-bit values in stack slots that it addresses with aligned moves
+        without aligning the stack to 32 (GCC bug 54412, open since 2012):
+        about every other call of an AVX2 kernel ends in a segmentation
+        fault. MSYS2's and Debian's compilers carry a patch; Cygwin's does
+        not. The assembler of binutils 2.38 and later encodes the aligned
+        moves as unaligned ones on request, which cost the same on every
+        CPU that has AVX. Clang has no such bug, and its assembler no such
+        option: the flag is tried on an empty file first.
+        """
+        # (os.name and uname(), not sys.platform, which the type checker
+        # evaluates for the platform it runs on)
+        windows = os.name == "nt" or platform.system().startswith("CYGWIN")
+        if self.compiler.compiler_type == "msvc" or not windows:
+            return []
+        flag = "-Wa,-muse-unaligned-vector-move"
+        with tempfile.TemporaryDirectory() as tmp:
+            source = os.path.join(tmp, "avx_move_probe.c")
+            with open(source, "w") as fp:
+                fp.write("int pillow_avx_move_probe;\n")
+            try:
+                self.compiler.compile(
+                    [source], output_dir=tmp, extra_postargs=["-mavx2", flag]
+                )
+            except Exception:
+                _dbg("%s is not accepted: AVX2 code may crash (GCC bug 54412)", flag)
+                return []
+        return [flag]
+
     def _configure_simd(self) -> str:
         """Add the compile flags for the SIMD kernels in PIL._imaging.
 
@@ -1091,6 +1126,12 @@ class pil_build_ext(build_ext):
         macros: list[tuple[str, str | None]] = []
         # a dispatch build: the kernel files of each tier and their flags
         tier_flags: dict[str, list[str]] = {}
+        # for every file compiled with AVX: GCC on Windows (see the method)
+        avx_moves = (
+            self._windows_gcc_avx_flags()
+            if x86 and requested not in ("disable", "sse4")
+            else []
+        )
         if requested == "disable":
             macros.append(("IMAGING_SIMD_DISABLE", None))
             simd = "disabled"
@@ -1110,7 +1151,7 @@ class pil_build_ext(build_ext):
                 raise ValueError(msg)
             # -march=native enables FMA, and GCC would then fuse float
             # multiplies and adds, which changes results.
-            args = ["-march=native", "-ffp-contract=off"]
+            args = ["-march=native", "-ffp-contract=off", *avx_moves]
             simd = "native (-march=native)"
             if any(a.startswith(("ppc", "powerpc")) for a in arches):
                 # GCC takes -mcpu, not -march, for POWER
@@ -1146,7 +1187,7 @@ class pil_build_ext(build_ext):
                 macros.append(("IMAGING_SIMD_DISPATCH", None))
                 tier_flags["SIMDKernels_sse4.c"] = [] if msvc else ["-msse4.1"]
                 tier_flags["SIMDKernels_avx2.c"] = (
-                    [] if msvc else ["-msse4.1", "-mavx2"]
+                    [] if msvc else ["-msse4.1", "-mavx2", *avx_moves]
                 )
                 simd = "dispatch (SSE4.1, AVX2)"
                 if not msvc:
@@ -1154,6 +1195,7 @@ class pil_build_ext(build_ext):
                         "-msse4.1",
                         "-mavx2",
                         "-mavxvnni",
+                        *avx_moves,
                     ]
                     macros.append(("IMAGING_SIMD_DISPATCH_AVXVNNI", None))
                     simd = "dispatch (SSE4.1, AVX2, AVX-VNNI)"
@@ -1161,10 +1203,10 @@ class pil_build_ext(build_ext):
                 if msvc:
                     msg = "'-C simd=avxvnni' is not supported with MSVC"
                     raise ValueError(msg)
-                args = ["-msse4.1", "-mavx2", "-mavxvnni"]
+                args = ["-msse4.1", "-mavx2", "-mavxvnni", *avx_moves]
                 simd = "SSE4.1 + AVX2 + AVX-VNNI"
             elif requested == "avx2":
-                args = ["/arch:AVX2"] if msvc else ["-msse4.1", "-mavx2"]
+                args = ["/arch:AVX2"] if msvc else ["-msse4.1", "-mavx2", *avx_moves]
                 simd = "SSE4.1 + AVX2"
             else:
                 args = [] if msvc else ["-msse4.1"]
