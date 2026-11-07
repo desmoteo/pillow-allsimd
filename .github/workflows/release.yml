@@ -196,7 +196,11 @@ jobs:
           [ "$files" -eq "$EXPECTED_DISTS" ]
 
   testpypi-publish:
-    if: github.event_name == 'workflow_dispatch'
+    # (a skipped source package job, in a macOS-only run, would otherwise
+    # skip this job too: the implicit success() looks at every earlier job)
+    if: >-
+      !cancelled() && needs.count-dists.result == 'success'
+      && github.event_name == 'workflow_dispatch'
     needs: count-dists
     runs-on: ubuntu-latest
     name: Upload to TestPyPI
@@ -218,7 +222,11 @@ jobs:
           attestations: true
 
   pypi-publish:
-    if: github.event_name == 'push'
+    # (as above: 13.0.0.post4's first macOS run built its wheels and skipped
+    # the upload)
+    if: >-
+      !cancelled() && needs.count-dists.result == 'success'
+      && github.event_name == 'push'
     needs: count-dists
     runs-on: ubuntu-latest
     name: Upload to PyPI

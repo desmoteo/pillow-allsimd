@@ -11,7 +11,9 @@ the workflow's other jobs:
 Environment: EVENT (push or workflow_dispatch), TAG (the tag of a push), and
 PLATFORMS (all, linux or macos: a manual run's input; a tag chooses with
 its suffix, -linux or -macos, or none for all). A push also checks that the
-tag's version is the package's.
+tag's version is the package's. A platform suffix may carry a number,
+-macos-2, for another run of the same files when one could not upload (no
+runner, or a fault in this workflow): a release tag is never moved.
 """
 
 from __future__ import annotations
@@ -91,7 +93,7 @@ def version() -> str:
 
 def plan(event: str, tag: str, platforms: str) -> dict[str, object]:
     if event == "push":
-        match = re.fullmatch(r"allsimd-(.+?)(?:-(linux|macos))?", tag)
+        match = re.fullmatch(r"allsimd-(.+?)(?:-(linux|macos)(?:-\d+)?)?", tag)
         if not match or match.group(1) != version():
             sys.exit(f"tag {tag}, version {version()}")
         platforms = match.group(2) or "all"
