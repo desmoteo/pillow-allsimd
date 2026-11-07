@@ -66,7 +66,11 @@ Pillow-AllSIMD::
 ``python3 -m PIL`` shows the kernels in use (``--- SIMD kernels: avx2
 (built: scalar, sse4, avx2, avxvnni)``).
 
-Uninstall Pillow before, not after: both own the files in ``PIL``. To build
+Uninstall Pillow before, not after: both own the files in ``PIL``.
+Installing a package that depends on ``pillow`` later, torchvision for
+one, puts Pillow back over it: install such packages first, or with
+``--no-deps``; ``pip check`` then reports Pillow as missing, which is
+expected. To build
 from source on Linux anyway, add ``--no-binary pillow-allsimd``. To
 rebuild with another ``simd`` option, add ``--no-cache-dir
 --force-reinstall``, or pip reuses the wheel it built first. The development

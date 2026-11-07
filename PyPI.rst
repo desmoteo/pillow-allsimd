@@ -116,7 +116,10 @@ does. Install your other packages first, then replace Pillow with it::
     python3 -m pip install pillow-allsimd
 
 Uninstall Pillow before installing, not after: both own the files in
-``PIL``. ``python3 -m PIL`` shows the kernels in use (``--- SIMD kernels:
+``PIL``. Installing a package that depends on ``pillow`` later, torchvision
+for one, puts Pillow back over it: install such packages first, or with
+``--no-deps``; ``pip check`` then reports Pillow as missing, which is
+expected. ``python3 -m PIL`` shows the kernels in use (``--- SIMD kernels:
 avx2 (built: scalar, sse4, avx2, avxvnni)``). The ``-C simd=`` options below
 apply to source builds only; to build from source on Linux anyway, add
 ``--no-binary pillow-allsimd``. To rebuild with another ``simd`` option, add
