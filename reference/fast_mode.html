@@ -399,9 +399,10 @@
 differ from Pillow’s by small, documented amounts. It is on by default: the
 operations listed below use their fast kernels. The other operations, and
 every operation in exact mode (fast mode off), compute with Pillow’s
-arithmetic, or an integer form of it that rounds differently by one level at
-most in a few places (resize with 16-bit coefficients, RGB to L with 15-bit
-ones). Fast mode was off by default until October 2026.</p>
+arithmetic, or an integer form of it that rounds differently in a few places:
+RGB to L with 15-bit weights by one level, and resize with 16-bit
+coefficients by one level, or two where both of its passes round the other
+way (enlarging with bicubic or Lanczos, in under 1% of the values). Fast mode was off by default until October 2026.</p>
 <p>This is a Pillow-AllSIMD feature: neither Pillow nor Pillow-SIMD has a fast
 mode. Check for it with <code class="docutils literal notranslate"><span class="pre">features.check_feature(&quot;fast&quot;)</span></code>.</p>
 <section id="turning-it-off">
