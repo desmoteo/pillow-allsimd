@@ -564,6 +564,20 @@ class TestFileJpeg:
         with Image.open(filename):
             pass
 
+    @pytest.mark.parametrize("mode", ("L", "RGB"))
+    def test_decode_in_pieces(self, mode: str) -> None:
+        # Pillow-AllSIMD: libjpeg writes the rows of L and RGB images itself,
+        # as many as the data so far gives, and carries on with the next piece
+        im = hopper(mode).resize((300, 200))
+        out = BytesIO()
+        im.save(out, "JPEG", quality=90)
+        data = out.getvalue()
+        parser = ImageFile.Parser()
+        for i in range(0, len(data), 500):
+            parser.feed(data[i : i + 500])
+        with Image.open(BytesIO(data)) as expected:
+            assert_image_equal(parser.close(), expected)
+
     def test_truncated_jpeg_should_read_all_the_data(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

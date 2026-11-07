@@ -3,6 +3,15 @@ Changelog (Pillow-AllSIMD)
 
 Pillow-AllSIMD's changes, then those of Pillow-SIMD, which it forks.
 
+Unreleased
+----------
+
+- JPEG loading: for L and RGB images, libjpeg-turbo writes the image's
+  rows itself instead of one line at a time into a buffer that Pillow
+  copied. The pixels are the same; averaged over heap layouts, RGB files
+  decode 4 to 10% faster, and the time moves less with where the heap
+  puts the buffers
+
 13.0.0.post4 (2026-11-06)
 -------------------------
 
