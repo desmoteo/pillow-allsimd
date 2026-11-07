@@ -433,6 +433,25 @@ def pypi_headline(m: Machines) -> str:
     )
 
 
+def readme_headline(m: Machines) -> str:
+    """The README's first paragraph: the speed-ups that the PyPI page
+    states, in Markdown."""
+    x, a = m["x86"], m["arm64"]
+    fast_x, cases = x.geomean(AVX2_FAST)
+    fast_a = a.geomean(NEON_FAST)[0]
+    cv_x, cv_cases = x.faster_than(AVX2_FAST, OPENCV)
+    cv_a = a.faster_than(NEON_FAST, OPENCV)[0]
+    return (
+        f"**Pillow 13, {fast_x:.1f}× as fast on x86-64 and {fast_a:.1f}× as "
+        f"fast on arm64**, as the geometric mean of {cases} operations on one "
+        f"thread ({x.geomean(AVX2)[0]:.1f}× and {a.geomean(NEON)[0]:.1f}× with "
+        f"Pillow's exact arithmetic). That is "
+        f"{fast_x / x.geomean(PILLOW_SIMD)[0]:.1f}× as fast as Pillow-SIMD, "
+        f"and faster than OpenCV in {cv_x} of the {cv_cases} operations both "
+        f"have on x86-64, {cv_a} on arm64."
+    )
+
+
 # --- the regions ------------------------------------------------------------
 
 
@@ -447,6 +466,7 @@ REGIONS: dict[str, Region] = {
     "pypi-figures": Region("PyPI.rst", pypi_figures),
     "pypi-headline": Region("PyPI.rst", pypi_headline),
     "pypi-benchmarks": Region("PyPI.rst", pypi_benchmarks),
+    "readme-headline": Region("README.md", readme_headline),
     "readme-gaussian-fast": Region("README.md", readme_gaussian, inline=True),
     "fast-mode-speedups": Region("docs/reference/fast_mode.rst", fast_mode_speedups),
     "kernels-appendix-a": Region("docs/allsimd-kernels.rst", appendix_a),
