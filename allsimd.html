@@ -8,7 +8,12 @@
 <meta property="og:url" content="https://desmoteo.github.io/pillow-allsimd/allsimd.html" />
 <meta property="og:site_name" content="Pillow-AllSIMD" />
 <meta property="og:description" content="Pillow-AllSIMD is Pillow with SIMD kernels: a fork of Pillow-SIMD, which is a fork of Pillow. Everything in these pages about Pillow’s API applies to it unchanged; this page and Fast mode (Pillow-A..." />
+<meta property="og:image:width" content="1146" />
+<meta property="og:image:height" content="600" />
+<meta property="og:image" content="https://desmoteo.github.io/pillow-allsimd/_images/social_previews/summary_allsimd_cd2388bb.png" />
+<meta property="og:image:alt" content="Pillow-AllSIMD is Pillow with SIMD kernels: a fork of Pillow-SIMD, which is a fork of Pillow. Everything in these pages about Pillow’s API applies to it unchanged; this page and Fast mode (Pillow-A..." />
 <meta name="description" content="Pillow-AllSIMD is Pillow with SIMD kernels: a fork of Pillow-SIMD, which is a fork of Pillow. Everything in these pages about Pillow’s API applies to it unchanged; this page and Fast mode (Pillow-A..." />
+<meta name="twitter:card" content="summary_large_image" />
 <link rel="author" title="About these documents" href="about.html"><link rel="index" title="Index" href="genindex.html"><link rel="search" title="Search" href="search.html"><link rel="next" title="Six times Pillow: notes from Pillow-AllSIMD" href="allsimd-story.html"><link rel="prev" title="Pillow-AllSIMD" href="index.html">
 
     <!-- Generated with Sphinx 9.2.0 and Furo 2025.12.19 -->
@@ -422,9 +427,9 @@ Pillow-SIMD are offered to it.</p></li>
 <h2>State<a class="headerlink" href="#state" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p>Version 13.0.0.post4, on Pillow 13.0.0 (the <code class="docutils literal notranslate"><span class="pre">simd/pillow-13</span></code> branch).</p></li>
-<li><p>Beta. On PyPI as wheels for Linux on x86-64 and arm64 (macOS to follow,
-when GitHub’s macOS runners build them), and as a source package,
-compiled on installation, everywhere else (below).</p></li>
+<li><p>Beta. On PyPI as wheels for Linux on x86-64 and arm64 and for macOS 11
+or later on Apple silicon, and as a source package, compiled on
+installation, everywhere else (below).</p></li>
 <li><p>Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson Orin):
 Pillow’s test suite on every build, the SIMD consistency tests, and output
 hashes per kernel that compare the builds (<code class="docutils literal notranslate"><span class="pre">checks/simd_hashes.py</span></code>). The
@@ -440,8 +445,8 @@ Pillow, Pillow-SIMD, OpenCV, libvips and ImageMagick, exact and fast mode.</p></
 installs a wheel with the image libraries bundled, as Pillow’s wheels
 have them. The x86-64 wheel holds SSE4.1, AVX2 and AVX-VNNI kernels and
 picks the set the CPU has when Pillow loads; the arm64 wheel has the NEON
-kernels. Wheels for macOS 11 or later on Apple silicon follow; until then
-macOS builds from source, with the NEON kernels too. Elsewhere,
+kernels, and so has the macOS wheel, for macOS 11 or later on Apple
+silicon. Elsewhere,
 Pillow-AllSIMD is a source package, which pip compiles on installation,
 so install the libraries that <a class="reference internal" href="installation/building-from-source.html"><span class="doc">building Pillow from source</span></a> needs first; a source build on
 x86-64 holds the same three sets as the wheel, so no option is needed.
