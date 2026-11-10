@@ -435,7 +435,8 @@ match double sums (the F, I and I;16 resample, the exact transforms) use
 fused multiply-adds explicitly and differ from x86 only where the scalar
 code would too. Against Pillow itself, resize uses 16-bit coefficients
 where Pillow uses 32-bit ones and RGB to L uses 15-bit weights, each off
-by one level in a few places, and the kernel filters use 16-bit
+by one level in a few places (two in resize where both passes round the
+other way: enlarging with bicubic or Lanczos, in under 1% of the values), and the kernel filters use 16-bit
 coefficients, which can’t hold 1/13 or 1/100 exactly (so <code class="docutils literal notranslate"><span class="pre">SMOOTH_MORE</span></code>
 differs by one level in a few percent of the pixels); everything else in
 exact mode is Pillow’s arithmetic.</p>
