@@ -167,8 +167,8 @@ Try it
     python3 -m pip uninstall -y pillow pillow-simd
     python3 -m pip install pillow-allsimd
 
-Wheels are on PyPI for Linux on x86-64 and arm64; elsewhere it builds from
-source. The :doc:`kernels page
+Wheels are on PyPI for Linux on x86-64 and arm64 and for macOS on Apple
+silicon; elsewhere it builds from source. The :doc:`kernels page
 <allsimd-kernels>` has the design of every kernel, and the
 `repository <https://github.com/desmoteo/pillow-allsimd>`_ has the design
 notes, the benchmark harness and the issue tracker.

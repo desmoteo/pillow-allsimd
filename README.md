@@ -32,7 +32,7 @@ x86:
 | x86-64              | SSE4.1, AVX2 and AVX-VNNI kernels, the best set chosen at import | SSE4 or AVX2, chosen when it is built |
 | arm64               | NEON kernels (Linux, macOS)                                     | does not build (`-msse4`)            |
 | Other CPUs          | portable C (riscv64, ppc64le, s390x, armv7)                     | does not build                       |
-| Wheels on PyPI      | Linux x86-64 and arm64, CPython 3.11 to 3.15 and free-threaded  | none: compiled when installed        |
+| Wheels on PyPI      | Linux x86-64 and arm64, macOS arm64; CPython 3.11 to 3.15 and free-threaded | none: compiled when installed |
 
 How the speed was found, and what didn't work:
 [Six times Pillow: notes from Pillow-AllSIMD](https://desmoteo.github.io/pillow-allsimd/allsimd-story.html).
@@ -62,9 +62,9 @@ For Pillow itself, please refer to its
 ## State
 
 - Version 13.0.0.post4, on Pillow 13.0.0 (the `simd/pillow-13` branch).
-- Beta. On PyPI as wheels for Linux on x86-64 and arm64 (macOS to follow,
-  when GitHub's macOS runners build them), and as a source package,
-  compiled on installation, everywhere else (below).
+- Beta. On PyPI as wheels for Linux on x86-64 and arm64 and for macOS 11
+  or later on Apple silicon, and as a source package, compiled on
+  installation, everywhere else (below).
 - Tested on x86-64 (Intel Core Ultra 9 285H) and arm64 (NVIDIA Jetson
   Orin): Pillow's test suite on every build (scalar, SSE4, AVX2, NEON),
   the SIMD consistency tests and per-kernel output hashes that compare the
@@ -311,8 +311,8 @@ On Linux (glibc 2.28 or later, or musl), on x86-64 and arm64, pip installs
 a wheel from PyPI with the image libraries bundled, as Pillow's wheels have
 them. The x86-64 wheel holds SSE4.1, AVX2 and AVX-VNNI kernels and picks
 the set your CPU has when Pillow loads; the arm64 wheel has the NEON
-kernels. Wheels for macOS 11 or later on Apple silicon follow; until then
-macOS builds from source, with the NEON kernels too. Elsewhere,
+kernels, and so has the macOS wheel, for macOS 11 or later on Apple
+silicon. Elsewhere,
 Pillow-AllSIMD is a source package: pip compiles it on installation, so
 install the [build prerequisites][allsimd-build-deps] for your platform
 first (those of Pillow); a source build on x86-64 holds the same three
