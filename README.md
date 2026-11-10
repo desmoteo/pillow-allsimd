@@ -332,9 +332,10 @@ another `simd` option, or to link the system's libraries), add
 
 - Uninstall Pillow before installing, not after: both own the files in
   `PIL`, so removing Pillow afterwards deletes Pillow-AllSIMD's files too.
-- A package that depends on `pillow` makes pip reinstall Pillow over it;
-  installing that package with `--no-deps`, or installing it first, avoids
-  that. `pip check` then reports Pillow as missing, which is expected.
+- A package that depends on `pillow`, torchvision for one, makes pip
+  reinstall Pillow over it; installing that package with `--no-deps`, or
+  installing it first, avoids that. `pip check` then reports Pillow as
+  missing, which is expected.
 - To rebuild with another `simd` option, add `--no-cache-dir
   --force-reinstall`: otherwise pip reuses the wheel it built the first time.
 - The development branch installs with
