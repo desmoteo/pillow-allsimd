@@ -34,6 +34,9 @@ x86:
 | Other CPUs          | portable C (riscv64, ppc64le, s390x, armv7)                     | does not build                       |
 | Wheels on PyPI      | Linux x86-64 and arm64, CPython 3.11 to 3.15 and free-threaded  | none: compiled when installed        |
 
+How the speed was found, and what didn't work:
+[Six times Pillow: notes from Pillow-AllSIMD](https://desmoteo.github.io/pillow-allsimd/allsimd-story.html).
+
 For Pillow itself, please refer to its
 [documentation][original-docs],
 [changelog][original-changelog] and
