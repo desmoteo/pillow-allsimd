@@ -2532,8 +2532,12 @@ The idea
 * **JPEG to 4-byte pixels.** With libjpeg-turbo, RGB images are read with
   the raw mode ``RGBX`` (``JCS_EXT_RGBX``), so its SIMD colour conversion
   writes Pillow's layout itself, 16.7 to 15.9 ms; ``draft()`` takes it.
-  Writing from RGBX was 3 to 7% slower than packing to RGB first, so
-  saving is unchanged.
+  For L and RGB images libjpeg also writes the image's rows, as many per
+  call as it has, where it wrote each line into one small buffer that
+  Pillow copied: the buffer's place in the heap moved the decoding time by
+  up to a fifth between processes, and averaged over heap layouts RGB
+  files decode 4 to 10% faster. Writing from RGBX was 3 to 7% slower than
+  packing to RGB first, so saving is unchanged.
 * **Palette mapping.** Three changes, each keeping the palette and the
   pixels: the colour hash table's nodes come from 4,096-node blocks
   instead of one ``malloc`` each (a fifth of the time; the chains, table
