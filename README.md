@@ -1,10 +1,38 @@
 # Pillow-AllSIMD
 
-Pillow-AllSIMD is a fork of [Pillow-SIMD][simd-repo], the SIMD build of
-[Pillow][original-homepage], the friendly fork of the Python Imaging Library.
-Like Pillow-SIMD it is a drop-in replacement for the Pillow version it
-follows, now Pillow 13.0.0: it installs the same `PIL` package, with the
-same API, built with SIMD kernels.
+<!-- generated: readme-headline (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92) -->
+
+**Pillow 13, 6.3× as fast on x86-64 and 3.3× as fast on arm64**, as the geometric mean of 111 operations on one thread (5.6× and 2.7× with Pillow's exact arithmetic). That is 3.0× as fast as Pillow-SIMD, and faster than OpenCV in 77 of the 104 operations both have on x86-64, 69 on arm64.
+
+<!-- generated-end -->
+
+[![PyPI](https://img.shields.io/pypi/v/pillow-allsimd)](https://pypi.org/project/pillow-allsimd/)
+[![Python](https://img.shields.io/pypi/pyversions/pillow-allsimd)](https://pypi.org/project/pillow-allsimd/)
+[![Downloads](https://img.shields.io/pypi/dw/pillow-allsimd)](https://pypistats.org/packages/pillow-allsimd)
+[![Benchmarks](https://img.shields.io/badge/benchmarks-vs%20Pillow%2C%20OpenCV%2C%20libvips-informational)][allsimd-perf-page]
+[![Docs](https://img.shields.io/badge/docs-pillow--allsimd-informational)][allsimd-docs]
+
+A drop-in replacement for [Pillow][original-homepage] 13.0.0: it installs
+the same `PIL` package, with the same API, built with SIMD kernels for
+x86-64 (SSE4.1, AVX2, AVX-VNNI) and arm64 (NEON). Your code doesn't change.
+
+```bash
+python3 -m pip uninstall -y pillow pillow-simd
+python3 -m pip install pillow-allsimd
+```
+
+[![How many times faster than Pillow 13.0.0 Pillow-AllSIMD runs ten operations, and the geometric mean of all, on x86-64 with AVX2 and on arm64 with NEON](docs/resources/allsimd-speedups.svg)][allsimd-perf-page]
+
+It is a fork of [Pillow-SIMD][simd-repo], which brought SIMD to Pillow on
+x86:
+
+|                     | Pillow-AllSIMD                                                  | Pillow-SIMD 12.1.1                   |
+|---------------------|-----------------------------------------------------------------|--------------------------------------|
+| Based on            | Pillow 13.0.0                                                   | Pillow 12.1.1                        |
+| x86-64              | SSE4.1, AVX2 and AVX-VNNI kernels, the best set chosen at import | SSE4 or AVX2, chosen when it is built |
+| arm64               | NEON kernels (Linux, macOS)                                     | does not build (`-msse4`)            |
+| Other CPUs          | portable C (riscv64, ppc64le, s390x, armv7)                     | does not build                       |
+| Wheels on PyPI      | Linux x86-64 and arm64, CPython 3.11 to 3.15 and free-threaded  | none: compiled when installed        |
 
 For Pillow itself, please refer to its
 [documentation][original-docs],
