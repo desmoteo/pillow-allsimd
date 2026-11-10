@@ -53,7 +53,7 @@ For Pillow itself, please refer to its
   every build and architecture.
 - **Pillow's results when asked.** In exact mode the operations follow
   Pillow's arithmetic, or an integer form of it that rounds differently by
-  one level at most in a few places, and every SIMD kernel is checked
+  a level or two in a few places, and every SIMD kernel is checked
   against the scalar code on every build.
 - **Following Pillow.** Each Pillow release is merged, and changes that
   suit Pillow-SIMD are offered to it.
@@ -187,7 +187,7 @@ RGB ↔ YCbCr, RGB → HSV, the affine, perspective and quad transforms and
 rotate(), blend(), resize() of RGB, RGBA and other 4-byte images, and
 large downscales). The other operations follow
 Pillow's arithmetic, or an integer form of it that rounds differently by
-one level at most in a few places (resize, RGB → L). Exact mode, with
+a level or two in a few places (resize, RGB → L). Exact mode, with
 `PILLOW_ALLSIMD_FAST=0` or `Image.set_fast(False)`, does that for every
 operation: use it to compare pixels with images made by Pillow, or to
 cache images by their content across versions. The
