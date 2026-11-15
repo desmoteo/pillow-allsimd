@@ -1,6 +1,6 @@
 # Pillow-AllSIMD
 
-<!-- generated: readme-headline (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92) -->
+<!-- generated: readme-headline (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a) -->
 
 **Pillow 13, 6.3× as fast on x86-64 and 3.3× as fast on arm64**, as the geometric mean of 111 operations on one thread (5.6× and 2.7× with Pillow's exact arithmetic). That is 3.0× as fast as Pillow-SIMD, and faster than OpenCV in 77 of the 104 operations both have on x86-64, 69 on arm64.
 
@@ -182,7 +182,7 @@ s390x, armv7 and 32-bit x86: [OTHER_ARCHITECTURES.md](design/OTHER_ARCHITECTURES
 Fast mode is on by default: some operations use faster kernels whose
 results differ from Pillow's by a few levels at most and are the same on
 every build and architecture (so far the Gaussian blur,
-<!-- generated: readme-gaussian-fast (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92) -->3.0x at radius 1 on x86-64, 3.1x on arm64<!-- generated-end -->,
+<!-- generated: readme-gaussian-fast (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a) -->3.0x at radius 1 on x86-64, 3.1x on arm64<!-- generated-end -->,
 RGB ↔ YCbCr, RGB → HSV, the affine, perspective and quad transforms and
 rotate(), blend(), resize() of RGB, RGBA and other 4-byte images, and
 large downscales). The other operations follow

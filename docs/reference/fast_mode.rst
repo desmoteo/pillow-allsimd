@@ -132,7 +132,7 @@ images on one core of an Intel Core Ultra 9 285H (AVX2) and an NVIDIA Jetson
 Orin (NEON), from the published benchmark (the exact kernels' own speed over
 Pillow is on the :doc:`kernels page </allsimd-kernels>`):
 
-.. generated: fast-mode-speedups (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: fast-mode-speedups (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1

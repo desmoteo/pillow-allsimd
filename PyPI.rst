@@ -1,4 +1,4 @@
-.. generated: pypi-figures (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: pypi-figures (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. |fast-x86| replace:: 6.3
 .. |fast-arm64| replace:: 3.3
@@ -16,7 +16,7 @@
 Pillow-AllSIMD
 ==============
 
-.. generated: pypi-headline (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: pypi-headline (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 **Pillow, 6 times as fast on x86-64 and 3 times as fast on arm64.**
 
@@ -59,7 +59,7 @@ Benchmarks
 Selected operations, one thread, a 2560×1600 RGB image. Each cell shows
 Pillow 13.0.0's time, then Pillow-AllSIMD's, then the speed-up:
 
-.. generated: pypi-benchmarks (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: pypi-benchmarks (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 =====================================  =========================  ========================
 Operation                              x86-64, AVX2               arm64, NEON

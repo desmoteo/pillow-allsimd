@@ -395,7 +395,7 @@ Numbers
 own time in milliseconds for scale. The arm64 column is the NEON build
 on the Jetson Orin.
 
-.. generated: kernels-resize (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-resize (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1
@@ -714,7 +714,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-blur (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-blur (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1
@@ -1051,7 +1051,7 @@ Numbers
 2560×1600, times faster than Pillow 13.0.0, which took the milliseconds
 shown.
 
-.. generated: kernels-filters (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-filters (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1
@@ -1314,7 +1314,7 @@ Numbers
 shown. The "portable" column is the fork's build without SIMD, where
 the compiler vectorizes the networks.
 
-.. generated: kernels-rank (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-rank (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1
@@ -1540,7 +1540,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-conversions (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-conversions (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1
@@ -1839,7 +1839,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-compositing (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-compositing (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1
@@ -2095,7 +2095,7 @@ Numbers
 2560×1600, exact mode, times faster than Pillow 13.0.0, which took the
 milliseconds shown.
 
-.. generated: kernels-geometry (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-geometry (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1
@@ -2359,7 +2359,7 @@ Numbers
 shown. The "portable" column is the build without SIMD: most of these
 gains are algorithmic.
 
-.. generated: kernels-drawing (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-drawing (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1
@@ -2625,7 +2625,7 @@ Numbers
 2560×1600 RGB, times faster than Pillow 13.0.0, which took the
 milliseconds shown; the "portable" column is the build without SIMD.
 
-.. generated: kernels-codecs (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-codecs (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1
@@ -3019,7 +3019,7 @@ Geometric means over the benchmark's 111 cases, times faster than Pillow
 the sections above and on the `benchmark page
 <https://desmoteo.github.io/pillow-allsimd-perf/>`_):
 
-.. generated: kernels-appendix-a (checks/simd_tables.py, pillow-allsimd-perf@392492cc3568d72691707b9cf15c7401bd712d92)
+.. generated: kernels-appendix-a (checks/simd_tables.py, pillow-allsimd-perf@26fb3ec59a8ca2cade352c4eedd84d7261093b3a)
 
 .. list-table::
    :header-rows: 1

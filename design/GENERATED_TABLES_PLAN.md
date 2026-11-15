@@ -32,7 +32,7 @@ ratios, the geometric mean over the cases both variants have, as
 regions in place:
 
 ```
-.. generated: pypi-benchmarks (checks/simd_tables.py, pillow-allsimd-perf@0d7d352)
+.. generated: pypi-benchmarks (checks/simd_tables.py, pillow-allsimd-perf@ce74509)
 
 <the table>
 

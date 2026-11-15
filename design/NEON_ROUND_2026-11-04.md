@@ -10,7 +10,7 @@ improvements the assessment points at, in the order of
 ## Assessment
 
 Two sources: the published benchmark data (the branch before the
-kernel-table refactor, `pillow-allsimd-perf` at 0d7d352), compared
+kernel-table refactor, `pillow-allsimd-perf` at ce74509), compared
 between the two machines, and the A/B on the Jetson of HEAD against the
 pre-refactor commit (`bench-results/jetson-ab.run.sh a0911aca7 HEAD`:
 NEON and scalar builds of both, their output hashes, then perf.py's 111
