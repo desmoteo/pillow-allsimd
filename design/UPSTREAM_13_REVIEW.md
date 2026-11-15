@@ -3,7 +3,7 @@
 > Written before this fork was named Pillow-AllSIMD: "Pillow-SIMD" here
 > means this code base, the fork of uploadcare/pillow-simd.
 
-Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/x86-fixes-arm64-neon`; review written at `2e6edeec2`, step 1 of section 5 done in `311d9e4e5`.
+Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_ASSESSMENT.md](ARM64_SIMD_ASSESSMENT.md). Branch `simd/x86-fixes-arm64-neon`; review written at `468d32c6c`, step 1 of section 5 done in `1fb0efcf6`.
 
 ## Where things stand (2026-10-29)
 
@@ -16,13 +16,13 @@ Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_AS
 - Pillow 12.3.0 and 13.0.0 sdists from PyPI, compared file by file.
   - The 12.3.0 sdist's `src/libImaging` is identical to this fork's base (`bb1d8e8ab`). Everything 12.3 added is already in pillow-simd.
 - The 13.0.0 release notes (`docs/releasenotes/13.0.0.rst`) and the C diffs for every file 13.0 changed that does pixel work: Resample, Filter, Convert, Chops, Bands, BoxBlur, ColorLUT, Geometry, GetBBox, Histo, Offset.
-- Benchmarks of this branch on a Jetson Orin (Cortex-A78AE, Ubuntu 22.04, GCC 11.4, Python 3.10), run with `checks/simd_bench_remote.sh` at commit `b1730a851`. They guided which ideas matter on arm64.
+- Benchmarks of this branch on a Jetson Orin (Cortex-A78AE, Ubuntu 22.04, GCC 11.4, Python 3.10), run with `checks/simd_bench_remote.sh` at commit `069410347`. They guided which ideas matter on arm64.
 - Points, Fill, Copy, Pack, Matrix and Negative changed only a little in 13.0 and were not reviewed line by line.
 
 ## Summary
 
 1. **Rebase pillow-simd onto 13.0 rather than cherry-pick.** 13.0 rewrote much of the scalar C so compilers vectorise it, added free-threading locks, a new `IMAGING_TYPE_I16` and two resampling filters, and changed several internal return conventions. Cherry-picking would leave the fork diverging on every file we touch.
-2. **Four upstream bug fixes affect code this branch changed.** All four are now ported (`311d9e4e5`):
+2. **Four upstream bug fixes affect code this branch changed.** All four are now ported (`1fb0efcf6`):
    - The `I;16` filter computation.
    - Box-blur radius validation (our new vertical pass loops over the radius, so a huge radius hangs).
    - Masked LA histograms.
@@ -31,11 +31,11 @@ Companion to [X86_SIMD_ASSESSMENT.md](X86_SIMD_ASSESSMENT.md) and [ARM64_SIMD_AS
    - vertical-first resampling when the height shrinks much more than the width,
    - 32-bit palette copies,
    - an OR-reduce in `getbbox`,
-   - row `memcpy` in `offset` (done, `bc77919ef`).
-4. **The Jetson run showed that compiler auto-vectorisation can beat hand-written NEON.** On GCC 11 it beat our NEON kernels for blur, unsharp mask and alpha composite. Those three now use the portable code on arm64 (`2e6edeec2`).
+   - row `memcpy` in `offset` (done, `698177a1d`).
+4. **The Jetson run showed that compiler auto-vectorisation can beat hand-written NEON.** On GCC 11 it beat our NEON kernels for blur, unsharp mask and alpha composite. Those three now use the portable code on arm64 (`468d32c6c`).
 5. **New SIMD targets** that upstream does not cover: `ImageChops.multiply`/`screen` (exact divide by 255 is possible), NEON ColorLUT, NEON `reduce` 3 and 4, and the horizontal box-blur pass. All done except the RGB horizontal box-blur pass; for 1-byte images it is done on x86.
 
-## 1. What the Jetson run says (commit `b1730a851`, ms, best of 5)
+## 1. What the Jetson run says (commit `069410347`, ms, best of 5)
 
 Upstream is the Pillow 12.3.0 wheel from PyPI. "scalar" is this branch built with `-C simd=disable`.
 
@@ -62,7 +62,7 @@ Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills
 
 | Area | 12.3 behaviour (and this branch) | 13.0 | Action |
 |---|---|---|---|
-| `I;16` 3×3/5×5 filters (`kernel_i16`) | High byte shifted right (`>> 8`) instead of left, and each byte clipped separately: a flat `I;16` image of 1000 filters to 233 | `<< 8`, clamped to 0..65535 with `clip16`; `IMAGING_TYPE_I16` loop separate from the 8-bit loop | Ported. `test_i16_uses_generic_kernel` (commit `cf334ba71`) pinned 12.3's wrong values; it now compares against an `I` image |
+| `I;16` 3×3/5×5 filters (`kernel_i16`) | High byte shifted right (`>> 8`) instead of left, and each byte clipped separately: a flat `I;16` image of 1000 filters to 233 | `<< 8`, clamped to 0..65535 with `clip16`; `IMAGING_TYPE_I16` loop separate from the 8-bit loop | Ported. `test_i16_uses_generic_kernel` (commit `72b733de4`) pinned 12.3's wrong values; it now compares against an `I` image |
 | BoxBlur radius | NaN, infinite and ≥ 2^31 radii accepted; converting them to `int` is undefined (NaN segfaults GaussianBlur) | Rejected with `ValueError` | Ported. Matters more here: `ImagingVerticalBoxBlur` loops from `-radius-1` to `radius`, so a huge radius hangs |
 | `ImagingExpand` (filter margin) | Size check can overflow, and divides by zero for margin 0 (SIGFPE) | 64-bit check; empty images handled | Ported |
 | Masked histogram of LA images | Second band counted from byte 1 (padding), not byte 3 (alpha); the unmasked path was already right | Byte 3 for two-band images | Ported (scalar) |
@@ -146,7 +146,7 @@ Compiling those files with the same GCC 11.4 for aarch64 showed no vector spills
    - take vertical-first resampling (3.1) through the SIMD kernels;
    - add mutexes to the SIMD entry points (3.6);
    - check the 16-bit coefficients with MKS2021.
-5. ~~**NEON ColorLUT (4.2) and NEON reduce 3/4 (4.3)**~~ Done (`9fd5b665a`). Horizontal box blur (4.4): done for 1-byte images on x86; two RGB rows per AVX2 vector and the arm64 port were measured and dropped.
+5. ~~**NEON ColorLUT (4.2) and NEON reduce 3/4 (4.3)**~~ Done (`7c46ea8db`). Horizontal box blur (4.4): done for 1-byte images on x86; two RGB rows per AVX2 vector and the arm64 port were measured and dropped.
 6. ~~**Items from [CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md)**, which are not in this review.~~ Done:
    - Kept: SIMD horizontal resample for L, SIMD reduce for L, and L blur four rows at a time.
    - Measured and dropped: column strips, the SSE4 blend and merge kernels, and two-row AVX2 blur. See the "Outcome" section of that document.
@@ -227,7 +227,7 @@ Baseline: the Pillow 13.0.0 wheel from PyPI. 2560×1600 images, best of 5 rounds
 | Machine | scalar | SSE4 | AVX2 | AVX-VNNI | NEON | pre-merge build |
 |---|---:|---:|---:|---:|---:|---:|
 | x86-64 laptop, Python 3.14, GCC 13 (82 ops) | 1.37x | 2.75x | 3.12x | 3.17x | | 3.05x (AVX2) |
-| Jetson Orin, Python 3.12 container, GCC 14 (86 ops, `ff08470e7`) | 1.25x | | | | 1.85x | 1.81x (NEON, same container) |
+| Jetson Orin, Python 3.12 container, GCC 14 (86 ops, `221dc4001`) | 1.25x | | | | 1.85x | 1.81x (NEON, same container) |
 
 On the same compiler, the merge cost nothing on average: AVX2 is 1.02x and NEON 1.02x the pre-merge build. The only operations more than 8% slower are flip left-right on x86 (0.91x), and `frombytes RGB` (0.85x) and `ROTATE_90` (0.88x) on arm64; see "Not faster than the wheel" below. The merge gained 13.0's scalar rewrites:
 
@@ -256,7 +256,7 @@ On the same compiler, the merge cost nothing on average: AVX2 is 1.02x and NEON 
 | median 3 L | 546 | 9.6 | 453 | 13.3 |
 | mode 3 L | 1039 | 77.7 | 1251 | 99.1 |
 
-\* after `a0fe1ba89`, see below.
+\* after `3a706c3a2`, see below.
 
 **Not faster than the wheel:**
 - Resize of F and I;16, YCbCr→RGB, L→1 dither, transposes, `chops offset`, `point` and `histogram` on x86 are within ±5%; none of them has a SIMD path.
@@ -264,9 +264,9 @@ On the same compiler, the merge cost nothing on average: AVX2 is 1.02x and NEON 
 - `ROTATE_90` on arm64 is 13.0's code now and 12% slower than 12.3's loop under GCC 14, though within 1% of the wheel.
 - `frombytes RGB` lost 15% with 13.0 on both the wheel and this build; it is still 1.6x the wheel.
 
-**arm64 kernels re-timed with newer compilers (`a0fe1ba89`).**
+**arm64 kernels re-timed with newer compilers (`3a706c3a2`).**
 
-`2e6edeec2` replaced three NEON kernels with the portable code, based on the host's GCC 11. In containers with GCC 12 (Debian 12) and GCC 14 (Debian 13), with the upstream column stable to 0.3%:
+`468d32c6c` replaced three NEON kernels with the portable code, based on the host's GCC 11. In containers with GCC 12 (Debian 12) and GCC 14 (Debian 13), with the upstream column stable to 0.3%:
 
 | Operation (ms, GCC 14 / GCC 12) | portable | all three NEON kernels back | kept: 4-byte horizontal pass and unsharp row |
 |---|---:|---:|---:|
@@ -287,31 +287,31 @@ On the same compiler, the merge cost nothing on average: AVX2 is 1.02x and NEON 
 - Only one arm64 machine was measured, with one compiler (GCC 11.4). Newer compilers vectorise more, which can move the NEON/portable balance in either direction.
 - The removal of three NEON kernels has since been re-timed on the Jetson; see "Jetson re-run" below.
 
-## Jetson re-run at `b913b10e8`
+## Jetson re-run at `2bb5f6fa0`
 
 Same machine and script as section 1. The upstream column matched the earlier run to within 1%, so differences of a few percent are real here.
 
-| Operation | NEON at `b1730a851` | NEON at `b913b10e8` | Change | Cause |
+| Operation | NEON at `069410347` | NEON at `2bb5f6fa0` | Change | Cause |
 |---|---:|---:|---:|---|
 | reduce L 2 | 2.33 | 0.23 | 10.1x | NEON 2×2 for 1-byte images |
 | reduce L 4 | 1.81 | 0.23 | 7.9x | NEON 4×4 for 1-byte images |
 | chops multiply | 21.25 | 4.15 | 5.1x | divide-free multiply (step 2) |
 | resize L 1/4 bicubic | 12.03 | 5.39 | 2.2x | NEON horizontal pass for 1-byte images |
-| gaussian RGB r=5 | 144.86 | 111.21 | 1.30x | portable code instead of NEON (`2e6edeec2`) |
+| gaussian RGB r=5 | 144.86 | 111.21 | 1.30x | portable code instead of NEON (`468d32c6c`) |
 | box RGB r=2 | 47.75 | 36.62 | 1.30x | same |
 | alpha_composite | 28.62 | 22.22 | 1.29x | same |
 | gaussian L r=5 | 36.57 | 29.54 | 1.24x | same |
 | unsharp RGB | 166.81 | 144.48 | 1.15x | same |
 | **resize L x1.5 lanczos** | 45.11 | 47.35 | **0.95x** | NEON horizontal pass slower than the compiler's code for short kernels (about 7 taps) |
 
-- This confirms the decision in `2e6edeec2`: alpha_composite with the portable code now runs at the upstream wheel's speed (22.2 vs 22.0 ms), against 28.6 ms with the old NEON kernel.
+- This confirms the decision in `468d32c6c`: alpha_composite with the portable code now runs at the upstream wheel's speed (22.2 vs 22.0 ms), against 28.6 ms with the old NEON kernel.
 - The outputs differ from upstream in exactly the same 7 operations as before. The new kernels add no differences.
 
 Open on arm64:
-- The L upscale regression above. The NEON 1-byte kernel handled one row at a time and paid for a horizontal `vaddvq` on every output pixel. Fixed in `4c45bd949`: the kernel now does four rows at a time, as on SSE4, with one `vpaddq` reduction per output pixel and the last 1–3 taps done across the four rows in one vector. Output is unchanged. On the Jetson (upstream column again within 0.3%):
+- The L upscale regression above. The NEON 1-byte kernel handled one row at a time and paid for a horizontal `vaddvq` on every output pixel. Fixed in `f9cd61a1c`: the kernel now does four rows at a time, as on SSE4, with one `vpaddq` reduction per output pixel and the last 1–3 taps done across the four rows in one vector. Output is unchanged. On the Jetson (upstream column again within 0.3%):
   - `resize L x1.5 lanczos`: 47.35 → 34.03 ms, 2.48x upstream and 1.43x the scalar build;
   - `resize L 1/4 bicubic`: 5.39 → 4.37 ms, 3.34x upstream.
-- ~~No NEON code yet for `reduce` 3 and 4 or ColorLUT, which stay at 1.0x upstream.~~ Done in `9fd5b665a`. On the Jetson, with the upstream column again within 1%:
+- ~~No NEON code yet for `reduce` 3 and 4 or ColorLUT, which stay at 1.0x upstream.~~ Done in `7c46ea8db`. On the Jetson, with the upstream column again within 1%:
   - `reduce RGB 3`: 5.06 → 1.84 ms (2.82x upstream);
   - `reduce RGB 4`: 4.47 → 1.64 ms (2.71x);
   - `colorlut RGB 17`: 100.98 → 68.31 ms (1.53x).
@@ -320,7 +320,7 @@ Open on arm64:
 - Left as is: `convert RGB->LA` is bound by memory bandwidth (0.99x), and `convert RGBA->RGBa` is 6% behind the upstream wheel.
 - The portable build is slower than the upstream wheel for `convert RGBA->RGBa` (0.32x), `merge RGB` (0.70x) and `convert RGB->L` (0.80x). The NEON build is unaffected, but builds without NEON pay this.
 
-## Rank filters, histogram, offset and RGB pack/unpack (`bc77919ef`)
+## Rank filters, histogram, offset and RGB pack/unpack (`698177a1d`)
 
 From a callgrind profile of 45 more common operations. These changes are plain C, or SSE4 and NEON for pack/unpack, so they help both architectures. Output is identical to the previous code, and the I;16 offset is now correct (it read and wrote past every row).
 
@@ -333,9 +333,9 @@ From a callgrind profile of 45 more common operations. These changes are plain C
 | frombytes RGB | 6.8 | 5.5 (1.2x) | 3.5 | 2.4 (1.5x) |
 | tobytes RGB | 4.0 | 3.2 (1.3x) | 3.6 | 3.1 (1.1x) |
 
-## x86 work ported to arm64 (`a85f87dfb`, `07d3ea375`)
+## x86 work ported to arm64 (`467bb2ba9`, `da5236787`)
 
-Jetson run at `07d3ea375`, with the upstream column again within 1% of earlier runs and the same 7 operations differing from upstream:
+Jetson run at `da5236787`, with the upstream column again within 1% of earlier runs and the same 7 operations differing from upstream:
 - **Kept: NEON reduce for large factors** (xscale 5..512 or yscale above 16). `reduce RGB 5`: 4.12 → 2.70 ms (1.53x the scalar build); `reduce RGB 8`: 3.92 → 1.93 ms (2.03x).
 - **Dropped: L blur four rows at a time** through the 4-byte line code, which gives 2.4–3x on x86. On the Jetson it was 1–5% slower than GCC's 1-byte code (gaussian L 29.95 vs 29.55 ms, box L 10.21 vs 9.77 ms). After the revert both match the scalar build (29.58 and 9.76 ms).
 
@@ -344,11 +344,11 @@ No x86 SIMD code is now missing on arm64.
 ### NEON float 3×3/5×5 filters
 
 - Used for kernels whose coefficients don't fit 16-bit fixed point, including the built-in `FIND_EDGES`, `CONTOUR` and `EDGE_ENHANCE_MORE`. The kernel (`FilterSIMD_NxNf.c`) works 16 bytes at a time and could also do 1-byte pixels.
-- Jetson Orin at `a6d6e1645`:
+- Jetson Orin at `d06f0fa86`:
   - `FIND_EDGES` on RGB: 151.6 → 90.5 ms (1.68x the scalar build).
   - `CONTOUR` on L: 15.5 → 22.9 ms, slower, because GCC already vectorises the generic 1-byte code well.
 
-  Since `a6d6e1645`, NEON is used only for 4-byte images, and L stays on the generic code, so its output equals the scalar build's.
+  Since `d06f0fa86`, NEON is used only for 4-byte images, and L stays on the generic code, so its output equals the scalar build's.
 - Each kernel row is a multiply followed by fused multiply-adds, then added to the sum, as GCC compiles the generic code for arm64.
 - Results: under emulation, 768 battery outputs were checked against the scalar arm64 build (GCC 12).
   - Kernels with exact coefficients match bit for bit.

@@ -21,7 +21,7 @@ in the benchmark cases.
   (performance profile, turbo off, one core) and NVIDIA Jetson Orin
   (Cortex-A78AE, one core), with the scripts in pillow-simd-perf's
   `analysis/` (raw outputs in `analysis/results-2026-10-31/`). Pillow-AllSIMD is
-  the AVX2 and NEON build of `simd/pillow-13` at 28b55224b.
+  the AVX2 and NEON build of `simd/pillow-13` at 2818661ee.
 - Accuracy is measured against float64 references of the same mathematical
   operation, in 8-bit levels against the reference rounded to the nearest
   integer, over the image interior: the maximum, the mean absolute error and

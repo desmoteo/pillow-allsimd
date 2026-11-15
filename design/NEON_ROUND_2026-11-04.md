@@ -12,7 +12,7 @@ improvements the assessment points at, in the order of
 Two sources: the published benchmark data (the branch before the
 kernel-table refactor, `pillow-allsimd-perf` at 0d7d352), compared
 between the two machines, and the A/B on the Jetson of HEAD against the
-pre-refactor commit (`bench-results/jetson-ab.run.sh b8fb92778 HEAD`:
+pre-refactor commit (`bench-results/jetson-ab.run.sh a0911aca7 HEAD`:
 NEON and scalar builds of both, their output hashes, then perf.py's 111
 cases interleaved with OpenCV, five rounds).
 
@@ -231,19 +231,19 @@ release note must say. The alpha composite's division stays.
 
 ## The test suite on the Jetson
 
-`checks/simd_test_remote.sh` at dbf572caf (2026-11-05), Python 3.13 in
+`checks/simd_test_remote.sh` at 11cdf1bf4 (2026-11-05), Python 3.13 in
 the test container: the scalar build 8,464 passed, 35 skipped, 3 expected
 failures; the NEON build 8,466 passed, 33 skipped, 3 expected failures,
 the new reference tests for the small-coefficient kernels and the 3x3
 mode filter among them. The comparison of the two builds' outputs lists
 the same seven operations, with the same counts, as the run of
-2026-10-31 at 9e061d4e6: the two filters with rounded coefficients
+2026-10-31 at 9c52ff73f: the two filters with rounded coefficients
 (`SMOOTH_MORE` on RGB and L, `DETAIL`) and the four that go through RGB
 to L. None of the filters the new kernel takes is among them.
 
 ## Found while re-running the benchmark for the pages (2026-11-05)
 
-The full x86 run at 1dc75d4d1 had `quantize/fastoctree` at 30 ms for
+The full x86 run at 6d794fe3b had `quantize/fastoctree` at 30 ms for
 the AVX2 build and 15.7 ms for the AVX-VNNI build of the same source,
 where the published run had 15.8 for both. Not a regression: the AVX2
 build of the published commit itself measures 30 ms or 15.6 ms

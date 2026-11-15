@@ -323,7 +323,7 @@ so everything here is user-mode cycles per run, read with
 `perf_event_open` (`bench-results/arm-round/armcyc.py`), which repeat to
 0.1% there; wall-clock times follow them (2 GHz).
 
-- **This round on arm64 first** (`jetson-ab.run.sh 832065f37 HEAD`):
+- **This round on arm64 first** (`jetson-ab.run.sh 44736bfd3 HEAD`):
   NEON and scalar hashes identical before and after; fast octree 42.4 to
   13.4 ms (3.2x), mask composite 11.1 to 6.2 ms (1.8x), PNG decoding
   100.9 to 79.3 ms (1.27x); 111 cases 1.02x.

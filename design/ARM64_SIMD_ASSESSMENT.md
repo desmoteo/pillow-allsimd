@@ -174,7 +174,7 @@ Every item is done when:
 ### Phase 1: builds and passes everywhere (scalar)
 - [x] **1.1 Arch-aware flags.** `setup.py` picks the flags from the target architecture (`sysconfig.get_platform()`, or `ARCHFLAGS` on macOS): `-msse4.1` on x86, none on arm64, none for universal2.
 - [x] **1.2 `ImagingSIMD.h`.** `#include <arm_neon.h>` and define `IMAGING_SIMD_NEON` for `__aarch64__` / `_M_ARM64`.
-- [x] **1.3 Scalar fallbacks** (done in `95f8f8035`, differently from plan where noted):
+- [x] **1.3 Scalar fallbacks** (done in `45bb94d9f`, differently from plan where noted):
   - [x] AlphaComposite: upstream code.
   - [x] Bands: upstream code.
   - [x] BoxBlur: a small `px4` abstraction (`ImagingPx4.h`) with SSE4, NEON and scalar versions giving identical results, rather than a separate copy.
@@ -190,20 +190,20 @@ Every item is done when:
 ### Phase 2: NEON kernels, in priority order
 Each kernel has its own commit and a comparison against the x86 output on the diff harness (odd sizes, all modes).
 
-- [x] **2.1 Resample** horizontal (1-row and 4-row) and vertical, `vmlal_n_s16` on widened pixels. **Identical to x86 SSE4.** (`a01049b05`)
+- [x] **2.1 Resample** horizontal (1-row and 4-row) and vertical, `vmlal_n_s16` on widened pixels. **Identical to x86 SSE4.** (`53aff1ae8`)
 - [x] **2.2 Bands.** `split`/`getband` via `vld4q_u8`, `merge` via `vst4q_u8`.
-- [x] **2.3 Convert.** (`48930a083`)
+- [x] **2.3 Convert.** (`50a83acbe`)
   - RGB→L/LA/I and RGBA→LA: `vld4q_u8` with the SSE4 15-bit coefficients, **identical to x86**. Last pixels via padded buffers.
   - RGBA→RGBa premultiply: exact `MULDIV255` (`vraddhn_u16`).
   - RGBa→RGBA: **exact** float division (`vdivq_f32`), not `vrecpeq_f32`, so it matches upstream; x86 SSE4 still uses `rcp_ps` (±1).
-- [x] **2.4 Reduce:** NEON for 1×2, 2×1 and 2×2, the common thumbnail factors (`vpaddlq`/`vpadalq` + rounding narrow, `vrhaddq`). **Identical to upstream.** (`bf56b0bfd`)
-  - Later: any horizontal factor up to 4 with `vld2/3/4q_u32` (`9fd5b665a`), larger factors up to 512 (`a85f87dfb`), and 2×2/4×4 for 1-byte images (`b913b10e8`). All identical to the scalar code.
-- [x] **2.5 Filter:** integer 3×3/5×5 for 4-byte and 1-byte images (`FilterSIMD_NxNi.c`, shared with x86 for 1-byte). Large coefficients use the generic code. **Identical to x86 SSE4.** (`30f0a1d50`, `b94b94ee2`)
-- [x] **2.6 BoxBlur:** horizontal pass via `px4`, vertical pass 16 bytes per step. **Identical to upstream.** (`e470d62b6`)
-- [x] **2.7 AlphaComposite:** eight pixels per step with upstream's **exact** integer arithmetic (division in `float64x2_t`), not `vrecpeq_f32`. Verified equal to the scalar code for all 65,536 alpha pairs. (`8e2a6db5c`)
-- [x] **2.8 ColorLUT:** NEON with the portable code's precision, so output is identical to upstream (`9fd5b665a`); 1.5x on the Jetson.
-- [x] **Also:** UnsharpMask post-pass (`47dad2b12`), merge (`4d508867b`), 1-byte horizontal resample (`4c45bd949`), `ImageChops.multiply`/`screen` (`e08321aae`), RGB pack/unpack (`bc77919ef`), float 3×3/5×5 filters for 4-byte images (`84639e8fd`).
-- [x] **Dropped after measuring on the Jetson:** the NEON kernels of 2.6 (blur), 2.7 (alpha composite) and the UnsharpMask post-pass. GCC 11's vectorised portable code was faster (`2e6edeec2`), and so was the 1-byte blur through the 4-byte line code. The NEON float filter is not used for 1-byte images.
+- [x] **2.4 Reduce:** NEON for 1×2, 2×1 and 2×2, the common thumbnail factors (`vpaddlq`/`vpadalq` + rounding narrow, `vrhaddq`). **Identical to upstream.** (`e7282437e`)
+  - Later: any horizontal factor up to 4 with `vld2/3/4q_u32` (`7c46ea8db`), larger factors up to 512 (`467bb2ba9`), and 2×2/4×4 for 1-byte images (`2bb5f6fa0`). All identical to the scalar code.
+- [x] **2.5 Filter:** integer 3×3/5×5 for 4-byte and 1-byte images (`FilterSIMD_NxNi.c`, shared with x86 for 1-byte). Large coefficients use the generic code. **Identical to x86 SSE4.** (`13655fedb`, `2d29ecb93`)
+- [x] **2.6 BoxBlur:** horizontal pass via `px4`, vertical pass 16 bytes per step. **Identical to upstream.** (`c873512c7`)
+- [x] **2.7 AlphaComposite:** eight pixels per step with upstream's **exact** integer arithmetic (division in `float64x2_t`), not `vrecpeq_f32`. Verified equal to the scalar code for all 65,536 alpha pairs. (`313ec0226`)
+- [x] **2.8 ColorLUT:** NEON with the portable code's precision, so output is identical to upstream (`7c46ea8db`); 1.5x on the Jetson.
+- [x] **Also:** UnsharpMask post-pass (`d57c78f15`), merge (`3b6afcd23`), 1-byte horizontal resample (`f9cd61a1c`), `ImageChops.multiply`/`screen` (`8f54a54a1`), RGB pack/unpack (`698177a1d`), float 3×3/5×5 filters for 4-byte images (`fe1a266a7`).
+- [x] **Dropped after measuring on the Jetson:** the NEON kernels of 2.6 (blur), 2.7 (alpha composite) and the UnsharpMask post-pass. GCC 11's vectorised portable code was faster (`468d32c6c`), and so was the 1-byte blur through the 4-byte line code. The NEON float filter is not used for 1-byte images.
 
 Remaining cross-architecture differences (arm64 vs x86 SSE4), all by design:
 - `rcp_ps`-based unpremultiply and alpha composite on x86 vs exact on arm64 (±1).

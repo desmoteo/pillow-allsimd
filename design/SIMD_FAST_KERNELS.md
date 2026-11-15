@@ -353,7 +353,7 @@ intermediate rounds every pixel. Both clip the intermediate at the
 filters' overshoots. The same hash on SSE4, AVX2, NEON and scalar builds.
 
 **Speed** (2560x1600, one core, ms, exact → fast, the benchmark at
-9e061d4e6):
+9c52ff73f):
 
 | | x86 AVX2 | arm64 NEON |
 |---|---|---|

@@ -10,7 +10,7 @@ Companion to [CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md), which covered only th
 - heap allocations,
 - native time.
 
-Branch `simd/pillow-13` at `a805ea34a`, x86-64 only.
+Branch `simd/pillow-13` at `34c9c1ba5`, x86-64 only.
 
 ## Method
 
@@ -88,7 +88,7 @@ Earlier work concentrated on filters and resampling. Most of the remaining time 
 - adaptive palettes;
 - drawing and text, which pillow-simd has not touched.
 
-## Correctness finding, fixed in `a805ea34a`
+## Correctness finding, fixed in `34c9c1ba5`
 
 The x86 SIMD unpremultiply (RGBa → RGBA), inherited from upstream pillow-simd, used an approximate reciprocal in 16-bit lanes.
 
@@ -111,23 +111,23 @@ Done since this profile, with output unchanged (1280×800 unless noted, ms befor
 
 | Item | Commit | Result |
 |---|---|---|
-| 1. Rank filters up to 11×11 by sorting network | `00df40576` | median 5: 1926 → 29.6 at 2560×1600 (65x) |
-| 10. Rank filters without the expanded copy | `4abb19ab3` | median 3 L 2.36 → 0.95, median 3 RGB 8.07 → 3.96 |
-| 6. Span fill and RGBA ink blend in ImageDraw | `205b37abf` | rectangles 6.45 → 2.85, polygons 45.8 → 28.4, RGBA ink 9.15 → 4.50 |
-| 8. invert, posterize, solarize as byte operations | `45e5d58b6` | 1.38 → 0.42 |
-| 9. ImageEnhance contrast and brightness as tables; `point()` without zero-filling | `ef475f463` | contrast 3.58 → 2.19, brightness 1.95 → 1.28, equalize 2.91 → 1.93 |
-| 2. PNG row filters | `f4dec230f` | level 1: 89.1 → 51.3; default level 436 → 399 |
-| 5. Masked fills (text, `bitmap()`) | `b63f28373` | `ImagingFill2` 154M → 15M instructions; text 93.9 → 88.1 |
-| 4. `floodfill` in C | `b8d1e31d3` | 86.3 → 1.39 |
-| 12. RGB ↔ YCbCr without tables | `ed826e396` | at 2560×1600: to YCbCr 11.65 → 7.45, to RGB 14.06 → 4.50 |
-| 5. Glyph cache per font | `6b5f11c54` | text 87.8 → 14.9, stroked text 85.6 → 5.0, `textbbox` 20.1 → 9.7 |
-| 3. Palette mapping: vector nearest-entry search and a colour cache | `47bf12020` | adaptive 448 → 257, median cut 165 → 132, max coverage 156 → 113 |
-| 14. Transposes and 90° rotations in register blocks, whole output lines | `fffd060cb` | L 0.86 → 0.27, RGB 1.0 → 0.68–0.73 |
-| 14. Flips and rotate 180 by vector row reversal | `4f427ace9` | RGB 0.55 → 0.39 (as fast as a row `memcpy`), L 0.53 → 0.05 |
-| 13. F, I and I;16 resampling in vectors of doubles | `661d7066e` | F 1/4 bicubic 3.12 → 1.17, I;16 1/4 bicubic 7.12 → 1.29, I;16 ×1.5 lanczos 39.8 → 7.3 |
-| 7. Arc clipping in fixed arrays, no allocations | `71cf7eccb` | pie slices 5.25 → 4.28, arcs 5.82 → 4.52, rounded rectangles 5.87 → 4.67 |
-| 16. `tobytes()` in one chunk; byte-order shuffles | `fce8b2be9` | `tobytes` RGB 0.63 → 0.33, BMP decode 1.24 → 1.06 |
-| 9. `alpha_composite` with an offset, in place | `17162edb3` | 1.94 → 0.86 |
+| 1. Rank filters up to 11×11 by sorting network | `dc8d0dfea` | median 5: 1926 → 29.6 at 2560×1600 (65x) |
+| 10. Rank filters without the expanded copy | `64715c8bb` | median 3 L 2.36 → 0.95, median 3 RGB 8.07 → 3.96 |
+| 6. Span fill and RGBA ink blend in ImageDraw | `97b8e027e` | rectangles 6.45 → 2.85, polygons 45.8 → 28.4, RGBA ink 9.15 → 4.50 |
+| 8. invert, posterize, solarize as byte operations | `86017db27` | 1.38 → 0.42 |
+| 9. ImageEnhance contrast and brightness as tables; `point()` without zero-filling | `bf81f9e91` | contrast 3.58 → 2.19, brightness 1.95 → 1.28, equalize 2.91 → 1.93 |
+| 2. PNG row filters | `2b73c12e6` | level 1: 89.1 → 51.3; default level 436 → 399 |
+| 5. Masked fills (text, `bitmap()`) | `904008045` | `ImagingFill2` 154M → 15M instructions; text 93.9 → 88.1 |
+| 4. `floodfill` in C | `40f403a9f` | 86.3 → 1.39 |
+| 12. RGB ↔ YCbCr without tables | `bfa1cbfbf` | at 2560×1600: to YCbCr 11.65 → 7.45, to RGB 14.06 → 4.50 |
+| 5. Glyph cache per font | `3fb4ff49a` | text 87.8 → 14.9, stroked text 85.6 → 5.0, `textbbox` 20.1 → 9.7 |
+| 3. Palette mapping: vector nearest-entry search and a colour cache | `072220d52` | adaptive 448 → 257, median cut 165 → 132, max coverage 156 → 113 |
+| 14. Transposes and 90° rotations in register blocks, whole output lines | `b66e445ad` | L 0.86 → 0.27, RGB 1.0 → 0.68–0.73 |
+| 14. Flips and rotate 180 by vector row reversal | `a793fb880` | RGB 0.55 → 0.39 (as fast as a row `memcpy`), L 0.53 → 0.05 |
+| 13. F, I and I;16 resampling in vectors of doubles | `1da5e234e` | F 1/4 bicubic 3.12 → 1.17, I;16 1/4 bicubic 7.12 → 1.29, I;16 ×1.5 lanczos 39.8 → 7.3 |
+| 7. Arc clipping in fixed arrays, no allocations | `d75da9c84` | pie slices 5.25 → 4.28, arcs 5.82 → 4.52, rounded rectangles 5.87 → 4.67 |
+| 16. `tobytes()` in one chunk; byte-order shuffles | `c32a1a3e6` | `tobytes` RGB 0.63 → 0.33, BMP decode 1.24 → 1.06 |
+| 9. `alpha_composite` with an offset, in place | `83594f197` | 1.94 → 0.86 |
 
 On x86, a vector 256-entry byte table (`pshufb`) was measured slower than the scalar lookup, which runs at 0.56 cycles per byte. So item 8 recognises the tables instead of vectorising the lookup.
 
@@ -150,14 +150,14 @@ Open:
 
 | Change | Commit | Result |
 |---|---|---|
-| Perspective coordinates per tile row in one vectorised loop; quad transforms inlined | `f0783f5be`, `8fa913767` | perspective RGB bilinear 62 → 44, bicubic 131 → 90, L nearest 23 → 13; quad 61 → 50 |
-| Horizontal resample without `vpdpwssd` chains (AVX-VNNI); 3-band portable resample | `b87e97786` | VNNI 26×16 shrinks 1.3–1.6x; scalar 1.2x, level with 13.0 |
-| `rgb2cmyk`, `l2rgb`, `rgb2rgba` a pixel at a time (x86); chops add/subtract in integers, lighter/darker unclipped | `410467263`, `1a25b8186` | CMYK 3.48 → 1.20, L→RGB 2.67 → 1.67, RGB↔RGBA 3.73 → 2.35, add 5.18 → 3.32 |
-| Transparent huge pages for image blocks where THP is in `madvise` mode | `410467263`, `53f7762e8` | box blur 1.47x, lighter 1.6x, large passes a few % |
-| Rank filters: all bands of 4-byte pixels in one pass; min/max in a ring of rows, both passes vectorised; median 3×3 in registers | `079be19ef` | RGB min/max 3×3 37 → 3.3, median 3×3 RGB 31 → 6.0, L 4.0 → 1.4 |
-| Median 5×5 in registers (Devillard's 99-comparator network, checked by the 0-1 principle) | `43e0402a3` | L 11.8 → 4.6, RGB 47 → 19.6 |
-| Box and Gaussian blur: passes fused per row and in one vertical sweep; AVX2 kernels for both directions | `b8b29e0da` | Gaussian RGB 57 → 28, box blur 27.6 → 11.8, unsharp mask 65 → 36 |
-| RGB → HSV in AVX2, eight pixels per step | `4a10d619c` | 20.2 → 9.4 |
+| Perspective coordinates per tile row in one vectorised loop; quad transforms inlined | `877b69954`, `bcaedc8f0` | perspective RGB bilinear 62 → 44, bicubic 131 → 90, L nearest 23 → 13; quad 61 → 50 |
+| Horizontal resample without `vpdpwssd` chains (AVX-VNNI); 3-band portable resample | `aeaff8fb3` | VNNI 26×16 shrinks 1.3–1.6x; scalar 1.2x, level with 13.0 |
+| `rgb2cmyk`, `l2rgb`, `rgb2rgba` a pixel at a time (x86); chops add/subtract in integers, lighter/darker unclipped | `948a613c2`, `a6dfede23` | CMYK 3.48 → 1.20, L→RGB 2.67 → 1.67, RGB↔RGBA 3.73 → 2.35, add 5.18 → 3.32 |
+| Transparent huge pages for image blocks where THP is in `madvise` mode | `948a613c2`, `993ce0d0a` | box blur 1.47x, lighter 1.6x, large passes a few % |
+| Rank filters: all bands of 4-byte pixels in one pass; min/max in a ring of rows, both passes vectorised; median 3×3 in registers | `58df00e8a` | RGB min/max 3×3 37 → 3.3, median 3×3 RGB 31 → 6.0, L 4.0 → 1.4 |
+| Median 5×5 in registers (Devillard's 99-comparator network, checked by the 0-1 principle) | `dcd102542` | L 11.8 → 4.6, RGB 47 → 19.6 |
+| Box and Gaussian blur: passes fused per row and in one vertical sweep; AVX2 kernels for both directions | `85c428295` | Gaussian RGB 57 → 28, box blur 27.6 → 11.8, unsharp mask 65 → 36 |
+| RGB → HSV in AVX2, eight pixels per step | `6b284cc36` | 20.2 → 9.4 |
 
 Over the whole set, the AVX2 build went from 3.79x to 4.83x the speed of Pillow 13.0 (geometric mean), and the scalar build from 1.39x to 1.62x. On the Jetson, NEON went from 2.07x to 2.21x.
 
@@ -203,7 +203,7 @@ Ranked by expected gain for typical use. Times are ms at 1280×800 (SIMD build /
 - Fix for 5×5: a sorting network evaluated on 16 or 32 pixels at a time with `pminub`/`pmaxub` (NEON `vmin`/`vmax`), as the 3×3 network already is. Since every pixel's window is sorted with the same network, there are no branches.
 - Fix for larger sizes: a sliding-window histogram (Huang), O(size) per pixel.
 - Exact. Expected 10–30x for 5×5.
-- **Done in `00df40576`.** Sizes 3 to 11 now use the network: a Batcher odd-even merge network for 5×5 and up, pruned to what the requested rank needs. Each compare-exchange is a min/max loop over 256 pixels, which the compiler vectorises in every build, with no intrinsics. Results are unchanged.
+- **Done in `dc8d0dfea`.** Sizes 3 to 11 now use the network: a Batcher odd-even merge network for 5×5 and up, pruned to what the requested rank needs. Each compare-exchange is a min/max loop over 256 pixels, which the compiler vectorises in every build, with no intrinsics. Results are unchanged.
   - 2560×1600, ms (wheel / before / AVX2): median 5 1947 / 1926 / 29.6 (65x); rank 7 3600 / 3560 / 70.9 (50x); median 3 544 / 9.67 / 7.55.
   - 1280×800: 9×9 1381 → 22.6 ms; 11×11 1987 → 60.0 ms.
   - A sliding histogram was not needed.

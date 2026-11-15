@@ -3,11 +3,11 @@
 > Written before this fork was named Pillow-AllSIMD: "Pillow-SIMD" here
 > means this code base, the fork of uploadcare/pillow-simd.
 
-Companion to [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md). Goal: find what is left to optimise after step 2 (`e08321aae`), using instruction counts, cache misses and per-line costs instead of only wall time.
+Companion to [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md). Goal: find what is left to optimise after step 2 (`8f54a54a1`), using instruction counts, cache misses and per-line costs instead of only wall time.
 
 ## Method
 
-- Builds of `e08321aae` at `-O2 -g` with GCC 13.3: scalar (`-C simd=disable`), SSE4, AVX2. Upstream is the Pillow 12.3.0 wheel from PyPI.
+- Builds of `8f54a54a1` at `-O2 -g` with GCC 13.3: scalar (`-C simd=disable`), SSE4, AVX2. Upstream is the Pillow 12.3.0 wheel from PyPI.
 - `checks/simd_callgrind.py` runs every operation of `checks/simd_bench.py` (2560×1600) under callgrind with cache and branch simulation. Only the operation is counted: instrumentation is switched on for one call after a warm-up call.
 - Machine: Intel Core Ultra 9 285H. Native times come from `checks/simd_bench.py`, best of 7 rounds, pinned to one P-core (5.4 GHz, 48 KB L1d; callgrind simulated the same L1 size).
 - Valgrind's limits:
@@ -122,7 +122,7 @@ Each item was implemented, checked for byte-identical output against the scalar 
 
 ## Operations without SIMD kernels
 
-A second pass over common operations that have no kernel of their own, to find where one would pay. Same method and machine as above, on `79435324e`. These operations are the `extra` set of `checks/simd_bench.py` (`--set extra`; `--set all` runs both sets). Builds: upstream Pillow 12.3.0 wheel, SSE4, AVX2. Valgrind 3.22 cannot run AVX-VNNI code, so the AVX-VNNI build was timed but not counted.
+A second pass over common operations that have no kernel of their own, to find where one would pay. Same method and machine as above, on `cd95e2c3d`. These operations are the `extra` set of `checks/simd_bench.py` (`--set extra`; `--set all` runs both sets). Builds: upstream Pillow 12.3.0 wheel, SSE4, AVX2. Valgrind 3.22 cannot run AVX-VNNI code, so the AVX-VNNI build was timed but not counted.
 
 Instructions in millions (Ir) and native time in ms, best of 5 rounds, 2560×1600.
 

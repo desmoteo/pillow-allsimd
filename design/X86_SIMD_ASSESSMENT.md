@@ -185,7 +185,7 @@ L images (documents, scans, ML preprocessing) get almost no benefit today.
 ### 3.6 Resample (small refinements)
 - Vertical AVX2 handles 8 pixels per iteration. 16 pixels per iteration (two loads per row) amortises the `set1` of coefficients and loop overhead, matching what the SSE4 path does with 2×4.
 - Horizontal 1-row kernel: the AVX2 `xmax < 8` fallback sets up an SSE accumulator but skips the 4-tap SSE loop, so 4–7-tap filters (bilinear/bicubic upscales) go through the 2-tap loop. Add the 4-tap SSE step.
-- AVX-VNNI (`_mm256_dpwssd_avx_epi32`) fuses `madd` + `add` in every resample, filter-int and ColorLUT inner loop. Done as a compile-time option, `-C simd=avxvnni` (`39f7971c4`), without dispatch: integer filters 1.3–2.1x and resize up to 1.13x faster than AVX2, output identical. See [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md).
+- AVX-VNNI (`_mm256_dpwssd_avx_epi32`) fuses `madd` + `add` in every resample, filter-int and ColorLUT inner loop. Done as a compile-time option, `-C simd=avxvnni` (`5f54aba3f`), without dispatch: integer filters 1.3–2.1x and resize up to 1.13x faster than AVX2, output identical. See [UPSTREAM_13_REVIEW.md](UPSTREAM_13_REVIEW.md).
 
 ### 3.7 Convert
 - RGB→L/LA/I use `hadd_epi32` (3 uops on Intel) and have no AVX2.
@@ -255,12 +255,12 @@ Every item is done when:
 ### Phase 1: bugs
 - [x] **1.1 BoxBlur channel order.** Fix `shiftmask` in `ImagingLineBoxBlur32` and `ImagingLineBoxBlurZero32` ([BoxBlur.c](../src/libImaging/BoxBlur.c)).
   - Test: `BoxBlur((r, 0))`, `BoxBlur((0, r))`, `GaussianBlur((r, 0))` on a flat non-grey RGBA image return the input colour, for n = 1, 2, 3 passes.
-  - Done in `c4fd9f480`; `test_channel_order` failed 18 times before the fix.
+  - Done in `9d49d95e9`; `test_channel_order` failed 18 times before the fix.
 - [x] **1.2 `I;16` filter dispatch.** Send `IMAGING_TYPE_SPECIAL` to the generic `ImagingFilter3x3/5x5` ([Filter.c](../src/libImaging/Filter.c)).
   - Test: `I;16`, `I;16L`, `I;16B` output equals the generic path, i.e. the same result as upstream for a kernel with a known answer.
-  - Done in `cf334ba71`.
-- [x] **Found during implementation: SSE4 Reduce 1×3 added the rounding term twice** (some outputs 1 too high). Fixed in `bf56b0bfd`, with `test_multiband_matches_single_band`, which checks every 4-byte kernel against the 1-byte code.
-- [x] **Found during implementation: the radius-below-1 BoxBlur line functions read `lineIn[-1]` and `lineIn[1]` on 1-pixel lines.** Fixed in `e470d62b6` with `test_one_pixel_line`. All blur results now match upstream.
+  - Done in `72b733de4`.
+- [x] **Found during implementation: SSE4 Reduce 1×3 added the rounding term twice** (some outputs 1 too high). Fixed in `e7282437e`, with `test_multiband_matches_single_band`, which checks every 4-byte kernel against the 1-byte code.
+- [x] **Found during implementation: the radius-below-1 BoxBlur line functions read `lineIn[-1]` and `lineIn[1]` on 1-pixel lines.** Fixed in `c873512c7` with `test_one_pixel_line`. All blur results now match upstream.
 
 ### Phase 2: build
 - [x] **2.1 Feature macros.** `ImagingSIMD.h` defines `IMAGING_SIMD_SSE4`, `IMAGING_SIMD_AVX2` and `IMAGING_SIMD_NEON`; kernels test these instead of compiler macros.
@@ -291,9 +291,9 @@ Every item is done when:
   - Output identical to the scalar loop for 40 percent/threshold combinations; 82 → 47 ms on a 2560×1600 RGB image.
 - [x] 4.5 Reduce 4-channel paths: four outputs per iteration for 1×2 (`pavgb`), 2×1 and 2×2 (`pshufb` + `pmaddubsw`), about 2x faster. Other factors keep one output per iteration.
 - [x] 4.6 Filter AVX2 path: measured and dropped for 4-byte images. The duplicated lanes carry different kernel alignments, so each 256-bit multiply-add already makes two output pixels; 8 consecutive pixels per step (each lane running the SSE4 scheme) saves shuffles but not multiply-adds, and was 0.93x (3×3) and 1.02x (5×5) with AVX2, 0.89x and 0.46x with AVX-VNNI. The premise in 3.5 was wrong. L images got a 256-bit path instead (32 pixels per step, `FilterSIMD_NxNi.c`): 2x faster than SSE4, see [CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md).
-- [x] 4.7 BoxBlur: the vertical pass works on rows (no transposes), 16 bytes per step with SSE4/NEON. GaussianBlur on L 1.8x faster, BoxBlur on RGB 1.5x, GaussianBlur on RGB 1.1x: the per-pixel horizontal passes now dominate. Later, 1-byte images were blurred four rows at a time through the 4-byte line code (2.4–3x, `b913b10e8`); two RGB rows per AVX2 vector was measured and dropped ([CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md)).
+- [x] 4.7 BoxBlur: the vertical pass works on rows (no transposes), 16 bytes per step with SSE4/NEON. GaussianBlur on L 1.8x faster, BoxBlur on RGB 1.5x, GaussianBlur on RGB 1.1x: the per-pixel horizontal passes now dominate. Later, 1-byte images were blurred four rows at a time through the 4-byte line code (2.4–3x, `2bb5f6fa0`); two RGB rows per AVX2 vector was measured and dropped ([CALLGRIND_PROFILE.md](CALLGRIND_PROFILE.md)).
 - [x] 4.8 L-mode integer 3×3/5×5 filter kernel (`FilterSIMD_NxNi.c`, shared with NEON). 1.4x (3×3) and 2x (5×5) faster than the float kernels; x86 and arm64 L filter output is identical.
-- [x] 4.9 New kernels: 3×3 rank filters (median and any rank) via a sorting network, and min/max of any size by rows then columns, in portable C that compilers vectorise (`bc77919ef`), 30–130x faster. **Affine/rotate bilinear is not done.**
+- [x] 4.9 New kernels: 3×3 rank filters (median and any rank) via a sorting network, and min/max of any size by rows then columns, in portable C that compilers vectorise (`698177a1d`), 30–130x faster. **Affine/rotate bilinear is not done.**
 
 ### Phase 5: verification
 - [x] Output diff harness (SSE4 vs AVX2 vs scalar vs upstream vs arm64) run after each change. Final state:

@@ -225,7 +225,7 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
       `SIMDKernels.c` with an empty table, `SIMDDispatch.c` with the
       static scalar table and `ImagingSIMDInit()` that selects the one
       compiled tier; `setup.py` lists the new sources. No kernel moves
-      yet; builds and hashes unchanged. Done 2026-11-04 (69bf0883f).
+      yet; builds and hashes unchanged. Done 2026-11-04 (5ee580cff).
 - [x] A2. The companions that already exist join `SIMDKernels.c`:
       `Resample.c` stops including `ResampleSIMD*.c` and `ResampleFast.c`'s
       SIMD loops, `Reduce.c` stops including `ReduceSIMD.c`, `Filter.c`
@@ -246,8 +246,8 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
       `test_image_resample`, `test_image_convert`, `test_imagechops`, the
       file's own tests). NEON is checked on the Jetson at the end of the
       phase with `checks/simd_test_remote.sh` and the hashes, and in CI on
-      the arm64 runners at every push. Done 2026-11-04 (0238a3998 to
-      35a821700, plus the `permute4` shuffle of `ImagingSIMD.h`, the last
+      the arm64 runners at every push. Done 2026-11-04 (6b2bfe576 to
+      0cde1c0bd, plus the `permute4` shuffle of `ImagingSIMD.h`, the last
       SIMD code a scalar file compiled itself); the whole test suite
       passes on the three x86 builds. Two lessons: the fast transforms,
       first called per tile row of 64 pixels, cost the SSE4 build 14% in
@@ -263,7 +263,7 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
       code maps of the sections list the companions; CHANGES.SIMD.rst.
       Done 2026-11-04. The measurement (`checks/simd_bench.py`, 43
       operations, best of 5 interleaved rounds, the `-O3` Docker builds of
-      b8fb92778 and 770e78be3, `bench-results/ab-phaseA-{avx2,sse4}.txt`):
+      a0911aca7 and 6611aa80e, `bench-results/ab-phaseA-{avx2,sse4}.txt`):
       outputs identical; AVX2 between 0.93x and 1.08x with no pattern
       (premultiply 0.93x, colour LUT 1.06x, max filter 1.07x); SSE4 between
       0.87x and 1.08x, most within 3%, the blurs and the 5x5 filter at
@@ -276,7 +276,7 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
 
 - [x] B1. The 4-byte float kernel filter: AVX2 sums in the SSE4 order;
       measure; the page's "Kernel filters" section loses its exception.
-      Done 2026-11-04 (68a594fed): the AVX2 kernel was 1.6x slower than
+      Done 2026-11-04 (3b3583c99): the AVX2 kernel was 1.6x slower than
       the SSE4 one and rounded 0.2% of the bytes differently, so the AVX2
       tier uses the SSE4 kernel; the AVX2 and SSE4 hashes now agree in
       every area.
@@ -285,7 +285,7 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
       A dispatch build on the development machine: all three tiers
       present, the hashes of each tier (through `PILLOW_ALLSIMD_ISA`)
       equal to the single-tier builds'.
-      Done 2026-11-04 (4d517eca8). The per-file flags go through a wrapper
+      Done 2026-11-04 (b272a07bd). The per-file flags go through a wrapper
       of the compiler's per-source `_compile` in `setup.py`; the common
       files get `IMAGING_SIMD_DISPATCH` and no instruction-set flag. On
       the Core Ultra 9 285H the build has the four tables, `avxvnni`
@@ -296,14 +296,14 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
 - [x] B3. The CPU detection, `ImagingSIMDInit()` choosing the tier, the
       env variable, `set_simd()`, `simd_kernels`, `simd_tiers`, the
       `features` entry, the import check of single-tier builds.
-      Done 2026-11-04 (4d517eca8): `cpuid` leaf 1 (SSE4.1; OSXSAVE and AVX
+      Done 2026-11-04 (b272a07bd): `cpuid` leaf 1 (SSE4.1; OSXSAVE and AVX
       with XCR0 bits 1 and 2 through `xgetbv`), leaf 7 (AVX2), leaf 7
       sub-leaf 1 (AVX-VNNI); `features.check("simd")`; `pilinfo` prints
       the active tier and the tiers built.
 - [x] B4. `Tests/test_simd_tiers.py`; the x86 CI jobs run it (`auto` is
       now the dispatch build) and `checks/simd_hashes.py` per tier;
       `test-windows.yml` builds the dispatch build with MSVC.
-      Done 2026-11-04 (4d517eca8): 75 operations, two shapes, exact and
+      Done 2026-11-04 (b272a07bd): 75 operations, two shapes, exact and
       fast, per tier; `test.yml` runs the whole suite on the dispatch
       build under `PILLOW_ALLSIMD_ISA` set to `sse4`, `avx2` and
       `scalar` besides the runner's best tier. `test-windows.yml`
@@ -312,7 +312,7 @@ the Jetson, and the tier is skipped with a notice where the CPU lacks it).
       the check that MSVC compiles it.
 - [x] B5. Measurement 2; loops moved into companions where it says so.
       AVX2 done 2026-11-04 (`bench-results/ab-phaseB-avx2.txt`, the `-O3`
-      Docker builds of 4d517eca8, `disp` with `PILLOW_ALLSIMD_ISA=avx2`
+      Docker builds of b272a07bd, `disp` with `PILLOW_ALLSIMD_ISA=avx2`
       against `one-avx2`): outputs identical, 0.96x to 1.08x with no
       pattern (premultiply 1.08x, unpremultiply 0.96x, both about 1 ms),
       so the common code compiled for plain x86-64 costs nothing

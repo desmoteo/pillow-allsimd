@@ -1,6 +1,6 @@
 # Where OpenCV and libvips are still faster than Pillow-AllSIMD, and why
 
-As of `simd/pillow-13` at 28b55224b (2026-10-31), against the libraries in
+As of `simd/pillow-13` at 2818661ee (2026-10-31), against the libraries in
 the [pillow-simd-perf](https://desmoteo.github.io/pillow-allsimd-perf/)
 benchmark. The kernels themselves, including the approximate ones, are
 described in [OTHER_LIBRARIES_KERNELS.md](OTHER_LIBRARIES_KERNELS.md); the
@@ -208,7 +208,7 @@ polygons of 12 points, 2 px; pillow-simd-perf `analysis/` and
   polygon: the outline is drawn through a mask holding the polygon's fill,
   so the cost grows with the polygon's area (these ROIs cover 7.0 Mpx, 9.7
   Mpx of bounding boxes, for 89 kpx of perimeter), where OpenCV's centred
-  stroke needs no inside test. Since 7238975d1 the mask covers the
+  stroke needs no inside test. Since 803d68157 the mask covers the
   polygon's bounding box only, not the image (17.2 -> 2.6 ms for the case).
 - **Spans, exact (2026-10-31):** the mask is now each row's inside spans,
   recorded from the same scan as the fill (the same clipped hline calls),
@@ -226,11 +226,11 @@ FIND_EDGES/EDGE_ENHANCE (4.4 vs 6.6 ms), YCbCr→RGB (2.0 vs 2.4), reduce by
 downscale (3.2 vs 3.6 for INTER_AREA), polygons and ellipses. On arm64:
 the 3x3 kernel filters (SHARPEN 27.1 vs 39.9 ms, FIND_EDGES 26.6 vs 39.8),
 the 5x5 ones (63.5 vs 102.8), the unsharp mask (74.8 vs 97.8) and
-RGB→RGBA. Geomean over all 109 cases against Pillow 13, at 28b55224b:
+RGB→RGBA. Geomean over all 109 cases against Pillow 13, at 2818661ee:
 NEON 2.40x against OpenCV's 2.06x; on x86 AVX2 5.22x, AVX-VNNI 5.34x
 against 3.40x.
 
-## Round 2: after fast mode (results at 7fab6973b)
+## Round 2: after fast mode (results at 82fe57704)
 
 Every case where OpenCV, libvips or ImageMagick beat the fastest
 Pillow-AllSIMD build (exact or fast mode) by 3% or more in the published
@@ -355,7 +355,7 @@ Where Pillow-AllSIMD computes in floats, FP16 doesn't fit:
   FP16 rounding in FP32 there, slower than the FP32 kernel; and these
   filters already beat OpenCV on both machines.
 
-## Round 3: NEON (results at 36580764d)
+## Round 3: NEON (results at e991fe4c2)
 
 The published tables give each case's speed-up over Pillow 13.0 on both
 machines. On arm64 it was often a fraction of the x86 one: alpha composite
@@ -468,9 +468,9 @@ Jetson Orin, CPU 2, 2560x1600, best of 7, NEON build before and after:
 
 ## Round 4: fast mode by default, and perf on both machines (2026-10-31)
 
-Fast mode became the default (`754ef42ea`): exact mode is
+Fast mode became the default (`dc068c55e`): exact mode is
 `PILLOW_ALLSIMD_FAST=0`. So this round compares the default, the published
-`-fast` variants, with OpenCV. With the results at `36580764d`, fast mode was
+`-fast` variants, with OpenCV. With the results at `e991fe4c2`, fast mode was
 behind OpenCV in 25 of 104 cases on x86 and 37 on arm64. The largest gaps were
 the RGBA upscale (arm64 3.4x, x86 1.4x to 1.7x), the 3x3 minimum and maximum
 (1.7x on both), the box blur at radius 2 (x86 1.8x) and fast HSV and
@@ -565,13 +565,13 @@ Fast mode (the default) before and after, best of 3 rounds, 2560x1600:
   (1.4x), `point/L/table` on x86 (1.46x, no byte shuffle over 256
   entries without AVX-512 VBMI), and text (Hershey strokes, not glyphs).
 
-### Fast resize (`9e061d4e6`)
+### Fast resize (`9c52ff73f`)
 
 Asked for after the round above: the 16-bit fast-mode resize
 (`ResampleFast.c`, described in SIMD_FAST_KERNELS.md), for 4-byte images.
 The passes are fused through a ring of rows, the horizontal sums kept to
 2^-6 levels, and the vertical pass multiplies in 16 bits. Benchmark at
-`9e061d4e6`, fast mode, against the tables at `ab4b5f813`:
+`9c52ff73f`, fast mode, against the tables at `8bbd33228`:
 
 | Case | x86 | arm64 | arm64 vs OpenCV |
 |---|---|---|---|

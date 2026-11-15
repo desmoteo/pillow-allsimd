@@ -76,7 +76,7 @@ to each section from the corresponding benchmark suite.
   interleave the channels of neighbouring pixels, AVX2 two pixels per lane;
   vertical kernel: madd over row pairs, 8 then 2 then 1 pixels per step.
 - AVX-VNNI `vpdpwssd`, and why long single-accumulator chains made it 1.55x
-  slower than AVX2 on extreme downscales (fixed in b87e97786).
+  slower than AVX2 on extreme downscales (fixed in aeaff8fb3).
 - 1-byte (L) images: four rows at a time; NEON versions (vmlal_s16, vqshrun).
 - F, I and I;16 images in vectors of doubles (exact with scalar double sums).
 - Reduce (integer box downscale): per-factor kernels, NEON up to factor 512.
@@ -189,7 +189,7 @@ rounds, error against the exact result and the float reference).
 
 ## How it would be written
 
-- Numbers from the published runs on both machines (28b55224b, 2026-10-31,
+- Numbers from the published runs on both machines (2818661ee, 2026-10-31,
   on the pillow-simd-perf page), refreshed when a section's code changes.
 - Sections 1, 2 and 5 first (largest, most asked about), then 3, 4, 6, 7,
   then the rest. Each section is checked against the code it describes.

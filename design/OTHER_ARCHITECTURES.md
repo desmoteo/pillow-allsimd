@@ -1,7 +1,7 @@
 # Other architectures: RISC-V, POWER, s390x, 32-bit ARM and x86
 
 As of `simd/pillow-13` on 2026-11-01 (the portable builds tested at
-`98d26558d` and `d67202ab7`).
+`666409903` and `995979312`).
 
 Pillow-AllSIMD has SIMD kernels for x86 (SSE4.1, AVX2, AVX-VNNI) and arm64
 (NEON). Every other architecture builds the portable C code. This document

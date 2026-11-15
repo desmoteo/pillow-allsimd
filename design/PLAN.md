@@ -1,7 +1,7 @@
 # Plan: releases, reports and open points
 
-As of 2026-11-01: `simd/pillow-13` and `simd/master` at `a689617c3` on
-GitHub, `142881bb3` (design documents moved to `design/`) local.
+As of 2026-11-01: `simd/pillow-13` and `simd/master` at `bb39d79a6` on
+GitHub, `63f9792b8` (design documents moved to `design/`) local.
 
 ## Publishing on PyPI
 
@@ -28,8 +28,8 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
 
 ### Step 1: the source package
 
-- [x] (2026-11-02, at `da7a94ac6`: all pass except the font test below) Run the test workflows on the current code: they last ran at
-      `1881401a5`, because every push since ended with a `[ci skip]`
+- [x] (2026-11-02, at `8f0b8c373`: all pass except the font test below) Run the test workflows on the current code: they last ran at
+      `f56621d7c`, because every push since ended with a `[ci skip]`
       commit (`gh workflow run test.yml -R desmoteo/pillow-allsimd --ref
       simd/pillow-13`, and the same for `test-windows.yml`).
 - [x] `Tests/test_imagefont.py::test_glyph_cache_variation[0]` failed on
@@ -69,7 +69,7 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       (matplotlib, torchvision…) make pip install Pillow too, and the last
       one installed overwrites `PIL`: install everything else first, then
       `python3 -m pip uninstall -y pillow` and install pillow-allsimd.
-- [x] (2026-11-03: on PyPI from the tag on a94a0c4f8, with a provenance
+- [x] (2026-11-03: on PyPI from the tag on e77af42bc, with a provenance
       attestation; installed from PyPI on the x86 laptop, SSE4.1 by default and
       AVX2 with `-C simd=avx2`, self-test and 1,106 SIMD, resample, filter and
       convert tests passing; on the Orin, NEON by default, 3.9x the portable
@@ -79,9 +79,9 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       must match `src/PIL/_version.py`. A version number can't be reused
       on PyPI, even after deleting it. **The tagged commit's message must
       not contain `[ci skip]`**: GitHub then skips the tag push's workflows
-      too (the first tag, on 0b0fa7ebc, started nothing).
+      too (the first tag, on 1deca8645, started nothing).
 - [x] (2026-11-03) `CHANGES.SIMD.rst` entry for the first PyPI release.
-- [x] (2026-11-03: on PyPI from the tag on 56fb2e978) 13.0.0.post1, the
+- [x] (2026-11-03: on PyPI from the tag on 8ebcf1614) 13.0.0.post1, the
       same code with a fuller PyPI description: the
       benchmark chart (`docs/resources/allsimd-speedups.svg`, drawn by
       `checks/simd_speedups_svg.py` from the perf repository's
@@ -121,7 +121,7 @@ compile them (`pip install pillow-simd`, or `CC="cc -mavx2" pip install
       simd=` applies to source builds, and `--no-binary pillow-allsimd`
       builds from source on arm64.
 - [ ] 13.0.0.post2, the same code with the arm64 wheels. The tag
-      `allsimd-13.0.0.post2` (on ddc6c6800) failed three times on
+      `allsimd-13.0.0.post2` (on 9f36651b7) failed three times on
       2026-11-03: GitHub had no macOS arm64 runner, and the release needed
       all 22 files. `release.yml` now builds what the tag names
       (`-linux`, `-macos`, or all), counts that, and embeds the SBOM
@@ -185,7 +185,7 @@ which also moves the inline SIMD code into companion files first.
 
 ## Pushes and pages
 
-- [x] Push `142881bb3` to `simd/pillow-13` and `simd/master`; republish the
+- [x] Push `63f9792b8` to `simd/pillow-13` and `simd/master`; republish the
       API docs (the About page names `design/OTHER_ARCHITECTURES.md`).
 - [x] Push so that CI runs: a push whose last commit says `[ci skip]` skips
       the tests for every commit in it. Push code commits on their own, or
