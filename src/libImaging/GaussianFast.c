@@ -136,6 +136,22 @@ ImagingGaussianBlurFastApplies(
     return gauss_kernel(&k, xradius) && gauss_kernel(&k, yradius);
 }
 
+/* One pair of taps of the portable loop: GAUSS_CHUNK sums, each plus the
+   weight times the two sources' bytes. A trip count the compiler knows and
+   16-bit sums, so that it makes 16-bit lanes of them like the kernels; a
+   function of its own, never inlined, because -O3 merges two iterations of
+   the loop over the taps into one loop that it then leaves scalar
+   (rf_vtap in ResampleFast.c). The sources may be one row at two offsets. */
+#define GAUSS_CHUNK 64
+
+SIMD_NOINLINE void
+gauss_tap_pair(UINT16 *restrict acc, const UINT8 *a, const UINT8 *b, UINT16 w) {
+    int i;
+    for (i = 0; i < GAUSS_CHUNK; i++) {
+        acc[i] = (UINT16)(acc[i] + w * (a[i] + b[i]));
+    }
+}
+
 /* out[i] = (128 + w[0] src[r][i] + sum over j of w[j] (src[r - j][i] +
    src[r + j][i])) >> 8 for i < n: the taps are 2r + 1 rows (vertical) or
    shifted pointers into one row (horizontal). The largest sum is
@@ -145,8 +161,26 @@ static void
 gauss_taps(UINT8 *restrict out, const UINT8 **src, const GaussKernel *k, int n) {
     const int r = k->radius;
     /* the active tier's kernel does the bytes it can (GaussianFastSIMD.c) */
-    int i = IMAGING_SIMD_CALL(gauss->taps, out, src, r, k->w, n), j;
+    int i = IMAGING_SIMD_CALL(gauss->taps, out, src, r, k->w, n), j, x;
 
+    /* The rest, all of it in the scalar tier: a pair of taps at a time over
+       a chunk, then the last few values one by one. A value at a time over
+       the taps, as below, is a loop no compiler vectorizes. */
+    for (; i + GAUSS_CHUNK <= n; i += GAUSS_CHUNK) {
+        UINT16 acc[GAUSS_CHUNK];
+        const UINT8 *centre = src[r] + i;
+        UINT8 *restrict o = out + i;
+        const UINT16 w0 = k->w[0];
+        for (x = 0; x < GAUSS_CHUNK; x++) {
+            acc[x] = (UINT16)(128 + w0 * centre[x]);
+        }
+        for (j = 1; j <= r; j++) {
+            gauss_tap_pair(acc, src[r - j] + i, src[r + j] + i, k->w[j]);
+        }
+        for (x = 0; x < GAUSS_CHUNK; x++) {
+            o[x] = (UINT8)(acc[x] >> 8);
+        }
+    }
     for (; i < n; i++) {
         unsigned int acc = 128 + (unsigned int)k->w[0] * src[r][i];
         for (j = 1; j <= r; j++) {

@@ -19,6 +19,12 @@ Unreleased
   compiler vectorizes them: enlarging takes 0.75 to 0.96 of the exact
   resize's time, reducing to a quarter 1.01 to 1.07. The pixels are the
   same in every build
+- The same builds: ``ImageFilter.GaussianBlur`` and ``UnsharpMask`` in
+  fast mode were 1.5 to 4.3 times slower than in exact mode up to the
+  radius where fast mode hands over to the box passes (6). The portable
+  loop of the fast Gaussian is now one the compiler vectorizes: radius 5
+  on a 2560x1600 RGB image takes 43 ms where it took 372, against 87 ms
+  in exact mode. The same pixels
 
 13.0.0.post4 (2026-11-06)
 -------------------------
