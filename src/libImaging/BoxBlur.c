@@ -491,11 +491,17 @@ ImagingHorizontalBoxBlur(Imaging imOut, Imaging imIn, float floatRadius, int pas
 
 /* One output row of the vertical pass: acc holds a running sum per byte,
    updated with the rows entering and leaving the window. Same arithmetic
-   per channel as the horizontal pass. */
+   per channel as the horizontal pass. The output row and the sums are
+   restrict: every caller writes a row of the output image or of the
+   pass's own ring, never one of the three rows it reads (which may be one
+   row, at the edges). Without it the compiler vectorizes behind a
+   run-time overlap test, and at -O2 not at all (five pointers are more
+   tests than it accepts); where no tier has a kernel for this, on arm64,
+   the loop below is the whole vertical pass. */
 static inline void
 ImagingBoxBlurColumns(
-    UINT8 *out,
-    UINT32 *acc,
+    UINT8 *restrict out,
+    UINT32 *restrict acc,
     const UINT8 *add,
     const UINT8 *sub,
     const UINT8 *far_row,

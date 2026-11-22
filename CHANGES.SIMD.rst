@@ -47,6 +47,9 @@ Unreleased
   3.7 ms on a 2560x1600 image). The index of every pixel's neighbourhood
   is computed for a whole row in a loop the compiler vectorizes, then
   looked up. The same pixels and count
+- arm64, when built by a Python that compiles at ``-O2``: the vertical
+  pass of ``BoxBlur`` and of the exact ``GaussianBlur`` is vectorized
+  (it was at ``-O3`` only). Not timed
 
 13.0.0.post4 (2026-11-06)
 -------------------------
