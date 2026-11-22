@@ -50,6 +50,14 @@ Unreleased
 - arm64, when built by a Python that compiles at ``-O2``: the vertical
   pass of ``BoxBlur`` and of the exact ``GaussianBlur`` is vectorized
   (it was at ``-O3`` only). Not timed
+- Building from source with a Python that compiles its extensions at
+  ``-O2`` (Debian's, Ubuntu's, conda's): the extensions with pixel loops
+  are compiled at ``-O3``, the level of the wheels and of every
+  measurement here. At ``-O2`` 21 of 219 operations were more than 10%
+  slower, the box blur at radius 2, the 90 degree transposes and the
+  bilinear transforms 1.3 to 1.5 times. A ``CFLAGS`` variable still
+  replaces the flags, level included, and an interpreter built for
+  debugging keeps its own
 
 13.0.0.post4 (2026-11-06)
 -------------------------

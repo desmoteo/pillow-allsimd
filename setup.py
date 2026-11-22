@@ -1116,6 +1116,22 @@ class pil_build_ext(build_ext):
         )
         return self._compiles(code, ["-mavx2", "-mavxvnni"])
 
+    @staticmethod
+    def _optimization_level(msvc: bool) -> list[str]:
+        """-O3 for the extensions that hold pixel loops, unless the builder
+        chose the flags (a CFLAGS variable replaces the interpreter's flags
+        altogether, level included, and is left as it is) or the interpreter
+        was built for debugging. MSVC's /O2 is already its highest level."""
+        if msvc or "CFLAGS" in os.environ:
+            return []
+        own = " ".join(
+            str(sysconfig.get_config_var(name) or "") for name in ("CFLAGS", "OPT")
+        )
+        levels = re.findall(r"(?:^|\s)-O(\S*)", own)
+        if not levels or levels[-1] in ("0", "g"):
+            return []
+        return ["-O3"]
+
     def _configure_simd(self) -> str:
         """Add the compile flags for the SIMD kernels in PIL._imaging.
 
@@ -1288,7 +1304,22 @@ class pil_build_ext(build_ext):
         if not msvc:
             args = args + ["-ftree-vectorize"]
 
+        # The level. The kernels, and the plain loops written for the
+        # compiler's vectorizer, are measured at -O3, which is CPython's own
+        # default; Debian's, Ubuntu's and conda's interpreters hand their
+        # extensions -O2, where 21 of 219 operations were more than 10%
+        # slower (box blur, the 90 degree transposes and the bilinear
+        # transforms 1.3 to 1.5 times). Appended, so it follows the
+        # interpreter's level and wins.
+        level = self._optimization_level(msvc)
         for extension in self.extensions:
+            if extension.name in (
+                "PIL._imaging",
+                "PIL._imagingft",
+                "PIL._imagingmath",
+                "PIL._imagingmorph",
+            ):
+                extension.extra_compile_args += level
             if extension.name == "PIL._imaging":
                 extension.extra_compile_args += args
                 extension.define_macros += macros
@@ -1308,7 +1339,7 @@ class pil_build_ext(build_ext):
                 return original_compile(obj, src, ext, cc_args, extra_postargs, pp_opts)
 
             self.compiler._compile = _compile
-        _dbg(f"SIMD for {arches}: {simd} {args} {tier_flags}")
+        _dbg(f"SIMD for {arches}: {simd} {args} {level} {tier_flags}")
         return simd
 
     def summary_report(self, feature: ext_feature) -> None:

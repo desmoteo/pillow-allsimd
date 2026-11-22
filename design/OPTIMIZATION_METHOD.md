@@ -136,7 +136,10 @@ The causes found here so far, with their fixes:
   Debian, Ubuntu and conda Pythons are `-O2`, so a kernel that relies on
   auto-vectorization must be checked at both, and A/B timings must use
   `-O3` builds (the box blur's unrolling gains 1.46x at `-O3` and nothing
-  at `-O2`).
+  at `-O2`). Since 2026-11-22 `setup.py` appends `-O3` for the extensions
+  with pixel loops, unless a `CFLAGS` variable gives the flags or the
+  interpreter was built for debugging, so a source build on those Pythons
+  is at `-O3` too; a comparison of levels has to set `CFLAGS`.
 - **Floating-point contraction**: GCC fuses `a * b + c` into `fmadd` on
   arm64 by default, so exact float results depend on the fusion pattern;
   kernels that must match a scalar double sum use `vfmaq_f64`
