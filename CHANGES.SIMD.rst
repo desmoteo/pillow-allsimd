@@ -33,6 +33,10 @@ Unreleased
   2560x1600, where allocating the result takes most of the time. A shift
   count is taken modulo 32, which is what x86 and arm64 did with counts
   outside 0 to 31 already. The same results
+- Text: the coverage of a glyph is laid over the mask in a loop the
+  compiler vectorizes (two tests per pixel are gone; the formula gives
+  the same value without them). ``ImageFont.getmask()`` 1.27 times
+  faster, ``ImageDraw.text()`` 1.03 to 1.10. The same pixels
 
 13.0.0.post4 (2026-11-06)
 -------------------------

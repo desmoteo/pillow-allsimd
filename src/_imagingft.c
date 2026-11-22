@@ -1457,19 +1457,19 @@ font_render_impl(FontObject *self, PyObject *args) {
                                 }
                             }
                         } else {
+                            /* The glyph's coverage over the mask, without a
+                               test for coverage 0: there the formula gives
+                               the target back (MULDIV255(t, 255) is t), so
+                               storing it changes nothing, and a loop with
+                               no branch around the store is one the
+                               compiler vectorizes. */
+                            unsigned char *restrict t = target;
+                            const unsigned char *s = source;
                             for (k = x0; k < x1; k++) {
-                                unsigned int src_alpha = source[k] * convert_scale;
-                                if (src_alpha > 0) {
-                                    target[k] =
-                                        target[k] > 0
-                                            ? CLIP8(
-                                                  src_alpha +
-                                                  MULDIV255(
-                                                      target[k], (255 - src_alpha), tmp
-                                                  )
-                                              )
-                                            : src_alpha;
-                                }
+                                unsigned int src_alpha = s[k] * convert_scale;
+                                unsigned int over =
+                                    src_alpha + MULDIV255(t[k], (255 - src_alpha), tmp);
+                                t[k] = t[k] > 0 ? CLIP8(over) : src_alpha;
                             }
                         }
                     } else {
