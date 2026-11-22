@@ -12,6 +12,8 @@
  * See the README file for information on usage and redistribution.
  */
 
+#include <stddef.h>
+
 #include "Imaging.h"
 #include "ConvertYCbCr.h"
 
@@ -400,7 +402,9 @@ ycc_fast_clip(int v) {
 
 void
 ImagingConvertRGB2YCbCrFast(UINT8 *out, const UINT8 *in, int pixels) {
-    int x = IMAGING_SIMD_CALL(convert->rgb2ycbcr_fast, out, in, pixels);
+    /* an index of a pointer's width: with an int, x * 4 could wrap under
+       -fno-strict-overflow and the loop is not vectorized */
+    ptrdiff_t x = IMAGING_SIMD_CALL(convert->rgb2ycbcr_fast, out, in, pixels);
     for (; x < pixels; x++) {
         const UINT8 *p = in + x * 4;
         int r = p[0], g = p[1], b = p[2];
@@ -417,7 +421,9 @@ ImagingConvertRGB2YCbCrFast(UINT8 *out, const UINT8 *in, int pixels) {
 
 void
 ImagingConvertYCbCr2RGBFast(UINT8 *out, const UINT8 *in, int pixels) {
-    int x = IMAGING_SIMD_CALL(convert->ycbcr2rgb_fast, out, in, pixels);
+    /* an index of a pointer's width: with an int, x * 4 could wrap under
+       -fno-strict-overflow and the loop is not vectorized */
+    ptrdiff_t x = IMAGING_SIMD_CALL(convert->ycbcr2rgb_fast, out, in, pixels);
     for (; x < pixels; x++) {
         const UINT8 *p = in + x * 4;
         int y = p[0], cb = p[1] - 128, cr = p[2] - 128;

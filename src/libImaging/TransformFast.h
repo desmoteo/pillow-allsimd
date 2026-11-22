@@ -425,10 +425,14 @@ tf_bilinear_pixel(UINT8 *out, Imaging im, int ps, INT32 qx, INT32 qy) {
     const int x0 = tf_clip(ix, im->xsize - 1), x1 = tf_clip(ix + 1, im->xsize - 1);
     const UINT8 *r0 = (UINT8 *)im->image[tf_clip(iy, im->ysize - 1)];
     const UINT8 *r1 = (UINT8 *)im->image[tf_clip(iy + 1, im->ysize - 1)];
+    /* the four pixels as pointers: indexed by x0 * ps + c, sums of ints that
+       may wrap under -fno-strict-overflow, the channels are not vectorized */
+    const UINT8 *p00 = r0 + x0 * ps, *p01 = r0 + x1 * ps;
+    const UINT8 *p10 = r1 + x0 * ps, *p11 = r1 + x1 * ps;
     int c;
     for (c = 0; c < ps; c++) {
-        const unsigned v0 = r0[x0 * ps + c] * (256 - fy) + r1[x0 * ps + c] * fy;
-        const unsigned v1 = r0[x1 * ps + c] * (256 - fy) + r1[x1 * ps + c] * fy;
+        const unsigned v0 = p00[c] * (256 - fy) + p10[c] * fy;
+        const unsigned v1 = p01[c] * (256 - fy) + p11[c] * fy;
         out[c] = (UINT8)(((v0 >> 1) * (256 - fx) + (v1 >> 1) * fx + 16384) >> 15);
     }
 }
