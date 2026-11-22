@@ -255,6 +255,10 @@ describe:
   image's rows, the box blur's zero far weight, the NEON colour LUT and
   resampling loops, and what the profiles of drawing and of the
   Cortex-A78's unstable cases showed instead of what was expected.
+- [COMPILER_FRIENDLY_ASSESSMENT.md](design/COMPILER_FRIENDLY_ASSESSMENT.md):
+  the plain C loops GCC leaves scalar on x86-64 and arm64, why (index
+  arithmetic, float clamps, reloaded bounds), and the rewrites that hand
+  them to the compiler on both, ordered by where they run.
 
 
 ## Benchmarks
