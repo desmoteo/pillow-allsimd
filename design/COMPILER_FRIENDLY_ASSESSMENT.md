@@ -4,8 +4,9 @@ Where Pillow-AllSIMD's own C spends time in loops that have no kernel and
 that GCC does not vectorize, on x86-64 and on arm64, and which of them a
 rewrite of the C would hand to the compiler on both at once. This is
 stage 3 of [OPTIMIZATION_METHOD.md](OPTIMIZATION_METHOD.md) ("help the
-compiler") applied to the whole library instead of one loop. Nothing here
-is implemented; the last section orders the work.
+compiler") applied to the whole library instead of one loop. The
+assessment came first; "Outcome" at the end says what was then done, what
+was measured and dropped, and what is left.
 
 It started from one loop. In the scalar tier, fast mode's fused resize was
 1.2 to 2.2 times slower than the exact resize, because its portable
@@ -17,6 +18,8 @@ the same pixels (`ResampleFast.c`, `rf_vtap`). The question was how many more
 loops are like it.
 
 ## Short answer
+
+As assessed, before the changes listed under "Outcome".
 
 - With kernels in place, little heavy pixel work is left in plain C on
   either architecture. The AVX2 tier and the NEON build cover nearly the
@@ -296,13 +299,13 @@ blur's unrolling was measured at 1.46 before, in the method note). The
 vectorizer's remarks tell the same story from the other side: 669 loops
 vectorized at `-O3` and 521 at `-O2` on x86-64, 522 and 385 on arm64.
 
-One line in `setup.py` would remove the difference for every source
-build on both architectures: `-O3` appended to the extension's flags for
-GCC and Clang, where the interpreter's `-O2` comes first and the later
-flag wins. It needs the test suite run once on an interpreter built
-at `-O2` with the flag in place (the Docker images used for tests and
-benchmarks are all `-O3`), and a decision that a distribution's choice
-of level may be overridden.
+`setup.py` now removes the difference for source builds on both
+architectures: it appends `-O3` to the flags of the extensions with pixel
+loops for GCC and Clang, where the interpreter's `-O2` comes first and
+the later flag wins, unless a `CFLAGS` variable gives the flags or the
+interpreter was built for debugging. The suite passes on a build made
+that way with the conda Python here, which is `-O2` (the Docker images
+used for tests and benchmarks are all `-O3`).
 
 ### Not candidates
 
@@ -340,6 +343,77 @@ before and after, the instruction count per line to confirm that the
 vector copy is the one that runs, output hashes in every tier, timings on
 `-O3` builds interleaved, and arm64 timings on the Jetson, which this
 assessment does not have.
+
+## Outcome (2026-11-22)
+
+Done the same day, each change with the same bytes as before in the
+scalar build and in the scalar, SSE4.1, AVX2 and AVX-VNNI tiers of the
+dispatch build, and the suite passing on both (8,800 tests). Timings:
+`-O3` in Docker, one P-core, 2560x1600 unless said, old and new builds
+alternating. arm64 has the cross compiler's reports only: the Jetson
+stayed unreachable.
+
+| change | where it runs | measured |
+|---|---|---|
+| fast Gaussian, `gauss_taps` in chunks | builds without kernels | radius 5 RGB 372 to 43 ms (exact: 87); fast mode now 2 to 4 times faster than exact there |
+| generic 3x3 and 5x5 filters (index type, clamps) | builds without kernels; arm64 for float kernels on L | 2.2 to 5.9 times: RGB 3x3 106 to 24 ms, L 5x5 float 89 to 15 ms |
+| portable resampling loops (index type) | builds without kernels | 1.06 to 3.5 times: RGB 1/4 Lanczos 33.5 to 16.6 ms, L 1/4 bicubic 10.9 to 3.1 ms |
+| `Reduce.c` (bounds, restrict rows, index type) | builds without kernels | 1.1 to 2.0 times: RGB by 2 3.28 to 2.33 ms, (3, 1) 5.54 to 2.79 ms |
+| ImageMath macros | every build | integer operations 1.7 to 1.9 times at 640x400, 1.1 to 1.2 at 2560x1600 (allocation-bound) |
+| ImageMorph `apply` | every build | 3.0 times: 11.1 to 3.7 ms |
+| glyph coverage | every build | `getmask` 1.27 times, `ImageDraw.text` 1.03 to 1.10 |
+| `restrict` in `ImagingBoxBlurColumns` | arm64 at `-O2` | vectorized at `-O2` on both targets; not timed |
+| fast YCbCr and bilinear pixel (index type) | builds without kernels | 1.02 to 1.12 times |
+| `-O3` in `setup.py` | source builds on `-O2` Pythons | the table of the `-O2` section; applied unless `CFLAGS` is set or the interpreter is a debug build |
+
+The instruction-count gate's scalar tier records them: Gaussian RGB
+radius 5 430M to 61M, filters -52 to -56%, resizes to a quarter -23 to
+-61%, reduce -27 to -37%.
+
+**Measured and dropped: `ImagingPointTransform`.** Two things went
+against the estimate. Converting a `double` to an integer is undefined in
+C when the value is out of range, and the vector instructions answer
+differently from the scalar ones on arm64 (the vector code converts to 64
+bits and truncates, the scalar code saturates at 32), so a row would have
+got two results in the overflow cases the code's own "FIXME: add
+clipping?" is about. Written out to keep each architecture's results
+(compare the `double`, choose the limit or the converted value), the
+loops vectorized on both targets and measured 1.05 times for I, 1.00 for
+F, which was vectorized all along, and 0.91 for I;16 on x86-64. Reverted.
+Clipping, as the FIXME asks, would be a change of results and a decision
+of its own.
+
+**The estimates.** Counting instructions of the generated loop predicted
+the direction and overstated the gain wherever memory, not the core,
+bounds the operation: ImageMath at full size, the point transform. The
+filters and the fast Gaussian, core-bound, gained more than the count
+suggested, since the scalar loops were also dependent chains.
+
+**Left**, all in builds without kernels:
+
+- The bicubic transform's pixel function (`tf_bicubic_px`, 195M and 132M
+  instructions on the two rotations of the profile) and the vertical
+  pass of the 32-bit and 16-bit resampling (`Resample.c:757-767`,
+  `912-921`): both compute one value from all its taps with the row
+  pointers loaded inside, the shape `rf_vtap` and `gauss_tap_pair`
+  replaced. An index type does nothing for them; they need the same
+  restructuring, a row or a chunk at a time.
+- Fast mode's YCbCr conversions are still slower than exact mode's
+  tables on baseline x86-64 (13.9 against 9.2 ms): the vector code
+  multiplies in 32-bit lanes, which SSE2 lacks. A portable form with
+  16-bit products would be needed, or the tiers' own trick spelled in C.
+- `Bands.c`, `Pack.c`, `Unpack.c`, `Geometry.c`: a few million
+  instructions each in the scalar tier, already written by hand for the
+  scalar case. Not touched.
+- The I;16 loops of `Filter.c` call a function per tap.
+- `ModeFilter.c:59` on arm64, and the two coordinate loops of
+  `TransformFast.h` that need obstacle 2 removed.
+
+**Found on the way, in Pillow itself and left as it is:** ImageMath
+divides `INT32` values without excluding -2^31 / -1, which raises SIGFPE
+and ends the process on x86 (`ImageMath.lambda_eval(lambda a: a["a"] /
+a["b"], ...)` with those two values; Pillow 13.0.0's wheel does the
+same). `DIV_I` and `MOD_I` in `_imagingmath.c`.
 
 ## Reproducing
 
