@@ -43,6 +43,10 @@ Unreleased
   on arm64 the kernels with coefficients too large for the integer
   kernels on single-band images, for which only x86 has a kernel. The
   portable loops are now vectorized by the compiler. The same pixels
+- ``ImageMorph``: applying a pattern's table is 3 times faster (11.1 to
+  3.7 ms on a 2560x1600 image). The index of every pixel's neighbourhood
+  is computed for a whole row in a loop the compiler vectorizes, then
+  looked up. The same pixels and count
 
 13.0.0.post4 (2026-11-06)
 -------------------------
