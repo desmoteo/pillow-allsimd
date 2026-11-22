@@ -65,7 +65,10 @@ RH(resample_horizontal_8u)(
     int kmax,
     int coefs_precision
 ) {
-    int xmin, xmax, xx, x;
+    int xmin, xmax, xx;
+    /* a pointer's width: with an int, x * 4 could wrap under
+       -fno-strict-overflow and the loop over the taps is not vectorized */
+    ptrdiff_t x;
     INT16 *k;
 
     for (xx = 0; xx < xsize; xx++) {
@@ -104,7 +107,10 @@ RH(resample_horizontal_8u3)(
     int kmax,
     int coefs_precision
 ) {
-    int xmin, xmax, xx, x;
+    int xmin, xmax, xx;
+    /* a pointer's width: with an int, x * 4 could wrap under
+       -fno-strict-overflow and the loop over the taps is not vectorized */
+    ptrdiff_t x;
     INT16 *k;
 
     for (xx = 0; xx < xsize; xx++) {

@@ -1,6 +1,7 @@
 #include "Imaging.h"
 
 #include <assert.h>
+#include <stddef.h>
 #include <math.h>
 
 #define ROUND_UP(f) ((int)((f) >= 0.0 ? (f) + 0.5F : (f) - 0.5F))
@@ -472,12 +473,17 @@ _ImagingResampleHorizontal_8bpc(
             UINT8 *restrict lineIn = imIn->image8[yy + offset];
             UINT8 *restrict lineOut = imOut->image8[yy];
             for (xx = 0; xx < xsize; xx++) {
+                /* a pointer and an index of its width: lineIn[x + xmin]
+                   with two ints is not vectorized (-fno-strict-overflow) */
+                const UINT8 *in;
+                ptrdiff_t t;
                 xmin = bounds[xx * 2 + 0];
                 xmax = bounds[xx * 2 + 1];
                 k = &kk[xx * ksize];
+                in = lineIn + xmin;
                 ss0 = 1 << (coefs_precision - 1);
-                for (x = 0; x < xmax; x++) {
-                    ss0 += lineIn[x + xmin] * k[x];
+                for (t = 0; t < xmax; t++) {
+                    ss0 += in[t] * k[t];
                 }
                 lineOut[xx] = clip8(ss0, coefs_precision);
             }

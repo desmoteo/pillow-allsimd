@@ -58,6 +58,14 @@ Unreleased
   bilinear transforms 1.3 to 1.5 times. A ``CFLAGS`` variable still
   replaces the flags, level included, and an interpreter built for
   debugging keeps its own
+- Builds without SIMD kernels: ``resize()`` of 8-bit images is 1.06 to
+  3.5 times faster again in both modes (RGB to a quarter with Lanczos
+  33.5 to 16.6 ms, L to a quarter with bicubic 10.9 to 3.1 ms, enlarging
+  1.06 to 1.15), ``reduce()`` 1.1 to 2.0 times, fast mode's YCbCr
+  conversions 1.03 to 1.12 and its bilinear transforms up to 1.10: the
+  loops over the taps, the reduce functions and the per-pixel loops use
+  indices of a pointer's width, bounds in locals and restrict rows. The
+  same pixels
 
 13.0.0.post4 (2026-11-06)
 -------------------------
