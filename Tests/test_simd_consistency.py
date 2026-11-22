@@ -3,12 +3,16 @@ from __future__ import annotations
 import platform
 import random
 import struct
+from typing import TYPE_CHECKING
 
 import pytest
 
 from PIL import Image, ImageFilter, ImageMath, ImageMorph
 
 from .simd_shapes import SHAPES
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # SIMD kernels process several pixels at once. The pixels left over at the
 # end of a row must get exactly the same arithmetic, so identical input
@@ -473,7 +477,7 @@ def _wrap32(v: int) -> int:
 # for the compiler's vectorizer, so a row has a vector part and a scalar
 # end, and both must wrap, compare and shift alike. A shift count is taken
 # modulo 32.
-_INT_OPS = {
+_INT_OPS: dict[str, Callable[[int, int], int]] = {
     "add": lambda a, b: _wrap32(a + b),
     "sub": lambda a, b: _wrap32(a - b),
     "mul": lambda a, b: _wrap32(a * b),
