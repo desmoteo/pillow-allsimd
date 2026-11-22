@@ -11,6 +11,14 @@ Unreleased
   copied. The pixels are the same; averaged over heap layouts, RGB files
   decode 4 to 10% faster, and the time moves less with where the heap
   puts the buffers
+- Builds without SIMD kernels (architectures other than x86-64 and
+  arm64, and the x86-64 wheel on a CPU without SSE4.1): ``resize()`` in
+  fast mode, the default, was 1.2 to 2.2 times slower than in exact mode
+  for bicubic, Lanczos and the other convolution filters, and slower than
+  Pillow when enlarging. Its portable loops are now written so that the
+  compiler vectorizes them: enlarging takes 0.75 to 0.96 of the exact
+  resize's time, reducing to a quarter 1.01 to 1.07. The pixels are the
+  same in every build
 
 13.0.0.post4 (2026-11-06)
 -------------------------

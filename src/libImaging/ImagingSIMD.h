@@ -111,6 +111,17 @@
 #define SIMD_FORCE_INLINE static inline
 #endif
 
+/* A static function that stays a function of its own, for a loop the
+   compiler vectorizes alone but not once inlined into the loops around it
+   (rf_vtap in ResampleFast.c). */
+#if defined(__GNUC__) || defined(__clang__)
+#define SIMD_NOINLINE static __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define SIMD_NOINLINE static __declspec(noinline)
+#else
+#define SIMD_NOINLINE static
+#endif
+
 #if defined(IMAGING_SIMD_SSE4)
 /* Unaligned 32-bit load. */
 static inline INT32

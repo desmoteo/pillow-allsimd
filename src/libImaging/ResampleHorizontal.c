@@ -13,16 +13,44 @@
 #endif
 
 #if defined(RESAMPLE_OUT16)
-static inline INT16
-RH(rh_clip)(int in, int precision) {
-    in >>= precision;
-    return (INT16)(2 * (in < 0 ? 0 : in > 255 << 6 ? 255 << 6 : in));
+/* The 16-bit results are clipped to 0 .. 255 (in 2^-6 levels) and doubled
+   a row at a time, after the sums were stored as they are: they fit 16
+   bits, since resample_fast8() leaves weights that could overflow them to
+   the exact passes (ResampleFast.h). Clipped one by one in the pixel loop
+   they cost four times the 8-bit kernels' table lookup, and branches that
+   mispredict at every clipped value; a row of 16-bit values the compiler
+   clips in vectors. In chunks of a constant size, not inlined, for the
+   reasons given at rf_vtap() in ResampleFast.c. */
+#define RH_CHUNK 64
+
+SIMD_NOINLINE void
+rh_clip_chunk_16(INT16 *restrict v) {
+    int i;
+    for (i = 0; i < RH_CHUNK; i++) {
+        int t = v[i];
+        v[i] = (INT16)(2 * (t < 0 ? 0 : t > 255 << 6 ? 255 << 6 : t));
+    }
 }
-#define RH_CLIP(in, precision) RH(rh_clip)(in, precision)
+
+static void
+rh_clip_row_16(INT16 *v, int n) {
+    int i = 0;
+    for (; i + RH_CHUNK <= n; i += RH_CHUNK) {
+        rh_clip_chunk_16(v + i);
+    }
+    for (; i < n; i++) {
+        int t = v[i];
+        v[i] = (INT16)(2 * (t < 0 ? 0 : t > 255 << 6 ? 255 << 6 : t));
+    }
+}
+
+#define RH_CLIP(in, precision) ((INT16)((in) >> (precision)))
+#define RH_FINISH(line, xsize) rh_clip_row_16((INT16 *)(line), (xsize) * 4)
 #define RH_ELEM INT16
-#define RH_FULL (255 << 7)
+#define RH_FULL (255 << 6) /* before the row's doubling */
 #else
 #define RH_CLIP(in, precision) clip8(in, precision)
+#define RH_FINISH(line, xsize)
 #define RH_ELEM UINT8
 #define RH_FULL 255
 #endif
@@ -61,6 +89,7 @@ RH(resample_horizontal_8u)(
         out[2] = RH_CLIP(ss2, coefs_precision);
         out[3] = RH_CLIP(ss3, coefs_precision);
     }
+    RH_FINISH(lineOut, xsize);
 }
 
 /* The same for 3-band images: the fourth byte is padding, so it isn't
@@ -98,6 +127,7 @@ RH(resample_horizontal_8u3)(
         out[2] = RH_CLIP(ss2, coefs_precision);
         out[3] = RH_FULL;
     }
+    RH_FINISH(lineOut, xsize);
 }
 
 static void
@@ -131,6 +161,7 @@ RH(resample_horizontal_8u4x)(
 }
 
 #undef RH_CLIP
+#undef RH_FINISH
 #undef RH_ELEM
 #undef RH_FULL
 #undef RH_OUT

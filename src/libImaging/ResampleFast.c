@@ -25,6 +25,8 @@
 
 #include "ResampleFast.h"
 
+#define RF_CHUNK 64
+
 /* The vertical pass's weights in 2^-14 units, ksize per output, from the
    exact path's coefficients. Returns 0 if the sums could overflow. */
 static int
@@ -47,16 +49,69 @@ rf_weights(INT16 *w, int size, int ksize, const int *bounds, const double *kk) {
     return 1;
 }
 
-/* An output row of n bytes from taps ring rows with weights w. */
+/* Whether the absolute values of each output's weights add up to
+   RF_WSUM_MAX at most: then the portable horizontal kernels' sums fit the
+   16 bits they are stored in before their clip (ResampleHorizontal.c). */
+static int
+rf_weights_bounded(int size, int ksize, const int *bounds, const double *kk) {
+    int i, k;
+    for (i = 0; i < size; i++) {
+        double total = 0;
+        for (k = 0; k < bounds[i * 2 + 1]; k++) {
+            total += fabs(kk[i * ksize + k]);
+        }
+        if (total > RF_WSUM_MAX) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* One tap of the portable vertical pass: RF_CHUNK sums, each plus its
+   value times the weight. A trip count the compiler knows (all it
+   vectorizes at -O2), 16-bit sums, which the bound on the weights keeps
+   from overflowing (ResampleFast.h), and the product from its two 16-bit
+   halves: 16-bit lanes with a high and a low multiply, like the SIMD
+   kernels' rounding multiply. Not inlined: inside the loop over the taps
+   GCC's -O3 merges two taps into one loop, which it then leaves scalar. */
+SIMD_NOINLINE void
+rf_vtap(INT16 *restrict ss, const INT16 *restrict row, INT16 wk) {
+    int i;
+    for (i = 0; i < RF_CHUNK; i++) {
+        ss[i] = (INT16)(ss[i] + rf_mul16(row[i], wk));
+    }
+}
+
+/* An output row of n bytes from taps ring rows with weights w. The SIMD
+   kernel does what it can. The rest, all of it in the scalar tier, goes in
+   chunks, a tap at a time over a whole chunk (the sums' order doesn't
+   matter), then the last few values one by one. */
 static void
 rf_vrow(UINT8 *restrict out, INT16 **rows, const INT16 *w, int taps, int n) {
-    int x = IMAGING_SIMD_CALL(resample->fast_vrow, out, rows, w, taps, n), k;
+    int x = IMAGING_SIMD_CALL(resample->fast_vrow, out, rows, w, taps, n);
+    int i, k;
+    for (; x + RF_CHUNK <= n; x += RF_CHUNK) {
+        INT16 ss[RF_CHUNK];
+        /* a pointer: indexed by the sum of two ints the stores would not
+           be vectorized (-fno-strict-overflow) */
+        UINT8 *restrict o = out + x;
+        for (i = 0; i < RF_CHUNK; i++) {
+            ss[i] = 1 << (RF_FRAC - 1);
+        }
+        for (k = 0; k < taps; k++) {
+            rf_vtap(ss, rows[k] + x, w[k]);
+        }
+        for (i = 0; i < RF_CHUNK; i++) {
+            int s = ss[i] >> RF_FRAC;
+            o[i] = (UINT8)(s < 0 ? 0 : s > 255 ? 255 : s);
+        }
+    }
     for (; x < n; x++) {
-        int s = 0;
+        int s = 1 << (RF_FRAC - 1);
         for (k = 0; k < taps; k++) {
             s += rf_mul(rows[k][x], w[k]);
         }
-        s = (s + (1 << (RF_FRAC - 1))) >> RF_FRAC;
+        s >>= RF_FRAC;
         out[x] = (UINT8)(s < 0 ? 0 : s > 255 ? 255 : s);
     }
 }
@@ -160,7 +215,8 @@ resample_fast8(
         ImagingError_MemoryError();
         return 1;
     }
-    if (!rf_weights(wv, ysize, ksize_v, bounds_v, kk_v)) {
+    if (!rf_weights(wv, ysize, ksize_v, bounds_v, kk_v) ||
+        (need_horizontal && !rf_weights_bounded(xsize, ksize_h, bounds_h, kk_h))) {
         free(wv);
         return 0;
     }
