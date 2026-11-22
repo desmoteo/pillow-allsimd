@@ -25,6 +25,14 @@ Unreleased
   loop of the fast Gaussian is now one the compiler vectorizes: radius 5
   on a 2560x1600 RGB image takes 43 ms where it took 372, against 87 ms
   in exact mode. The same pixels
+- ``ImageMath`` on integer (I) images: the 20 operations other than
+  division, modulo and power run in vectors where they ran a pixel at a
+  time (addition, subtraction, multiplication, the bitwise ones, shifts
+  on arm64, minimum, maximum, comparisons, ``abs``, negation): 1.7 to
+  1.9 times faster on images that fit the cache, 1.1 to 1.2 at
+  2560x1600, where allocating the result takes most of the time. A shift
+  count is taken modulo 32, which is what x86 and arm64 did with counts
+  outside 0 to 31 already. The same results
 
 13.0.0.post4 (2026-11-06)
 -------------------------

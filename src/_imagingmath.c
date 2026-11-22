@@ -26,34 +26,36 @@
 #define MATH_FUNC_UNOP_MAGIC "Pillow Math unary func"
 #define MATH_FUNC_BINOP_MAGIC "Pillow Math binary func"
 
-#define UNOP(name, op, type)                   \
-    void name(Imaging out, Imaging im1) {      \
-        int x, y;                              \
-        for (y = 0; y < out->ysize; y++) {     \
-            type *p0 = (type *)out->image[y];  \
-            type *p1 = (type *)im1->image[y];  \
-            for (x = 0; x < out->xsize; x++) { \
-                *p0 = op(type, *p1);           \
-                p0++;                          \
-                p1++;                          \
-            }                                  \
-        }                                      \
+/* The loops below are written for the compiler's vectorizer: the sizes in
+   locals (a store through an INT32 pointer could otherwise change
+   out->xsize, and the trip count would be unknown: the integer operations
+   all ran a pixel at a time) and the output row restrict. ImageMath
+   allocates the output image itself, so it is never an operand. */
+#define UNOP(name, op, type)                              \
+    void name(Imaging out, Imaging im1) {                 \
+        int x, y;                                         \
+        const int xsize = out->xsize, ysize = out->ysize; \
+        for (y = 0; y < ysize; y++) {                     \
+            type *restrict p0 = (type *)out->image[y];    \
+            const type *p1 = (const type *)im1->image[y]; \
+            for (x = 0; x < xsize; x++) {                 \
+                p0[x] = op(type, p1[x]);                  \
+            }                                             \
+        }                                                 \
     }
 
-#define BINOP(name, op, type)                          \
-    void name(Imaging out, Imaging im1, Imaging im2) { \
-        int x, y;                                      \
-        for (y = 0; y < out->ysize; y++) {             \
-            type *p0 = (type *)out->image[y];          \
-            type *p1 = (type *)im1->image[y];          \
-            type *p2 = (type *)im2->image[y];          \
-            for (x = 0; x < out->xsize; x++) {         \
-                *p0 = op(type, *p1, *p2);              \
-                p0++;                                  \
-                p1++;                                  \
-                p2++;                                  \
-            }                                          \
-        }                                              \
+#define BINOP(name, op, type)                             \
+    void name(Imaging out, Imaging im1, Imaging im2) {    \
+        int x, y;                                         \
+        const int xsize = out->xsize, ysize = out->ysize; \
+        for (y = 0; y < ysize; y++) {                     \
+            type *restrict p0 = (type *)out->image[y];    \
+            const type *p1 = (const type *)im1->image[y]; \
+            const type *p2 = (const type *)im2->image[y]; \
+            for (x = 0; x < xsize; x++) {                 \
+                p0[x] = op(type, p1[x], p2[x]);           \
+            }                                             \
+        }                                                 \
     }
 
 #define NEG(type, v1) -(v1)
@@ -69,8 +71,11 @@
 #define AND(type, v1, v2) (v1) & (v2)
 #define OR(type, v1, v2) (v1) | (v2)
 #define XOR(type, v1, v2) (v1) ^ (v2)
-#define LSHIFT(type, v1, v2) (v1) << (v2)
-#define RSHIFT(type, v1, v2) (v1) >> (v2)
+/* The count modulo 32, which is what the shift instructions of x86 and
+   arm64 did with a count outside 0..31 (undefined in C); vector shifts
+   treat such counts differently, so the mask keeps the results. */
+#define LSHIFT(type, v1, v2) (v1) << ((v2) & 31)
+#define RSHIFT(type, v1, v2) (v1) >> ((v2) & 31)
 
 #define ABS_I(type, v1) abs((v1))
 #define ABS_F(type, v1) fabs((v1))
