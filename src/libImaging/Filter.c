@@ -25,34 +25,32 @@
  */
 
 #include <math.h>
+#include <stddef.h>
 #include <stdint.h>
 #include "Imaging.h"
 
 #define INT32_MAX_F 2147483647.0F
 
+/* The clamps compare the float and choose among integers. Written as
+   selects of floats (in = in < 0 ? 0 : in) they are branches to GCC, which
+   may not evaluate a float comparison it was not asked for while
+   floating-point exceptions count, and a loop with a branch is not
+   vectorized. The values are the same for every input. */
 static inline UINT8
 clip8(float in) {
-    // Branchless clamp to [0, 255].
-    in = in < 0.0f ? 0.0f : in;
-    in = in > 255.0f ? 255.0f : in;
-    return (UINT8)in;
+    return in < 0.0f ? 0 : in > 255.0f ? 255 : (UINT8)in;
 }
 
 static inline int
 clip16(float in) {
-    // Branchless clamp to [0, 65535].
-    in = in < 0.0f ? 0.0f : in;
-    in = in > 65535.0f ? 65535.0f : in;
-    return (int)in;
+    return in < 0.0f ? 0 : in > 65535.0f ? 65535 : (int)in;
 }
 
 static inline INT32
 clip32(float in) {
-    // Clamp the low bound branchlessly (maxss).
-    in = in < 0.0f ? 0.0f : in;
     // Must explicitly return INT32_MAX for the high bound
     // to avoid incorrect overflow to INT_MIN.
-    return in >= INT32_MAX_F ? INT32_MAX : (INT32)in;
+    return in < 0.0f ? 0 : in >= INT32_MAX_F ? INT32_MAX : (INT32)in;
 }
 
 Imaging
@@ -155,7 +153,11 @@ ImagingFilter3x3(Imaging imOut, Imaging im, const float *kernel, float offset) {
     ((float)(in0[x - d]) * (kernel)[0] + (float)(in0[x]) * (kernel)[1] + \
      (float)(in0[x + d]) * (kernel)[2])
 
-    int x = 0, y = 0;
+    /* x has the width of a pointer: in0[x - d] with an int x is index
+       arithmetic that could wrap under -fno-strict-overflow, which every
+       common Python passes, and GCC then vectorizes none of these loops */
+    ptrdiff_t x = 0;
+    int y = 0;
     // restrict safety: assert im and imOut to be separate,
     // so we can safely `restrict` the copy pointers below
     assert(im->image != imOut->image);
@@ -315,7 +317,8 @@ ImagingFilter5x5(Imaging imOut, Imaging im, const float *kernel, float offset) {
      (float)(in0[x]) * (kernel)[2] + (float)(in0[x + d]) * (kernel)[3] +         \
      (float)(in0[x + d + d]) * (kernel)[4])
 
-    int x = 0, y = 0;
+    ptrdiff_t x = 0; /* a pointer's width, as in ImagingFilter3x3 */
+    int y = 0;
 
     // restrict safety: assert im and imOut to be separate,
     // so we can safely `restrict` the copy pointers below

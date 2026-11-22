@@ -37,6 +37,12 @@ Unreleased
   compiler vectorizes (two tests per pixel are gone; the formula gives
   the same value without them). ``ImageFont.getmask()`` 1.27 times
   faster, ``ImageDraw.text()`` 1.03 to 1.10. The same pixels
+- ``Image.filter()`` with 3x3 and 5x5 kernels where no SIMD kernel
+  takes it: in builds without kernels all of them, 2.2 to 5.9 times
+  faster (3x3 on RGB 106 to 24 ms, 5x5 on L 89 to 15 ms at 2560x1600);
+  on arm64 the kernels with coefficients too large for the integer
+  kernels on single-band images, for which only x86 has a kernel. The
+  portable loops are now vectorized by the compiler. The same pixels
 
 13.0.0.post4 (2026-11-06)
 -------------------------
