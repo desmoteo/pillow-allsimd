@@ -200,6 +200,13 @@ def extra_operations(
                 "resize RGB 1/4 MKS2013": lambda: rgb.resize(small, R.MKS2013),
                 "resize RGB 1/4 MKS2021": lambda: rgb.resize(small, R.MKS2021),
                 "resize L 1/4 MKS2021": lambda: L.resize(small, R.MKS2021),
+                "resize RGBA 1/4 MKS2021": lambda: rgba.resize(small, R.MKS2021),
+                "resize RGB x1.5 MKS2013": lambda: rgb.resize(
+                    (w * 3 // 2, h * 3 // 2), R.MKS2013
+                ),
+                "resize RGB x1.5 MKS2021": lambda: rgb.resize(
+                    (w * 3 // 2, h * 3 // 2), R.MKS2021
+                ),
                 "resize RGB 1/8 height lanczos": lambda: rgb.resize(
                     (w, max(1, h // 8)), R.LANCZOS
                 ),

@@ -238,7 +238,7 @@ worth running.
 found late and by accident: the span fill as a table kernel, the library
 calls to `floor`, the octree's gap in the wheel. Timings on a GitHub
 runner are noise; instruction counts under callgrind are the same on
-every run. `checks/simd_ir_gate.py` runs 59 operations of `simd_bench.py`
+every run. `checks/simd_ir_gate.py` runs 62 operations of `simd_bench.py`
 (at least one per kernel group, and the paths that pay per call: drawing,
 the quantizers, pasting, PNG) in the scalar, SSE4.1 and AVX2 tiers of a
 dispatch build, counts the instructions executed inside Pillow's own
