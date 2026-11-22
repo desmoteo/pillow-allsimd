@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import platform
 import random
+import struct
 
 import pytest
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageMath, ImageMorph
 
 from .simd_shapes import SHAPES
 
@@ -462,3 +463,102 @@ def test_resize_alpha_matches_premultiplied_conversions(
             result = im.resize(size, resample, box, reducing_gap)
             assert result.mode == mode
             assert result.tobytes() == expected.convert(mode).tobytes()
+
+
+def _wrap32(v: int) -> int:
+    return (v + 2**31) % 2**32 - 2**31
+
+
+# ImageMath on I images, against Python's integers: the loops are written
+# for the compiler's vectorizer, so a row has a vector part and a scalar
+# end, and both must wrap, compare and shift alike. A shift count is taken
+# modulo 32.
+_INT_OPS = {
+    "add": lambda a, b: _wrap32(a + b),
+    "sub": lambda a, b: _wrap32(a - b),
+    "mul": lambda a, b: _wrap32(a * b),
+    "and": lambda a, b: a & b,
+    "or": lambda a, b: a | b,
+    "xor": lambda a, b: a ^ b,
+    "lshift": lambda a, b: _wrap32(a << (b & 31)),
+    "rshift": lambda a, b: a >> (b & 31),
+    "min": min,
+    "max": max,
+    "diff": lambda a, b: _wrap32(abs(_wrap32(a - b))),
+    "eq": lambda a, b: int(a == b),
+    "ne": lambda a, b: int(a != b),
+    "lt": lambda a, b: int(a < b),
+    "le": lambda a, b: int(a <= b),
+    "gt": lambda a, b: int(a > b),
+    "ge": lambda a, b: int(a >= b),
+    "abs": lambda a, b: _wrap32(abs(a)),
+    "neg": lambda a, b: _wrap32(-a),
+    "invert": lambda a, b: ~a,
+}
+
+
+@pytest.mark.parametrize("op", sorted(_INT_OPS))
+@pytest.mark.parametrize("width", (1, 7, 16, 37, 67))
+def test_imagemath_integers(op: str, width: int) -> None:
+    rnd = random.Random(f"{op}{width}")
+    edges = (0, 1, -1, 31, 32, 33, -31, -33, 2**31 - 1, -(2**31), 2**30, 65536)
+    n = width * 3
+    a = [rnd.choice(edges + (rnd.randint(-(2**31), 2**31 - 1),)) for _ in range(n)]
+    b = [rnd.choice(edges + (rnd.randint(-70, 70),)) for _ in range(n)]
+    im_a = Image.frombytes("I", (width, 3), struct.pack(f"{n}i", *a))
+    im_b = Image.frombytes("I", (width, 3), struct.pack(f"{n}i", *b))
+    operand = ImageMath._Operand(im_a)
+    if op in ("abs", "neg", "invert"):
+        out = operand.apply(op, operand)
+    else:
+        out = operand.apply(op, operand, ImageMath._Operand(im_b))
+    assert out.im.mode == "I"
+    expected = [_INT_OPS[op](x, y) for x, y in zip(a, b)]
+    assert list(struct.unpack(f"{n}i", out.im.tobytes())) == expected
+
+
+@pytest.mark.parametrize("size", ((1, 1), (2, 2), (3, 3), (5, 4), (19, 7), (67, 5)))
+def test_morphology_matches_its_table(size: tuple[int, int]) -> None:
+    # every pixel's neighbourhood read as a 9-bit index into the table, the
+    # row above first and the left neighbour lowest, the border zero; the
+    # count is of the pixels whose lowest bit changed
+    width, height = size
+    rnd = random.Random(width * 100 + height)
+    data = bytes(rnd.choice((0, 255, 1, 254, 255)) for _ in range(width * height))
+    lut = bytes(rnd.getrandbits(8) for _ in range(512))
+    im = Image.frombytes("L", size, data)
+    count, out = ImageMorph.MorphOp(lut=bytearray(lut)).apply(im)
+    expected = bytearray(width * height)
+    changed = 0
+    for y in range(1, height - 1):
+        for x in range(1, width - 1):
+            index = sum(
+                (data[(y + dy) * width + x + dx] & 1) << ((dy + 1) * 3 + dx + 1)
+                for dy in (-1, 0, 1)
+                for dx in (-1, 0, 1)
+            )
+            expected[y * width + x] = 255 * (lut[index] & 1)
+            changed += (data[y * width + x] & 1) != (lut[index] & 1)
+    assert out.tobytes() == bytes(expected)
+    assert count == changed
+
+
+@pytest.mark.parametrize("mode", ("L", "RGB", "RGBA"))
+@pytest.mark.parametrize("size", (3, 5))
+def test_float_kernel_same_in_a_row_and_alone(mode: str, size: int) -> None:
+    # A kernel too large for the integer kernels, on pixels that all
+    # differ: each pixel of a wide image, computed among many at once,
+    # equals the same pixel computed alone as the centre of an image no
+    # larger than the kernel
+    rnd = random.Random(f"{mode}{size}")
+    width, height = 40, size + 2
+    bands = len(mode)
+    im = Image.frombytes(mode, (width, height), rnd.randbytes(width * height * bands))
+    kernel = [rnd.uniform(-900, 1100) for _ in range(size * size)]
+    flt = ImageFilter.Kernel((size, size), kernel, scale=sum(kernel), offset=2.5)
+    out = im.filter(flt)
+    r = size // 2
+    for y in range(r, height - r):
+        for x in range(r, width - r):
+            alone = im.crop((x - r, y - r, x + r + 1, y + r + 1)).filter(flt)
+            assert out.getpixel((x, y)) == alone.getpixel((r, r)), (x, y)
