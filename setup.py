@@ -1304,6 +1304,20 @@ class pil_build_ext(build_ext):
         if not msvc:
             args = args + ["-ftree-vectorize"]
 
+        # Float contraction off on x86. None of the flags above enables FMA,
+        # so the compiler had no multiply to fuse into an add, and the float
+        # code gives the same pixels in every tier and every build. A
+        # compiler whose own default architecture has FMA does fuse them:
+        # the GCC of Ubuntu 26.04's amd64v3 packages defaults to
+        # -march=x86-64-v3, and so does any CC or CFLAGS with -march=haswell
+        # or later. Two compiled copies of one loop then round differently
+        # (the colour matrix, by one level, between the scalar table and the
+        # AVX2 one), and the results differ from every other build's. arm64
+        # is left as it is: its compilers contract by default, and the NEON
+        # kernels are written to match.
+        if x86 and not msvc and "-ffp-contract=off" not in args:
+            args = args + ["-ffp-contract=off"]
+
         # The level. The kernels, and the plain loops written for the
         # compiler's vectorizer, are measured at -O3, which is CPython's own
         # default; Debian's, Ubuntu's and conda's interpreters hand their

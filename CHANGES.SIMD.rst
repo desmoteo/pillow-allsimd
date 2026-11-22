@@ -71,6 +71,12 @@ Unreleased
   32 bits, and on x86 the division raised SIGFPE (in Pillow too). The
   quotient is now the wrapped negation, -2147483648, and the remainder
   0, which is what arm64 computed
+- Building on x86 with a compiler whose default architecture has FMA
+  (the GCC of Ubuntu 26.04's amd64v3 packages, which defaults to
+  ``-march=x86-64-v3``, or ``CC``/``CFLAGS`` with ``-march=haswell`` or
+  later): the float code no longer fuses multiplies into additions, so
+  the pixels are those of every other build. Such a build differed by a
+  level in the colour matrix, the float kernels and other float code
 
 13.0.0.post4 (2026-11-06)
 -------------------------
