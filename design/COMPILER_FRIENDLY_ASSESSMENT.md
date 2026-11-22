@@ -409,11 +409,12 @@ suggested, since the scalar loops were also dependent chains.
 - `ModeFilter.c:59` on arm64, and the two coordinate loops of
   `TransformFast.h` that need obstacle 2 removed.
 
-**Found on the way, in Pillow itself and left as it is:** ImageMath
-divides `INT32` values without excluding -2^31 / -1, which raises SIGFPE
+**Found on the way, in Pillow itself, and fixed after the rest:** ImageMath
+divided `INT32` values without excluding -2^31 / -1, which raises SIGFPE
 and ends the process on x86 (`ImageMath.lambda_eval(lambda a: a["a"] /
 a["b"], ...)` with those two values; Pillow 13.0.0's wheel does the
-same). `DIV_I` and `MOD_I` in `_imagingmath.c`.
+same). `DIV_I` and `MOD_I` in `_imagingmath.c` now take a divisor of -1
+apart: the quotient is the negation, wrapped, and the remainder 0.
 
 ## Reproducing
 

@@ -88,10 +88,16 @@
  * PyFPE_END_PROTECT(result)
  */
 
-#define DIV_I(type, v1, v2) ((v2) != 0) ? (v1) / (v2) : 0
+/* -2^31 / -1 has no INT32 quotient, and the division instruction of x86
+   raises SIGFPE for it, which ended the process. A divisor of -1 is taken
+   apart: the quotient is the negation, wrapped like the other integer
+   operations (so -2^31 stays -2^31, as arm64's division gives it), and the
+   remainder is 0. */
+#define DIV_I(type, v1, v2) \
+    ((v2) == 0 ? 0 : (v2) == -1 ? (type)(0u - (UINT32)(v1)) : (v1) / (v2))
 #define DIV_F(type, v1, v2) ((v2) != 0.0F) ? (v1) / (v2) : 0.0F
 
-#define MOD_I(type, v1, v2) ((v2) != 0) ? (v1) % (v2) : 0
+#define MOD_I(type, v1, v2) ((v2) == 0 || (v2) == -1 ? 0 : (v1) % (v2))
 #define MOD_F(type, v1, v2) ((v2) != 0.0F) ? fmod((v1), (v2)) : 0.0F
 
 static int

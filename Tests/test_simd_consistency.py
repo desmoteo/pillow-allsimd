@@ -491,6 +491,12 @@ _INT_OPS = {
     "le": lambda a, b: int(a <= b),
     "gt": lambda a, b: int(a > b),
     "ge": lambda a, b: int(a >= b),
+    # C's division truncates and its remainder has the dividend's sign;
+    # a zero divisor gives 0, and -2^31 / -1 wraps (it raised SIGFPE)
+    "div": lambda a, b: (
+        _wrap32(abs(a) // abs(b) * (1 if (a < 0) == (b < 0) else -1)) if b else 0
+    ),
+    "mod": lambda a, b: (abs(a) % abs(b) * (-1 if a < 0 else 1)) if b else 0,
     "abs": lambda a, b: _wrap32(abs(a)),
     "neg": lambda a, b: _wrap32(-a),
     "invert": lambda a, b: ~a,
@@ -562,3 +568,15 @@ def test_float_kernel_same_in_a_row_and_alone(mode: str, size: int) -> None:
         for x in range(r, width - r):
             alone = im.crop((x - r, y - r, x + r + 1, y + r + 1)).filter(flt)
             assert out.getpixel((x, y)) == alone.getpixel((r, r)), (x, y)
+
+
+def test_imagemath_division_overflow() -> None:
+    # the one quotient INT32 can't hold: it ended the process with SIGFPE
+    # on x86; now it wraps, and the remainder is 0
+    low, minus_one = -(2**31), -1
+    a = Image.frombytes("I", (5, 1), struct.pack("5i", low, low, 7, low, -9))
+    b = Image.frombytes("I", (5, 1), struct.pack("5i", minus_one, 1, -1, 0, -1))
+    div = ImageMath.lambda_eval(lambda args: args["a"] / args["b"], a=a, b=b)
+    mod = ImageMath.lambda_eval(lambda args: args["a"] % args["b"], a=a, b=b)
+    assert struct.unpack("5i", div.tobytes()) == (low, low, -7, 0, 9)
+    assert struct.unpack("5i", mod.tobytes()) == (0, 0, 0, 0, 0)

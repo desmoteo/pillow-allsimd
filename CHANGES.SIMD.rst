@@ -66,6 +66,11 @@ Unreleased
   loops over the taps, the reduce functions and the per-pixel loops use
   indices of a pointer's width, bounds in locals and restrict rows. The
   same pixels
+- ``ImageMath``: dividing -2147483648 by -1 on integer images, or taking
+  the remainder, no longer ends the process. The quotient does not fit
+  32 bits, and on x86 the division raised SIGFPE (in Pillow too). The
+  quotient is now the wrapped negation, -2147483648, and the remainder
+  0, which is what arm64 computed
 
 13.0.0.post4 (2026-11-06)
 -------------------------
